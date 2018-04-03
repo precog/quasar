@@ -2,6 +2,8 @@
     "name": "filter on date part",
 
     "backends": {
+        "marklogic_json": "pending",
+        "mimir": "pending"
     },
 
     "data": "../days.data",

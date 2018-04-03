@@ -25,6 +25,7 @@ import IsoSerialization._, Iso8601Serialization._, Versioned._, Extractor._
 import shapeless.HNil
 
 import scalaz._, Scalaz._, Validation._
+import java.time.Instant
 
 sealed trait EventMessage {
   def path: Path

@@ -213,8 +213,8 @@ object nonFsMounts {
       case Delete(path) =>
         mountDelete(path)
 
-      case TempFile(nearTo) =>
-        manage.tempFile(nearTo).run
+      case TempFile(nearTo, prefix) =>
+        manage.tempFile(nearTo, prefix).run
     }
   }
 

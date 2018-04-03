@@ -19,7 +19,7 @@ package quasar.fs
 import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.Data
-import quasar.DataArbitrary._
+import quasar.DataGenerators._
 import quasar.contrib.pathy._, PathArbitrary._
 import quasar.fp._
 import quasar.fp.free.Interpreter

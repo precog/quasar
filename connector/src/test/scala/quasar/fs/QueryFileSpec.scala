@@ -17,7 +17,7 @@
 package quasar.fs
 
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary}
+import quasar.{Data, DataGenerators}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.stream._
 import quasar.fp._
@@ -33,7 +33,7 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
 
 class QueryFileSpec extends quasar.Qspec with FileSystemFixture {
-  import InMemory._, FileSystemError._, PathError._, DataArbitrary._
+  import InMemory._, FileSystemError._, PathError._, DataGenerators._
   import query._
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]

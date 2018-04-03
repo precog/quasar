@@ -16,21 +16,21 @@
 
 package quasar.yggdrasil.table
 
-import quasar.yggdrasil._
-import quasar.precog.util._
-import quasar.precog._
-import quasar.yggdrasil.util.CPathUtils
-import quasar.precog.common._
-import quasar.yggdrasil.bytecode._
-import quasar.precog.util.RingDeque
-
-import TransSpecModule._
 import quasar.blueeyes._, json._
+import quasar.precog._
+import quasar.precog.common._
+import quasar.precog.util._
+import quasar.precog.util.RingDeque
+import quasar.time.{DateTimeInterval, OffsetDate}
+import quasar.yggdrasil._
+import quasar.yggdrasil.TransSpecModule._
+import quasar.yggdrasil.bytecode._
+import quasar.yggdrasil.util.CPathUtils
 
 import scalaz._, Scalaz._, Ordering._
 
 import java.nio.CharBuffer
-import java.time.ZonedDateTime
+import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.annotation.{switch, tailrec}
 import scala.collection.mutable
@@ -218,13 +218,38 @@ trait Slice { source =>
               def isDefinedAt(row: Int) = source.isDefinedAt(row)
               def apply(row: Int)       = n
             })
-          case CDate(d) =>
-            (ColumnRef(CPath.Identity, CDate), new DateColumn {
+          case COffsetDateTime(d) =>
+            (ColumnRef(CPath.Identity, COffsetDateTime), new OffsetDateTimeColumn {
               def isDefinedAt(row: Int) = source.isDefinedAt(row)
               def apply(row: Int)       = d
             })
-          case CPeriod(p) =>
-            (ColumnRef(CPath.Identity, CPeriod), new PeriodColumn {
+          case COffsetTime(d) =>
+            (ColumnRef(CPath.Identity, COffsetTime), new OffsetTimeColumn {
+              def isDefinedAt(row: Int) = source.isDefinedAt(row)
+              def apply(row: Int)       = d
+            })
+          case COffsetDate(d) =>
+            (ColumnRef(CPath.Identity, COffsetDate), new OffsetDateColumn {
+              def isDefinedAt(row: Int) = source.isDefinedAt(row)
+              def apply(row: Int)       = d
+            })
+          case CLocalDateTime(d) =>
+            (ColumnRef(CPath.Identity, CLocalDateTime), new LocalDateTimeColumn {
+              def isDefinedAt(row: Int) = source.isDefinedAt(row)
+              def apply(row: Int)       = d
+            })
+          case CLocalTime(d) =>
+            (ColumnRef(CPath.Identity, CLocalTime), new LocalTimeColumn {
+              def isDefinedAt(row: Int) = source.isDefinedAt(row)
+              def apply(row: Int)       = d
+            })
+          case CLocalDate(d) =>
+            (ColumnRef(CPath.Identity, CLocalDate), new LocalDateColumn {
+              def isDefinedAt(row: Int) = source.isDefinedAt(row)
+              def apply(row: Int)       = d
+            })
+          case CInterval(p) =>
+            (ColumnRef(CPath.Identity, CInterval), new IntervalColumn {
               def isDefinedAt(row: Int) = source.isDefinedAt(row)
               def apply(row: Int)       = p
             })
@@ -878,21 +903,61 @@ trait Slice { source =>
           }
           ArrayStrColumn(defined, values)
 
-        case col: DateColumn =>
+        case col: OffsetDateTimeColumn =>
           val defined = col.definedAt(0, source.size)
-          val values  = new Array[ZonedDateTime](source.size)
+          val values  = new Array[OffsetDateTime](source.size)
           Loop.range(0, source.size) { row =>
             if (defined(row)) values(row) = col(row)
           }
-          ArrayDateColumn(defined, values)
+          ArrayOffsetDateTimeColumn(defined, values)
 
-        case col: PeriodColumn =>
+        case col: OffsetTimeColumn =>
           val defined = col.definedAt(0, source.size)
-          val values  = new Array[Period](source.size)
+          val values  = new Array[OffsetTime](source.size)
           Loop.range(0, source.size) { row =>
             if (defined(row)) values(row) = col(row)
           }
-          ArrayPeriodColumn(defined, values)
+          ArrayOffsetTimeColumn(defined, values)
+
+        case col: OffsetDateColumn =>
+          val defined = col.definedAt(0, source.size)
+          val values  = new Array[OffsetDate](source.size)
+          Loop.range(0, source.size) { row =>
+            if (defined(row)) values(row) = col(row)
+          }
+          ArrayOffsetDateColumn(defined, values)
+
+        case col: LocalDateTimeColumn =>
+          val defined = col.definedAt(0, source.size)
+          val values  = new Array[LocalDateTime](source.size)
+          Loop.range(0, source.size) { row =>
+            if (defined(row)) values(row) = col(row)
+          }
+          ArrayLocalDateTimeColumn(defined, values)
+
+        case col: LocalTimeColumn =>
+          val defined = col.definedAt(0, source.size)
+          val values  = new Array[LocalTime](source.size)
+          Loop.range(0, source.size) { row =>
+            if (defined(row)) values(row) = col(row)
+          }
+          ArrayLocalTimeColumn(defined, values)
+
+        case col: LocalDateColumn =>
+          val defined = col.definedAt(0, source.size)
+          val values  = new Array[LocalDate](source.size)
+          Loop.range(0, source.size) { row =>
+            if (defined(row)) values(row) = col(row)
+          }
+          ArrayLocalDateColumn(defined, values)
+
+        case col: IntervalColumn =>
+          val defined = col.definedAt(0, source.size)
+          val values  = new Array[DateTimeInterval](source.size)
+          Loop.range(0, source.size) { row =>
+            if (defined(row)) values(row) = col(row)
+          }
+          ArrayIntervalColumn(defined, values)
 
         case col: EmptyArrayColumn =>
           val ncol = MutableEmptyArrayColumn.empty()
@@ -1276,13 +1341,43 @@ trait Slice { source =>
         }
 
         @inline
-        def renderDate(date: ZonedDateTime) {
+        def renderTimestamp(instant: Instant) {
+          renderString(instant.toString)
+        }
+
+        @inline
+        def renderOffsetDateTime(time: OffsetDateTime) {
+          renderString(time.toString)
+        }
+
+        @inline
+        def renderOffsetTime(time: OffsetTime) {
+          renderString(time.toString)
+        }
+
+        @inline
+        def renderOffsetDate(date: OffsetDate) {
           renderString(date.toString)
         }
 
         @inline
-        def renderPeriod(period: Period) {
-          renderString(period.toString)
+        def renderLocalDateTime(time: LocalDateTime) {
+          renderString(time.toString)
+        }
+
+        @inline
+        def renderLocalTime(time: LocalTime) {
+          renderString(time.toString)
+        }
+
+        @inline
+        def renderLocalDate(date: LocalDate) {
+          renderString(date.toString)
+        }
+
+        @inline
+        def renderInterval(duration: DateTimeInterval) {
+          renderString(duration.toString)
         }
 
         @inline
@@ -1486,24 +1581,84 @@ trait Slice { source =>
                 }
               }
 
-              case CDate => {
-                val specCol = col.asInstanceOf[DateColumn]
+              case COffsetDateTime => {
+                val specCol = col.asInstanceOf[OffsetDateTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderDate(specCol(row))
+                  renderOffsetDateTime(specCol(row))
                   true
                 } else {
                   false
                 }
               }
 
-              case CPeriod => {
-                val specCol = col.asInstanceOf[PeriodColumn]
+              case COffsetTime => {
+                val specCol = col.asInstanceOf[OffsetTimeColumn]
 
                 if (specCol.isDefinedAt(row)) {
                   flushIn()
-                  renderPeriod(specCol(row))
+                  renderOffsetTime(specCol(row))
+                  true
+                } else {
+                  false
+                }
+              }
+
+              case COffsetDate => {
+                val specCol = col.asInstanceOf[OffsetDateColumn]
+
+                if (specCol.isDefinedAt(row)) {
+                  flushIn()
+                  renderOffsetDate(specCol(row))
+                  true
+                } else {
+                  false
+                }
+              }
+
+              case CLocalDateTime => {
+                val specCol = col.asInstanceOf[LocalDateTimeColumn]
+
+                if (specCol.isDefinedAt(row)) {
+                  flushIn()
+                  renderLocalDateTime(specCol(row))
+                  true
+                } else {
+                  false
+                }
+              }
+
+              case CLocalTime => {
+                val specCol = col.asInstanceOf[LocalTimeColumn]
+
+                if (specCol.isDefinedAt(row)) {
+                  flushIn()
+                  renderLocalTime(specCol(row))
+                  true
+                } else {
+                  false
+                }
+              }
+
+              case CLocalDate => {
+                val specCol = col.asInstanceOf[LocalDateColumn]
+
+                if (specCol.isDefinedAt(row)) {
+                  flushIn()
+                  renderLocalDate(specCol(row))
+                  true
+                } else {
+                  false
+                }
+              }
+
+              case CInterval => {
+                val specCol = col.asInstanceOf[IntervalColumn]
+
+                if (specCol.isDefinedAt(row)) {
+                  flushIn()
+                  renderInterval(specCol(row))
                   true
                 } else {
                   false
@@ -1569,7 +1724,9 @@ trait Slice { source =>
   def toRValue(row: Int): RValue = {
     columns.foldLeft[RValue](CUndefined) {
       case (rv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
-        rv.unsafeInsert(selector, col.cValue(row))
+        CPathUtils.cPathToJPaths(selector, col.cValue(row)).foldLeft(rv) {
+          case (rv, (path, value)) => rv.unsafeInsert(CPath(path), value)
+        }
 
       case (rv, _) => rv
     }
@@ -1579,7 +1736,7 @@ trait Slice { source =>
     columns.foldLeft[JValue](JUndefined) {
       case (jv, (ColumnRef(selector, _), col)) if col.isDefinedAt(row) =>
         CPathUtils.cPathToJPaths(selector, col.cValue(row)).foldLeft(jv) {
-          case (jv, (path, value)) => jv.unsafeInsert(path, value.toJValue)
+          case (jv, (path, value)) => jv.unsafeInsert(path, value.toJValueRaw)
         }
 
       case (jv, _) => jv
@@ -1662,13 +1819,38 @@ object Slice {
               c.update(sliceIndex, s)
             }
 
-          case CDate(d) =>
-            acc.getOrElse(ref, ArrayDateColumn.empty(sliceSize)).asInstanceOf[ArrayDateColumn].unsafeTap { c =>
+          case COffsetDateTime(d) =>
+            acc.getOrElse(ref, ArrayOffsetDateTimeColumn.empty(sliceSize)).asInstanceOf[ArrayOffsetDateTimeColumn].unsafeTap { c =>
               c.update(sliceIndex, d)
             }
 
-          case CPeriod(p) =>
-            acc.getOrElse(ref, ArrayPeriodColumn.empty(sliceSize)).asInstanceOf[ArrayPeriodColumn].unsafeTap { c =>
+          case COffsetTime(d) =>
+            acc.getOrElse(ref, ArrayOffsetTimeColumn.empty(sliceSize)).asInstanceOf[ArrayOffsetTimeColumn].unsafeTap { c =>
+              c.update(sliceIndex, d)
+            }
+
+          case COffsetDate(d) =>
+            acc.getOrElse(ref, ArrayOffsetDateColumn.empty(sliceSize)).asInstanceOf[ArrayOffsetDateColumn].unsafeTap { c =>
+              c.update(sliceIndex, d)
+            }
+
+          case CLocalDateTime(d) =>
+            acc.getOrElse(ref, ArrayLocalDateTimeColumn.empty(sliceSize)).asInstanceOf[ArrayLocalDateTimeColumn].unsafeTap { c =>
+              c.update(sliceIndex, d)
+            }
+
+          case CLocalTime(d) =>
+            acc.getOrElse(ref, ArrayLocalTimeColumn.empty(sliceSize)).asInstanceOf[ArrayLocalTimeColumn].unsafeTap { c =>
+              c.update(sliceIndex, d)
+            }
+
+          case CLocalDate(d) =>
+            acc.getOrElse(ref, ArrayLocalDateColumn.empty(sliceSize)).asInstanceOf[ArrayLocalDateColumn].unsafeTap { c =>
+              c.update(sliceIndex, d)
+            }
+
+          case CInterval(p) =>
+            acc.getOrElse(ref, ArrayIntervalColumn.empty(sliceSize)).asInstanceOf[ArrayIntervalColumn].unsafeTap { c =>
               c.update(sliceIndex, p)
             }
 
@@ -1700,7 +1882,7 @@ object Slice {
   }
 
   def fromJValues(values: Stream[JValue]): Slice =
-    fromRValues(values.map(RValue.fromJValue).collect({ case Some(x) => x }))
+    fromRValues(values.flatMap(RValue.fromJValue))
 
   def fromRValues(values: Stream[RValue]): Slice = {
     val sliceSize = values.size
@@ -1770,7 +1952,7 @@ object Slice {
     jv.flattenWithPath.foldLeft(into) {
       case (acc, (jpath, JUndefined)) => acc
       case (acc, (jpath, v)) =>
-        val ctype = CType.forJValue(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
+        val ctype = CType.forJValueRaw(v) getOrElse { sys.error("Cannot determine ctype for " + v + " at " + jpath + " in " + jv) }
         val ref   = ColumnRef(remapPath.map(_ (jpath)).getOrElse(CPath(jpath)), ctype)
 
         val updatedColumn: ArrayColumn[_] = v match {

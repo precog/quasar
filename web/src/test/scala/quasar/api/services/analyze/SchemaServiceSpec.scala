@@ -17,7 +17,7 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary, DataCodec}
+import quasar.{Data, DataGenerators, DataCodec}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.matryoshka.arbitrary._
@@ -57,7 +57,7 @@ import spire.std.double._
 
 final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import SchemaServiceSpec._
-  import DataArbitrary._
+  import DataGenerators._
 
   type J = Fix[EJson]
 
@@ -77,6 +77,9 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
   def nonPos(i: Int): Int =
     if (i > 0) -i else i
 
+  def nonNat(i: Int): Int =
+    if (i ≟ 0) -1 else nonPos(i)
+
   def sstResponse(dataset: Vector[Data], cfg: analysis.CompressionSettings): Json = {
     type P[X] = StructuralType[J, X]
 
@@ -88,7 +91,11 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
       .toVector.headOption.getOrElse(Json.jNull)
   }
 
+  case class SmallNatural(n: Natural)
   case class SmallPositive(p: Positive)
+
+  implicit val smallNaturalArbitrary: Arbitrary[SmallNatural] =
+    Arbitrary(chooseRefinedNum(0L: Natural, 10L: Natural) map (SmallNatural(_)))
 
   implicit val smallPositiveArbitrary: Arbitrary[SmallPositive] =
     Arbitrary(chooseRefinedNum(1L: Positive, 10L: Positive) map (SmallPositive(_)))
@@ -128,17 +135,33 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
         .unsafePerformSync
     }
 
-    addFragments(Fragments(List("arrayMaxLength", "mapMaxSize", "stringMaxLength", "unionMaxSize") map { param =>
-      s"non-positive $param given" >> prop { (file: AFile, i: Int) =>
-        val ruri = pathUri(file) +? (param, nonPos(i).toString)
+    val nonNaturalInvalid =
+      List("arrayMaxLength", "mapMaxSize", "stringMaxLength") map { param =>
+        s"non-natural $param given" >> prop { (file: AFile, i: Int) =>
+          val ruri = pathUri(file) +? (param, nonNat(i).toString)
 
-        service(InMemState.empty)(Request(uri = ruri))
-          .flatMap(_.as[ApiError])
-          .map(_ must beApiErrorWithMessage(
-            BadRequest withReason "Invalid query parameter."))
-          .unsafePerformSync
+          service(InMemState.empty)(Request(uri = ruri))
+            .flatMap(_.as[ApiError])
+            .map(_ must beApiErrorWithMessage(
+              BadRequest withReason "Invalid query parameter."))
+            .unsafePerformSync
+        }
       }
-    } : _*))
+
+    val nonPositiveInvalid =
+      List("unionMaxSize") map { param =>
+        s"non-positive $param given" >> prop { (file: AFile, i: Int) =>
+          val ruri = pathUri(file) +? (param, nonPos(i).toString)
+
+          service(InMemState.empty)(Request(uri = ruri))
+            .flatMap(_.as[ApiError])
+            .map(_ must beApiErrorWithMessage(
+              BadRequest withReason "Invalid query parameter."))
+            .unsafePerformSync
+        }
+      }
+
+    addFragments(Fragments(nonNaturalInvalid ::: nonPositiveInvalid : _*))
   }
 
   "successful response" >> {
@@ -164,19 +187,19 @@ final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with H
         testReq(a => a))
     }
 
-    "applies arrayMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallPositive) =>
-      val cfg = analysis.CompressionSettings.Default.copy(arrayMaxLength = len.p)
-      shouldSucceed(x, y, cfg, testReq(_ +? ("arrayMaxLength", len.p.shows)))
+    "applies arrayMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallNatural) =>
+      val cfg = analysis.CompressionSettings.Default.copy(arrayMaxLength = len.n)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("arrayMaxLength", len.n.shows)))
     }
 
-    "applies mapMaxSize when specified" >> prop { (x: Data, y: Data, size: SmallPositive) =>
-      val cfg = analysis.CompressionSettings.Default.copy(mapMaxSize = size.p)
-      shouldSucceed(x, y, cfg, testReq(_ +? ("mapMaxSize", size.p.shows)))
+    "applies mapMaxSize when specified" >> prop { (x: Data, y: Data, size: SmallNatural) =>
+      val cfg = analysis.CompressionSettings.Default.copy(mapMaxSize = size.n)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("mapMaxSize", size.n.shows)))
     }
 
-    "applies stringMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallPositive) =>
-      val cfg = analysis.CompressionSettings.Default.copy(stringMaxLength = len.p)
-      shouldSucceed(x, y, cfg, testReq(_ +? ("stringMaxLength", len.p.shows)))
+    "applies stringMaxLength when specified" >> prop { (x: Data, y: Data, len: SmallNatural) =>
+      val cfg = analysis.CompressionSettings.Default.copy(stringMaxLength = len.n)
+      shouldSucceed(x, y, cfg, testReq(_ +? ("stringMaxLength", len.n.shows)))
     }
 
     "applies unionMaxSize when specified" >> prop { (x: Data, y: Data, size: SmallPositive) =>

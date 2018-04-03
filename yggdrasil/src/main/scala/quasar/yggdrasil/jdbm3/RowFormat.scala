@@ -20,12 +20,15 @@ package jdbm3
 import table._
 import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.precog.util.RawBitSet
-import scalaz._, Scalaz._
-import quasar.precog.util.{ ByteBufferMonad, ByteBufferPool, NumericComparisons }, ByteBufferPool._
+import quasar.precog.util.{ByteBufferMonad, ByteBufferPool, NumericComparisons, RawBitSet}
+import ByteBufferPool._
+import quasar.time.{DateTimeInterval, OffsetDate}
+
+import scalaz._
+import Scalaz._
 
 import java.nio.ByteBuffer
-import java.time.ZonedDateTime
+import java.time.{LocalDateTime, LocalTime, LocalDate, OffsetDateTime, OffsetTime}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -179,9 +182,9 @@ trait RowFormatSupport { self: StdCodecs =>
         }
       }
 
-    case (CDate, col: DateColumn) =>
-      new SimpleColumnValueEncoder[ZonedDateTime] {
-        val codec = Codec[ZonedDateTime]
+    case (COffsetDateTime, col: OffsetDateTimeColumn) =>
+      new SimpleColumnValueEncoder[OffsetDateTime] {
+        val codec = Codec[OffsetDateTime]
 
         def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
           codec.writeInit(col(row), buffer) match {
@@ -191,9 +194,69 @@ trait RowFormatSupport { self: StdCodecs =>
         }
       }
 
-    case (CPeriod, col: PeriodColumn) =>
-      new SimpleColumnValueEncoder[Period] {
-        val codec = Codec[Period]
+    case (COffsetTime, col: OffsetTimeColumn) =>
+      new SimpleColumnValueEncoder[OffsetTime] {
+        val codec = Codec[OffsetTime]
+
+        def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
+          codec.writeInit(col(row), buffer) match {
+            case Some(s) => Some(writeMore(s, pool, buffer :: Nil))
+            case None    => None
+          }
+        }
+      }
+
+    case (COffsetDate, col: OffsetDateColumn) =>
+      new SimpleColumnValueEncoder[OffsetDate] {
+        val codec = Codec[OffsetDate]
+
+        def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
+          codec.writeInit(col(row), buffer) match {
+            case Some(s) => Some(writeMore(s, pool, buffer :: Nil))
+            case None    => None
+          }
+        }
+      }
+
+    case (CLocalDateTime, col: LocalDateTimeColumn) =>
+      new SimpleColumnValueEncoder[LocalDateTime] {
+        val codec = Codec[LocalDateTime]
+
+        def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
+          codec.writeInit(col(row), buffer) match {
+            case Some(s) => Some(writeMore(s, pool, buffer :: Nil))
+            case None    => None
+          }
+        }
+      }
+
+    case (CLocalTime, col: LocalTimeColumn) =>
+      new SimpleColumnValueEncoder[LocalTime] {
+        val codec = Codec[LocalTime]
+
+        def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
+          codec.writeInit(col(row), buffer) match {
+            case Some(s) => Some(writeMore(s, pool, buffer :: Nil))
+            case None    => None
+          }
+        }
+      }
+
+    case (CLocalDate, col: LocalDateColumn) =>
+      new SimpleColumnValueEncoder[LocalDate] {
+        val codec = Codec[LocalDate]
+
+        def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
+          codec.writeInit(col(row), buffer) match {
+            case Some(s) => Some(writeMore(s, pool, buffer :: Nil))
+            case None    => None
+          }
+        }
+      }
+
+    case (CInterval, col: IntervalColumn) =>
+      new SimpleColumnValueEncoder[DateTimeInterval] {
+        val codec = Codec[DateTimeInterval]
 
         def encode(row: Int, buffer: ByteBuffer, pool: ByteBufferPool): Option[List[ByteBuffer]] = {
           codec.writeInit(col(row), buffer) match {
@@ -246,13 +309,33 @@ trait RowFormatSupport { self: StdCodecs =>
       new ColumnValueDecoder {
         def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[String].read(buf))
       }
-    case (CDate, col: ArrayDateColumn) =>
+    case (COffsetDateTime, col: ArrayOffsetDateTimeColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[ZonedDateTime].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[OffsetDateTime].read(buf))
       }
-    case (CPeriod, col: ArrayPeriodColumn) =>
+    case (COffsetTime, col: ArrayOffsetTimeColumn) =>
       new ColumnValueDecoder {
-        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[Period].read(buf))
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[OffsetTime].read(buf))
+      }
+    case (COffsetDate, col: ArrayOffsetDateColumn) =>
+      new ColumnValueDecoder {
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[OffsetDate].read(buf))
+      }
+    case (CLocalDateTime, col: ArrayLocalDateTimeColumn) =>
+      new ColumnValueDecoder {
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalDateTime].read(buf))
+      }
+    case (CLocalTime, col: ArrayLocalTimeColumn) =>
+      new ColumnValueDecoder {
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalTime].read(buf))
+      }
+    case (CLocalDate, col: ArrayLocalDateColumn) =>
+      new ColumnValueDecoder {
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[LocalDate].read(buf))
+      }
+    case (CInterval, col: ArrayIntervalColumn) =>
+      new ColumnValueDecoder {
+        def decode(row: Int, buf: ByteBuffer) = col.update(row, Codec[DateTimeInterval].read(buf))
       }
     case (CEmptyObject, col: MutableEmptyObjectColumn) =>
       new ColumnValueDecoder {
@@ -429,15 +512,20 @@ trait ValueRowFormat extends RowFormat with RowFormatSupport { self: StdCodecs =
     private def writeCValues(xs: List[CValue], sink: ByteBuffer): Option[S] = xs match {
       case x :: xs =>
         (x match {
-          case CBoolean(x)      => wrappedWriteInit[Boolean](x, sink)
-          case CString(x)       => wrappedWriteInit[String](x, sink)
-          case CDate(x)         => wrappedWriteInit[ZonedDateTime](x, sink)
-          case CPeriod(x)       => wrappedWriteInit[Period](x, sink)
-          case CLong(x)         => wrappedWriteInit[Long](x, sink)
-          case CDouble(x)       => wrappedWriteInit[Double](x, sink)
-          case CNum(x)          => wrappedWriteInit[BigDecimal](x, sink)
-          case CArray(x, cType) => wrappedWriteInit(x, sink)(codecForCValueType(cType))
-          case _: CNullType     => None
+          case CBoolean(x)        => wrappedWriteInit[Boolean](x, sink)
+          case CString(x)         => wrappedWriteInit[String](x, sink)
+          case COffsetDateTime(x) => wrappedWriteInit[OffsetDateTime](x, sink)
+          case COffsetTime(x)     => wrappedWriteInit[OffsetTime](x, sink)
+          case COffsetDate(x)     => wrappedWriteInit[OffsetDate](x, sink)
+          case CLocalDateTime(x)  => wrappedWriteInit[LocalDateTime](x, sink)
+          case CLocalTime(x)      => wrappedWriteInit[LocalTime](x, sink)
+          case CLocalDate(x)      => wrappedWriteInit[LocalDate](x, sink)
+          case CInterval(x)       => wrappedWriteInit[DateTimeInterval](x, sink)
+          case CLong(x)           => wrappedWriteInit[Long](x, sink)
+          case CDouble(x)         => wrappedWriteInit[Double](x, sink)
+          case CNum(x)            => wrappedWriteInit[BigDecimal](x, sink)
+          case CArray(x, cType)   => wrappedWriteInit(x, sink)(codecForCValueType(cType))
+          case _: CNullType       => None
         }) match {
           case None    => writeCValues(xs, sink)
           case Some(s) => Some((Right(s), xs))
@@ -719,7 +807,7 @@ trait SortingRowFormat extends RowFormat with StdCodecs with RowFormatSupport {
           case FEmptyObject => 0
           case FEmptyArray  => 0
           case FNull        => 0
-          case FDate =>
+          case FLocalDate =>
             math.signum(Codec[Long].read(abuf) - Codec[Long].read(bbuf)).toInt
           case FPeriod =>
             math.signum(Codec[Long].read(abuf) - Codec[Long].read(bbuf)).toInt
@@ -747,46 +835,61 @@ object SortingRowFormat {
   }
 
   def flagForCType(cType: CType): Byte = cType match {
-    case CBoolean      => FBoolean
-    case CString       => FString
-    case CLong         => FLong
-    case CDouble       => FDouble
-    case CNum          => FBigDecimal
-    case CDate         => FDate
-    case CPeriod       => FPeriod
-    case CEmptyObject  => FEmptyObject
-    case CEmptyArray   => FEmptyArray
-    case CNull         => FNull
-    case CUndefined    => FUndefined
-    case CArrayType(_) => abort("Unexpected CArrayType")
+    case CBoolean        => FBoolean
+    case CString         => FString
+    case CLong           => FLong
+    case CDouble         => FDouble
+    case CNum            => FBigDecimal
+    case COffsetDateTime => FOffsetDateTime
+    case COffsetTime     => FOffsetTime
+    case COffsetDate     => FOffsetDate
+    case CLocalDateTime  => FLocalDateTime
+    case CLocalTime      => FLocalTime
+    case CLocalDate      => FLocalDate
+    case CInterval       => FPeriod
+    case CEmptyObject    => FEmptyObject
+    case CEmptyArray     => FEmptyArray
+    case CNull           => FNull
+    case CUndefined      => FUndefined
+    case CArrayType(_)   => abort("Unexpected CArrayType")
   }
 
   def cTypeForFlag(flag: Byte): CType = flag match {
-    case FBoolean     => CBoolean
-    case FString      => CString
-    case FLong        => CLong
-    case FDouble      => CDouble
-    case FBigDecimal  => CNum
-    case FDate        => CDate
-    case FPeriod      => CPeriod
-    case FEmptyObject => CEmptyObject
-    case FEmptyArray  => CEmptyArray
-    case FNull        => CNull
-    case FUndefined   => CUndefined
+    case FBoolean        => CBoolean
+    case FString         => CString
+    case FLong           => CLong
+    case FDouble         => CDouble
+    case FBigDecimal     => CNum
+    case FLocalDateTime  => CLocalDateTime
+    case FLocalTime      => CLocalTime
+    case FLocalDate      => CLocalDate
+    case FOffsetDateTime => COffsetDateTime
+    case FOffsetTime     => COffsetTime
+    case FOffsetDate     => COffsetDate
+    case FPeriod         => CInterval
+    case FEmptyObject    => CEmptyObject
+    case FEmptyArray     => CEmptyArray
+    case FNull           => CNull
+    case FUndefined      => CUndefined
   }
 
-  private val FUndefined: Byte   = 0x0.toByte
-  private val FBoolean: Byte     = 0x10.toByte
-  private val FString: Byte      = 0x20.toByte
-  private val FNumeric: Byte     = 0x40.toByte
-  private val FLong: Byte        = 0x41.toByte
-  private val FDouble: Byte      = 0x42.toByte
-  private val FBigDecimal: Byte  = 0x43.toByte
-  private val FEmptyObject: Byte = 0x60.toByte
-  private val FEmptyArray: Byte  = 0x70.toByte
-  private val FNull: Byte        = 0x80.toByte
-  private val FDate: Byte        = 0x90.toByte
-  private val FPeriod: Byte      = 0x91.toByte
+  private val FUndefined: Byte      = 0x0.toByte
+  private val FBoolean: Byte        = 0x10.toByte
+  private val FString: Byte         = 0x20.toByte
+  private val FNumeric: Byte        = 0x40.toByte
+  private val FLong: Byte           = 0x41.toByte
+  private val FDouble: Byte         = 0x42.toByte
+  private val FBigDecimal: Byte     = 0x43.toByte
+  private val FEmptyObject: Byte    = 0x60.toByte
+  private val FEmptyArray: Byte     = 0x70.toByte
+  private val FNull: Byte           = 0x80.toByte
+  private val FOffsetDateTime: Byte = 0x91.toByte
+  private val FOffsetTime: Byte     = 0x92.toByte
+  private val FOffsetDate: Byte     = 0x93.toByte
+  private val FLocalDateTime: Byte  = 0x94.toByte
+  private val FLocalTime: Byte      = 0x95.toByte
+  private val FLocalDate: Byte      = 0x96.toByte
+  private val FPeriod: Byte         = 0x97.toByte
 }
 
 trait IdentitiesRowFormat extends RowFormat {

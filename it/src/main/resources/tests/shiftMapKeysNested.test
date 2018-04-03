@@ -1,0 +1,11 @@
+{
+    "name":  "shift map keys - nested",
+    "backends": {
+        "marklogic_xml": "pending"
+    },
+    "data": "nested.data",
+    "query": "select topObj.midObj{_:} from nested",
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+    "expected": ["botArr", "botObj"]
+}

@@ -25,8 +25,10 @@ import argonaut.{DecodeJson, Json => AJson}
 import matryoshka._
 import matryoshka.implicits._
 import scalaz._
+import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.option._
+import scalaz.syntax.equal._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.either._
@@ -128,8 +130,11 @@ sealed abstract class DecodeEJsonInstances extends DecodeEJsonInstances0 {
 
   implicit val charDecodeEJson: DecodeEJson[SChar] =
     new DecodeEJson[SChar] {
-      def decode[J](j: J)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Decoded[SChar] =
-        Decoded.attempt(j, Fixed[J].char.getOption(j) \/> "Char")
+      def decode[J](j: J)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Decoded[SChar] = {
+        val fromChar = Fixed[J].char.getOption(j)
+        def fromStr = Fixed[J].str.getOption(j).filter(_.length ≟ 1).map(_(0))
+        Decoded.attempt(j, (fromChar orElse fromStr) \/> "Char")
+      }
     }
 
   implicit def optionDecodeEJson[A](implicit A: DecodeEJson[A]): DecodeEJson[Option[A]] =

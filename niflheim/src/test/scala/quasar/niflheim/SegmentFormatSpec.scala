@@ -17,14 +17,14 @@
 package quasar.niflheim
 
 import quasar.precog.common._
-
 import quasar.precog.util._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import org.specs2._
 import org.specs2.mutable.Specification
 import org.scalacheck._, Prop._
 
-import java.time.ZonedDateTime
+import java.time._
 
 class V1SegmentFormatSpec extends SegmentFormatSpec {
   val format = V1SegmentFormat
@@ -72,7 +72,13 @@ trait SegmentFormatSpec extends Specification with ScalaCheck with SegmentFormat
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDouble, EmptyBitSet, new Array[Double](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CNum, EmptyBitSet, new Array[BigDecimal](0)))
       surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CString, EmptyBitSet, new Array[String](0)))
-      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CDate, EmptyBitSet, new Array[ZonedDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), COffsetDateTime, EmptyBitSet, new Array[OffsetDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), COffsetTime, EmptyBitSet, new Array[OffsetTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), COffsetDate, EmptyBitSet, new Array[OffsetDate](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalDateTime, EmptyBitSet, new Array[LocalDateTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalTime, EmptyBitSet, new Array[LocalTime](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CLocalDate, EmptyBitSet, new Array[LocalDate](0)))
+      surviveRoundTrip(ArraySegment(1234L, CPath("a.b.c"), CInterval, EmptyBitSet, new Array[DateTimeInterval](0)))
     }
     "roundtrip simple boolean segment" in {
       val segment = BooleanSegment(1234L, CPath("a.b.c"),

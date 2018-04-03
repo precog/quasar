@@ -135,12 +135,12 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             }
           }
 
-        case CDate =>
-          new DateColumn {
+        case COffsetDateTime =>
+          new OffsetDateTimeColumn {
             private var row0: Int           = -1
-            private var refCol0: DateColumn = _
-            @inline private def refCol(row: Int): DateColumn =
-              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[DateColumn]
+            private var refCol0: OffsetDateTimeColumn = _
+            @inline private def refCol(row: Int): OffsetDateTimeColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[OffsetDateTimeColumn]
 
             def apply(row: Int) = refCol0(row)
 
@@ -152,12 +152,97 @@ class DerefSlice(source: Slice, derefBy: PartialFunction[Int, CPathNode]) extend
             }
           }
 
-        case CPeriod =>
-          new PeriodColumn {
+        case COffsetTime =>
+          new OffsetTimeColumn {
+            private var row0: Int           = -1
+            private var refCol0: OffsetTimeColumn = _
+            @inline private def refCol(row: Int): OffsetTimeColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[OffsetTimeColumn]
+
+            def apply(row: Int) = refCol0(row)
+
+            def isDefinedAt(row: Int) = {
+              derefBy.isDefinedAt(row) && {
+                if (row0 != row) { row0 = row; refCol0 = refCol(row) }
+                refCol0 != null && refCol0.isDefinedAt(row)
+              }
+            }
+          }
+
+        case COffsetDate =>
+          new OffsetDateColumn {
+            private var row0: Int           = -1
+            private var refCol0: OffsetDateColumn = _
+            @inline private def refCol(row: Int): OffsetDateColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[OffsetDateColumn]
+
+            def apply(row: Int) = refCol0(row)
+
+            def isDefinedAt(row: Int) = {
+              derefBy.isDefinedAt(row) && {
+                if (row0 != row) { row0 = row; refCol0 = refCol(row) }
+                refCol0 != null && refCol0.isDefinedAt(row)
+              }
+            }
+          }
+
+        case CLocalDateTime =>
+          new LocalDateTimeColumn {
+            private var row0: Int           = -1
+            private var refCol0: LocalDateTimeColumn = _
+            @inline private def refCol(row: Int): LocalDateTimeColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[LocalDateTimeColumn]
+
+            def apply(row: Int) = refCol0(row)
+
+            def isDefinedAt(row: Int) = {
+              derefBy.isDefinedAt(row) && {
+                if (row0 != row) { row0 = row; refCol0 = refCol(row) }
+                refCol0 != null && refCol0.isDefinedAt(row)
+              }
+            }
+          }
+
+        case CLocalTime =>
+          new LocalTimeColumn {
+            private var row0: Int           = -1
+            private var refCol0: LocalTimeColumn = _
+            @inline private def refCol(row: Int): LocalTimeColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[LocalTimeColumn]
+
+            def apply(row: Int) = refCol0(row)
+
+            def isDefinedAt(row: Int) = {
+              derefBy.isDefinedAt(row) && {
+                if (row0 != row) { row0 = row; refCol0 = refCol(row) }
+                refCol0 != null && refCol0.isDefinedAt(row)
+              }
+            }
+          }
+
+        case CLocalDate =>
+          new LocalDateColumn {
+            private var row0: Int           = -1
+            private var refCol0: LocalDateColumn = _
+            @inline private def refCol(row: Int): LocalDateColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[LocalDateColumn]
+
+            def apply(row: Int) = refCol0(row)
+
+            def isDefinedAt(row: Int) = {
+              derefBy.isDefinedAt(row) && {
+                if (row0 != row) { row0 = row; refCol0 = refCol(row) }
+                refCol0 != null && refCol0.isDefinedAt(row)
+              }
+            }
+          }
+
+        case CInterval =>
+          new IntervalColumn {
             private var row0: Int             = -1
-            private var refCol0: PeriodColumn = _
-            @inline private def refCol(row: Int): PeriodColumn =
-              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[PeriodColumn]
+            private var refCol0: IntervalColumn = _
+            @inline private def refCol(row: Int): IntervalColumn =
+              derefColumns(derefBy(row)).flatMap(_.get(resultRef)).orNull.asInstanceOf[IntervalColumn]
 
             def apply(row: Int) = refCol0(row)
 

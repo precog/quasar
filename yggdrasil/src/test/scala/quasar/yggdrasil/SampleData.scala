@@ -17,6 +17,8 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes._, json._
+import quasar.RCValueGenerators
+import quasar.precog.common._
 
 import scalaz._, Scalaz._
 
@@ -28,36 +30,38 @@ import org.specs2._
 import org.scalacheck._
 import org.scalacheck.Gen._
 import org.scalacheck.Arbitrary._
-import CValueGenerators.JSchema
+import SJValueGenerators.JSchema
 
-case class SampleData(data: Stream[JValue], schema: Option[(Int, JSchema)] = None) {
+case class SampleData(data: Stream[RValue], schema: Option[(Int, JSchema)] = None) {
   override def toString = {
     "SampleData: \ndata = "+data.map(_.toString.replaceAll("\n", "\n  ")).mkString("[\n  ", ",\n  ", "]\n") +
     "\nschema: " + schema
   }
 
-  def sortBy[B: scala.math.Ordering](f: JValue => B) = copy(data = data.sortBy(f))
+  def sortBy[B: scala.math.Ordering](f: JValue => B) = copy(data = data.sortBy(f compose (_.toJValue)))
 }
 
-object SampleData extends CValueGenerators {
+object SampleData extends SJValueGenerators with RCValueGenerators {
+  def apply(data: Stream[JValue]): SampleData = new SampleData(data.flatMap(RValue.fromJValue), None)
+
   def toRecord(ids: Array[Long], jv: JValue): JValue = {
     JObject(Nil).set(JPath(".key"), JArray(ids.map(JNum(_)).toList)).set(JPath(".value"), jv)
   }
 
   implicit def keyOrder[A]: scala.math.Ordering[(Identities, A)] = tupledIdentitiesOrder[A](IdentitiesOrder).toScalaOrdering
 
-  def sample(schema: Int => Gen[JSchema]) = Arbitrary(
+  def sample(schema: Int => Gen[JSchema]): Arbitrary[SampleData] = Arbitrary(
     for {
       depth   <- choose(0, 1)
       jschema <- schema(depth)
       (idCount, data) <- genEventColumns(jschema)
     } yield {
       SampleData(
-        data.sorted.toStream flatMap {
+        data.sorted flatMap {
           // Sometimes the assembly process will generate overlapping values which will
           // cause RuntimeExceptions in JValue.unsafeInsert. It's easier to filter these
           // out here than prevent it from happening in the first place.
-          case (ids, jv) => try { Some(toRecord(ids, assemble(jv))) } catch { case _ : RuntimeException => None }
+          case (ids, jv) => try { Some(RValue.fromJValueRaw(toRecord(ids, assemble(jv)))) } catch { case _ : RuntimeException => None }
         },
         Some((idCount, jschema)))
     })
@@ -91,7 +95,7 @@ object SampleData extends CValueGenerators {
       for {
         sampleData <- arbitrary(sample)
       } yield {
-        SampleData(sampleData.data.sorted, sampleData.schema)
+        SampleData(sampleData.data.sortBy(_.toJValue), sampleData.schema)
       })
   }
 
@@ -152,7 +156,7 @@ object SampleData extends CValueGenerators {
         sampleData <- arbitrary(sample)
       } yield {
         val rows = for(row <- sampleData.data)
-          yield if (Random.nextDouble < 0.25) JUndefined else row
+          yield if (Random.nextDouble < 0.25) CUndefined else row
         SampleData(rows, sampleData.schema)
       }
 
@@ -164,15 +168,15 @@ object SampleData extends CValueGenerators {
       sampleData <- arbitrary(sample)
     } yield {
       val rows = for (row <- sampleData.data) yield {
-        if (false && Random.nextDouble >= 0.25) {
-          row
-        } else if (row.get(path) != null && row.get(path) != JUndefined) {
-          row.set(path, JUndefined)
+        val rowj = row.toJValue
+        val rp = rowj.get(path)
+        if (rp != null && rp != JUndefined) {
+          rowj.set(path, JUndefined)
         } else {
-          row
+          rowj
         }
       }
-      SampleData(rows, sampleData.schema)
+      SampleData(rows.flatMap(RValue.fromJValue), sampleData.schema)
     }
 
     Arbitrary(gen)

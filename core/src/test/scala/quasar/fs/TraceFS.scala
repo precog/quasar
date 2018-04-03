@@ -87,6 +87,8 @@ object TraceFS {
         }))
   }
 
+  val defaultPrefix = TempFilePrefix("")
+
   def mfTrace = new (ManageFile ~> Trace) {
     import ManageFile._
 
@@ -96,8 +98,8 @@ object TraceFS {
           case Move(scenario, semantics) => \/-(())
           case Copy(pair)                => \/-(())
           case Delete(path)              => \/-(())
-          case TempFile(near) =>
-            \/-(refineType(near).fold(ι, fileParent) </> file("tmp"))
+          case TempFile(near, prefix) =>
+            \/-(TmpFile.tmpFile0(near, prefix.getOrElse(defaultPrefix), "tmp"))
         }))
   }
 

@@ -163,9 +163,9 @@ object mount {
     S1: VCacheKVS :<: S
   ): EitherT[Free[S, ?], ApiError, Unit] =
     for {
-      dataFile      <- MF.tempFile(viewPath).leftMap(_.toApiError)
+      cacheFile     <- VCache.cacheFile(viewPath).leftMap(_.toApiError)
       refreshAfter  <- T.timestamp.liftM[ApiErrT]
-      newViewCache  =  ViewCache.mk(viewConfig, maxAge.toSeconds, refreshAfter, dataFile)
+      newViewCache  =  ViewCache.mk(viewConfig, maxAge.toSeconds, refreshAfter, cacheFile)
       _             <- vcache.get(viewPath).fold(
                           κ(vcache.modify(viewPath, modifyViewCache(newViewCache))),
                           vcache.put(viewPath, newViewCache)).join.liftM[ApiErrT]

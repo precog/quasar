@@ -17,17 +17,20 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Func, SemanticError, Type, TypeArbitrary}, Type.Const
+
+import quasar.{Func, SemanticError, Type, TypeGenerators}, Type.Const
 import quasar.frontend.logicalplan._
+import quasar.time.DateTimeInterval
+
+import java.time.{OffsetDateTime => JOffsetDateTime}
 
 import matryoshka.data.Fix
 import org.scalacheck.Arbitrary
-import java.time.{Instant, Duration}
 import scalaz.ValidationNel
 import scalaz.Validation.FlatMap._
 import shapeless._
 
-class MathSpec extends quasar.Qspec with TypeArbitrary {
+class MathSpec extends quasar.Qspec with TypeGenerators {
   import MathLib._
   import quasar.Data._
 
@@ -198,9 +201,9 @@ class MathSpec extends quasar.Qspec with TypeArbitrary {
 
     "add timestamp and interval" in {
       val expr = Add.tpe(Func.Input2(
-        Type.Const(Timestamp(Instant.parse("2015-01-21T00:00:00Z"))),
-        Type.Const(Interval(Duration.ofHours(9)))))
-      expr should beSuccessful(Type.Const(Timestamp(Instant.parse("2015-01-21T09:00:00Z"))))
+        Type.Const(OffsetDateTime(JOffsetDateTime.parse("2015-01-21T00:00:00Z"))),
+        Type.Const(Interval(DateTimeInterval.ofHours(9)))))
+      expr should beSuccessful(Type.Const(OffsetDateTime(JOffsetDateTime.parse("2015-01-21T09:00:00Z"))))
     }
 
     def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[SemanticError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {

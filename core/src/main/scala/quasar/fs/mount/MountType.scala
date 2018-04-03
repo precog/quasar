@@ -57,6 +57,12 @@ object MountType {
       case ModuleMount => ()
     } (κ(ModuleMount))
 
+  val fromConfig: MountConfig => MountType = {
+    case MountConfig.ViewConfig(_, _)         => viewMount()
+    case MountConfig.FileSystemConfig(tpe, _) => fileSystemMount(tpe)
+    case MountConfig.ModuleConfig(_)          => moduleMount()
+  }
+
   implicit val order: Order[MountType] =
     Order.orderBy(mt => (viewMount.nonEmpty(mt), fileSystemMount.getOption(mt)))
 

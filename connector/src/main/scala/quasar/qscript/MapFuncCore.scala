@@ -17,14 +17,16 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar._, RenderTree.ops._
+
+import quasar._
+import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.qscript.rewrites.{DedupeGuards, ExtractFiltering}
-import quasar.std.TemporalPart
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data._
@@ -447,6 +449,9 @@ object MapFuncCore {
         case Undefined() => G.point(Undefined[T, B]())
         case JoinSideName(n) => G.point(JoinSideName[T, B](n))
         case Now() => G.point(Now[T, B]())
+        case NowTime() => G.point(NowTime[T, B]())
+        case NowDate() => G.point(NowDate[T, B]())
+        case CurrentTimeZone() => G.point(CurrentTimeZone[T, B]())
 
         // unary
         case ExtractCentury(a1) => f(a1) ∘ (ExtractCentury(_))
@@ -458,26 +463,30 @@ object MapFuncCore {
         case ExtractHour(a1) => f(a1) ∘ (ExtractHour(_))
         case ExtractIsoDayOfWeek(a1) => f(a1) ∘ (ExtractIsoDayOfWeek(_))
         case ExtractIsoYear(a1) => f(a1) ∘ (ExtractIsoYear(_))
-        case ExtractMicroseconds(a1) => f(a1) ∘ (ExtractMicroseconds(_))
+        case ExtractMicrosecond(a1) => f(a1) ∘ (ExtractMicrosecond(_))
         case ExtractMillennium(a1) => f(a1) ∘ (ExtractMillennium(_))
-        case ExtractMilliseconds(a1) => f(a1) ∘ (ExtractMilliseconds(_))
+        case ExtractMillisecond(a1) => f(a1) ∘ (ExtractMillisecond(_))
         case ExtractMinute(a1) => f(a1) ∘ (ExtractMinute(_))
         case ExtractMonth(a1) => f(a1) ∘ (ExtractMonth(_))
         case ExtractQuarter(a1) => f(a1) ∘ (ExtractQuarter(_))
         case ExtractSecond(a1) => f(a1) ∘ (ExtractSecond(_))
-        case ExtractTimezone(a1) => f(a1) ∘ (ExtractTimezone(_))
-        case ExtractTimezoneHour(a1) => f(a1) ∘ (ExtractTimezoneHour(_))
-        case ExtractTimezoneMinute(a1) => f(a1) ∘ (ExtractTimezoneMinute(_))
+        case ExtractTimeZone(a1) => f(a1) ∘ (ExtractTimeZone(_))
+        case ExtractTimeZoneHour(a1) => f(a1) ∘ (ExtractTimeZoneHour(_))
+        case ExtractTimeZoneMinute(a1) => f(a1) ∘ (ExtractTimeZoneMinute(_))
         case ExtractWeek(a1) => f(a1) ∘ (ExtractWeek(_))
         case ExtractYear(a1) => f(a1) ∘ (ExtractYear(_))
-        case Date(a1) => f(a1) ∘ (Date(_))
-        case Time(a1) => f(a1) ∘ (Time(_))
-        case Timestamp(a1) => f(a1) ∘ (Timestamp(_))
+        case OffsetDateTime(a1) => f(a1) ∘ (OffsetDateTime(_))
+        case OffsetTime(a1) => f(a1) ∘ (OffsetTime(_))
+        case OffsetDate(a1) => f(a1) ∘ (OffsetDate(_))
+        case LocalDateTime(a1) => f(a1) ∘ (LocalDateTime(_))
+        case LocalTime(a1) => f(a1) ∘ (LocalTime(_))
+        case LocalDate(a1) => f(a1) ∘ (LocalDate(_))
         case Interval(a1) => f(a1) ∘ (Interval(_))
         case StartOfDay(a1) => f(a1) ∘ (StartOfDay(_))
         case TemporalTrunc(a1, a2) => f(a2) ∘ (TemporalTrunc(a1, _))
         case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
+        case ToLocal(a1) => f(a1) ∘ (ToLocal(_))
         case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case ToId(a1) => f(a1) ∘ (ToId(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
@@ -494,6 +503,9 @@ object MapFuncCore {
         case Meta(a1) => f(a1) ∘ (Meta(_))
 
         // binary
+        case SetTimeZone(a1, a2) => (f(a1) ⊛ f(a2))(SetTimeZone(_, _))
+        case SetTimeZoneHour(a1, a2) => (f(a1) ⊛ f(a2))(SetTimeZoneHour(_, _))
+        case SetTimeZoneMinute(a1, a2) => (f(a1) ⊛ f(a2))(SetTimeZoneMinute(_, _))
         case Add(a1, a2) => (f(a1) ⊛ f(a2))(Add(_, _))
         case Multiply(a1, a2) => (f(a1) ⊛ f(a2))(Multiply(_, _))
         case Subtract(a1, a2) => (f(a1) ⊛ f(a2))(Subtract(_, _))
@@ -539,6 +551,9 @@ object MapFuncCore {
         case (JoinSideName(n1), JoinSideName(n2)) => n1 ≟ n2
         case (Undefined(), Undefined()) => true
         case (Now(), Now()) => true
+        case (NowTime(), NowTime()) => true
+        case (NowDate(), NowDate()) => true
+        case (CurrentTimeZone(), CurrentTimeZone()) => true
         // unary
         case (ExtractCentury(a1), ExtractCentury(a2)) => in.equal(a1, a2)
         case (ExtractDayOfMonth(a1), ExtractDayOfMonth(a2)) => in.equal(a1, a2)
@@ -549,26 +564,30 @@ object MapFuncCore {
         case (ExtractHour(a1), ExtractHour(a2)) => in.equal(a1, a2)
         case (ExtractIsoDayOfWeek(a1), ExtractIsoDayOfWeek(a2)) => in.equal(a1, a2)
         case (ExtractIsoYear(a1), ExtractIsoYear(a2)) => in.equal(a1, a2)
-        case (ExtractMicroseconds(a1), ExtractMicroseconds(a2)) => in.equal(a1, a2)
+        case (ExtractMicrosecond(a1), ExtractMicrosecond(a2)) => in.equal(a1, a2)
         case (ExtractMillennium(a1), ExtractMillennium(a2)) => in.equal(a1, a2)
-        case (ExtractMilliseconds(a1), ExtractMilliseconds(a2)) => in.equal(a1, a2)
+        case (ExtractMillisecond(a1), ExtractMillisecond(a2)) => in.equal(a1, a2)
         case (ExtractMinute(a1), ExtractMinute(a2)) => in.equal(a1, a2)
         case (ExtractMonth(a1), ExtractMonth(a2)) => in.equal(a1, a2)
         case (ExtractQuarter(a1), ExtractQuarter(a2)) => in.equal(a1, a2)
         case (ExtractSecond(a1), ExtractSecond(a2)) => in.equal(a1, a2)
-        case (ExtractTimezone(a1), ExtractTimezone(a2)) => in.equal(a1, a2)
-        case (ExtractTimezoneHour(a1), ExtractTimezoneHour(a2)) => in.equal(a1, a2)
-        case (ExtractTimezoneMinute(a1), ExtractTimezoneMinute(a2)) => in.equal(a1, a2)
+        case (ExtractTimeZone(a1), ExtractTimeZone(a2)) => in.equal(a1, a2)
+        case (ExtractTimeZoneHour(a1), ExtractTimeZoneHour(a2)) => in.equal(a1, a2)
+        case (ExtractTimeZoneMinute(a1), ExtractTimeZoneMinute(a2)) => in.equal(a1, a2)
         case (ExtractWeek(a1), ExtractWeek(a2)) => in.equal(a1, a2)
         case (ExtractYear(a1), ExtractYear(a2)) => in.equal(a1, a2)
-        case (Date(a1), Date(b1)) => in.equal(a1, b1)
-        case (Time(a1), Time(b1)) => in.equal(a1, b1)
-        case (Timestamp(a1), Timestamp(b1)) => in.equal(a1, b1)
+        case (OffsetDateTime(a1), OffsetDateTime(b1)) => in.equal(a1, b1)
+        case (OffsetTime(a1), OffsetTime(b1)) => in.equal(a1, b1)
+        case (OffsetDate(a1), OffsetDate(b1)) => in.equal(a1, b1)
+        case (LocalDateTime(a1), LocalDateTime(b1)) => in.equal(a1, b1)
+        case (LocalTime(a1), LocalTime(b1)) => in.equal(a1, b1)
+        case (LocalDate(a1), LocalDate(b1)) => in.equal(a1, b1)
         case (Interval(a1), Interval(b1)) => in.equal(a1, b1)
         case (StartOfDay(a1), StartOfDay(b1)) => in.equal(a1, b1)
         case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => a1 ≟ b1 && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
+        case (ToLocal(a1), ToLocal(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (ToId(a1), ToId(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
@@ -585,6 +604,9 @@ object MapFuncCore {
         case (Meta(a1), Meta(b1)) => in.equal(a1, b1)
 
         //  binary
+        case (SetTimeZone(a1, a2), SetTimeZone(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (SetTimeZoneHour(a1, a2), SetTimeZoneHour(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (SetTimeZoneMinute(a1, a2), SetTimeZoneMinute(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Add(a1, a2), Add(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Multiply(a1, a2), Multiply(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (Subtract(a1, a2), Subtract(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -633,6 +655,9 @@ object MapFuncCore {
           case Undefined() => Cord("Undefined()")
           case JoinSideName(n) => Cord("JoinSideName(") ++ n.show ++ Cord(")")
           case Now() => Cord("Now()")
+          case NowTime() => Cord("NowTime()")
+          case NowDate() => Cord("NowDate()")
+          case CurrentTimeZone() => Cord("CurrentTimeZone()")
 
           // unary
           case ExtractCentury(a1) => shz("ExtractCentury", a1)
@@ -644,26 +669,30 @@ object MapFuncCore {
           case ExtractHour(a1) => shz("ExtractHour", a1)
           case ExtractIsoDayOfWeek(a1) => shz("ExtractIsoDayOfWeek", a1)
           case ExtractIsoYear(a1) => shz("ExtractIsoYear", a1)
-          case ExtractMicroseconds(a1) => shz("ExtractMicroseconds", a1)
+          case ExtractMicrosecond(a1) => shz("ExtractMicrosecond", a1)
           case ExtractMillennium(a1) => shz("ExtractMillennium", a1)
-          case ExtractMilliseconds(a1) => shz("ExtractMilliseconds", a1)
+          case ExtractMillisecond(a1) => shz("ExtractMillisecond", a1)
           case ExtractMinute(a1) => shz("ExtractMinute", a1)
           case ExtractMonth(a1) => shz("ExtractMonth", a1)
           case ExtractQuarter(a1) => shz("ExtractQuarter", a1)
           case ExtractSecond(a1) => shz("ExtractSecond", a1)
-          case ExtractTimezone(a1) => shz("ExtractTimezone", a1)
-          case ExtractTimezoneHour(a1) => shz("ExtractTimezoneHour", a1)
-          case ExtractTimezoneMinute(a1) => shz("ExtractTimezoneMinute", a1)
+          case ExtractTimeZone(a1) => shz("ExtractTimeZone", a1)
+          case ExtractTimeZoneHour(a1) => shz("ExtractTimeZoneHour", a1)
+          case ExtractTimeZoneMinute(a1) => shz("ExtractTimeZoneMinute", a1)
           case ExtractWeek(a1) => shz("ExtractWeek", a1)
           case ExtractYear(a1) => shz("ExtractYear", a1)
-          case Date(a1) => shz("Date", a1)
-          case Time(a1) => shz("Time", a1)
-          case Timestamp(a1) => shz("Timestamp", a1)
+          case OffsetDateTime(a1) => shz("OffsetDateTime", a1)
+          case OffsetTime(a1) => shz("OffsetTime", a1)
+          case OffsetDate(a1) => shz("OffsetDate", a1)
+          case LocalDateTime(a1) => shz("LocalDateTime", a1)
+          case LocalTime(a1) => shz("LocalTime", a1)
+          case LocalDate(a1) => shz("LocalDate", a1)
           case Interval(a1) => shz("Interval", a1)
           case StartOfDay(a1) => shz("StartOfDay", a1)
           case TemporalTrunc(a1, a2) => Cord("TemporalTrunc(", a1.show, ", ", sh.show(a2), ")")
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
+          case ToLocal(a1) => shz("ToLocal", a1)
           case TypeOf(a1) => shz("TypeOf", a1)
           case ToId(a1) => shz("ToId", a1)
           case Negate(a1) => shz("Negate", a1)
@@ -703,6 +732,9 @@ object MapFuncCore {
           case DeleteKey(a1, a2) => shz("DeleteKey", a1, a2)
           case ConcatArrays(a1, a2) => shz("ConcatArrays", a1, a2)
           case Range(a1, a2) => shz("Range", a1, a2)
+          case SetTimeZone(a1, a2) => shz("SetTimeZone", a1, a2)
+          case SetTimeZoneHour(a1, a2) => shz("SetTimeZoneHour", a1, a2)
+          case SetTimeZoneMinute(a1, a2) => shz("SetTimeZoneMinute", a1, a2)
           case Split(a1, a2) => shz("Split", a1, a2)
 
           //  ternary
@@ -737,6 +769,9 @@ object MapFuncCore {
           case Undefined() => Terminal("Undefined" :: nt, None)
           case JoinSideName(n) => Terminal("JoinSideName(" ::nt, n.shows.some)
           case Now() => Terminal("Now" :: nt, None)
+          case NowTime() => Terminal("NowTime" :: nt, None)
+          case NowDate() => Terminal("NowDate" :: nt, None)
+          case CurrentTimeZone() => Terminal("CurrentTimeZone" :: nt, None)
 
           // unary
           case ExtractCentury(a1) => nAry("ExtractCentury", a1)
@@ -748,26 +783,30 @@ object MapFuncCore {
           case ExtractHour(a1) => nAry("ExtractHour", a1)
           case ExtractIsoDayOfWeek(a1) => nAry("ExtractIsoDayOfWeek", a1)
           case ExtractIsoYear(a1) => nAry("ExtractIsoYear", a1)
-          case ExtractMicroseconds(a1) => nAry("ExtractMicroseconds", a1)
+          case ExtractMicrosecond(a1) => nAry("ExtractMicrosecond", a1)
           case ExtractMillennium(a1) => nAry("ExtractMillennium", a1)
-          case ExtractMilliseconds(a1) => nAry("ExtractMilliseconds", a1)
+          case ExtractMillisecond(a1) => nAry("ExtractMillisecond", a1)
           case ExtractMinute(a1) => nAry("ExtractMinute", a1)
           case ExtractMonth(a1) => nAry("ExtractMonth", a1)
           case ExtractQuarter(a1) => nAry("ExtractQuarter", a1)
           case ExtractSecond(a1) => nAry("ExtractSecond", a1)
-          case ExtractTimezone(a1) => nAry("ExtractTimezone", a1)
-          case ExtractTimezoneHour(a1) => nAry("ExtractTimezoneHour", a1)
-          case ExtractTimezoneMinute(a1) => nAry("ExtractTimezoneMinute", a1)
+          case ExtractTimeZone(a1) => nAry("ExtractTimeZone", a1)
+          case ExtractTimeZoneHour(a1) => nAry("ExtractTimeZoneHour", a1)
+          case ExtractTimeZoneMinute(a1) => nAry("ExtractTimeZoneMinute", a1)
           case ExtractWeek(a1) => nAry("ExtractWeek", a1)
           case ExtractYear(a1) => nAry("ExtractYear", a1)
-          case Date(a1) => nAry("Date", a1)
-          case Time(a1) => nAry("Time", a1)
-          case Timestamp(a1) => nAry("Timestamp", a1)
+          case OffsetDateTime(a1) => nAry("OffsetDateTime", a1)
+          case OffsetTime(a1) => nAry("OffsetTime", a1)
+          case OffsetDate(a1) => nAry("OffsetDate", a1)
+          case LocalDateTime(a1) => nAry("LocalDateTime", a1)
+          case LocalTime(a1) => nAry("LocalTime", a1)
+          case LocalDate(a1) => nAry("LocalDate", a1)
           case Interval(a1) => nAry("Interval", a1)
           case StartOfDay(a1) => nAry("StartOfDay", a1)
           case TemporalTrunc(a1, a2) => NonTerminal("TemporalTrunc" :: nt, a1.shows.some, List(r.render(a2)))
           case TimeOfDay(a1) => nAry("TimeOfDay", a1)
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
+          case ToLocal(a1) => nAry("ToLocal", a1)
           case TypeOf(a1) => nAry("TypeOf", a1)
           case ToId(a1) => nAry("ToId", a1)
           case Negate(a1) => nAry("Negate", a1)
@@ -807,6 +846,9 @@ object MapFuncCore {
           case DeleteKey(a1, a2) => nAry("DeleteKey", a1, a2)
           case ConcatArrays(a1, a2) => nAry("ConcatArrays", a1, a2)
           case Range(a1, a2) => nAry("Range", a1, a2)
+          case SetTimeZone(a1, a2) => nAry("SetTimeZone", a1, a2)
+          case SetTimeZoneHour(a1, a2) => nAry("SetTimeZoneHour", a1, a2)
+          case SetTimeZoneMinute(a1, a2) => nAry("SetTimeZoneMinute", a1, a2)
           case Split(a1, a2) => nAry("Split", a1, a2)
 
           //  ternary
@@ -845,6 +887,9 @@ object MapFuncsCore {
 
   // date
   // See https://www.postgresql.org/docs/9.2/static/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT
+  @Lenses final case class SetTimeZone[T[_[_]], A](a1: A, a2: A) extends Unary[T, A]
+  @Lenses final case class SetTimeZoneHour[T[_[_]], A](a1: A, a2: A) extends Unary[T, A]
+  @Lenses final case class SetTimeZoneMinute[T[_[_]], A](a1: A, a2: A) extends Unary[T, A]
   @Lenses final case class ExtractCentury[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractDayOfMonth[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractDecade[T[_[_]], A](a1: A) extends Unary[T, A]
@@ -854,28 +899,37 @@ object MapFuncsCore {
   @Lenses final case class ExtractHour[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractIsoDayOfWeek[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractIsoYear[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ExtractMicroseconds[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMicrosecond[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMillennium[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ExtractMilliseconds[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractMillisecond[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMinute[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractMonth[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractQuarter[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractSecond[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ExtractTimezone[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ExtractTimezoneHour[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ExtractTimezoneMinute[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractTimeZone[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractTimeZoneHour[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ExtractTimeZoneMinute[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractWeek[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ExtractYear[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class Date[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class Time[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class Timestamp[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class OffsetDateTime[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class OffsetTime[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class OffsetDate[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class LocalDateTime[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class LocalTime[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class LocalDate[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Interval[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class StartOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class TemporalTrunc[T[_[_]], A](part: TemporalPart, a1: A) extends Unary[T, A]
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
-  /** Fetches the [[quasar.Type.Timestamp]] for the current instant in time. */
+  @Lenses final case class ToLocal[T[_[_]], A](a1: A) extends Unary[T, A]
+  /** Fetches the [[quasar.Type.OffsetDateTime]] for the current instant in time, in UTC. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
+  /** Fetches the [[quasar.Type.OffsetTime]] for the current instant in time, in UTC. */
+  @Lenses final case class NowTime[T[_[_]], A]() extends Nullary[T, A]
+  /** Fetches the [[quasar.Type.OffsetDate]] for the current instant in time, in UTC. */
+  @Lenses final case class NowDate[T[_[_]], A]() extends Nullary[T, A]
+  @Lenses final case class CurrentTimeZone[T[_[_]], A]() extends Nullary[T, A]
 
   // identity
   /** Returns a string describing the type of the value. If the value has a

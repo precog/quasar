@@ -28,6 +28,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{~>, \/, Applicative, Bind}
+import scalaz.std.string._
 import scalaz.syntax.equal._
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
@@ -51,11 +52,14 @@ object Empty {
     case WriteFile.Close(_)       => ().point[F]
   }
 
+  val defaultPrefix = TempFilePrefix("")
+
   def manageFile[F[_]: Applicative] = λ[ManageFile ~> F] {
-    case ManageFile.Move(scn, _) => fsPathNotFound(scn.src)
-    case ManageFile.Copy(pair)   => fsPathNotFound(pair.src)
-    case ManageFile.Delete(p)    => fsPathNotFound(p)
-    case ManageFile.TempFile(p)  => (refineType(p).swap.valueOr(fileParent) </> file("tmp")).right.point[F]
+    case ManageFile.Move(scn, _)   => fsPathNotFound(scn.src)
+    case ManageFile.Copy(pair)     => fsPathNotFound(pair.src)
+    case ManageFile.Delete(p)      => fsPathNotFound(p)
+    case ManageFile.TempFile(n, p) =>
+      TmpFile.tmpFile0(n, p.getOrElse(defaultPrefix), "tmp").right.point[F]
   }
 
   def queryFile[F[_]: Applicative]: QueryFile ~> F =

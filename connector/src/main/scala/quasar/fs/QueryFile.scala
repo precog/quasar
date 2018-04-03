@@ -184,7 +184,7 @@ object QueryFile {
       listContents(dir)
 
     /** Returns a Map of all files in this directory and all of it's sub-directories
-      * along with it's `Node.Type`
+      * along with its `Node.Type`.
       * Fails if the directory does not exist.
       */
     def descendantFiles(dir: ADir): M[Map[RFile, Node.Type]] = {

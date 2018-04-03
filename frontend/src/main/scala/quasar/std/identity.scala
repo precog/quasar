@@ -70,9 +70,12 @@ trait IdentityLib extends Library {
         Some(success(typ.toPrimaryType.fold(
           if      (Type.Bottom.contains(typ))    Type.Bottom
           // NB: These cases should be identified via metadata
-          else if (Type.Timestamp.contains(typ)) Type.Const(Data.Str("timestamp"))
-          else if (Type.Date.contains(typ))      Type.Const(Data.Str("date"))
-          else if (Type.Time.contains(typ))      Type.Const(Data.Str("time"))
+          else if (Type.OffsetDateTime.contains(typ)) Type.Const(Data.Str("offsetdatetime"))
+          else if (Type.OffsetDate.contains(typ)) Type.Const(Data.Str("offsetdate"))
+          else if (Type.OffsetTime.contains(typ)) Type.Const(Data.Str("offsettime"))
+          else if (Type.LocalDateTime.contains(typ)) Type.Const(Data.Str("localdatetime"))
+          else if (Type.LocalDate.contains(typ)) Type.Const(Data.Str("localdate"))
+          else if (Type.LocalTime.contains(typ)) Type.Const(Data.Str("localtime"))
           else if (Type.Interval.contains(typ))  Type.Const(Data.Str("interval"))
           else                                   Type.Str)(
           t => Type.Const(Data.Str(PrimaryType.name.reverseGet(t))))))

@@ -63,16 +63,17 @@ class DataReadSupportSpec extends Qspec {
       )
     }
 
+    // TODO: Come back to this, ask Pawel about ZoneOffset
     "read logical types: UTF8, DATE, TIME_MILIS, TIME_MICROS, TIMESTAMP_MILIS, TIMESTAMP_MICROS" in {
       val data = readAll(path("/test-data-2.parquet")).unsafePerformSync
       data must_= Vector(
         Data.Obj(
           "description" -> Data.Str("this is a description"),
-          "creation" -> Data.Date(LocalDate.of(2017,2,17)),
-          "creationStamp" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
-          "meetingTime" -> Data.Time(LocalTime.of(0,0,4,0)),
-          "creationStampMicros" -> Data.Timestamp(Instant.parse("2017-02-17T13:42:05.017Z")),
-          "meetingTimeMicros" -> Data.Time(LocalTime.of(0,0,4,0))
+          "creation" -> Data.LocalDate(LocalDate.of(2017,2,17)),
+          "creationStamp" -> Data.LocalDateTime(LocalDateTime.parse("2017-02-17T13:42:05.017")),
+          "meetingTime" -> Data.LocalTime(LocalTime.of(0,0,4,0)),
+          "creationStampMicros" -> Data.LocalDateTime(LocalDateTime.parse("2017-02-17T13:42:05.017")),
+          "meetingTimeMicros" -> Data.LocalTime(LocalTime.of(0,0,4,0))
         )
       )
     }

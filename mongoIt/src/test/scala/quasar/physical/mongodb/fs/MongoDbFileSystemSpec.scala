@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
-import quasar._, DataArbitrary._
+import quasar._, DataGenerators._
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
@@ -340,7 +340,7 @@ class MongoDbFileSystemSpec
             val pdir = rootDir </> dir(s"db${esc}name")
 
             run((for {
-              tfile  <- manage.tempFile(pdir)
+              tfile  <- manage.tempFile(pdir, None)
               dbName <- EitherT.fromDisjunction[manage.FreeS](
                           Collection.dbNameFromPath(tfile).leftMap(pathErr(_)))
             } yield dbName).run).unsafePerformSync must_=== Collection.dbNameFromPath(pdir).leftMap(pathErr(_))

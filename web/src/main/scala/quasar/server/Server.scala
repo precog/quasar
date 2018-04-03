@@ -67,7 +67,7 @@ object Server {
         { plugins =>
           val err = Task.fail(new RuntimeException("plugin directory does not exist (or is a file)"))
           val check = Task.delay(plugins.exists() && !plugins.isFile())
-          check.ifM(Task.now(BackendConfig.JarDirectory(plugins)), err)
+          check.ifM(Task.now(BackendConfig.PluginDirectory(plugins)), err)
         },
         backends => BackendConfig.fromBackends(IList.fromList(backends)))
 

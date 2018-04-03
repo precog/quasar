@@ -77,7 +77,7 @@ private[mongodb] final class JavaScriptWorkflowExecutor
       List(AnonFunDecl(List("elem"), List(Return(AnonObjDecl(List(field.asText -> Ident("elem")))))))))
   }
 
-  protected def drop(coll: Collection) =
+  protected def dropUnsafe(coll: Collection) =
     tell(Call(Select(toJsRef(coll), "drop"), List()))
 
   protected def find(src: Collection, cfg: Find) = {

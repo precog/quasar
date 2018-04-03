@@ -38,8 +38,7 @@ sealed abstract class TypeStat[A] {
   def size(implicit A: AdditiveSemigroup[A]): A = this match {
     case  Bool(t, f   )       => A.plus(t, f)
     case  Byte(c, _, _)       => c
-    case  Char(c, _, _)       => c
-    case   Str(c, _, _, _, _) => c
+    case  Char(s, _, _)       => s.size
     case   Int(s, _, _)       => s.size
     case   Dec(s, _, _)       => s.size
     case  Coll(c, _, _)       => c
@@ -53,20 +52,10 @@ sealed abstract class TypeStat[A] {
     (this, other) match {
       case (Bool(t1, f1        ), Bool(t2, f2        )) => bool(t1 + t2, f1 + f2)
       case (Byte(c1, min1, max1), Byte(c2, min2, max2)) => byte(c1 + c2, mn(min1, min2), mx(max1, max2))
-      case (Char(c1, min1, max1), Char(c2, min2, max2)) => char(c1 + c2, mn(min1, min2), mx(max1, max2))
+      case (Char(s1, min1, max1), Char(s2, min2, max2)) => char(s1 + s2, mn(min1, min2), mx(max1, max2))
       case ( Int(s1, min1, max1),  Int(s2, min2, max2)) =>  int(s1 + s2, mn(min1, min2), mx(max1, max2))
       case ( Dec(s1, min1, max1),  Dec(s2, min2, max2)) =>  dec(s1 + s2, mn(min1, min2), mx(max1, max2))
       case (Coll(c1, min1, max1), Coll(c2, min2, max2)) => coll(c1 + c2, mn(min1, min2), mx(max1, max2))
-
-      case (Str(c1, minl1, maxl1, min1, max1), Str(c2, minl2, maxl2, min2, max2)) =>
-        str(c1 + c2, mn(minl1, minl2), mx(maxl1, maxl2), mn(min1, min2), mx(max1, max2))
-
-      case (Coll(c1, min1, max1),  Str(c2, minl2, maxl2, _, _)) =>
-        coll(c1 + c2, mn(min1, some(minl2)), mx(max1, some(maxl2)))
-
-      case (Str(c1, minl1, maxl1, _, _), Coll(c2, min2, max2)) =>
-        coll(c1 + c2, mn(some(minl1), min2), mx(some(maxl1), max2))
-
       case (                   x,                    y) => count(x.size + y.size)
     }
 
@@ -78,8 +67,7 @@ sealed abstract class TypeStat[A] {
 object TypeStat extends TypeStatInstances {
   final case class  Bool[A](trues: A, falses: A)                                     extends TypeStat[A]
   final case class  Byte[A](cnt: A, min: SByte, max: SByte)                          extends TypeStat[A]
-  final case class  Char[A](cnt: A, min: SChar, max: SChar)                          extends TypeStat[A]
-  final case class   Str[A](cnt: A, minLen: A, maxLen: A, min: String, max: String)  extends TypeStat[A]
+  final case class  Char[A](stats: SampleStats[A], min: SChar, max: SChar)           extends TypeStat[A]
   final case class   Int[A](stats: SampleStats[A], min: BigInt, max: BigInt)         extends TypeStat[A]
   final case class   Dec[A](stats: SampleStats[A], min: BigDecimal, max: BigDecimal) extends TypeStat[A]
   final case class  Coll[A](cnt: A, minSize: Option[A], maxSize: Option[A])          extends TypeStat[A]
@@ -93,13 +81,9 @@ object TypeStat extends TypeStatInstances {
     case Byte(n, min, max) => (n, min, max)
   } ((Byte[A](_, _, _)).tupled)
 
-  def char[A] = Prism.partial[TypeStat[A], (A, SChar, SChar)] {
-    case Char(n, min, max) => (n, min, max)
+  def char[A] = Prism.partial[TypeStat[A], (SampleStats[A], SChar, SChar)] {
+    case Char(ss, min, max) => (ss, min, max)
   } ((Char[A](_, _, _)).tupled)
-
-  def str[A] = Prism.partial[TypeStat[A], (A, A, A, String, String)] {
-    case Str(n, minLen, maxLen, min, max) => (n, minLen, maxLen, min, max)
-  } ((Str[A](_, _, _, _, _)).tupled)
 
   def int[A] = Prism.partial[TypeStat[A], (SampleStats[A], BigInt, BigInt)] {
     case Int(ss, min, max) => (ss, min, max)
@@ -126,8 +110,8 @@ object TypeStat extends TypeStatInstances {
     case C(   ejs.Null())  => count(cnt)
     case C(   ejs.Bool(b)) => bool(b.fold(cnt, M.zero), b.fold(M.zero, cnt))
     case E(   ejs.Byte(b)) => byte(cnt, b, b)
-    case E(   ejs.Char(c)) => char(cnt, c, c)
-    case C(    ejs.Str(s)) => str(cnt, A fromInt s.length, A fromInt s.length, s, s)
+    case E(   ejs.Char(c)) => char(SampleStats.freq(cnt, A fromInt c.toInt), c, c)
+    case C(    ejs.Str(s)) => coll(cnt, some(A fromInt s.length), some(A fromInt s.length))
     case E(    ejs.Int(i)) => int(SampleStats.freq(cnt, A fromBigInt     i), i, i)
     case C(    ejs.Dec(d)) => dec(SampleStats.freq(cnt, A fromBigDecimal d), d, d)
     case C(   ejs.Arr(xs)) => fromFoldable(cnt, xs)
@@ -198,7 +182,7 @@ sealed abstract class TypeStatInstances {
               minmax[SByte](j) map (TypeStat.byte(_))
 
             case Kind.Char =>
-              minmax[SChar](j) map (TypeStat.char(_))
+              dist[SChar](j) map (TypeStat.char(_))
 
             case Kind.Int =>
               dist[BigInt](j) map (TypeStat.int(_))
@@ -215,15 +199,6 @@ sealed abstract class TypeStatInstances {
                 j.keyS(MinLenKey).traverse(_.decodeAs[A]) |@|
                 j.keyS(MaxLenKey).traverse(_.decodeAs[A])
               )(TypeStat.coll(_, _, _))
-
-            case Kind.Str =>
-              (
-                j.decodedKeyS[A](CountKey)    |@|
-                j.decodedKeyS[A](MinLenKey)   |@|
-                j.decodedKeyS[A](MaxLenKey)   |@|
-                j.decodedKeyS[String](MinKey) |@|
-                j.decodedKeyS[String](MaxKey)
-              )(TypeStat.str(_, _, _, _, _))
 
             case other =>
               Decoded.failureFor[TypeStat[A]](j, s"Unknown TypeStat: $kind.")
@@ -251,9 +226,6 @@ sealed abstract class TypeStatInstances {
       case ( Coll(x1, x2, x3),  Coll(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case (Count(x1        ), Count(y1        )) => x1 ≟ y1
 
-      case (Str(x1, x2, x3, x4, x5), Str(y1, y2, y3, y4, y5)) =>
-        x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3 && x4 ≟ y4 && x5 ≟ y5
-
       case _ => false
     })
 
@@ -261,8 +233,7 @@ sealed abstract class TypeStatInstances {
     Show.shows {
       case  Bool(t, f       )             => s"Bool(${t.shows}, ${f.shows})"
       case  Byte(c, min, max)             => s"Byte(${c.shows}, ${min.shows}, ${max.shows})"
-      case  Char(c, min, max)             => s"Char(${c.shows}, ${min.shows}, ${max.shows})"
-      case   Str(c, minl, maxl, min, max) => s"Str(${c.shows}, ${minl.shows}, ${maxl.shows}, ${min.shows}, ${max.shows})"
+      case  Char(s, min, max)             => s"Char(${s.shows}, ${min.shows}, ${max.shows})"
       case   Int(s, min, max)             => s"Int(${s.shows}, ${min.shows}, ${max.shows})"
       case   Dec(s, min, max)             => s"Dec(${s.shows}, ${min.shows}, ${max.shows})"
       case  Coll(c, min, max)             => s"Coll(${c.shows}, ${min.shows}, ${max.shows})"
@@ -299,7 +270,6 @@ sealed abstract class TypeStatInstances {
     val Count = "count"
     val Dec = "decimal"
     val Int = "integer"
-    val Str = "string"
   }
 
   private[sst] def encodeEJson0[A: EncodeEJson: Equal: Field: NRoot, J](
@@ -363,8 +333,8 @@ sealed abstract class TypeStatInstances {
       case Byte(c, mn, mx) =>
         minmax(Kind.Byte, c, mn, mx)
 
-      case Char(c, mn, mx) =>
-        minmax(Kind.Char, c, mn, mx)
+      case Char(s, mn, mx) =>
+        dist(Kind.Char, s, mn, mx)
 
       case Int(s, mn, mx) =>
         dist(Kind.Int, s, mn, mx)
@@ -381,15 +351,6 @@ sealed abstract class TypeStatInstances {
           (CountKey -> c.asEJson[J]) ::
           optEntry(MinLenKey, mnl)   :::
           optEntry(MaxLenKey, mxl) : _*)
-
-      case Str(c, mnl, mxl, mn, mx) =>
-        kmap(
-          Kind.Str
-        , CountKey  -> c.asEJson[J]
-        , MinLenKey -> mnl.asEJson[J]
-        , MaxLenKey -> mxl.asEJson[J]
-        , MinKey    -> mn.asEJson[J]
-        , MaxKey    -> mx.asEJson[J])
     }
   }
 }

@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.fs
 
-import scala.Predef.$conforms
-import slamdata.Predef._
-import quasar.sql.ExprArbitrary
+import quasar.contrib.pathy._
 
-import org.scalacheck.Arbitrary, Arbitrary.{arbitrary => arb}
+import pathy.Path._
+import scalaz._, Scalaz._
 
-trait VariablesArbitrary {
-  implicit val arbitraryVarName: Arbitrary[VarName] =
-    Arbitrary(arb[String].map(VarName(_)))
+object TmpFile {
 
-  implicit val arbitraryVarValue: Arbitrary[VarValue] =
-    Arbitrary(ExprArbitrary.constExprGen.map(expr => VarValue(sql.pprint(expr))))
+  def tmpFilename[A: Show](prefix: TempFilePrefix, a: A): FileName =
+    FileName(prefix.s + a.shows)
 
-  implicit val arbitraryVariables: Arbitrary[Variables] =
-    Arbitrary(arb[Map[VarName, VarValue]].map(Variables(_)))
+  def tmpFile[A: Show](dir: ADir, prefix: TempFilePrefix, a: A): AFile =
+    dir </> file1(tmpFilename(prefix, a))
+
+  def tmpFile0[A: Show](near: APath, prefix: TempFilePrefix, a: A): AFile =
+    tmpFile(nearDir(near), prefix, a)
 }
-
-object VariablesArbitrary extends VariablesArbitrary

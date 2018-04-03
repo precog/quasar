@@ -101,7 +101,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         key.toJValue must beLike {
           case jo: JObject => (jo \ "tic_a") match {
@@ -124,7 +124,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultIter = result.flatMap(_.toJson).copoint
+    val resultIter = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultIter must haveSize(set.distinct.size)
 
@@ -162,7 +162,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         key.toJValue must beLike {
           case jo: JObject => (jo \ "tic_a") match {
@@ -184,7 +184,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultIter = result.flatMap(_.toJson).copoint
+    val resultIter = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultIter must haveSize(set.distinct.size)
 
@@ -218,7 +218,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         key.toJValue must beLike {
           case jo: JObject => (jo \ "tic_a") match {
@@ -240,7 +240,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultIter = result.flatMap(_.toJson).copoint
+    val resultIter = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultIter must haveSize((set map { _ % 2 } distinct) size)
 
@@ -286,7 +286,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key, map) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         key.toJValue must beLike {
           case obj: JObject => {
@@ -314,7 +314,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultJson must haveSize(2)
 
@@ -346,7 +346,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key, map) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         key.toJValue must beLike {
           case obj: JObject => {
@@ -391,7 +391,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
     resultJson must haveSize(8)
 
     forall(resultJson) { v =>
@@ -422,7 +422,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key, map) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         (key.toJValue(tic_bj)) must beLike {
           case JNum(i) => i must_== 7
@@ -433,7 +433,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultJson must haveSize(1)
 
@@ -466,7 +466,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     val result = Table.merge(spec) { (key, map) =>
       for {
         gs1  <- map(groupId)
-        gs1Json <- gs1.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
       } yield {
         (key.toJValue(tic_bj)) must beLike {
           case JUndefined =>
@@ -484,7 +484,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultJson must haveSize(5)
 
@@ -537,8 +537,8 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       for {
         gs1  <- map(groupId1)
         gs2  <- map(groupId2)
-        gs1Json <- gs1.toJson
-        gs2Json <- gs2.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
+        gs2Json <- gs2.toJson.map(_.map(_.toJValue))
       } yield {
         val JNum(keyBigInt) = key.toJValue(tic_aj)
 
@@ -558,7 +558,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     resultJson must haveSize((rawData1.toSet intersect rawData2.toSet).size)
 
@@ -611,8 +611,8 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       for {
         gs1  <- map(groupId1)
         gs2  <- map(groupId2)
-        gs1Json <- gs1.toJson
-        gs2Json <- gs2.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
+        gs2Json <- gs2.toJson.map(_.map(_.toJValue))
       } yield {
         val JNum(keyBigInt) = key.toJValue(tic_aj)
         key.toJValue(tic_bj) must beLike {
@@ -641,7 +641,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
 
     val joinKeys = (rawData1.map(_._1).toSet intersect rawData2.toSet)
 
@@ -713,8 +713,8 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       for {
         gs1  <- map(groupId1)
         gs2  <- map(groupId2)
-        gs1Json <- gs1.toJson
-        gs2Json <- gs2.toJson
+        gs1Json <- gs1.toJson.map(_.map(_.toJValue))
+        gs2Json <- gs2.toJson.map(_.map(_.toJValue))
       } yield {
         val ka @ JNum(kaValue) = key.toJValue(tic_aj)
         val kb = key.toJValue(tic_bj)
@@ -742,7 +742,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint
+    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
     val elapsedOverMerge = System.currentTimeMillis - firstMerge
     //println("total elapsed in merge: " + elapsedOverMerge)
     //println("total elapsed outside of body: " + (elapsedOverMerge - elapsed))
@@ -894,7 +894,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
     forallJson must not(beEmpty)
     forallJson must haveSize(3)
 
-    forall(forallJson) { row =>
+    forall(forallJson.map(_.toJValue)) { row =>
       val JNum(ai) = row \ "a"
       val JNum(bi) = row \ "b"
 

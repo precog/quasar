@@ -133,8 +133,8 @@ object transformPaths {
           .leftMap(transformErrorPath(outPath))
           .run
 
-      case TempFile(p) =>
-        M.tempFile(inPath(p))
+      case TempFile(p, prefix) =>
+        M.tempFile(inPath(p), prefix)
           .bimap(transformErrorPath(outPath), outPath(_))
           .run
     }

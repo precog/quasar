@@ -17,7 +17,7 @@
 package quasar.physical.couchbase
 
 import slamdata.Predef._
-import quasar.{Data => QData, TestConfig}
+import quasar.{Data => QData, TestConfig, Type => QType}
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
@@ -29,8 +29,9 @@ import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
 import quasar.Planner.PlannerError
 import quasar.qscript._
 import quasar.std.StdLibSpec
+import quasar.time.{DateGenerators, DateTimeInterval}
 
-import java.time.LocalDate
+import java.time._
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -50,20 +51,27 @@ class CouchbaseStdLibSpec extends StdLibSpec {
   type F[A] = Free[Eff, A]
   type M[A] = EitherT[F, PlannerError, A]
 
-  def ignoreSomeUnary(prg: FreeMapA[Fix, UnaryArg], arg: QData)(run: => Result): Result =
+  private def ignoreSomeUnary(prg: FreeMapA[Fix, UnaryArg], arg: QData)(run: => Result)
+      : Result =
     (prg, arg) match {
+      case (_, _) if isTemporal(arg.dataType) => pending
+      case (ExtractFunc(MapFuncsCore.OffsetDate(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.OffsetDateTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.OffsetTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.LocalDate(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.LocalDateTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.LocalTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.ToTimestamp(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.Interval(_)), _) => pending
       case (ExtractFunc(MapFuncsCore.Length(_)), QData.Str(s)) if !isPrintableAscii(s) =>
         Pending("only printable ascii supported")
       case _ => run
     }
 
-  def ignoreSomeBinary(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result): Result =
+  private def ignoreSomeBinary(prg: FreeMapA[Fix, BinaryArg], arg1: QData, arg2: QData)(run: => Result)
+      : Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), QData.Date(_), QData.Timestamp(_)) => pending
+      case (_, _, _) if isTemporal(arg1.dataType) || isTemporal(arg2.dataType) => pending
       case (ExtractFunc(MapFuncsCore.IfUndefined(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.ProjectKey(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.And(_,_)), _, _) => pending
@@ -71,12 +79,19 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       case _ => run
     }
 
-  def ignoreSomeTernary(prg: FreeMapA[Fix, TernaryArg], arg1: QData, arg2: QData, arg3: QData)(run: => Result): Result =
+  private def ignoreSomeTernary(prg: FreeMapA[Fix, TernaryArg], arg1: QData, arg2: QData, arg3: QData)(run: => Result)
+      : Result =
     (prg, arg1, arg2, arg3) match {
+      case (_, _, _, _) if isTemporal(arg1.dataType) || isTemporal(arg2.dataType) || isTemporal(arg3.dataType) => pending
       case (ExtractFunc(MapFuncsCore.Substring(_,_,_)), QData.Str(s), _, _) if !isPrintableAscii(s) =>
         Pending("only printable ascii supported")
       case _ => run
     }
+
+  private def isTemporal(tpe: QType): Boolean =
+    (tpe == QType.OffsetDateTime) || (tpe == QType.OffsetDate) || (tpe == QType.OffsetTime) ||
+      (tpe == QType.LocalDateTime) || (tpe == QType.LocalDate) || (tpe == QType.LocalTime) ||
+      (tpe == QType.Interval)
 
   def run[A](
     fm: Free[MapFunc[Fix, ?], A],
@@ -162,6 +177,9 @@ class CouchbaseStdLibSpec extends StdLibSpec {
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
 
+    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genDateTimeInterval
+    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
   }
 
   TestConfig.fileSystemConfigs(FsType).flatMap(_ traverse_ { case (backend, uri, _) =>

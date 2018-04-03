@@ -61,12 +61,12 @@ package object tpe {
     case C(ejs.Bool(_))    => SimpleType.Bool.left
     case E(ejs.Byte(_))    => SimpleType.Byte.left
     case E(ejs.Char(_))    => SimpleType.Char.left
+    case C(ejs.Str(_))     => SimpleType.Str.left
     case E( ejs.Int(_))    => SimpleType.Int.left
     case C( ejs.Dec(_))    => SimpleType.Dec.left
     // Composite
     case C(ejs.Arr(_))     => CompositeType.Arr.right
     case E(ejs.Map(_))     => CompositeType.Map.right
-    case C(ejs.Str(_))     => CompositeType.Arr.right
   }
 
   /** Returns the primary type of the given EJson value, if it is simple. */

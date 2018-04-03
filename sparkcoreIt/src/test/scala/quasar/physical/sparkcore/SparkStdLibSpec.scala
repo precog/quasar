@@ -24,6 +24,7 @@ import quasar.fp.tree._
 import quasar.qscript._, MapFuncsCore._, MapFuncsDerived._
 import quasar.physical.sparkcore.fs.CoreMap
 import quasar.std._
+import quasar.time.DateGenerators
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -38,7 +39,6 @@ class SparkStdLibSpec extends StdLibSpec {
 
   def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => Skipped("TODO")
       case _ => run
     }
 
@@ -106,7 +106,10 @@ class SparkStdLibSpec extends StdLibSpec {
 
     def stringDomain = arbitrary[String]
 
-    def dateDomain = DateArbitrary.genDate
+    val dateDomain = DateGenerators.genLocalDate
+    val timeDomain = DateGenerators.genLocalTime
+    val intervalDomain = DateGenerators.genDateTimeInterval
+    val timezoneDomain = DateGenerators.genZoneOffset
   }
 
   tests(runner)

@@ -18,10 +18,9 @@ package quasar.api.services
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{Data, RepresentableData}
-import quasar.DataArbitrary._
-import quasar.DateArbitrary._
-import quasar.RepresentableDataArbitrary._
+import quasar.{Data, RepresentableData, Variables}
+import quasar.DataGenerators._
+import quasar.RepresentableDataGenerators._
 import quasar.api._,
   ApiErrorEntityDecoder._, PathUtils._, MessageFormat.JsonContentType, MessageFormatGen._
 import quasar.api.matchers._
@@ -37,7 +36,7 @@ import MountConfig.{ModuleConfig, ViewConfig, viewConfig0}
 import quasar.fs.mount.cache.ViewCache
 import quasar.main.CoreEffIO
 import quasar.sql._
-import quasar.Variables
+import quasar.time.DateGenerators._
 
 import java.time.{Duration, Instant}
 
@@ -621,10 +620,10 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
             }
           val expectedData = List(
             Data.Obj(ListMap("a" -> Data.Int(1))),
-            Data.Obj(ListMap("b" -> Data.Time(java.time.LocalTime.parse("12:34:56")))))
+            Data.Obj(ListMap("b" -> Data.LocalTime(java.time.LocalTime.parse("12:34:56")))))
           "Json" >> {
             val line1 = Json("a" := 1)
-            val preciseLine2 = Json("b" := Json("$time" := "12:34:56"))
+            val preciseLine2 = Json("b" := Json("$localtime" := "12:34:56"))
             val readableLine2 = Json("b" := "12:34:56")
             "when formatted with one json object per line" >> {
               "Precise" >> {

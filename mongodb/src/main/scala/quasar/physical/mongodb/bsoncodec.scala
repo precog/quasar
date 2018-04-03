@@ -17,12 +17,22 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.ejson.EJson
+import quasar.ejson.{EJson, TypeTag}
 import quasar.fp._
 import quasar.fp.ski._
 import quasar._, Planner._
+import quasar.Data.DateTimeConstants
 
-import java.time.{Instant, LocalDate, LocalDateTime, ZoneOffset}
+import java.time.{
+  Instant,
+  LocalDate=> JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
+}
+import java.time.format.DateTimeFormatter
 
 import matryoshka._
 import matryoshka.implicits._
@@ -88,59 +98,109 @@ object BsonCodec {
   val fromExtension: AlgebraM[PlannerError \/ ?, ejson.Extension, Bson] = {
     case ejson.Map(value) => value.traverse(_.bitraverse({
       case Bson.Text(key) => key.right
-      case _              =>
+      case _ =>
         NonRepresentableEJson(value.toString + " is not a valid document key").left
     }, _.right)) ∘ (m => Bson.Doc(ListMap(m: _*)))
+
     // FIXME: cheating, but it’s what we’re already doing in the SQL parser
-    case ejson.Char(value)      => Bson.Text(value.toString).right
-    case ejson.Byte(value)      => Bson.Binary.fromArray(Array[Byte](value)).right
-    case ejson.Int(value)       =>
+    case ejson.Char(value) => Bson.Text(value.toString).right
+    case ejson.Byte(value) => Bson.Binary.fromArray(Array[Byte](value)).right
+
+    case ejson.Int(value) =>
       if (value.isValidInt) Bson.Int32(value.toInt).right
       else if (value.isValidLong) Bson.Int64(value.toLong).right
       else NonRepresentableEJson(value.toString + " is too large").left
+
     case ejson.Meta(value, meta) => (meta, value) match {
       case (EJsonType("_bson.oid"), Bson.Text(oid)) =>
         Bson.ObjectId.fromString(oid) \/> ObjectIdFormatError(oid)
-      case (EJsonTypeSize("_ejson.binary", size), Bson.Text(data)) =>
+
+      case (EJsonTypeSize(TypeTag.Binary.value, size), Bson.Text(data)) =>
         if (size.isValidInt)
           ejson.z85.decode(data).fold[PlannerError \/ Bson](
             NonRepresentableEJson("“" + data + "” is not a valid Z85-encoded string").left)(
             bv => Bson.Binary(ImmutableArray.fromArray(bv.take(size.toLong).toArray)).right)
         else NonRepresentableEJson(size.shows + " is too large for binary data").left
-      case (EJsonType("_ejson.date"), Bson.Doc(map)) =>
-        (extract(map.get("year"), Bson._int32) ⊛
-          extract(map.get("day_of_year"), Bson._int32))((y, d) =>
-          LocalDate.ofYearDay(y, d))
-          .orElse((extract(map.get("year"), Bson._int32) ⊛
-            extract(map.get("month"), Bson._int32) ⊛
-            extract(map.get("day_of_month"), Bson._int32))((y, m, d) =>
-            LocalDate.of(y, m, d)))
-          .flatMap(date => Bson.Date.fromInstant(date.atStartOfDay.toInstant(ZoneOffset.UTC))) \/>
-          NonRepresentableEJson(value.shows + " is not a valid date")
-      case (EJsonType("_ejson.time"), Bson.Doc(map)) =>
-        (extract(map.get("hour"), Bson._int32) ⊛
-          extract(map.get("minute"), Bson._int32) ⊛
-          extract(map.get("second"), Bson._int32) ⊛
-          extract(map.get("nanosecond"), Bson._int32))((h, m, s, n) =>
-          Bson.Text(
-            pad2(h) + ":" +
-              pad2(m) + ":" +
-              pad2(s) + "." +
-              pad3(n))) \/>
-        NonRepresentableEJson(value.shows + " is not a valid time")
-      case (EJsonType("_ejson.interval"), Bson.Doc(map)) =>
-        extract(map.get("seconds"), Bson._dec).map(s => Bson.Dec(s * millisPerSec)) \/>
-          NonRepresentableEJson(value.shows + " is not a valid interval")
-      case (EJsonType("_ejson.timestamp"), Bson.Doc(map)) =>
-        (extract(map.get("year"), Bson._int32) ⊛
-          extract(map.get("month"), Bson._int32) ⊛
-          extract(map.get("day_of_month"), Bson._int32) ⊛
-          extract(map.get("hour"), Bson._int32) ⊛
-          extract(map.get("minute"), Bson._int32) ⊛
-          extract(map.get("second"), Bson._int32) ⊛
-          extract(map.get("nanosecond"), Bson._int32))((y, mo, d, h, mi, s, n) =>
-          Bson.Date.fromInstant(LocalDateTime.of(y, mo, d, h, mi, s, n).toInstant(ZoneOffset.UTC))).join \/>
-          NonRepresentableEJson(value.shows + " is not a valid timestamp")
+
+      case (EJsonType(TypeTag.OffsetDateTime.value), Bson.Doc(map)) =>
+        (extract(map.get(DateTimeConstants.year), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.month), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.day), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.hour), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.minute), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.second), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.offset), Bson._int32)) {
+            (y, mo, d, h, mi, s, n, o) =>
+              Bson.Date.fromInstant(
+                JOffsetDateTime.of(y, mo, d, h, mi, s, n, ZoneOffset.ofTotalSeconds(o)).toInstant)
+          }.join \/> NonRepresentableEJson(value.shows + " is not a valid OffsetDateTime")
+
+      case (EJsonType(TypeTag.OffsetTime.value), Bson.Doc(map)) =>
+        (extract(map.get(DateTimeConstants.hour), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.minute), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.second), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.offset), Bson._int32)) {
+            (h, m, s, n, o) =>
+              Bson.Text(
+                JOffsetTime.of(h, m, s, n,ZoneOffset.ofTotalSeconds(o)).toString)
+          } \/> NonRepresentableEJson(value.shows + " is not a valid OffsetTime")
+
+      case (EJsonType(TypeTag.OffsetDate.value), Bson.Doc(map)) =>
+        (extract(map.get(DateTimeConstants.year), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.month), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.day), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.offset), Bson._int32)) {
+            (y, m, d, o) =>
+              Bson.Date.fromInstant(
+                JLocalDate.of(y, m, d).atStartOfDay.toInstant(ZoneOffset.ofTotalSeconds(o)))
+          }.join \/> NonRepresentableEJson(value.shows + " is not a valid OffsetDate")
+
+      case (EJsonType(TypeTag.LocalDateTime.value), Bson.Doc(map)) =>
+        (extract(map.get(DateTimeConstants.year), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.month), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.day), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.hour), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.minute), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.second), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), Bson._int32)) {
+            (y, mo, d, h, mi, s, n) =>
+              Bson.Date.fromInstant(
+                JLocalDateTime.of(y, mo, d, h, mi, s, n).toInstant(ZoneOffset.UTC))
+          }.join \/> NonRepresentableEJson(value.shows + " is not a valid LocalDateTime")
+
+      case (EJsonType(TypeTag.LocalTime.value), Bson.Doc(map)) =>
+        (extract(map.get(DateTimeConstants.hour), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.minute), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.second), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.nanosecond), Bson._int32)) {
+            (h, m, s, n) =>
+              Bson.Text(
+                JLocalTime.of(h, m, s, n).format(DateTimeFormatter.ISO_LOCAL_TIME))
+          } \/> NonRepresentableEJson(value.shows + " is not a valid LocalTime")
+
+      case (EJsonType(TypeTag.LocalDate.value), Bson.Doc(map)) =>
+        (extract(map.get(DateTimeConstants.year), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.month), Bson._int32) ⊛
+          extract(map.get(DateTimeConstants.day), Bson._int32)) {
+            (y, m, d) =>
+              Bson.Date.fromInstant(
+                JLocalDate.of(y, m, d).atStartOfDay.toInstant(ZoneOffset.UTC))
+          }.join \/> NonRepresentableEJson(value.shows + " is not a valid LocalDate")
+
+      case (EJsonType(TypeTag.Interval.value), Bson.Doc(map)) =>
+        (for {
+          y <- extract[Int](map.get(DateTimeConstants.year), Bson._int32)
+          m <- extract[Int](map.get(DateTimeConstants.month), Bson._int32)
+          d <- extract[Int](map.get(DateTimeConstants.day), Bson._int32)
+          s <- extract[Int](map.get(DateTimeConstants.second), Bson._int32)
+          n <- extract[Int](map.get(DateTimeConstants.nanosecond), Bson._int32)
+          if y === 0 && m === 0 // TODO support intervals with dates in them
+        } yield {
+          Bson.Dec(d*86400000 + s*1000 + n*1e-6)
+        }) \/> NonRepresentableEJson(value.shows + " is either not a valid Interval or contains a nonzero year or month (currently only time-like intervals and days are supported)")
+
       case (_, _) => value.right
     }
   }
@@ -165,21 +225,23 @@ object BsonCodec {
     case Bson.Int32(value)     => E.inj(ejson.Int(value)).right
     case Bson.Int64(value)     => E.inj(ejson.Int(value)).right
     case Bson.Date(value)      =>
-      val ldt = LocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneOffset.UTC)
+      // Bson dates are stored in UTC
+      val dt = JLocalDateTime.ofInstant(Instant.ofEpochMilli(value), ZoneOffset.UTC)
       E.inj(ejson.Meta(
         Bson.Doc(ListMap(
-          "year"         -> Bson.Int32(ldt.getYear),
-          "month"        -> Bson.Int32(ldt.getMonth.getValue),
-          "day_of_month" -> Bson.Int32(ldt.getDayOfMonth),
-          "hour"         -> Bson.Int32(ldt.getHour),
-          "minute"       -> Bson.Int32(ldt.getMinute),
-          "second"       -> Bson.Int32(ldt.getSecond),
-          "nanosecond"   -> Bson.Int32(ldt.getNano))),
-        EJsonType("_ejson.timestamp"))).right
+          DateTimeConstants.year       -> Bson.Int32(dt.getYear),
+          DateTimeConstants.month      -> Bson.Int32(dt.getMonth.getValue),
+          DateTimeConstants.day        -> Bson.Int32(dt.getDayOfMonth),
+          DateTimeConstants.hour       -> Bson.Int32(dt.getHour),
+          DateTimeConstants.minute     -> Bson.Int32(dt.getMinute),
+          DateTimeConstants.second     -> Bson.Int32(dt.getSecond),
+          DateTimeConstants.nanosecond -> Bson.Int32(dt.getNano),
+          DateTimeConstants.offset     -> Bson.Int32(0))),
+        EJsonType(TypeTag.OffsetDateTime.value))).right
     case Bson.Binary(value)    =>
       E.inj(ejson.Meta(
         Bson.Text(ejson.z85.encode(ByteVector.view(value.toArray))),
-        EJsonTypeSize("_ejson.binary", value.size))).right
+        EJsonTypeSize(TypeTag.Binary.value, value.size))).right
     case id @ Bson.ObjectId(_) =>
       E.inj(ejson.Meta(Bson.Text(id.str), EJsonType("_bson.oid"))).right
     case bson                  => bson.left

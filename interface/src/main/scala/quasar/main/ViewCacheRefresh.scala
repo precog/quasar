@@ -25,7 +25,7 @@ import quasar.frontend.SemanticErrsT
 import quasar.fp.free
 import quasar.fs.FileSystemError, FileSystemError._
 import quasar.fs.mount.{MountConfig, Mounting}
-import quasar.fs.mount.cache.ViewCache
+import quasar.fs.mount.cache.{ViewCache, VCache}
 import quasar.fs.MoveSemantics.Overwrite
 import quasar.fs.PathError._
 import quasar.fs.{ManageFile, QueryFile, WriteFile}
@@ -71,7 +71,7 @@ object ViewCacheRefresh {
 
     for {
       vc  <- getCachedView
-      tf  <- lift(M.tempFile(viewPath).run)
+      tf  <- lift(VCache.cacheFile(viewPath).run)
       ts1 <- lift(T.timestamp ∘ (_.right[FileSystemError]))
       _   <- lift(assigneeStart(viewPath, assigneeId, ts1, tf) ∘ (_.right[FileSystemError]))
       _   <- writeViewCache[S](fileParent(viewPath), tf, vc.viewConfig)

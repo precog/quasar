@@ -31,15 +31,17 @@ object Mounter {
 
   /** A kind of key-value store where the keys are absolute paths, with an
     * additional operation to efficiently look up nested paths. */
-  trait PathStore[F[_], V] {
-    /** The current value for a path, if any. */
-    def get(path: APath): EitherT[OptionT[F, ?], MountingError, V]
-    /** All paths which are nested within the given path and for which a value
-      * is present. */
-    def descendants(dir: ADir): F[Set[APath]]
+  trait MountStore[F[_]] {
+    /** The current config for a path, if any. */
+    def get(path: APath): EitherT[OptionT[F, ?], MountingError, MountConfig]
+
+    /** The type of configs nested within the given path, indexed by path. */
+    def descendants(dir: ADir): F[Map[APath, MountingError \/ MountType]]
+
     /** Associate a value with a path that is not already present, or else do
       * nothing. Yields true if the write occurred. */
-    def insert(path: APath, value: V): F[Boolean]
+    def insert(path: APath, value: MountConfig): F[Boolean]
+
     /** Remove a path and its value, if present, or do nothing */
     def delete(path: APath): F[Unit]
   }
@@ -48,7 +50,7 @@ object Mounter {
   def apply[F[_]: Monad](
     mount: MountRequest => MntErrT[F, Unit],
     unmount: MountRequest => F[Unit],
-    store: PathStore[F, MountConfig]
+    store: MountStore[F]
   ): Mounting ~> F = {
     type MntE[A] = MntErrT[F, A]
 
@@ -56,13 +58,6 @@ object Mounter {
 
     def failIfExisting(path: APath): MntE[Unit] =
       store.get(path).run.as(pathExists(path)).toLeft(())
-
-    def getType(p: APath): EitherT[OptionT[F, ?], MountingError, MountType] =
-      store.get(p).map {
-        case ViewConfig(_, _)         => MountType.viewMount()
-        case FileSystemConfig(tpe, _) => MountType.fileSystemMount(tpe)
-        case ModuleConfig(_)          => MountType.moduleMount()
-      }
 
     def handleMount(req: MountRequest): MntE[Unit] = {
       val putOrUnmount: MntE[Unit] =
@@ -101,13 +96,10 @@ object Mounter {
 
     λ[Mounting ~> F] {
       case HavingPrefix(dir) =>
-        for {
-          paths <- store.descendants(dir)
-          pairs <- paths.toList.traverse(p => getType(p).run.strengthL(p).run)
-        } yield pairs.flatMap(_.toList).toMap
+        store.descendants(dir)
 
       case LookupType(path) =>
-        getType(path).run.run
+        store.get(path).map(MountType.fromConfig).run.run
 
       case LookupConfig(path) =>
         store.get(path).run.run
@@ -124,8 +116,9 @@ object Mounter {
       case Unmount(path) =>
         handleUnmount(path)
           .flatMapF(_ =>
-            refineType(path).swap.foldMapM(store.descendants)
-              .flatMap(_.toList.traverse_(handleUnmount(_)).run.void))
+            refineType(path).swap
+              .foldMapM(d => store.descendants(d) map (_.keySet))
+              .flatMap(_.traverse_(handleUnmount(_)).run.void))
           .toRight(pathNotFound(path))
           .run
 
@@ -140,7 +133,7 @@ object Mounter {
 
           val moveNested: F[Unit] =
             (maybeDir(src) |@| maybeDir(dst))((srcDir, dstDir) =>
-              store.descendants(srcDir).flatMap(_.toList.traverse_(move(srcDir, dstDir, _)))).sequence_
+              store.descendants(srcDir).flatMap(_.keySet.traverse_(move(srcDir, dstDir, _)))).sequence_
 
           // It's important to move the descendants first or else we will move the mount itself again
           // if it's being moved to a path that is below it's current path. i.e. moving /foo/ to /foo/bar/
@@ -163,18 +156,28 @@ object Mounter {
     S1: MountConfigs :<: S
   ): Mounting ~> Free[S, ?] = {
     val mountConfigs = KeyValueStore.Ops[APath, MountConfig, S]
+
     Mounter[Free[S, ?]](
       req => EitherT[Free[S, ?], MountingError, Unit](free.lift(mount(req)).into[S]),
       req => free.lift(unmount(req)).into[S],
-      new PathStore[Free[S, ?], MountConfig] {
+      new MountStore[Free[S, ?]] {
         def get(path: APath) =
           EitherT.rightT(mountConfigs.get(path))
+
         def descendants(dir: ADir) =
-          mountConfigs.keys.map(_
-            .filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
-            .toSet)
+          for {
+            paths <- mountConfigs.keys
+
+            descs =  paths.filter(p => (dir: APath) ≠ p && p.relativeTo(dir).isDefined)
+
+            pairs <- descs.traverse { p =>
+              mountConfigs.get(p).map(MountType.fromConfig andThen ((p, _))).run
+            }
+          } yield pairs.unite.toMap.mapValues(_.right[MountingError])
+
         def insert(path: APath, value: MountConfig) =
           mountConfigs.compareAndPut(path, None, value)
+
         def delete(path: APath) =
           mountConfigs.delete(path)
       })

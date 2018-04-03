@@ -68,7 +68,7 @@ package object fs {
       Collection.dbNameFromPath(path).map(DefaultDb(_)).toOption
   }
 
-  final case class TmpPrefix(run: String) extends scala.AnyVal
+  final case class Salt(s: String) extends scala.AnyVal
 
   type PhysFsEff[A]  = Coproduct[Task, PhysErr, A]
 

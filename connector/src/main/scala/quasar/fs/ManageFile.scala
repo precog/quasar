@@ -68,7 +68,7 @@ object ManageFile {
   final case class Delete(path: APath)
     extends ManageFile[FileSystemError \/ Unit]
 
-  final case class TempFile(near: APath)
+  final case class TempFile(near: APath, prefix: Option[TempFilePrefix])
     extends ManageFile[FileSystemError \/ AFile]
 
   final class Ops[S[_]](implicit S: ManageFile :<: S)
@@ -113,8 +113,8 @@ object ManageFile {
     /** Returns the path to a new temporary file as physically close to the
       * supplied path as possible.
       */
-    def tempFile(near: APath): M[AFile] =
-      EitherT(lift(TempFile(near)))
+    def tempFile(near: APath, prefix: Option[TempFilePrefix]): M[AFile] =
+      EitherT(lift(TempFile(near, prefix)))
   }
 
   object Ops {
@@ -132,7 +132,8 @@ object ManageFile {
         case Copy(pair) => NonTerminal(List("Copy"), None,
           List(pair.src.render, pair.dst.render))
         case Delete(path) => NonTerminal(List("Delete"), None, List(path.render))
-        case TempFile(nearTo) => NonTerminal(List("TempFile"), None, List(nearTo.render))
+        case TempFile(nearTo, prefix) =>
+          NonTerminal(List("TempFile"), None, List(nearTo.render, prefix.render))
       }
     }
 }

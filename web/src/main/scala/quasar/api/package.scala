@@ -21,12 +21,9 @@ import quasar.contrib.pathy._
 
 import argonaut.{DecodeResult => _, _}, Argonaut._
 import org.http4s._
-import org.http4s.argonaut._
 import org.http4s.dsl.{Path => HPath, _}
-import org.http4s.headers.{`Content-Disposition`, Warning}
-import org.http4s.server._
+import org.http4s.headers.Warning
 import org.http4s.server.staticcontent._
-import org.http4s.util._
 import pathy.Path, Path._
 import pathy.argonaut.PosixCodecJson._
 import scalaz.{Failure => _, _}, Scalaz._
@@ -40,128 +37,6 @@ package object api {
 
   // https://tools.ietf.org/html/rfc7234#section-4.2.4
   val StaleHeader = Header(Warning.name.value, """110 - "Response is Stale"""")
-
-  object Destination extends HeaderKey.Singleton {
-    type HeaderT = Header
-    val name = CaseInsensitiveString("Destination")
-    override def matchHeader(header: Header): Option[HeaderT] = {
-      if (header.name ≟ name) Some(header)
-      else None
-    }
-    override def parse(s: String): ParseResult[Header] =
-      ParseResult.success(Header.Raw(name, s))
-  }
-
-  object XFileName extends HeaderKey.Singleton {
-    type HeaderT = Header
-    val name = CaseInsensitiveString("X-File-Name")
-    override def matchHeader(header: Header): Option[HeaderT] = {
-      if (header.name ≟ name) Some(header)
-      else None
-    }
-    override def parse(s: String): ParseResult[Header] =
-      ParseResult.success(Header.Raw(name, s))
-  }
-
-  object HeaderParam extends HttpMiddleware {
-    type HeaderValues = Map[CaseInsensitiveString, List[String]]
-
-    def parse(param: String): String \/ HeaderValues = {
-      def strings(json: Json): String \/ List[String] =
-        json.string.map(str => \/-(str :: Nil)).getOrElse(
-          json.array.map { vs =>
-            vs.traverse(v => v.string \/> (s"expected string in array; found: $v"))
-          }.getOrElse(-\/(s"expected a string or array of strings; found: $json")))
-
-      for {
-        json <- Parse.parse(param).leftMap("parse error (" + _ + ")").disjunction
-        obj <- json.obj \/> (s"expected a JSON object; found: $json")
-        values <- obj.toList.traverse { case (k, v) =>
-          strings(v).map(CaseInsensitiveString(k) -> _)
-        }
-      } yield Map(values: _*)
-    }
-
-    def rewrite(headers: Headers, param: HeaderValues): Headers =
-      Headers(
-        param.toList.flatMap {
-          case (k, vs) => vs.map(v => Header.Raw(CaseInsensitiveString(k), v))
-        } ++
-        headers.toList.filterNot(h => param contains h.name))
-
-    def apply(service: HttpService): HttpService =
-      Service.lift { req =>
-        (req.params.get("request-headers").fold[String \/ Request](\/-(req)) { v =>
-          parse(v).map(hv => req.withHeaders(rewrite(req.headers, hv)))
-        }).fold(
-          err => BadRequest(Json("error" := "invalid request-headers: " + err)),
-          service.run)
-      }
-  }
-
-  // [#1861] Workaround to support a small slice of RFC 5987 for this isolated case
-  object RFC5987ContentDispositionRender extends HttpMiddleware {
-    // NonUnitStatements due to http4s's Writer
-    @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-    final case class ContentDisposition(dispositionType: String, parameters: Map[String, String])
-      extends Header.Parsed {
-      import org.http4s.util.Writer
-      override def key = `Content-Disposition`
-      override lazy val value = super.value
-      override def renderValue(writer: Writer): writer.type = {
-        writer.append(dispositionType)
-        parameters.foreach(p =>
-          p._1.endsWith("*").fold(
-            writer << "; " << p._1 << "=" << p._2,
-            writer << "; " << p._1 << "=\"" << p._2 << '"'))
-        writer
-      }
-    }
-
-    def apply(service: HttpService): HttpService =
-      service.map {
-        case resp: Response =>
-          resp.headers.get(`Content-Disposition`).cata(
-            i => resp.copy(headers = resp.headers
-              .filter(_.name ≠ `Content-Disposition`.name)
-              .put(ContentDisposition(i.dispositionType, i.parameters))),
-            resp)
-        case pass => pass
-      }
-  }
-
-  object Prefix {
-    def apply(prefix: String)(service: HttpService): HttpService = {
-      import monocle.Lens
-      import monocle.macros.GenLens
-      import scalaz.std.option._
-
-      val uriLens = Lens[Request, Uri](_.uri)(uri => req => req.withUri(uri))
-
-      val _uri_path = uriLens composeLens GenLens[Uri](_.path)
-
-      val stripChars = prefix match {
-        case "/"                    => 0
-        case x if x.startsWith("/") => x.length
-        case x                      => x.length + 1
-      }
-
-      def rewrite(path: String): Option[String] =
-        if (path.startsWith(prefix)) Some(path.substring(stripChars))
-        else None
-
-      Service.lift { req: Request =>
-        _uri_path.modifyF(rewrite)(req) match {
-          case Some(req1) => service(req1)
-          case None       => Pass.now
-        }
-      }
-    }
-  }
-
-  // NB: HPath's own toString doesn't encode properly
-  private def pathString(p: HPath) =
-    "/" + p.toList.map(UriPathCodec.escape).mkString("/")
 
   // TODO: See if possible to avoid re-encoding and decoding
   object AsDirPath {
@@ -219,4 +94,8 @@ package object api {
       // TODO: probably need a URL-specific codec here
       TemporaryRedirect(req.uri.copy(path = basePath + posixCodec.printPath(path)))
   }
+
+  // NB: HPath's own toString doesn't encode properly
+  private def pathString(p: HPath) =
+    "/" + p.toList.map(UriPathCodec.escape).mkString("/")
 }

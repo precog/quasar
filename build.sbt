@@ -7,6 +7,7 @@ import java.lang.{Integer, String, Throwable}
 import scala.{Boolean, List, Predef, None, Some, StringContext, sys, Unit}, Predef.{any2ArrowAssoc, assert, augmentString}
 import scala.collection.Seq
 import scala.collection.immutable.Map
+import scala.sys.process._
 
 import sbt._, Keys._
 import sbt.std.Transform.DummyTaskMap
@@ -128,7 +129,21 @@ concurrentRestrictions in Global := {
 // Tasks tagged with `ExclusiveTest` should be run exclusively.
 concurrentRestrictions in Global += Tags.exclusive(ExclusiveTest)
 
+version in ThisBuild := {
+  val currentVersion = (version in ThisBuild).value
+  if (!isTravisBuild.value)
+    currentVersion + "-" + "git rev-parse HEAD".!!.substring(0, 7)
+  else
+    currentVersion
+}
+
+useGpg in Global := {
+  val oldValue = (useGpg in Global).value
+  !isTravisBuild.value || oldValue
+}
+
 lazy val publishSettings = commonPublishSettings ++ Seq(
+  performSonatypeSync := false,   // basically just ignores all the sonatype sync parts of things
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/quasar-analytics/quasar")),
@@ -137,7 +152,14 @@ lazy val publishSettings = commonPublishSettings ++ Seq(
       url("https://github.com/quasar-analytics/quasar"),
       "scm:git@github.com:quasar-analytics/quasar.git"
     )
-  ))
+  ),
+  bintrayCredentialsFile := {
+    val oldValue = bintrayCredentialsFile.value
+    if (!isTravisBuild.value)
+      Path.userHome / ".bintray" / ".credentials"
+    else
+      oldValue
+  })
 
 lazy val assemblySettings = Seq(
   test in assembly := {},
@@ -180,7 +202,7 @@ lazy val assemblySettings = Seq(
 lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
 
 // not doing this causes NoSuchMethodErrors when using coursier
-lazy val excludeTypelevelScalaLibrary = 
+lazy val excludeTypelevelScalaLibrary =
   Seq(excludeDependencies += "org.typelevel" % "scala-library")
 
 // Include to also publish a project's tests
@@ -208,8 +230,8 @@ def isolatedBackendSettings(classnames: String*) = Seq(
   isolatedBackends in Global ++=
     classnames.map(_ -> (fullClasspath in Compile).value.files),
 
-  packageOptions in assembly +=
-    Package.ManifestAttributes(new java.util.jar.Attributes.Name("Backend-Module") -> classnames.mkString(" ")))
+  packageOptions in (Compile, packageBin) +=
+    Package.ManifestAttributes("Backend-Module" -> classnames.mkString(" ")))
 
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")

@@ -217,24 +217,6 @@ object StructuralType extends StructuralTypeInstances {
       case other =>
         TypeST(normalization.lowerConst[J, T].apply(other))
     }
-
-  /** Lift a transform over types to a transform over structural types. */
-  object typeTransform {
-    def apply[L] = new PartiallyApplied[L]
-
-    final class PartiallyApplied[L] {
-      type G[A, B] = EnvT[A, TypeF[L, ?], B]
-      val I = Inject[TypeF[L, ?], StructuralType.ST[L, ?]]
-
-      def apply[A, B](pf: PartialFunction[G[A, B], G[A, B]])
-        : STF[L, A, B] => STF[L, A, B] =
-        orOriginal((stf: STF[L, A, B]) =>
-            stf.run.traverse(I.prj)
-              .map(EnvT(_))
-              .collect(pf)
-              .map(EnvT.hmap(I)(_)))
-    }
-  }
 }
 
 sealed abstract class StructuralTypeInstances extends StructuralTypeInstances0 {

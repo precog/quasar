@@ -270,10 +270,11 @@ trait SparkCore extends BackendModule with DefaultAnalyzeModule {
     def copy(pair: PathPair): Backend[Unit] =
       unsupportedOperation("Spark connector does not currently support copy operation").left[Unit].point[M].liftB.unattempt
 
-    def tempFile(near: APath): Backend[AFile] = lift(Task.delay {
-      val parent: ADir = refineType(near).fold(d => d, fileParent(_))
+    val defaultPrefix = TempFilePrefix("quasar-")
+
+    def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] = lift(Task.delay {
       val random = scala.util.Random.nextInt().toString
-        (parent </> file(s"quasar-$random.tmp")).right[FileSystemError]
+      TmpFile.tmpFile0(near, prefix.getOrElse(defaultPrefix), s"$random.tmp").right[FileSystemError]
     }
     ).into[Eff].liftB.unattempt
   }

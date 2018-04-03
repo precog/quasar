@@ -50,7 +50,11 @@ object ExtractPrimary {
     implicit L: Recursive.Aux[L, EJson]
   ): ExtractPrimary[TypeF[L, ?]] =
     new ExtractPrimary[TypeF[L, ?]] {
-      def primaryTag[A](fa: TypeF[L, A]) = TypeF.primary(fa) map (_.left)
+      def primaryTag[A](fa: TypeF[L, A]) =
+        fa match {
+          case TypeF.Const(l) => some(primaryTagOf(l))
+          case _ => TypeF.primary(fa) map (_.left)
+        }
     }
 
   implicit def envTExtractPrimary[E, F[_]: ExtractPrimary]

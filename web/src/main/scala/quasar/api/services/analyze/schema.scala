@@ -42,9 +42,9 @@ object schema {
 
   val DefaultSampleSize: Positive = 1000L
 
-  object ArrayMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Positive]("arrayMaxLength")
-  object MapMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Positive]("mapMaxSize")
-  object StringMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Positive]("stringMaxLength")
+  object ArrayMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Natural]("arrayMaxLength")
+  object MapMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Natural]("mapMaxSize")
+  object StringMaxLength extends OptionalValidatingQueryParamDecoderMatcher[Natural]("stringMaxLength")
   object UnionMaxSize extends OptionalValidatingQueryParamDecoderMatcher[Positive]("unionMaxSize")
 
   def service[S[_]](

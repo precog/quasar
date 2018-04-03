@@ -17,14 +17,16 @@
 package quasar.physical.marklogic
 
 import slamdata.Predef._
-
 import java.util.Base64
 
 import monocle.Prism
 import java.time._
 import java.time.format._
 import java.time.temporal.{TemporalAccessor, TemporalQuery}
-import scalaz._, Scalaz._
+
+import quasar.time.{DateTimeInterval, OffsetDate}
+
+import scalaz._
 
 object optics {
   val base64Bytes = Prism[String, ImmutableArray[Byte]](
@@ -33,13 +35,16 @@ object optics {
            .toOption
   )((Base64.getEncoder.encodeToString(_)) compose (_.toArray))
 
-  val isoDuration = Prism[String, Duration](
-    s => \/.fromTryCatchNonFatal(Duration.parse(s)).toOption)(
-    d => (d.isNegative either d.negated or d).umap(_.toString).map("-" + _).merge)
+  val isoDuration = Prism[String, DateTimeInterval](
+    DateTimeInterval.parse)(_.toString)
 
-  val isoInstant:   Prism[String, Instant]   = temporal(Instant   from _, DateTimeFormatter.ISO_INSTANT)
-  val isoLocalDate: Prism[String, LocalDate] = temporal(LocalDate from _, DateTimeFormatter.ISO_DATE)
-  val isoLocalTime: Prism[String, LocalTime] = temporal(LocalTime from _, DateTimeFormatter.ISO_TIME)
+  val isoOffsetDateTime: Prism[String, OffsetDateTime] = temporal(OffsetDateTime from _, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+  val isoOffsetDate: Prism[String, OffsetDate]         =
+    Prism[String, OffsetDate](s => \/.fromTryCatchNonFatal(OffsetDate.parse(s)).toOption)(DateTimeFormatter.ISO_OFFSET_DATE.format)
+  val isoOffsetTime: Prism[String, OffsetTime]         = temporal(OffsetTime     from _, DateTimeFormatter.ISO_OFFSET_TIME)
+  val isoLocalDateTime: Prism[String, LocalDateTime]   = temporal(LocalDateTime  from _, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+  val isoLocalDate: Prism[String, LocalDate]           = temporal(LocalDate      from _, DateTimeFormatter.ISO_LOCAL_DATE)
+  val isoLocalTime: Prism[String, LocalTime]           = temporal(LocalTime      from _, DateTimeFormatter.ISO_LOCAL_TIME)
 
   ////
 

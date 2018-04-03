@@ -22,7 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, EncodeEJson}
 import quasar.ejson.implicits._
-import quasar.fp.numeric.Positive
+import quasar.fp.numeric.{Natural, Positive}
 import quasar.fs._
 import quasar.fs.mount.Mounting
 import quasar.frontend.SemanticErrors
@@ -35,7 +35,8 @@ import eu.timepit.refined.auto._
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._, Scalaz._
+import scalaz.{Writer => ZWriter, _}, Scalaz._
+import scalaz.syntax.tag._
 import scalaz.stream._
 import spire.algebra.{Field, NRoot}
 import spire.math.ConvertableTo
@@ -49,16 +50,16 @@ object analysis {
     * @param unionMaxSize    unions larger than this will be compressed
     */
   final case class CompressionSettings(
-    arrayMaxLength:  Positive,
-    mapMaxSize:      Positive,
-    stringMaxLength: Positive,
+    arrayMaxLength:  Natural,
+    mapMaxSize:      Natural,
+    stringMaxLength: Natural,
     unionMaxSize:    Positive
   )
 
   object CompressionSettings {
-    val DefaultArrayMaxLength:  Positive = 64L
-    val DefaultMapMaxSize:      Positive = 64L
-    val DefaultStringMaxLength: Positive = 64L
+    val DefaultArrayMaxLength:  Natural  = 10L
+    val DefaultMapMaxSize:      Natural  = 32L
+    val DefaultStringMaxLength: Natural  =  0L
     val DefaultUnionMaxSize:    Positive =  1L
 
     val Default: CompressionSettings =
@@ -76,22 +77,38 @@ object analysis {
     JC: Corecursive.Aux[J, EJson],
     JR: Recursive.Aux[J, EJson]
   ): Process1[Data, SST[J, A]] = {
-    val structuralTrans =
-      compression.coalesceWithUnknown[J, A]                    >>>
-      compression.coalesceKeys[J, A](settings.mapMaxSize)      >>>
-      compression.z85EncodedBinary[J, A]                       >>>
-      compression.limitStrings[J, A](settings.stringMaxLength) >>>
-      compression.limitArrays[J, A](settings.arrayMaxLength)   >>>
-      compression.coalescePrimary[J, A]                        >>>
-      compression.narrowUnion[J, A](settings.unionMaxSize)
+    type W[A] = ZWriter[Boolean @@ Tags.Disjunction, A]
 
-    val compress = (sst: SST[J, A]) => {
-      val compSST = sst.transCata[SST[J, A]](structuralTrans)
-      (sst ≠ compSST) option compSST
+    val thresholding: ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] = {
+      val independent =
+        orOriginal(applyTransforms(
+          compression.z85EncodedBinary[J, A],
+          compression.limitStrings[J, A](settings.stringMaxLength)))
+
+      compression.limitArrays[J, A](settings.arrayMaxLength)
+        .andThen(_.bimap(_.transAna[SST[J, A]](independent), independent))
+    }
+
+    val reduction: SSTF[J, A, SST[J, A]] => W[SSTF[J, A, SST[J, A]]] = {
+      val f = applyTransforms(
+        compression.coalesceWithUnknown[J, A],
+        compression.coalesceKeys[J, A](settings.mapMaxSize),
+        compression.coalescePrimary[J, A],
+        compression.narrowUnion[J, A](settings.unionMaxSize))
+
+      sstf => f(sstf).fold(sstf.point[W])(r => WriterT.writer((true.disjunction, r)))
+    }
+
+    def iterate(sst: SST[J, A]): Option[SST[J, A]] = {
+      val (changed, compressed) =
+        sst.transAnaM[W, SST[J, A], SSTF[J, A, ?]](reduction).run
+
+      changed.unwrap option compressed
     }
 
     process1.lift(SST.fromData[J, A](Field[A].one, _: Data))
-      .reduce((x, y) => repeatedly(compress)(x |+| y))
+      .map(_.elgotApo[SST[J, A]](thresholding))
+      .reduce((x, y) => repeatedly(iterate)(x |+| y))
   }
 
   /** The schema of the results of the given query. */

@@ -17,9 +17,9 @@
 package quasar.niflheim
 
 import java.io._
+
 import quasar.blueeyes.json._
 import quasar.precog.common._
-
 import quasar.precog.BitSet
 
 import org.specs2.mutable._
@@ -348,5 +348,6 @@ object RawHandlerSpecs extends Specification with ScalaCheck {
 
       a3REmpty.toSet must_== Set()
     }
+
   }
 }

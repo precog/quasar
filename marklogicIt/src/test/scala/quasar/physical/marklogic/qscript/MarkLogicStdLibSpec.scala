@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
-import quasar.{Data, TestConfig}
+import quasar.{Data, TestConfig, Type}
 import quasar.contrib.scalacheck.gen
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
@@ -28,8 +28,9 @@ import quasar.physical.marklogic.testing
 import quasar.physical.marklogic.xquery._
 import quasar.qscript._
 import quasar.std._
+import quasar.time.{DateGenerators, DateTimeInterval}
 
-import java.time.LocalDate
+import java.time._
 import scala.math.{abs, round}
 
 import com.marklogic.xcc.ContentSource
@@ -44,13 +45,26 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
   implicit SP: StructuralPlanner[F, FMT]
 ) extends StdLibSpec {
 
-  def ignoreSome(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result): Result =
+  private def ignoreUnary(prg: FreeMapA[Fix, UnaryArg], arg1: Data)(run: => Result)
+      : Result =
+    (prg, arg1) match {
+      case (_, _) if isTemporal(arg1.dataType) => pending
+      case (ExtractFunc(MapFuncsCore.ToTimestamp(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.ToLocal(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.OffsetDate(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.OffsetDateTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.OffsetTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.LocalDate(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.LocalDateTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.LocalTime(_)), _) => pending
+      case (ExtractFunc(MapFuncsCore.Interval(_)), _) => pending
+      case (_, _) => run
+    }
+
+  private def ignoreBinary(prg: FreeMapA[Fix, BinaryArg], arg1: Data, arg2: Data)(run: => Result)
+      : Result =
     (prg, arg1, arg2) match {
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Date(_), Data.Timestamp(_)) => pending
+      case (_, _, _) if isTemporal(arg1.dataType) || isTemporal(arg2.dataType) => pending
       case (ExtractFunc(MapFuncsCore.Split(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.Within(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.IfUndefined(_,_)), _, _) => pending
@@ -58,8 +72,20 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       case (ExtractFunc(MapFuncsCore.And(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.Or(_,_)), _, _) => pending
       case (ExtractFunc(MapFuncsCore.Range(_,_)), _, _) => pending
-      case _ => run
+      case (_, _, _) => run
     }
+
+  private def ignoreTernary(prg: FreeMapA[Fix, TernaryArg], arg1: Data, arg2: Data, arg3: Data)(run: => Result)
+      : Result =
+    (prg, arg1, arg2, arg3) match {
+      case (_, _, _, _) if isTemporal(arg1.dataType) || isTemporal(arg2.dataType) || isTemporal(arg3.dataType) => pending
+      case (_, _, _, _) => run
+    }
+
+  private def isTemporal(tpe: Type): Boolean =
+    (tpe == Type.OffsetDateTime) || (tpe == Type.OffsetDate) || (tpe == Type.OffsetTime) ||
+      (tpe == Type.LocalDateTime) || (tpe == Type.LocalDate) || (tpe == Type.LocalTime) ||
+      (tpe == Type.Interval)
 
   type RunT[X[_], A] = EitherT[X, Result, A]
 
@@ -79,7 +105,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       prg: FreeMapA[Fix, UnaryArg],
       arg: Data,
       expected: Data
-    ): Result = {
+    ): Result = ignoreUnary(prg, arg) {
       val xqyPlan = asXqy(arg) flatMap (a1 => planFreeMap[UnaryArg](prg)(κ(a1)))
 
       run(xqyPlan, expected)
@@ -89,7 +115,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       prg: FreeMapA[Fix, BinaryArg],
       arg1: Data, arg2: Data,
       expected: Data
-    ): Result = ignoreSome(prg, arg1, arg2){
+    ): Result = ignoreBinary(prg, arg1, arg2) {
       val xqyPlan = (asXqy(arg1) |@| asXqy(arg2)).tupled flatMap {
         case (a1, a2) => planFreeMap[BinaryArg](prg)(_.fold(a1, a2))
       }
@@ -100,7 +126,7 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
       prg: FreeMapA[Fix, TernaryArg],
       arg1: Data, arg2: Data, arg3: Data,
       expected: Data
-    ): Result = {
+    ): Result = ignoreTernary(prg, arg1, arg2, arg3) {
       val xqyPlan = (asXqy(arg1) |@| asXqy(arg2) |@| asXqy(arg3)).tupled flatMap {
         case (a1, a2, a3) => planFreeMap[TernaryArg](prg)(_.fold(a1, a2, a3))
       }
@@ -128,6 +154,10 @@ abstract class MarkLogicStdLibSpec[F[_]: Monad: QNameGenerator: PrologW: MonadPl
         LocalDate.of(1000, 1, 1).toEpochDay,
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
+
+    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genDateTimeInterval
+    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
 
     ////
 

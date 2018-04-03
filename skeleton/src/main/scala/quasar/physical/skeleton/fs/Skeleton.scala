@@ -108,6 +108,6 @@ object Skeleton extends BackendModule with DefaultAnalyzeModule {
     def move(scenario: PathPair, semantics: MoveSemantics): Backend[Unit] = ???
     def copy(pair: PathPair): Backend[Unit] = ???
     def delete(path: APath): Backend[Unit] = ???
-    def tempFile(near: APath): Backend[AFile] = ???
+    def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] = ???
   }
 }

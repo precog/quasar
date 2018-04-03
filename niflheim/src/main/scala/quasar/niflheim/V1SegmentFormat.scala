@@ -205,15 +205,18 @@ object V1SegmentFormat extends SegmentFormat {
   }
 
   private def getCodecFor[A](ctype: CValueType[A]): Codec[A] = ctype match {
-    case CPeriod => ???
-      // there doesn't appear to be a sane way to handle this
-      // Codec.LongCodec.as[Period](_.toStandardDuration.getMillis, new Period(_))
     case CBoolean => Codec.BooleanCodec
     case CString => Codec.Utf8Codec
     case CLong => Codec.PackedLongCodec
     case CDouble => Codec.DoubleCodec
     case CNum => Codec.BigDecimalCodec
-    case CDate => Codec.ZonedDateTimeCodec
+    case COffsetDateTime => Codec.OffsetDateTimeCodec
+    case COffsetTime => Codec.OffsetTimeCodec
+    case COffsetDate => Codec.OffsetDateCodec
+    case CLocalDateTime => Codec.LocalDateTimeCodec
+    case CLocalTime => Codec.LocalTimeCodec
+    case CLocalDate => Codec.LocalDateCodec
+    case CInterval => Codec.IntervalCodec
     case CArrayType(elemType) =>
       Codec.ArrayCodec(getCodecFor(elemType))(elemType.classTag)
   }

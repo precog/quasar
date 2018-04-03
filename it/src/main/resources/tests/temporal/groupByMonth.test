@@ -2,6 +2,8 @@
     "name": "group by month",
 
     "backends": {
+      "marklogic_json": "pendingIgnoreFieldOrder",
+      "mimir": "pendingIgnoreFieldOrder"
     },
 
     "data": "../days.data",

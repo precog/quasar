@@ -50,11 +50,13 @@ object BackendConfig {
   }
 
   /**
-   * A single directory containing jars, each of which will be
-   * loaded as a backend.  With each jar, the `BackendModule` class
-   * name will be determined from the `Manifest.mf` file.
+   * A single directory containing plugin files, each of which will be
+   * loaded as a backend. Plugin is defined by a json file containing
+   * a path to the main plugin jar from which `BackendModule` class
+   * name will be determined using the `Manifest.mf` file. The other thing
+   * in plugin file is a classpath that will be loaded for this plugin.
    */
-  final case class JarDirectory(dir: File) extends BackendConfig
+  final case class PluginDirectory(dir: File) extends BackendConfig
 
   /**
    * Any files in the classpath will be loaded as jars; any directories

@@ -18,12 +18,8 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.qscript.{MapFuncCore, MapFuncsCore}
-
-import quasar.blueeyes.json.JValue
-import quasar.precog.common.{CBoolean, CLong, CPathField, CPathIndex, CString, RValue}
-// import quasar.yggdrasil.TransSpecModule
-import quasar.yggdrasil.bytecode.{JDateT, JTextT, JType, JUnionT}
-
+import quasar.precog.common._
+import quasar.yggdrasil.bytecode._
 import matryoshka.{AlgebraM, RecursiveT}
 import matryoshka.implicits._
 
@@ -42,8 +38,6 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
     import cake.trans._
     import cake.Library._
 
-    private val StrAndDateT = JUnionT(JTextT, JDateT)
-
     private def undefined[A <: SourceType](id: TransSpec[A]): TransSpec[A] =
       DerefArrayStatic[A](OuterArrayConcat[A](WrapArray(id)), CPathIndex(1))
 
@@ -52,60 +46,90 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         undefined(id).point[F]
 
       case MapFuncsCore.Constant(ejson) =>
-        // EJson => Data => JValue => RValue => Table
+        // EJson => Data => RValue => Table
         val data: Data = ejson.cata(Data.fromEJson)
-        val jvalue: JValue = JValue.fromData(data)
-        val rvalue: Option[RValue] = RValue.fromJValue(jvalue)
-
+        val rvalue = MapFuncCorePlanner.dataToRValue(data)
         rvalue.map(transRValue(_, id)).getOrElse(undefined(id)).point[F]
 
       case MapFuncsCore.JoinSideName(_) => ??? // should never be received
 
       case MapFuncsCore.Length(a1) => length.spec(a1).point[F]
 
-      case MapFuncsCore.ExtractCentury(a1) => ???
+      case MapFuncsCore.ExtractCentury(a1) =>
+        (Map1[A](a1, cake.Library.ExtractCentury.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractDayOfMonth(a1) =>
-        (Map1[A](a1, cake.Library.DayOfMonth.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractDecade(a1) => ???
+        (Map1[A](a1, cake.Library.ExtractDayOfMonth.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractDecade(a1) =>
+        (Map1[A](a1, cake.Library.ExtractDecade.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractDayOfWeek(a1) =>
-        (Map1[A](a1, cake.Library.DayOfWeek.f1): TransSpec[A]).point[F]
+        (Map1[A](a1, cake.Library.ExtractDayOfWeek.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractDayOfYear(a1) =>
-        (Map1[A](a1, cake.Library.DayOfYear.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractEpoch(a1) => ???
+        (Map1[A](a1, cake.Library.ExtractDayOfYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractEpoch(a1) =>
+        (Map1[A](a1, cake.Library.ExtractEpoch.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractHour(a1) =>
-        (Map1[A](a1, cake.Library.HourOfDay.f1): TransSpec[A]).point[F]
+        (Map1[A](a1, cake.Library.ExtractHour.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractIsoDayOfWeek(a1) =>
-        (Map1[A](a1, cake.Library.DayOfWeek.f1): TransSpec[A]).point[F]
+        (Map1[A](a1, cake.Library.ExtractIsoDayOfWeek.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractIsoYear(a1) =>
-        (Map1[A](a1, cake.Library.Year.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractMicroseconds(a1) => ???
-      case MapFuncsCore.ExtractMillennium(a1) => ???
-      case MapFuncsCore.ExtractMilliseconds(a1) => ???
+        (Map1[A](a1, cake.Library.ExtractIsoYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractMicrosecond(a1) =>
+        (Map1[A](a1, cake.Library.ExtractMicrosecond.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractMillennium(a1) =>
+        (Map1[A](a1, cake.Library.ExtractMillennium.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractMillisecond(a1) =>
+        (Map1[A](a1, cake.Library.ExtractMillisecond.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractMinute(a1) =>
-        (Map1[A](a1, cake.Library.MinuteOfHour.f1): TransSpec[A]).point[F]
+        (Map1[A](a1, cake.Library.ExtractMinute.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractMonth(a1) =>
-        (Map1[A](a1, cake.Library.MonthOfYear.f1): TransSpec[A]).point[F]
+        (Map1[A](a1, cake.Library.ExtractMonth.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractQuarter(a1) =>
-        (Map1[A](a1, cake.Library.QuarterOfYear.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractSecond(a1) => ??? // expects a decimal like 32.12383
-      case MapFuncsCore.ExtractTimezone(a1) =>
-        (Map1[A](a1, cake.Library.TimeZone.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.ExtractTimezoneHour(a1) => ???
-      case MapFuncsCore.ExtractTimezoneMinute(a1) => ???
-      case MapFuncsCore.ExtractWeek(a1) => ??? // week of year
+        (Map1[A](a1, cake.Library.ExtractQuarter.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractSecond(a1) =>
+        (Map1[A](a1, cake.Library.ExtractSecond.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractTimeZone(a1) =>
+        (Map1[A](a1, cake.Library.ExtractTimeZone.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractTimeZoneHour(a1) =>
+        (Map1[A](a1, cake.Library.ExtractTimeZoneHour.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractTimeZoneMinute(a1) =>
+        (Map1[A](a1, cake.Library.ExtractTimeZoneMinute.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.ExtractWeek(a1) =>
+        (Map1[A](a1, cake.Library.ExtractWeek.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ExtractYear(a1) =>
-        (Map1[A](a1, cake.Library.Year.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.Date(a1) =>
-        (Map1[A](a1, cake.Library.Date.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.Time(a1) =>
-        (Map1[A](a1, cake.Library.Time.f1): TransSpec[A]).point[F]
-      case MapFuncsCore.Timestamp(a1) => ???
-      case MapFuncsCore.Interval(a1) => ???
-      case MapFuncsCore.StartOfDay(a1) => ???
-      case MapFuncsCore.TemporalTrunc(part, a1) => ???
-      case MapFuncsCore.TimeOfDay(a1) => ???
+        (Map1[A](a1, cake.Library.ExtractYear.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.LocalDateTime(a1) =>
+        (Map1[A](a1, cake.Library.LocalDateTime.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.LocalDate(a1) =>
+        (Map1[A](a1, cake.Library.LocalDate.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.LocalTime(a1) =>
+        (Map1[A](a1, cake.Library.LocalTime.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.OffsetDateTime(a1) =>
+        (Map1[A](a1, cake.Library.OffsetDateTime.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.OffsetTime(a1) =>
+        (Map1[A](a1, cake.Library.OffsetTime.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.OffsetDate(a1) =>
+        (Map1[A](a1, cake.Library.OffsetDate.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.Interval(a1) =>
+        (Map1[A](a1, cake.Library.Interval.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.StartOfDay(a1) =>
+        (Map1[A](a1, cake.Library.StartOfDay.f1): TransSpec[A]).point[F]
+      case MapFuncsCore.TemporalTrunc(part, a1) =>
+        (Map1[A](a1, cake.Library.truncPart(part).f1): TransSpec[A]).point[F]
+      case MapFuncsCore.TimeOfDay(a1) =>
+        (Map1[A](a1, cake.Library.TimeOfDay.f1): TransSpec[A]).point[F]
       case MapFuncsCore.ToTimestamp(a1) => ???
+
       case MapFuncsCore.Now() => ???
+      case MapFuncsCore.NowTime() => ???
+      case MapFuncsCore.NowDate() => ???
+      case MapFuncsCore.CurrentTimeZone() => ???
+
+      case MapFuncsCore.SetTimeZone(v, a1) =>
+        (Map2[A](a1, v, cake.Library.SetTimeZone.f2): TransSpec[A]).point[F]
+      case MapFuncsCore.SetTimeZoneHour(v, a1) =>
+        (Map2[A](a1, v, cake.Library.SetTimeZoneHour.f2): TransSpec[A]).point[F]
+      case MapFuncsCore.SetTimeZoneMinute(v, a1) =>
+        (Map2[A](a1, v, cake.Library.SetTimeZoneMinute.f2): TransSpec[A]).point[F]
 
       case MapFuncsCore.TypeOf(a1) => ???
       case MapFuncsCore.ToId(a1) => ???
@@ -214,7 +238,7 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
 
       case MapFuncsCore.ConcatArrays(a1, a2) =>
         (Cond(
-          Infix.And.spec2[A](IsType(a1, StrAndDateT), IsType(a2, StrAndDateT)),
+          Infix.And.spec2[A](IsType(a1, JTextT), IsType(a2, JTextT)),
           concat.spec[A](a1, a2),
           OuterArrayConcat[A](a1, a2)): TransSpec[A]).point[F]
 
@@ -246,4 +270,54 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         (Cond(IsType(src, JType.fromType(tpe)), a2, a3): TransSpec[A]).point[F]
     }
   }
+}
+
+object MapFuncCorePlanner {
+
+  import scalaz.syntax.std.option._
+  import scalaz.syntax.functor._
+  import scalaz.std.option._
+  def dataToRValue(data: Data): Option[RValue] = data match {
+    case Data.Arr(d) => RArray(d.flatMap(dataToRValue)).some
+    case Data.Obj(o) => RObject(o.flatMap { case (k, v) => dataToRValue(v).strengthL(k) }).some
+    case Data.Null => CNull.some
+    case Data.Bool(b) => CBoolean(b).some
+    case Data.Str(s) => CString(s).some
+    case Data.Dec(k) => CNum(k).some
+    case Data.Int(k) =>
+      (if (k.isValidLong) CLong(k.toLong) else CNum(BigDecimal(k))).some
+    case Data.OffsetDateTime(v) => COffsetDateTime(v).some
+    case Data.OffsetDate(v) => COffsetDate(v).some
+    case Data.OffsetTime(v) => COffsetTime(v).some
+    case Data.LocalDateTime(v) => CLocalDateTime(v).some
+    case Data.LocalDate(v) => CLocalDate(v).some
+    case Data.LocalTime(v) => CLocalTime(v).some
+    case Data.Interval(k) => CInterval(k).some
+    case Data.Binary(k) => CArray[Long](k.map(l => l.toLong).toArray).some
+    case Data.Id(s) => CString(s).some
+    case Data.NA => None
+  }
+
+  def rValueToData(rvalue: RValue): Data = rvalue match {
+    case RArray(a)           => Data.Arr(a.map(rValueToData))
+    case CArray(a, ty)       => Data.Arr(a.map(k => rValueToData(ty.elemType(k))).toList)
+    case RObject(a)          => Data.Obj(a.mapValues(rValueToData).toList: _*)
+    case CEmptyArray         => Data.Arr(Nil)
+    case CEmptyObject        => Data.Obj()
+    case CString(as)         => Data.Str(as)
+    case CBoolean(ab)        => Data.Bool(ab)
+    case CLong(al)           => Data.Int(BigInt(al))
+    case CDouble(ad)         => Data.Dec(BigDecimal(ad))
+    case CNum(an)            => Data.Dec(an)
+    case CLocalDateTime(ad)  => Data.LocalDateTime(ad)
+    case CLocalDate(ad)      => Data.LocalDate(ad)
+    case CLocalTime(ad)      => Data.LocalTime(ad)
+    case COffsetDateTime(ad) => Data.OffsetDateTime(ad)
+    case COffsetDate(ad)     => Data.OffsetDate(ad)
+    case COffsetTime(ad)     => Data.OffsetTime(ad)
+    case CInterval(ad)       => Data.Interval(ad)
+    case CUndefined          => Data.NA
+    case CNull               => Data.Null
+  }
+
 }

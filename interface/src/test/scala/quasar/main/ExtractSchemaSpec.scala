@@ -18,6 +18,7 @@ package quasar.main
 
 import slamdata.Predef.{Int => SInt, _}
 import quasar.Data
+import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
@@ -26,32 +27,41 @@ import quasar.fp.numeric.SampleStats
 import quasar.sst._
 import quasar.tpe._
 
+import scala.Byte
+
 import eu.timepit.refined.auto._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.stream.Process
 import spire.std.double._
+import spire.math.Real
 
 final class ExtractSchemaSpec extends quasar.Qspec {
-  import Data._, StructuralType.TypeST
+  import Data._, StructuralType.{TagST, TypeST}
 
   type J = Fix[EJson]
-  type S = SST[J, Double]
+  type S = SST[J, Real]
+
+  implicit val showReal: Show[Real] =
+    Show.showFromToString
 
   val J = Fixed[J]
   val settings = analysis.CompressionSettings(1000L, 1000L, 1000L, 1000L)
 
   def verify(cs: analysis.CompressionSettings, input: List[Data], expected: S) =
     Process.emitAll(input)
-      .pipe(analysis.extractSchema[J, Double](cs))
+      .pipe(analysis.extractSchema[J, Real](cs))
       .toVector.headOption must beSome(equal(expected))
 
   def ints(n: SInt, ns: SInt*): NonEmptyList[S] =
     NonEmptyList(n, ns: _*) map (n =>
       envT(
-        TypeStat.int(SampleStats.one(n.toDouble), BigInt(n), BigInt(n)),
+        TypeStat.int(SampleStats.one(Real(n)), BigInt(n), BigInt(n)),
         TypeST(TypeF.const[J, S](J.int(BigInt(n))))).embed)
+
+  def strSS(s: String): SampleStats[Real] =
+    SampleStats.fromFoldable(s.map(c => Real(c.toInt)).toList)
 
   "compress arrays" >> {
     val input = List(
@@ -60,14 +70,14 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(2.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.coll(1.0, 2.0.some, 2.0.some),
+          TypeStat.coll(Real(1), Real(2).some, Real(2).some),
           TypeST(TypeF.arr[J, S](ints(1, 2).list.left))).embed,
 
         J.str("bar") -> envT(
-          TypeStat.coll(1.0, 3.0.some, 3.0.some),
+          TypeStat.coll(Real(1), Real(3).some, Real(3).some),
           TypeST(TypeF.arr[J, S](ints(1, 2, 3).suml1.right))).embed
       ), None))).embed
 
@@ -81,17 +91,22 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(2.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.str(1.0, 6.0, 6.0, "", ""),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(1.0),
-            TypeST(TypeF.simple[J, S](SimpleType.Char))
-          ).embed.right))).embed,
+          TypeStat.coll(Real(1), Real(6).some, Real(6).some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(Real(1), Real(6).some, Real(6).some),
+              TypeST(TypeF.arr[J, S](envT(
+                TypeStat.char(strSS("abcdef"), 'a', 'f'),
+                TypeST(TypeF.simple[J, S](SimpleType.Char))).embed.right))
+            ).embed))
+          ).embed,
 
         J.str("bar") -> envT(
-          TypeStat.str(1.0, 5.0, 5.0, "abcde", "abcde"),
+          TypeStat.coll(Real(1), Real(5).some, Real(5).some),
           TypeST(TypeF.const[J, S](J.str("abcde")))
         ).embed
       ), None))).embed
@@ -101,9 +116,9 @@ final class ExtractSchemaSpec extends quasar.Qspec {
 
   "compress encoded binary strings" >> {
     val b1 = ImmutableArray.fromArray("".getBytes)
-    val l1 = b1.length.toDouble
+    val l1 = Real(b1.length)
     val b2 = ImmutableArray.fromArray("abcdef".getBytes)
-    val l2 = b2.length.toDouble
+    val l2 = Real(b2.length)
 
     val input = List(
       _obj(ListMap("foo" -> _binary(b1))),
@@ -111,19 +126,19 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(2.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.coll(1.0, l1.some, l1.some),
+          TypeStat.coll(Real(1), l1.some, l1.some),
           TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(1.0),
+            TypeStat.byte(Real(1), Byte.MinValue, Byte.MaxValue),
             TypeST(TypeF.simple[J, S](SimpleType.Byte))
           ).embed.right))).embed,
 
         J.str("bar") -> envT(
-          TypeStat.coll(1.0, l2.some, l2.some),
+          TypeStat.coll(Real(1), l2.some, l2.some),
           TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(1.0),
+            TypeStat.byte(Real(1), Byte.MinValue, Byte.MaxValue),
             TypeST(TypeF.simple[J, S](SimpleType.Byte))
           ).embed.right))).embed
       ), None))).embed
@@ -139,17 +154,34 @@ final class ExtractSchemaSpec extends quasar.Qspec {
       _obj(ListMap("quux" -> _int(1)))
     )
 
+    val fooSS =
+      SampleStats.fromFoldable("foo".map(_.toDouble).toList)
+
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux"),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(4.0),
-            TypeST(TypeF.simple[J, S](SimpleType.Char))
-          ).embed.right))).embed,
+          TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+              TypeST(TypeF.arr[J, S](IList(
+                envT(
+                  TypeStat.char(strSS("fbbq"), 'b', 'q'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("oaau"), 'a', 'u'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("orzu"), 'o', 'z'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("x"), 'x', 'x'),
+                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+              ).left))).embed))).embed,
         envT(
-          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)),
+          TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
           TypeST(TypeF.const[J, S](J.int(1)))
         ).embed
       ))))).embed
@@ -166,16 +198,30 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
         envT(
-          TypeStat.str(4.0, 3.0, 4.0, "bar", "quux"),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.count(4.0),
-            TypeST(TypeF.simple[J, S](SimpleType.Char))
-          ).embed.right))).embed,
+          TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+          TagST[J](Tagged(
+            strings.StructuralString,
+            envT(
+              TypeStat.coll(Real(4), Real(3).some, Real(4).some),
+              TypeST(TypeF.arr[J, S](IList(
+                envT(
+                  TypeStat.char(strSS("fbbq"), 'b', 'q'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("oaau"), 'a', 'u'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("orzu"), 'o', 'z'),
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
+                envT(
+                  TypeStat.char(strSS("x"), 'x', 'x'),
+                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+              ).left))).embed))).embed,
         envT(
-          TypeStat.int(SampleStats.freq(4.0, 1.0), BigInt(1), BigInt(1)),
+          TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
           TypeST(TypeF.const[J, S](J.int(1)))
         ).embed
       ))))).embed
@@ -192,19 +238,19 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.count(4.0),
+          TypeStat.count(Real(4)),
           TypeST(TypeF.coproduct[J, S](
             envT(
               TypeStat.int(
-                SampleStats.fromFoldable(IList(1.0, 2.0)),
+                SampleStats.fromFoldable(IList(Real(1), Real(2))),
                 BigInt(1),
                 BigInt(2)),
               TypeST(TypeF.simple[J, S](SimpleType.Int))).embed,
             envT(
-              TypeStat.bool(1.0, 1.0),
+              TypeStat.bool(Real(1), Real(1)),
               TypeST(TypeF.simple[J, S](SimpleType.Bool))).embed))
         ).embed
       ), None))).embed
@@ -221,19 +267,19 @@ final class ExtractSchemaSpec extends quasar.Qspec {
     )
 
     val expected = envT(
-      TypeStat.coll(4.0, 1.0.some, 1.0.some),
+      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
       TypeST(TypeF.map[J, S](IMap(
         J.str("foo") -> envT(
-          TypeStat.count(4.0),
+          TypeStat.count(Real(4)),
           TypeST(TypeF.coproduct[J, S](
             envT(
               TypeStat.int(
-                SampleStats.fromFoldable(IList(1.0, 2.0, 3.0)),
+                SampleStats.fromFoldable(IList(Real(1), Real(2), Real(3))),
                 BigInt(1),
                 BigInt(3)),
               TypeST(TypeF.simple[J, S](SimpleType.Int))).embed,
             envT(
-              TypeStat.bool(1.0, 0.0),
+              TypeStat.bool(Real(1), Real(0)),
               TypeST(TypeF.const[J, S](J.bool(true)))).embed))
         ).embed
       ), None))).embed

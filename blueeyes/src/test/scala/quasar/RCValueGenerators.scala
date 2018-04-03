@@ -14,47 +14,49 @@
  * limitations under the License.
  */
 
-package quasar.yggdrasil
-package jdbm3
+package quasar
 
-import quasar.blueeyes._
 import quasar.precog.common._
-import quasar.precog.TestSupport._, Gen._
+import quasar.pkg.tests._, Gen._
+import quasar.time.DateGenerators._
 
-import java.time.{Instant, ZoneOffset, ZonedDateTime}
-
-trait CValueGenerators {
+trait RCValueGenerators {
   def maxArrayDepth = 3
 
   def genColumn(size: Int, values: Gen[Array[CValue]]): Gen[List[Seq[CValue]]] = containerOfN[List,Seq[CValue]](size, values.map(_.toSeq))
 
-  private def genNonArrayCValueType: Gen[CValueType[_]] = Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum, CDate)
+  private def genNonArrayCValueType: Gen[CValueType[_]] =
+    Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum,
+      COffsetDateTime, COffsetTime, COffsetDate,
+      CLocalDateTime, CLocalTime, CLocalDate, CInterval)
 
-  def genCValueType(maxDepth: Int = maxArrayDepth, depth: Int = 0): Gen[CValueType[_]] = {
-    if (depth >= maxDepth) genNonArrayCValueType else {
-      frequency(0 -> (genCValueType(maxDepth, depth + 1) map (CArrayType(_))), 6 -> genNonArrayCValueType)
+  def genCValueType(maxDepth: Int = maxArrayDepth): Gen[CValueType[_]] = {
+    if (maxDepth > 0) {
+      genNonArrayCValueType
+    } else {
+      frequency(0 -> (genCValueType(maxDepth - 1) map (CArrayType(_))), 6 -> genNonArrayCValueType)
     }
   }
 
   def genCType: Gen[CType] = frequency(7 -> genCValueType(), 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
 
-  // TODO remove duplication with `SegmentFormatSupport#genForCType`
   def genValueForCValueType[A](cType: CValueType[A]): Gen[CWrappedValue[A]] = cType match {
-    case CString  => genString map (CString(_))
+    case CString  => genJSONString map (CString(_))
     case CBoolean => genBool map (CBoolean(_))
     case CLong    => genLong map (CLong(_))
     case CDouble  => genDouble map (CDouble(_))
-    case CNum     => for {
-      scale  <- genInt
-      bigInt <- genBigInt
-    } yield CNum(BigDecimal(new java.math.BigDecimal(bigInt.bigInteger, scale - 1), java.math.MathContext.UNLIMITED))
-    case CDate =>
-      genPosLong ^^ (n => CDate(ZonedDateTime.ofInstant(Instant.ofEpochSecond(n % Instant.MAX.getEpochSecond), ZoneOffset.UTC)))
+    case CNum     => genSmallScaleBigDecimal.map(CNum(_))
+    case CLocalDateTime => genLocalDateTime.map(CLocalDateTime(_))
+    case CLocalTime => genLocalTime.map(CLocalTime(_))
+    case CLocalDate => genLocalDate.map(CLocalDate(_))
+    case COffsetDateTime => genOffsetDateTime.map(COffsetDateTime(_))
+    case COffsetTime => genOffsetTime.map(COffsetTime(_))
+    case COffsetDate => genOffsetDate.map(COffsetDate(_))
+    case CInterval => genInterval.map(CInterval(_))
     case CArrayType(elemType) =>
       vectorOf(genValueForCValueType(elemType) map (_.value)) map { xs =>
         CArray(xs.toArray(elemType.classTag), CArrayType(elemType))
       }
-    case CPeriod => abort("undefined")
   }
 
   def genCValue(tpe: CType): Gen[CValue] = tpe match {
@@ -66,4 +68,5 @@ trait CValueGenerators {
   }
 }
 
+object RCValueGenerators extends RCValueGenerators
 

@@ -17,13 +17,12 @@
 package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary}, DataArbitrary.dataShrink
+import quasar.{Data, DataGenerators}, DataGenerators.dataShrink
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 
 import java.math.MathContext
-import java.time._
 import scala.collection.Traversable
 
 import eu.timepit.refined.auto._
@@ -48,32 +47,18 @@ abstract class StructuralPlannerSpec[F[_]: Monad, FMT](
     val genKey = Gen.alphaNumChar flatMap (c => Gen.alphaNumStr map (c.toString + _))
     val genDbl = Gen.choose(-1000.0, 1000.0)
 
-    val secondsInDay: Long        = 24L * 60 * 60
-    //  TODO: Many negative years parse fine, but some don't, randomly
-    //  1600-01-01 to 9999-12-31
-    val genSeconds: Gen[Long]     = Gen.choose(-11676096000L, 253402214400L)
-    val genSecondOfDay: Gen[Long] = Gen.choose(0L, secondsInDay - 1)
-    val genMillis: Gen[Long]      = Gen.choose(0L, 999L)
-    val genNanos: Gen[Long]       = genMillis map (_ * 1000000)
-
-    val genInstant: Gen[Instant]   = (genSeconds |@| genNanos)(Instant.ofEpochSecond)
-    val genDuration: Gen[Duration] = (genSeconds |@| genNanos)(Duration.ofSeconds)
-    val genDate: Gen[LocalDate]    = genSeconds map (s => LocalDate.ofEpochDay(s / secondsInDay))
-    val genTime: Gen[LocalTime]    = genSecondOfDay map LocalTime.ofSecondOfDay
-
+    // TODO Support datetimes and intervals.
+    // Many negative years parse fine, but some don't, randomly.
+    // The dates in 1600-01-01 to 9999-12-31 will parse, but it's worth checking the negative ones again.
     val genAtomic = Gen.oneOf[Data](
                                  Data.Null,
       Gen.alphaStr           map Data.Str,
       arbitrary[Boolean]     map Data.Bool,
       genDbl                 map (d => Data.Dec(BigDecimal(d, MathContext.DECIMAL32))),
       arbitrary[Int]         map (i => Data.Int(BigInt(i))),
-      genInstant             map Data.Timestamp,
-      genDate                map Data.Date,
-      genTime                map Data.Time,
-      genDuration            map Data.Interval,
       arbitrary[Array[Byte]] map Data.Binary.fromArray)
 
-    Arbitrary(DataArbitrary.genNested(genKey, genAtomic))
+    Arbitrary(DataGenerators.genNested(genKey, genAtomic))
   }
 
   val emptyArr: Data              = Data._arr(List())

@@ -19,11 +19,11 @@ package quasar.yggdrasil
 import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.blueeyes.json._
-import java.math.MathContext
+import quasar.RCValueGenerators
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._, Gen._
 
-object CValueGenerators {
+object SJValueGenerators {
   type JSchema = Seq[(JPath, CType)]
 
   def inferSchema(data: Seq[JValue]): JSchema = {
@@ -40,8 +40,8 @@ object CValueGenerators {
   }
 }
 
-trait CValueGenerators extends ArbitraryBigDecimal {
-  import CValueGenerators._
+trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
+  import SJValueGenerators._
 
   def schema(depth: Int): Gen[JSchema] = {
     if (depth <= 0) leafSchema
@@ -91,24 +91,17 @@ trait CValueGenerators extends ArbitraryBigDecimal {
     CNum,
     CNull,
     CEmptyObject,
-    CEmptyArray
+    CEmptyArray,
+    CInterval,
+    COffsetDateTime,
+    COffsetTime,
+    COffsetDate,
+    CLocalDateTime,
+    CLocalTime,
+    CLocalDate
   )
 
-  // FIXME: TODO Should this provide some form for CDate?
-  def jvalue(ctype: CType): Gen[JValue] = ctype match {
-    case CString       => alphaStr map (JString(_))
-    case CBoolean      => arbitrary[Boolean] map (JBool(_))
-    case CLong         => arbitrary[Long] map { ln => JNum(BigDecimal(ln, MathContext.UNLIMITED)) }
-    case CDouble       => arbitrary[Double] map { d => JNum(BigDecimal(d, MathContext.UNLIMITED)) }
-    case CNum          => arbitrary[BigDecimal] map { bd => JNum(bd) }
-    case CNull         => JNull
-    case CEmptyObject  => JObject.empty
-    case CEmptyArray   => JArray.empty
-    case CUndefined    => JUndefined
-    case CArrayType(_) => abort("undefined")
-    case CDate         => abort("undefined")
-    case CPeriod       => abort("undefined")
-  }
+  def jvalue(ctype: CType): Gen[JValue] = genCValue(ctype).map(_.toJValue)
 
   def jvalue(schema: Seq[(JPath, CType)]): Gen[JValue] = {
     schema.foldLeft(Gen.const[JValue](JUndefined)) {

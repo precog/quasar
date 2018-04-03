@@ -20,10 +20,11 @@ import quasar.blueeyes._, json._
 import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scalaz.Semigroup
 
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -139,17 +140,47 @@ object HomogeneousArrayColumn {
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
         def apply(row: Int): BigDecimal = col(row)(i)
       }
-    case col @ HomogeneousArrayColumn(CDate) =>
-      new DateColumn {
+    case col @ HomogeneousArrayColumn(COffsetDateTime) =>
+      new OffsetDateTimeColumn {
         def isDefinedAt(row: Int): Boolean =
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
-        def apply(row: Int): ZonedDateTime = col(row)(i)
+        def apply(row: Int): OffsetDateTime = col(row)(i)
       }
-    case col @ HomogeneousArrayColumn(CPeriod) =>
-      new PeriodColumn {
+    case col @ HomogeneousArrayColumn(COffsetTime) =>
+      new OffsetTimeColumn {
         def isDefinedAt(row: Int): Boolean =
           i >= 0 && col.isDefinedAt(row) && i < col(row).length
-        def apply(row: Int): Period = col(row)(i)
+        def apply(row: Int): OffsetTime = col(row)(i)
+      }
+    case col @ HomogeneousArrayColumn(COffsetDate) =>
+      new OffsetDateColumn {
+        def isDefinedAt(row: Int): Boolean =
+          i >= 0 && col.isDefinedAt(row) && i < col(row).length
+        def apply(row: Int): OffsetDate = col(row)(i)
+      }
+    case col @ HomogeneousArrayColumn(CLocalDateTime) =>
+      new LocalDateTimeColumn {
+        def isDefinedAt(row: Int): Boolean =
+          i >= 0 && col.isDefinedAt(row) && i < col(row).length
+        def apply(row: Int): LocalDateTime = col(row)(i)
+      }
+    case col @ HomogeneousArrayColumn(CLocalTime) =>
+      new LocalTimeColumn {
+        def isDefinedAt(row: Int): Boolean =
+          i >= 0 && col.isDefinedAt(row) && i < col(row).length
+        def apply(row: Int): LocalTime = col(row)(i)
+      }
+    case col @ HomogeneousArrayColumn(CLocalDate) =>
+      new LocalDateColumn {
+        def isDefinedAt(row: Int): Boolean =
+          i >= 0 && col.isDefinedAt(row) && i < col(row).length
+        def apply(row: Int): LocalDate = col(row)(i)
+      }
+    case col @ HomogeneousArrayColumn(CInterval) =>
+      new IntervalColumn {
+        def isDefinedAt(row: Int): Boolean =
+          i >= 0 && col.isDefinedAt(row) && i < col(row).length
+        def apply(row: Int): DateTimeInterval = col(row)(i)
       }
     case col @ HomogeneousArrayColumn(cType: CArrayType[a]) =>
       new HomogeneousArrayColumn[a] {
@@ -211,7 +242,7 @@ trait LongColumn extends Column with (Int => Long) {
   override val tpe = CLong
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CLong(this(row))
-  override def strValue(row: Int): String = String.valueOf(this(row))
+  override def strValue(row: Int): String = String.valueOf(jValue(row))
   override def toString                   = "LongColumn"
 }
 
@@ -223,7 +254,7 @@ trait DoubleColumn extends Column with (Int => Double) {
   override val tpe = CDouble
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CDouble(this(row))
-  override def strValue(row: Int): String = String.valueOf(this(row))
+  override def strValue(row: Int): String = String.valueOf(JValue.coerceNumerics(jValue(row)))
   override def toString                   = "DoubleColumn"
 }
 
@@ -235,7 +266,7 @@ trait NumColumn extends Column with (Int => BigDecimal) {
   override val tpe = CNum
   override def jValue(row: Int)           = JNum(this(row))
   override def cValue(row: Int)           = CNum(this(row))
-  override def strValue(row: Int): String = this(row).toString
+  override def strValue(row: Int): String = JValue.coerceNumerics(jValue(row)).toString
   override def toString                   = "NumColumn"
 }
 
@@ -252,29 +283,89 @@ trait StrColumn extends Column with (Int => String) {
   override def toString                   = "StrColumn"
 }
 
-trait DateColumn extends Column with (Int => ZonedDateTime) {
-  def apply(row: Int): ZonedDateTime
-  def rowEq(row1: Int, row2: Int): Boolean = apply(row1) == apply(row2)
-  def rowCompare(row1: Int, row2: Int): Int =
-    apply(row1) compareTo apply(row2)
-
-  override val tpe                        = CDate
-  override def jValue(row: Int)           = JString(this(row).toString)
-  override def cValue(row: Int)           = CDate(this(row))
-  override def strValue(row: Int): String = this(row).toString
-  override def toString                   = "DateColumn"
-}
-
-trait PeriodColumn extends Column with (Int => Period) {
-  def apply(row: Int): Period
+trait OffsetDateTimeColumn extends Column with (Int => OffsetDateTime) {
+  def apply(row: Int): OffsetDateTime
   def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
   def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
 
-  override val tpe                        = CPeriod
+  override val tpe                        = COffsetDateTime
   override def jValue(row: Int)           = JString(this(row).toString)
-  override def cValue(row: Int)           = CPeriod(this(row))
+  override def cValue(row: Int)           = COffsetDateTime(this(row))
   override def strValue(row: Int): String = this(row).toString
-  override def toString                   = "PeriodColumn"
+  override def toString                   = "OffsetDateTimeColumn"
+}
+
+trait OffsetTimeColumn extends Column with (Int => OffsetTime) {
+  def apply(row: Int): OffsetTime
+  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+
+  override val tpe                        = COffsetTime
+  override def jValue(row: Int)           = JString(this(row).toString)
+  override def cValue(row: Int)           = COffsetTime(this(row))
+  override def strValue(row: Int): String = this(row).toString
+  override def toString                   = "OffsetTimeColumn"
+}
+
+trait OffsetDateColumn extends Column with (Int => OffsetDate) {
+  def apply(row: Int): OffsetDate
+  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+
+  override val tpe                        = COffsetDate
+  override def jValue(row: Int)           = JString(this(row).toString)
+  override def cValue(row: Int)           = COffsetDate(this(row))
+  override def strValue(row: Int): String = this(row).toString
+  override def toString                   = "OffsetDateColumn"
+}
+
+trait LocalDateTimeColumn extends Column with (Int => LocalDateTime) {
+  def apply(row: Int): LocalDateTime
+  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+
+  override val tpe                        = CLocalDateTime
+  override def jValue(row: Int)           = JString(this(row).toString)
+  override def cValue(row: Int)           = CLocalDateTime(this(row))
+  override def strValue(row: Int): String = this(row).toString
+  override def toString                   = "LocalDateTimeColumn"
+}
+
+trait LocalTimeColumn extends Column with (Int => LocalTime) {
+  def apply(row: Int): LocalTime
+  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+
+  override val tpe                        = CLocalTime
+  override def jValue(row: Int)           = JString(this(row).toString)
+  override def cValue(row: Int)           = CLocalTime(this(row))
+  override def strValue(row: Int): String = this(row).toString
+  override def toString                   = "LocalTimeColumn"
+}
+
+trait LocalDateColumn extends Column with (Int => LocalDate) {
+  def apply(row: Int): LocalDate
+  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
+  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+
+  override val tpe                        = CLocalDate
+  override def jValue(row: Int)           = JString(this(row).toString)
+  override def cValue(row: Int)           = CLocalDate(this(row))
+  override def strValue(row: Int): String = this(row).toString
+  override def toString                   = "LocalDateColumn"
+}
+
+trait IntervalColumn extends Column with (Int => DateTimeInterval) {
+  def apply(row: Int): DateTimeInterval
+  def rowEq(row1: Int, row2: Int): Boolean  = apply(row1) == apply(row2)
+  // TODO: fix this
+  def rowCompare(row1: Int, row2: Int): Int = sys.error("Cannot compare periods.")
+
+  override val tpe                        = CInterval
+  override def jValue(row: Int)           = JString(this(row).toString)
+  override def cValue(row: Int)           = CInterval(this(row))
+  override def strValue(row: Int): String = this(row).toString
+  override def toString                   = "IntervalColumn"
 }
 
 trait EmptyArrayColumn extends Column {
@@ -374,7 +465,13 @@ object Column {
     case CDouble(v)                          => const(v)
     case CNum(v)                             => const(v)
     case CString(v)                          => const(v)
-    case CDate(v)                            => const(v)
+    case COffsetDateTime(v)                  => const(v)
+    case COffsetDate(v)                      => const(v)
+    case COffsetTime(v)                      => const(v)
+    case CLocalDateTime(v)                   => const(v)
+    case CLocalDate(v)                       => const(v)
+    case CLocalTime(v)                       => const(v)
+    case CInterval(v)                        => const(v)
     case CArray(v, t @ CArrayType(elemType)) => const(v)(elemType)
     case CEmptyObject                        => new InfiniteColumn with EmptyObjectColumn
     case CEmptyArray                         => new InfiniteColumn with EmptyArrayColumn
@@ -429,11 +526,31 @@ object Column {
     def apply(row: Int) = v
   }
 
-  @inline def const(v: ZonedDateTime) = new InfiniteColumn with DateColumn {
+  @inline def const(v: OffsetDateTime) = new InfiniteColumn with OffsetDateTimeColumn {
     def apply(row: Int) = v
   }
 
-  @inline def const(v: Period) = new InfiniteColumn with PeriodColumn {
+  @inline def const(v: OffsetTime) = new InfiniteColumn with OffsetTimeColumn {
+    def apply(row: Int) = v
+  }
+
+  @inline def const(v: OffsetDate) = new InfiniteColumn with OffsetDateColumn {
+    def apply(row: Int) = v
+  }
+
+  @inline def const(v: LocalDateTime) = new InfiniteColumn with LocalDateTimeColumn {
+    def apply(row: Int) = v
+  }
+
+  @inline def const(v: LocalTime) = new InfiniteColumn with LocalTimeColumn {
+    def apply(row: Int) = v
+  }
+
+  @inline def const(v: LocalDate) = new InfiniteColumn with LocalDateColumn {
+    def apply(row: Int) = v
+  }
+
+  @inline def const(v: DateTimeInterval) = new InfiniteColumn with IntervalColumn {
     def apply(row: Int) = v
   }
 
@@ -448,8 +565,13 @@ object Column {
     case col: DoubleColumn              => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: NumColumn                 => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: StrColumn                 => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: DateColumn                => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
-    case col: PeriodColumn              => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: OffsetDateTimeColumn      => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: OffsetTimeColumn          => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: OffsetDateColumn          => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: LocalDateTimeColumn       => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: LocalTimeColumn           => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: LocalDateColumn           => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
+    case col: IntervalColumn            => HomogeneousArrayColumn { case row if col isDefinedAt row => Array(col(row)) }
     case col: HomogeneousArrayColumn[a] =>
       new HomogeneousArrayColumn[Array[a]] {
         val tpe = CArrayType(col.tpe)

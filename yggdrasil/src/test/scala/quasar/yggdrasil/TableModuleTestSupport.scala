@@ -19,6 +19,7 @@ package quasar.yggdrasil
 import quasar.blueeyes._, json._
 import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
+import quasar.precog.common.RValue
 
 trait TestLib[M[+_]] extends TableModule[M] {
   def lookupF1(namespace: List[String], name: String): F1
@@ -30,9 +31,9 @@ trait TableModuleTestSupport[M[+_]] extends TableModule[M] with TestLib[M] {
   implicit def M: Monad[M] with Comonad[M]
 
   def fromJson(data: Stream[JValue], maxBlockSize: Option[Int] = None): Table
-  def toJson(dataset: Table): M[Stream[JValue]] = dataset.toJson.map(_.toStream)
+  def toJson(dataset: Table): M[Stream[RValue]] = dataset.toJson.map(_.toStream)
 
-  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data, maxBlockSize)
+  def fromSample(sampleData: SampleData, maxBlockSize: Option[Int] = None): Table = fromJson(sampleData.data.map(_.toJValueRaw), maxBlockSize)
 }
 
 trait TableModuleSpec[M[+_]] extends SpecificationLike with ScalaCheck {

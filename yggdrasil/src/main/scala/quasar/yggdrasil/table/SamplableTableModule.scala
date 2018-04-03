@@ -143,8 +143,13 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
         case CDouble              => ArrayDoubleColumn.empty(size)
         case CNum                 => ArrayNumColumn.empty(size)
         case CString              => ArrayStrColumn.empty(size)
-        case CDate                => ArrayDateColumn.empty(size)
-        case CPeriod              => ArrayPeriodColumn.empty(size)
+        case COffsetDateTime      => ArrayOffsetDateTimeColumn.empty(size)
+        case COffsetTime          => ArrayOffsetTimeColumn.empty(size)
+        case COffsetDate          => ArrayOffsetDateColumn.empty(size)
+        case CLocalDateTime       => ArrayLocalDateTimeColumn.empty(size)
+        case CLocalTime           => ArrayLocalTimeColumn.empty(size)
+        case CLocalDate           => ArrayLocalDateColumn.empty(size)
+        case CInterval            => ArrayIntervalColumn.empty(size)
         case CArrayType(elemType) => ArrayHomogeneousArrayColumn.empty(size)(elemType)
         case CNull                => MutableNullColumn.empty()
         case CEmptyObject         => MutableEmptyObjectColumn.empty()
@@ -181,7 +186,32 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
               def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
               def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
             }
-          case (src: DateColumn, dest: ArrayDateColumn) =>
+          case (src: OffsetDateTimeColumn, dest: ArrayOffsetDateTimeColumn) =>
+            new ColumnOps(src, dest) {
+              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+            }
+          case (src: OffsetTimeColumn, dest: ArrayOffsetTimeColumn) =>
+            new ColumnOps(src, dest) {
+              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+            }
+          case (src: OffsetDateColumn, dest: ArrayOffsetDateColumn) =>
+            new ColumnOps(src, dest) {
+              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+            }
+          case (src: LocalDateTimeColumn, dest: ArrayLocalDateTimeColumn) =>
+            new ColumnOps(src, dest) {
+              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+            }
+          case (src: LocalTimeColumn, dest: ArrayLocalTimeColumn) =>
+            new ColumnOps(src, dest) {
+              def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
+              def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))
+            }
+          case (src: LocalDateColumn, dest: ArrayLocalDateColumn) =>
             new ColumnOps(src, dest) {
               def unsafeInsert(srcRow: Int, destRow: Int) = dest.update(destRow, src(srcRow))
               def unsafeMove(from: Int, to: Int)          = dest.update(to, dest(from))

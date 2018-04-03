@@ -122,7 +122,7 @@ abstract class QueryRegressionTest[S[_]](
       }
 
       step(println("]"))
-      step(runT(fs.setupInterpM)(manage.delete(DataDir)).runVoid)
+      step(doDelete(fs.setupInterpM, DataDir).runVoid)
     }
   }
 

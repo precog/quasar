@@ -23,7 +23,8 @@ import quasar.contrib.spire.random.dist._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.sst.{SST, StructuralType, TypeStat}
+import quasar.fp.numeric.SampleStats
+import quasar.sst.{strings, SST, StructuralType, TypeStat}
 import quasar.tpe.{SimpleType, TypeF}
 
 import matryoshka.data.Fix
@@ -48,9 +49,7 @@ final class GenerateSpec extends quasar.Qspec {
     sst(ts, TypeF.simple(st))
 
   def sstS(n: Int, s: String): S =
-    sst(
-      tsJ(n, J.str(s)),
-      TypeF.arr(sstL(TypeStat.count(n.toDouble), SimpleType.Char).right))
+    strings.widen[J, Double](n.toDouble, s).embed
 
   def tsJ(n: Int, j: J): TypeStat[Double] =
     TypeStat.fromEJson(n.toDouble, j)
@@ -76,7 +75,7 @@ final class GenerateSpec extends quasar.Qspec {
     }
 
     "weighted selection from a union" >> {
-      val x = sstL(TypeStat.char(0.0, 'a', 'a'), SimpleType.Char)
+      val x = sstL(TypeStat.char(SampleStats.freq(0.0, 'a'.toDouble), 'a', 'a'), SimpleType.Char)
       val y = sstL(TypeStat.byte(100.0, 7.toByte, 7.toByte), SimpleType.Char)
       val z = sstL(TypeStat.bool(0.0, 0.0), SimpleType.Bool)
       val u = sst(TypeStat.count(100.0), TypeF.union(x, y, IList(z)))
@@ -184,9 +183,12 @@ final class GenerateSpec extends quasar.Qspec {
         val name =
           J.str("name")
 
+        val atof =
+          SampleStats.fromFoldable(IList('a', 'b', 'c', 'd', 'e', 'f') map (_.toDouble))
+
         val unkk =
           sstL(
-            TypeStat.char(5.0, 'a', 'f'),
+            TypeStat.char(atof, 'a', 'f'),
             SimpleType.Char)
 
         val msst =
@@ -233,18 +235,29 @@ final class GenerateSpec extends quasar.Qspec {
       valuesShould(csst)(J.char.exist(c => (c >= 'e') && (c <= 'l')))
     }
 
-    "str within length range and char range of min/max values" >> {
-      def strSst(s: String): S =
-        sst(
-          tsJ1(J.str(s)),
-          TypeF.arr(sstL(TypeStat.count(1.0), SimpleType.Char).right))
+    "str within length range and char range" >> {
+      val ssst =
+        NonEmptyList("foo", "quux", "xex", "orp") foldMap1 { s =>
+          val strStat = TypeStat.fromEJson(1.0, J.str(s))
+          strings.compress[S, J, Double](strStat, s).embed
+        }
 
+      valuesShould(ssst)(J.str.exist { s =>
+        (s.length ≟ 4 || s.length ≟ 3) &&
+        s.toList.all(c => c >= 'e' && c <= 'x')
+      })
+    }
+
+    "str within length range and positional char range" >> {
       val ssst =
         NonEmptyList("foo", "quux", "xex", "orp") foldMap1 (sstS(1, _))
 
       valuesShould(ssst)(J.str.exist { s =>
         (s.length ≟ 4 || s.length ≟ 3) &&
-        s.toList.all(c => c >= 'e' && c <= 'x')
+        (IList('f', 'q', 'x', 'o') element s(0)) &&
+        (IList('o', 'u', 'e', 'r') element s(1)) &&
+        (IList('o', 'u', 'x', 'p') element s(2)) &&
+        (s.length ≟ 4).fold(s(3) ≟ 'x', true)
       })
     }
 

@@ -17,7 +17,7 @@
 package quasar.api.services
 
 import slamdata.Predef._
-import quasar.{Variables, VariablesArbitrary}
+import quasar.{Variables, VariablesGenerators}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.pathy._, PathArbitrary._
@@ -53,7 +53,7 @@ object MetadataFixture {
 
 class MetadataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import metadata.FsNode
-  import VariablesArbitrary._
+  import VariablesGenerators._
   import FileSystemTypeArbitrary._, ConnectionUriArbitrary._
   import MetadataFixture._
   import PathError._

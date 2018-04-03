@@ -22,6 +22,8 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fp.ski._
+import quasar.fs.FileSystemError._
 import quasar.fs.mount._, BackendDef.DefinitionResult, Fixture._
 import quasar.fs.mount.cache.VCache, VCache.VCacheKVS
 import quasar.effect._
@@ -80,6 +82,12 @@ abstract class FileSystemTest[S[_]](
       .as(AsResult(a))
       .valueOr(cs => skipped(s"Doesn't support: ${cs.map(_.shows).intercalate(", ")}"))
 
+  def ifSupported[A, B: AsResult](fa: FsTask[A])(f: FileSystemError \/ A => Task[B]): Result =
+    (fa.run flatMap {
+      case -\/(FileSystemError.UnsupportedOperation(reason)) => skipped(reason).point[Task]
+      case other => f(other) map (AsResult(_))
+    }).unsafePerformSync
+
   def pendingFor[A: AsResult](fs: FileSystemUT[S])(toPend: Set[String])(a: => A): Result = {
     val name: String = fs.ref.name.name
     toPend.contains(name).fold(pending(s"PENDING: Not supported for $name."), AsResult(a))
@@ -133,6 +141,29 @@ abstract class FileSystemTest[S[_]](
 
   def execT[A](run: Run, p: Process[FileSystemErrT[F, ?], A]): FsTask[Unit] =
     p.translate[FsTask](runT(run)).run
+
+  def doDelete(run: Run, dir: ADir)(implicit Q: QueryFile.Ops[S], M: ManageFile.Ops[S]): FsTask[Unit] = {
+
+    def filesUnder(dir: ADir): EitherT[F, FileSystemError, List[AFile]] =
+      Q.descendantFiles(dir).map(_.map(y => dir </> y._1).toList)
+
+    def deletePerFile(dir: ADir)
+        : Free[S, FileSystemError \/ Unit] =
+      (for {
+        files <- filesUnder(dir)
+        ds <- files.traverse(M.delete(_))
+      } yield ds).run.map(_.map((κ(()))))
+
+    def delete(dir: ADir): Free[S, FileSystemError \/ Unit] = for {
+      d <- M.delete(dir).run
+      r <- d match {
+             case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
+             case x => Free.point[S, FileSystemError \/ Unit](x)
+           }
+    } yield r
+
+    runT(run)(EitherT(delete(dir)))
+  }
 
   ////
 

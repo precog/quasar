@@ -1,5 +1,5 @@
 {
-    "name": "flatten a single field as an object",
+    "name": "flatten a single field as a map",
     "backends": {
         "couchbase": "pending",
         "marklogic_json": "pending",

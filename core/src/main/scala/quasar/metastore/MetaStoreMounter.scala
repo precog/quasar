@@ -42,16 +42,19 @@ object MetaStoreMounter {
     Mounter[Free[S, ?]](
       req => EitherT(lift(mount(req)).into[S]),
       req => lift(unmount(req)).into[S],
-      new Mounter.PathStore[Free[S, ?], MountConfig] {
+      new Mounter.MountStore[Free[S, ?]] {
         def get(path: APath) =
           EitherT(OptionT(lift(lookupMountConfig(path)).into[S]))
+
         def descendants(dir: ADir) =
-          lift(mountsHavingPrefix(dir).map(_.keys.toSet)).into[S]
+          lift(mountsHavingPrefix(dir)).into[S]
+
         def insert(path: APath, value: MountConfig) =
           lift(insertMount(path, value).attempt
                 .flatMap(_.fold(
                   κ(HC.rollback.as(false)),
                   κ(true.point[ConnectionIO])))).into[S]
+
         def delete(path: APath) =
           lift(deleteMount(path).run.void).into[S]
       })

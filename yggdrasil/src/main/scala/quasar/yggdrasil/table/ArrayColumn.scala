@@ -16,12 +16,12 @@
 
 package quasar.yggdrasil.table
 
-import quasar.blueeyes._
 import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.reflect.ClassTag
 import scala.specialized
@@ -154,40 +154,130 @@ object ArrayStrColumn {
     new ArrayStrColumn(new BitSet, new Array[String](size))
 }
 
-class ArrayDateColumn(val defined: BitSet, values: Array[ZonedDateTime]) extends ArrayColumn[ZonedDateTime] with DateColumn {
+class ArrayOffsetDateTimeColumn(val defined: BitSet, values: Array[OffsetDateTime]) extends ArrayColumn[OffsetDateTime] with OffsetDateTimeColumn {
   def apply(row: Int) = values(row)
 
-  def update(row: Int, value: ZonedDateTime) = {
+  def update(row: Int, value: OffsetDateTime) = {
     defined.set(row)
     values(row) = value
   }
 }
 
-object ArrayDateColumn {
-  def apply(values: Array[ZonedDateTime]) =
-    new ArrayDateColumn(BitSetUtil.range(0, values.length), values)
-  def apply(defined: BitSet, values: Array[ZonedDateTime]) =
-    new ArrayDateColumn(defined.copy, values)
-  def empty(size: Int): ArrayDateColumn =
-    new ArrayDateColumn(new BitSet, new Array[ZonedDateTime](size))
+object ArrayOffsetDateTimeColumn {
+  def apply(values: Array[OffsetDateTime]) =
+    new ArrayOffsetDateTimeColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[OffsetDateTime]) =
+    new ArrayOffsetDateTimeColumn(defined.copy, values)
+  def empty(size: Int): ArrayOffsetDateTimeColumn =
+    new ArrayOffsetDateTimeColumn(new BitSet, new Array[OffsetDateTime](size))
 }
 
-class ArrayPeriodColumn(val defined: BitSet, values: Array[Period]) extends ArrayColumn[Period] with PeriodColumn {
+class ArrayOffsetTimeColumn(val defined: BitSet, values: Array[OffsetTime]) extends ArrayColumn[OffsetTime] with OffsetTimeColumn {
   def apply(row: Int) = values(row)
 
-  def update(row: Int, value: Period) = {
+  def update(row: Int, value: OffsetTime) = {
     defined.set(row)
     values(row) = value
   }
 }
 
-object ArrayPeriodColumn {
-  def apply(values: Array[Period]) =
-    new ArrayPeriodColumn(BitSetUtil.range(0, values.length), values)
-  def apply(defined: BitSet, values: Array[Period]) =
-    new ArrayPeriodColumn(defined.copy, values)
-  def empty(size: Int): ArrayPeriodColumn =
-    new ArrayPeriodColumn(new BitSet, new Array[Period](size))
+object ArrayOffsetTimeColumn {
+  def apply(values: Array[OffsetTime]) =
+    new ArrayOffsetTimeColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[OffsetTime]) =
+    new ArrayOffsetTimeColumn(defined.copy, values)
+  def empty(size: Int): ArrayOffsetTimeColumn =
+    new ArrayOffsetTimeColumn(new BitSet, new Array[OffsetTime](size))
+}
+
+class ArrayOffsetDateColumn(val defined: BitSet, values: Array[OffsetDate]) extends ArrayColumn[OffsetDate] with OffsetDateColumn {
+  def apply(row: Int) = values(row)
+
+  def update(row: Int, value: OffsetDate) = {
+    defined.set(row)
+    values(row) = value
+  }
+}
+
+object ArrayOffsetDateColumn {
+  def apply(values: Array[OffsetDate]) =
+    new ArrayOffsetDateColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[OffsetDate]) =
+    new ArrayOffsetDateColumn(defined.copy, values)
+  def empty(size: Int): ArrayOffsetDateColumn =
+    new ArrayOffsetDateColumn(new BitSet, new Array[OffsetDate](size))
+}
+
+class ArrayLocalDateTimeColumn(val defined: BitSet, values: Array[LocalDateTime]) extends ArrayColumn[LocalDateTime] with LocalDateTimeColumn {
+  def apply(row: Int) = values(row)
+
+  def update(row: Int, value: LocalDateTime) = {
+    defined.set(row)
+    values(row) = value
+  }
+}
+
+object ArrayLocalDateTimeColumn {
+  def apply(values: Array[LocalDateTime]) =
+    new ArrayLocalDateTimeColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[LocalDateTime]) =
+    new ArrayLocalDateTimeColumn(defined.copy, values)
+  def empty(size: Int): ArrayLocalDateTimeColumn =
+    new ArrayLocalDateTimeColumn(new BitSet, new Array[LocalDateTime](size))
+}
+
+class ArrayLocalTimeColumn(val defined: BitSet, values: Array[LocalTime]) extends ArrayColumn[LocalTime] with LocalTimeColumn {
+  def apply(row: Int) = values(row)
+
+  def update(row: Int, value: LocalTime) = {
+    defined.set(row)
+    values(row) = value
+  }
+}
+
+object ArrayLocalTimeColumn {
+  def apply(values: Array[LocalTime]) =
+    new ArrayLocalTimeColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[LocalTime]) =
+    new ArrayLocalTimeColumn(defined.copy, values)
+  def empty(size: Int): ArrayLocalTimeColumn =
+    new ArrayLocalTimeColumn(new BitSet, new Array[LocalTime](size))
+}
+
+class ArrayLocalDateColumn(val defined: BitSet, values: Array[LocalDate]) extends ArrayColumn[LocalDate] with LocalDateColumn {
+  def apply(row: Int) = values(row)
+
+  def update(row: Int, value: LocalDate) = {
+    defined.set(row)
+    values(row) = value
+  }
+}
+
+object ArrayLocalDateColumn {
+  def apply(values: Array[LocalDate]) =
+    new ArrayLocalDateColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[LocalDate]) =
+    new ArrayLocalDateColumn(defined.copy, values)
+  def empty(size: Int): ArrayLocalDateColumn =
+    new ArrayLocalDateColumn(new BitSet, new Array[LocalDate](size))
+}
+
+class ArrayIntervalColumn(val defined: BitSet, values: Array[DateTimeInterval]) extends ArrayColumn[DateTimeInterval] with IntervalColumn {
+  def apply(row: Int) = values(row)
+
+  def update(row: Int, value: DateTimeInterval) = {
+    defined.set(row)
+    values(row) = value
+  }
+}
+
+object ArrayIntervalColumn {
+  def apply(values: Array[DateTimeInterval]) =
+    new ArrayIntervalColumn(BitSetUtil.range(0, values.length), values)
+  def apply(defined: BitSet, values: Array[DateTimeInterval]) =
+    new ArrayIntervalColumn(defined.copy, values)
+  def empty(size: Int): ArrayIntervalColumn =
+    new ArrayIntervalColumn(new BitSet, new Array[DateTimeInterval](size))
 }
 
 class MutableEmptyArrayColumn(val defined: BitSet) extends ArrayColumn[Boolean] with EmptyArrayColumn {

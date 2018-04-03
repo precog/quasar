@@ -19,18 +19,18 @@ package quasar.precog.common
 import quasar.blueeyes._
 import quasar.precog._
 import quasar.precog.util.{BitSetUtil, ByteBufferMonad, ByteBufferPool, RawBitSet}
-
-import scalaz._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.{CharsetEncoder, CoderResult}
 import java.math.{BigDecimal => BigDec}
-import java.time.{LocalDateTime, ZonedDateTime}
-import java.time.format.DateTimeFormatter
+import java.time._
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.specialized
+
+import scalaz._
 
 /**
   * Codecs allow a writer to deal with the case where we have a buffer overflow
@@ -366,16 +366,100 @@ object Codec {
     }
   }
 
-  implicit val LocalDateTimeCodec =
-    Codec[Long].as[LocalDateTime](_.getMillis, dateTime.fromMillis)
+  implicit val LocalDateTimeCodec = CompositeCodec[LocalDate, LocalTime, LocalDateTime](
+    LocalDateCodec,
+    LocalTimeCodec,
+    dt => (dt.toLocalDate, dt.toLocalTime),
+    (d, t) => LocalDateTime.of(d, t)
+  )
 
-  implicit val ZonedDateTimeCodec = {
-    val formatter = DateTimeFormatter.ISO_ZONED_DATE_TIME
-    Utf8Codec.as[ZonedDateTime](_.format(formatter), ZonedDateTime.parse(_, formatter))
+  implicit case object LocalTimeCodec extends FixedWidthCodec[LocalTime] {
+    def size: Int = 7
+    def writeUnsafe(a: LocalTime, buffer: ByteBuffer): Unit = {
+      buffer.put(a.getHour.toByte)
+      buffer.put(a.getMinute.toByte)
+      buffer.put(a.getSecond.toByte)
+      buffer.putInt(a.getNano)
+    }
+    def read(buffer: ByteBuffer): LocalTime = {
+      val hour = buffer.get()
+      val min = buffer.get()
+      val sec = buffer.get()
+      val nano = buffer.getInt()
+      LocalTime.of(hour, min, sec, nano)
+    }
   }
 
-  implicit val PeriodCodec =
-    Codec[Long].as[Period](_.getMillis, period.fromMillis)
+  implicit case object LocalDateCodec extends FixedWidthCodec[LocalDate] {
+    def size: Int = 8
+    def writeUnsafe(a: LocalDate, buffer: ByteBuffer): Unit = {
+      buffer.putInt(a.getYear)
+      buffer.put(a.getMonthValue.toByte)
+      buffer.put(a.getDayOfMonth.toByte)
+    }
+    def read(buffer: ByteBuffer): LocalDate = {
+      val year = buffer.getInt()
+      val month = buffer.get()
+      val day = buffer.get()
+      LocalDate.of(year, month, day)
+    }
+  }
+
+  implicit case object ZoneOffsetCodec extends FixedWidthCodec[ZoneOffset] {
+    def size: Int = 3
+    def writeUnsafe(a: ZoneOffset, buffer: ByteBuffer): Unit = {
+      val totalSeconds = a.getTotalSeconds
+      buffer.putShort((totalSeconds >> 1).toShort)
+      buffer.put((totalSeconds & 1).toByte)
+    }
+    def read(buffer: ByteBuffer): ZoneOffset = {
+      val pref = buffer.getShort()
+      val suff = buffer.get()
+      ZoneOffset.ofTotalSeconds((pref << 1) | suff)
+    }
+  }
+
+  implicit val OffsetDateTimeCodec = CompositeCodec[LocalDateTime, ZoneOffset, OffsetDateTime](
+    LocalDateTimeCodec,
+    ZoneOffsetCodec,
+    odt => (odt.toLocalDateTime, odt.getOffset),
+    OffsetDateTime.of
+  )
+
+  implicit val OffsetTimeCodec = CompositeCodec[LocalTime, ZoneOffset, OffsetTime](
+    LocalTimeCodec,
+    ZoneOffsetCodec,
+    ot => (ot.toLocalTime, ot.getOffset),
+    OffsetTime.of
+  )
+
+  implicit val OffsetDateCodec = CompositeCodec[LocalDate, ZoneOffset, OffsetDate](
+    LocalDateCodec,
+    ZoneOffsetCodec,
+    od => (od.date, od.offset),
+    OffsetDate(_, _)
+  )
+
+  implicit case object IntervalCodec extends FixedWidthCodec[DateTimeInterval]  {
+    def size: Int = 24
+
+    def writeUnsafe(a: DateTimeInterval, buffer: ByteBuffer): Unit = {
+      buffer.putInt(a.period.getYears)
+      buffer.putInt(a.period.getMonths)
+      buffer.putInt(a.period.getDays)
+      buffer.putLong(a.duration.getSeconds)
+      buffer.putInt(a.duration.getNano)
+    }
+
+    def read(buffer: ByteBuffer): DateTimeInterval = {
+      val years = buffer.getInt()
+      val months = buffer.getInt()
+      val days = buffer.getInt()
+      val seconds = buffer.getLong()
+      val nanos = buffer.getInt()
+      DateTimeInterval.make(years, months, days, seconds, nanos)
+    }
+  }
 
   implicit case object DoubleCodec extends FixedWidthCodec[Double] {
     val size = 8

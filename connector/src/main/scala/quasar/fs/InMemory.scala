@@ -151,11 +151,9 @@ object InMemory {
       case Delete(path) =>
         refineType(path).fold(deleteDir, deleteFile)
 
-      case TempFile(path) =>
-        nextSeq map (n => refineType(path).fold(
-          _ </> file(tmpName(n)),
-          renameFile(_, κ(FileName(tmpName(n))))
-        ).right[FileSystemError])
+      case TempFile(path, prefix) =>
+        nextSeq map (
+          TmpFile.tmpFile0(path, prefix.getOrElse(defaultPrefix), _).right[FileSystemError])
     }
   }
 
@@ -280,7 +278,7 @@ object InMemory {
 
   private val lpr = new LogicalPlanR[Fix[LogicalPlan]]
 
-  private def tmpName(n: Long) = s"__quasar.gen_$n"
+  private val defaultPrefix = TempFilePrefix("__quasar.gen_")
 
   private val seqL: InMemState @> Long =
     Lens.lensg(s => n => s.copy(seq = n), _.seq)

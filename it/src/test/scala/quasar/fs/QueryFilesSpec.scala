@@ -40,7 +40,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
   val queryPrefix: ADir = rootDir </> dir("q")
 
   def deleteForQuery(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(queryPrefix))
+    doDelete(run, queryPrefix)
 
   val lpr = new LogicalPlanR[Fix[LP]]
 
@@ -61,7 +61,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
 
       "executing query to an existing file overwrites with results" >> ifSupports(fs,
         BackendCapability.query(),
-        BackendCapability.write()) { pendingFor(fs)(Set("mimir")) {
+        BackendCapability.write()) {
 
         val d = queryPrefix </> dir("execappends")
         val a = d </> file("afile")
@@ -80,7 +80,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
 
         runLogT(fs.testInterpM, p).runEither must
           beRight(completelySubsume(Vector[Data](Data.Obj("c" -> Data._int(2)))))
-      } }
+      }
 
       "listing directory returns immediate child nodes" >> {
         val d = queryPrefix </> dir("lsch")
@@ -106,7 +106,7 @@ class QueryFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsU
         runT(nonChFs.testInterpM)(query.ls(rootDir)).runEither must beRight
       }
 
-      "listing nonexistent directory returns dir NotFound" >> pendingFor(fs)(Set("mimir")) {
+      "listing nonexistent directory returns dir NotFound" >> {
         val d = queryPrefix </> dir("lsdne")
         runT(fs.testInterpM)(query.ls(d)).runEither must beLeft(pathErr(pathNotFound(d)))
       }

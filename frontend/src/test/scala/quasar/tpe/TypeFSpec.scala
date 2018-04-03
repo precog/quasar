@@ -96,9 +96,8 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     }
 
     "{m} ∪ {k:v} <: {m}" >> prop { kn: IMap[J, T] =>
-      val normM = kn.mapKeys(_.transCata[J](
-        EJson.replaceString[J] <<< EJson.elideMetadata[J]
-      ))
+      val normM =
+        kn.mapKeys(_.transCata[J](EJson.elideMetadata[J]))
 
       normM.maxViewWithKey forall { case ((k, v), m) =>
         isSubtypeOf[J](
@@ -150,18 +149,6 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
     "x <: (x ∨ y) && y <: (x ∨ y)" >> prop { (x: T, y: T) =>
       val z = lub[J](x, y)
       (isSubtypeOf[J](x, z) && isSubtypeOf[J](y, z))
-    }
-
-    "str <: char[]" >> prop { (s: String) =>
-      isSubtypeOf[J](
-        const[J, T](J.str("s" + s)).embed,
-        arr[J, T](simple[J, T](SimpleType.Char).embed.right).embed)
-    }
-
-    "[] = ''" >> {
-      val emptyArr = arr[J, T](IList().left).embed
-      val emptyStr = const[J, T](J.str("")).embed
-      emptyArr ≟ emptyStr
     }
   }
 

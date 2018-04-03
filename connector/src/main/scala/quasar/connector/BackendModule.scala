@@ -139,7 +139,7 @@ trait BackendModule {
         ManageFileModule.move(pathPair, semantics).run.value
       case ManageFile.Copy(pathPair) => ManageFileModule.copy(pathPair).run.value
       case ManageFile.Delete(path) => ManageFileModule.delete(path).run.value
-      case ManageFile.TempFile(near) => ManageFileModule.tempFile(near).run.value
+      case ManageFile.TempFile(near, prefix) => ManageFileModule.tempFile(near, prefix).run.value
     }
 
     qfInter :+: rfInter :+: wfInter :+: mfInter
@@ -255,7 +255,7 @@ trait BackendModule {
     def move(pair: PathPair, semantics: MoveSemantics): Backend[Unit]
     def copy(pair: PathPair): Backend[Unit]
     def delete(path: APath): Backend[Unit]
-    def tempFile(near: APath): Backend[AFile]
+    def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile]
   }
 
   def ManageFileModule: ManageFileModule

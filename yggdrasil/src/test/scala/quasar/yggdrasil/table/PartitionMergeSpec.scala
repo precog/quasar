@@ -64,7 +64,7 @@ trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with S
       derefed.reduce(reducer).map(s => Table.constString(Set(s)))
     }
 
-    result.flatMap(_.toJson).copoint must_== expected.toStream
+    result.flatMap(_.toJson).getJValues must_== expected.toStream
   }
 
 }

@@ -18,12 +18,12 @@ package quasar.std
 
 import quasar.Func
 import slamdata.Predef._
-import quasar.TypeArbitrary
+import quasar.TypeGenerators
 
 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
 import scalaz.Validation, Validation.FlatMap._
 
-class RelationsSpec extends quasar.Qspec with TypeArbitrary {
+class RelationsSpec extends quasar.Qspec with TypeGenerators {
   import RelationsLib._
   import quasar.Type
   import quasar.Type.Const

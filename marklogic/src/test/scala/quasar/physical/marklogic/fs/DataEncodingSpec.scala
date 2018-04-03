@@ -17,7 +17,7 @@
 package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary}, DataArbitrary._
+import quasar.{Data, DataGenerators}, DataGenerators._
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.fs.data._
 import quasar.physical.marklogic.qscript.EJsonTypeKey

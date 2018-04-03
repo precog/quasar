@@ -62,7 +62,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
   }
 
   def deleteForReading(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(readsPrefix))
+    doDelete(run, readsPrefix)
 
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM
@@ -114,8 +114,7 @@ class ReadFilesSpec extends FileSystemTest[BackendEffect](FileSystemTest.allFsUT
         r.run_\/ must_= Vector.empty.right
       }
 
-      // disabled for mimir, not because it doesn't work, but because it's absurdly slow
-      "scan with offset k > 0 and no limit skips first k data" >> pendingFor(fs)(Set("mimir")) {
+      "scan with offset k > 0 and no limit skips first k data" >> {
         prop { k: Int Refined RPositive =>
           val rFull = runLogT(run, read.scan(smallFile.file, 0L, None)).run_\/
           val r     = runLogT(run, read.scan(smallFile.file, widenPositive(k), None)).run_\/

@@ -36,12 +36,12 @@ trait Queries {
   def mounts: Query0[PathedMountConfig]  =
     sql"SELECT * FROM Mounts".query[PathedMountConfig]
 
-  def mountsHavingPrefix(dir: ADir): Query0[(APath, MountType)] = {
+  def mountsHavingPrefix(dir: ADir): Query0[(APath, Mount)] = {
     val patternChars = List("\\\\", "_", "%") // NB: Order is important here to avoid double-escaping
     val patternEscaped = patternChars.foldLeft(posixCodec.printPath(dir))((s, c) =>
                            s.replaceAll(c, s"\\\\$c"))
-    sql"SELECT path, type FROM Mounts WHERE path LIKE ${patternEscaped + "_%"}"
-      .query[(APath, MountType)]
+    sql"SELECT path, type, connectionUri FROM Mounts WHERE path LIKE ${patternEscaped + "_%"}"
+      .query[(APath, Mount)]
   }
 
   def lookupMountType(path: APath): Query0[MountType] =

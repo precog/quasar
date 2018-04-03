@@ -2,7 +2,8 @@
     "name": "convert dates to/from strings",
     "backends": {
         "couchbase": "ignoreFieldOrder",
-        "marklogic_json": "ignoreFieldOrder",
+        "marklogic_json": "pendingIgnoreFieldOrder",
+        "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
@@ -15,13 +16,13 @@
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-        { "d": { "$date": "2014-08-17" }, "t": { "$time": "06:00:00.000" }, "ts": { "$timestamp": "2014-08-17T06:00:00.000Z" }, "s": "2014-08-17T06:00:00.000Z" },
-        { "d": { "$date": "2014-08-18" }, "t": { "$time": "07:00:00.000" }, "ts": { "$timestamp": "2014-08-18T07:00:00.000Z" }, "s": "2014-08-18T07:00:00.000Z" },
-        { "d": { "$date": "2014-08-19" }, "t": { "$time": "08:00:00.000" }, "ts": { "$timestamp": "2014-08-19T08:00:00.000Z" }, "s": "2014-08-19T08:00:00.000Z" },
-        { "d": { "$date": "2014-08-20" }, "t": { "$time": "09:00:00.000" }, "ts": { "$timestamp": "2014-08-20T09:00:00.000Z" }, "s": "2014-08-20T09:00:00.000Z" },
-        { "d": { "$date": "2014-08-21" }, "t": { "$time": "10:00:00.000" }, "ts": { "$timestamp": "2014-08-21T10:00:00.000Z" }, "s": "2014-08-21T10:00:00.000Z" },
-        { "d": { "$date": "2014-08-22" }, "t": { "$time": "11:00:00.000" }, "ts": { "$timestamp": "2014-08-22T11:00:00.000Z" }, "s": "2014-08-22T11:00:00.000Z" },
-        { "d": { "$date": "2014-08-23" }, "t": { "$time": "12:00:00.000" }, "ts": { "$timestamp": "2014-08-23T12:00:00.000Z" }, "s": "2014-08-23T12:00:00.000Z" },
-        { "d": { "$date": "1969-12-31" }, "t": { "$time": "23:59:59.000" }, "ts": { "$timestamp": "1969-12-31T23:59:59.000Z" }, "s": "1969-12-31T23:59:59.000Z" },
-        { "d": { "$date": "1653-02-10" }, "t": { "$time": "01:13:20.000" }, "ts": { "$timestamp": "1653-02-10T01:13:20.000Z" }, "s": "1653-02-10T01:13:20.000Z" }]
+        { "d": { "$localdate": "2014-08-17" }, "t": { "$localtime": "06:00" },    "ts": { "$offsetdatetime": "2014-08-17T06:00:00.000000000Z" }, "s": "2014-08-17T06:00Z" },
+        { "d": { "$localdate": "2014-08-18" }, "t": { "$localtime": "07:00" },    "ts": { "$offsetdatetime": "2014-08-18T07:00:00.000000000Z" }, "s": "2014-08-18T07:00Z" },
+        { "d": { "$localdate": "2014-08-19" }, "t": { "$localtime": "08:00" },    "ts": { "$offsetdatetime": "2014-08-19T08:00:00.000000000Z" }, "s": "2014-08-19T08:00Z" },
+        { "d": { "$localdate": "2014-08-20" }, "t": { "$localtime": "09:00" },    "ts": { "$offsetdatetime": "2014-08-20T09:00:00.000000000Z" }, "s": "2014-08-20T09:00Z" },
+        { "d": { "$localdate": "2014-08-21" }, "t": { "$localtime": "10:00" },    "ts": { "$offsetdatetime": "2014-08-21T10:00:00.000000000Z" }, "s": "2014-08-21T10:00Z" },
+        { "d": { "$localdate": "2014-08-22" }, "t": { "$localtime": "11:00" },    "ts": { "$offsetdatetime": "2014-08-22T11:00:00.000000000Z" }, "s": "2014-08-22T11:00Z" },
+        { "d": { "$localdate": "2014-08-23" }, "t": { "$localtime": "12:00" },    "ts": { "$offsetdatetime": "2014-08-23T12:00:00.000000000Z" }, "s": "2014-08-23T12:00Z" },
+        { "d": { "$localdate": "1969-12-31" }, "t": { "$localtime": "23:59:59" }, "ts": { "$offsetdatetime": "1969-12-31T23:59:59.000000000Z" }, "s": "1969-12-31T23:59:59Z" },
+        { "d": { "$localdate": "1653-02-10" }, "t": { "$localtime": "01:13:20" }, "ts": { "$offsetdatetime": "1653-02-10T01:13:20.000000000Z" }, "s": "1653-02-10T01:13:20Z" }]
 }

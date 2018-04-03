@@ -2,14 +2,14 @@
     "name": "[qa_s07] join the results of a pair of sub-queries",
 
     "backends": {
-        "couchbase":      "timeout",
-        "marklogic_json": "timeout",
-        "marklogic_xml":  "timeout",
-        "mimir":          "ignoreFieldOrder"
+        "couchbase":      "skip",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir":          "ignoreFieldOrder",
+        "postgres":       "pending"
     },
 
     "NB": "#1587: Disabled in couchbase due to lack of general join.",
-    "NB": "Skipping for postgres until there's support for SUM",
+    "NB2": "Skipping for postgres until there's support for SUM",
 
     "data": ["../../zips.data", "../../largeZips.data"],
 

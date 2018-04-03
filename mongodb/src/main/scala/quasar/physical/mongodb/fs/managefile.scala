@@ -32,7 +32,7 @@ import scalaz.concurrent.Task
 object managefile {
   import FileSystemError._, PathError._, MongoDbIO._, fsops._
 
-  type ManageIn           = (TmpPrefix, TaskRef[Long])
+  type ManageIn           = (Salt, TaskRef[Long])
   type ManageInT[F[_], A] = ReaderT[F, ManageIn, A]
   type MongoManage[A]     = ManageInT[MongoDbIO, A]
 
@@ -43,10 +43,10 @@ object managefile {
     S0: Task :<: S,
     S1: PhysErr :<: S
   ): Task[MongoManage ~> Free[S, ?]] =
-    (tmpPrefix |@| TaskRef(0L)) { (prefix, ref) =>
+    (salt |@| TaskRef(0L)) { (s, ref) =>
       new (MongoManage ~> Free[S, ?]) {
         def apply[A](fs: MongoManage[A]) =
-          fs.run((prefix, ref)).runF(client)
+          fs.run((s, ref)).runF(client)
       }
     }
 
@@ -76,9 +76,7 @@ object managefile {
     if (src === dst)
       ().point[MongoFsM]
     else if (depth(src) == 1)
-      dbNameFromPathM(src) flatMap { dbName =>
-        moveAllUserCollections *> dropDatabase(dbName).liftM[FileSystemErrT]
-      }
+      unsupportedOperation("MongoDb connector does not support moving directories involving databases").raiseError[MongoFsM, Unit]
     else
       moveAllUserCollections
   }
@@ -142,23 +140,8 @@ object managefile {
       } yield ()
   }
 
-  // TODO: Really need a Path#fold[A] method, which will be much more reliable
-  //       than this process of deduction.
   def deleteDir(dir: ADir): MongoFsM[Unit] =
-    Collection.dbNameFromPath(dir).toOption match {
-      case Some(n) if depth(dir) == 1 =>
-        dropDatabase(n).liftM[FileSystemErrT]
-
-      case Some(_) =>
-        collectionsInDir(dir)
-          .flatMap(_.traverse_(dropCollection(_).liftM[FileSystemErrT]))
-
-      case None if depth(dir) == 0 =>
-        dropAllDatabases.liftM[FileSystemErrT]
-
-      case None =>
-        nonExistentParent(dir)
-    }
+    unsupportedOperation("MongoDb connector does not support deleting directories").raiseError[MongoFsM, Unit]
 
   def deleteFile(file: AFile): MongoFsM[Unit] =
     collFromFileM(file) flatMap (c =>
@@ -166,13 +149,19 @@ object managefile {
         dropCollection(c).liftM[FileSystemErrT],
         pathErr(pathNotFound(file)).raiseError[MongoFsM, Unit]))
 
-  def freshName: MongoManage[String] =
+  val defaultPrefix = TempFilePrefix("__quasar.tmp_")
+
+  def saltedPrefix(salt: Salt, prefix: Option[TempFilePrefix]): TempFilePrefix =
+    prefix.getOrElse(defaultPrefix) |+| TempFilePrefix(salt.s + "_")
+
+  def freshFile(near: APath, prefix: Option[TempFilePrefix]): MongoManage[AFile] = {
     for {
       in <- MonadReader[MongoManage, ManageIn].ask
-      (prefix, ref) = in
+      (salt, ref) = in
       n  <- liftTask(ref.modifyS(i => (i + 1, i))).liftM[ManageInT]
-    } yield prefix.run + n.toString
+    } yield TmpFile.tmpFile0(near, saltedPrefix(salt, prefix), n)
+  }
 
-  def tmpPrefix: Task[TmpPrefix] =
-    NameGenerator.salt map (s => TmpPrefix(s"__quasar.tmp_${s}_"))
+  def salt: Task[Salt] =
+    NameGenerator.salt map (Salt(_))
 }

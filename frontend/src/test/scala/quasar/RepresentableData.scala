@@ -18,28 +18,34 @@ package quasar
 
 import quasar.Data._
 import quasar.pkg.tests._
+import quasar.time.DateGenerators
 
 case class RepresentableData(data: Data)
 
-trait RepresentableDataArbitrary {
+trait RepresentableDataGenerators {
 
   // See DataCodec.representable for what needs to be avoided in this generator
   val atomicData: Gen[Data] = Gen.oneOf[Data](
     Null,
     True,
     False,
-    Gen.alphaStr                   ^^ Str,
-    DataArbitrary.defaultInt       ^^ Int,
-    DataArbitrary.defaultDec       ^^ Dec,
-    DateArbitrary.genDate          ^^ Date,
-    DateArbitrary.genTime          ^^ Time)
+    Gen.alphaStr                     ^^ Str,
+    DataGenerators.defaultInt        ^^ Int,
+    DataGenerators.defaultDec        ^^ Dec,
+    DateGenerators.genOffsetDateTime ^^ OffsetDateTime,
+    DateGenerators.genOffsetDate     ^^ Data.OffsetDate,
+    DateGenerators.genOffsetTime     ^^ OffsetTime,
+    DateGenerators.genLocalDateTime  ^^ LocalDateTime,
+    DateGenerators.genLocalDate      ^^ LocalDate,
+    DateGenerators.genLocalTime      ^^ LocalTime,
+    DateGenerators.genInterval       ^^ Interval)
 
   implicit val representableDataArbitrary: Arbitrary[RepresentableData] = Arbitrary(
     Gen.oneOf(
       atomicData,
-      DataArbitrary.genNested(DataArbitrary.genKey, atomicData)
-    ).map(RepresentableData(_))
+      DataGenerators.genNested(DataGenerators.genKey, atomicData)
+    ) ^^ RepresentableData
   )
 }
 
-object RepresentableDataArbitrary extends RepresentableDataArbitrary
+object RepresentableDataGenerators extends RepresentableDataGenerators

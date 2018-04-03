@@ -21,7 +21,6 @@ import quasar.common.JoinType._
 import quasar.common.SortDir.{Ascending, Descending}
 import quasar.{Data, DataCodec}
 import quasar.fp.ski._
-import quasar.DataCodec.Precise.{TimeKey, TimestampKey}
 import quasar.physical.rdbms.model._
 import quasar.physical.rdbms.fs.postgres._
 import quasar.physical.rdbms.fs.postgres.mapping._
@@ -186,7 +185,7 @@ object PostgresRenderQuery extends RenderQuery {
 
   def galg[T[_[_]]: BirecursiveT]: GAlgebraM[(T[SqlExpr], ?), PlannerError \/ ?, SqlExpr, String] = {
     case Unreferenced() =>
-    InternalError("Unexpected Unreferenced!", none).left
+      InternalError("Unexpected Unreferenced!", none).left
     case Null() => "null".right
     case SqlExpr.Id(v, _) =>
       s"""$v""".right
@@ -380,10 +379,16 @@ object PostgresRenderQuery extends RenderQuery {
     case ArrayUnwind(toUnwind) => s"jsonb_array_elements_text(${text(toUnwind)})".right
 
     case Time((_, expr)) =>
-      buildJson((TimeKey, expr)).right
+      ???
+      // TODO reimplement this
+      // buildJson((TimeKey, expr)).right
     case Timestamp((_, expr)) =>
-      buildJson((TimestampKey, expr)).right
+      ???
+      // TODO reimplement this
+      // buildJson((TimestampKey, expr)).right
     case DatePart(TextExpr(part), (_, expr)) =>
-      s"date_part($part, to_timestamp($expr->>'$TimestampKey', 'YYYY-MM-DD HH24:MI:SSZ'))".right
+      ???
+      // TODO reimplement this
+      // s"date_part($part, to_timestamp($expr->>'$TimestampKey', 'YYYY-MM-DD HH24:MI:SSZ'))".right
   }
 }

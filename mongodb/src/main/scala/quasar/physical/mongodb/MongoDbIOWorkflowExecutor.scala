@@ -79,7 +79,7 @@ private[mongodb] final class MongoDbIOWorkflowExecutor
       distinct0.exec(c.distinct(cfg.field.asText, classOf[BsonValue]))))
   }
 
-  protected def drop(c: Collection) =
+  protected def dropUnsafe(c: Collection) =
     MongoDbIO.dropCollection(c)
 
   protected def find(src: Collection, cfg: Find) = {

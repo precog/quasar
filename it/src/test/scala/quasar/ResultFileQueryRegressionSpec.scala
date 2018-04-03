@@ -16,6 +16,7 @@
 
 package quasar
 
+import slamdata.Predef._
 import quasar.common._
 import quasar.contrib.pathy._
 import quasar.fp.liftMT
@@ -52,7 +53,7 @@ class ResultFileQueryRegressionSpec
       execToCompExec compose[M] Hoist[FileSystemErrT].hoist[F, G](liftMT[F, PhaseResultT])
 
     for {
-      tmpFile <- hoistM(manage.tempFile(DataDir)).liftM[Process]
+      tmpFile <- hoistM(manage.tempFile(DataDir, None)).liftM[Process]
       _       <- fsQ.executeQuery(expr, vars, basePath, tmpFile).liftM[Process]
       cleanup =  hoistM(
                    query.fileExists(tmpFile).liftM[FileSystemErrT].ifM(

@@ -16,13 +16,14 @@
 
 package quasar
 
-import quasar.contrib.pathy.PathSegment
+import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadError_
 import quasar.effect.Failure
 import quasar.fp._
 import quasar.fp.free._
+import quasar.fp.ski._
 
-import pathy.Path.{FileName, DirName}
+import pathy.Path._
 import scalaz.{Failure => _, _}, Scalaz._
 
 package object fs extends PhysicalErrorPrisms {
@@ -103,5 +104,8 @@ package object fs extends PhysicalErrorPrisms {
     m: ManageFile ~> M
   ): BackendEffect ~> M =
     a :+: q :+: r :+: w :+: m
+
+  def nearDir(path: APath): ADir =
+    refineType(path).fold(ι, fileParent)
 
 }

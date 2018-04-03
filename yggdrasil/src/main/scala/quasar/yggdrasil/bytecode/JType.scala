@@ -29,8 +29,13 @@ case object JTextT    extends JPrimitiveType
 case object JBooleanT extends JPrimitiveType
 case object JNullT    extends JPrimitiveType
 
-case object JDateT   extends JPrimitiveType
-case object JPeriodT extends JPrimitiveType
+case object JOffsetDateTimeT extends JPrimitiveType
+case object JOffsetTimeT     extends JPrimitiveType
+case object JOffsetDateT     extends JPrimitiveType
+case object JLocalDateTimeT  extends JPrimitiveType
+case object JLocalDateT      extends JPrimitiveType
+case object JLocalTimeT      extends JPrimitiveType
+case object JIntervalT       extends JPrimitiveType
 
 sealed trait JArrayT extends JType
 case class JArrayHomogeneousT(jType: JType)        extends JArrayT
@@ -51,43 +56,72 @@ case class JUnionT(left: JType, right: JType) extends JType {
 }
 
 object JType {
-  val JPrimitiveUnfixedT = JNumberT | JTextT | JBooleanT | JNullT | JDateT | JPeriodT
-  val JUniverseT         = JPrimitiveUnfixedT | JObjectUnfixedT | JArrayUnfixedT
+  val JPrimitiveUnfixedT =
+    JNumberT | JTextT | JBooleanT | JNullT | JIntervalT |
+      JLocalDateTimeT | JLocalTimeT | JLocalDateT |
+      JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
+  val JUniverseT = JPrimitiveUnfixedT | JObjectUnfixedT | JArrayUnfixedT
+  val JTemporalT =
+    JIntervalT |
+      JLocalDateTimeT | JLocalTimeT | JLocalDateT |
+      JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
+  val JTemporalAbsoluteT =
+    JLocalDateTimeT | JLocalTimeT | JLocalDateT |
+      JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
+  val JAbsoluteT = JTemporalAbsoluteT | JNumberT
+  val JRelativeT = JAbsoluteT | JIntervalT
+  val JDateTimeT =
+    JLocalDateTimeT | JOffsetDateTimeT
+  val JTimeT =
+    JLocalDateTimeT | JLocalTimeT |
+      JOffsetDateTimeT | JOffsetTimeT
+  val JDateT =
+    JLocalDateTimeT | JLocalDateT |
+      JOffsetDateTimeT | JOffsetDateT
+  val JOffsetT =
+    JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT
 
   // this must be consistent with JValue.fromData
-  def fromType(tpe: Type): JType = tpe match {
-    case Type.Null => JNullT
-    case Type.Str => JTextT
-    case Type.Int | Type.Dec | Type.Binary => JNumberT
-    case Type.Bool => JBooleanT
-    case Type.Timestamp | Type.Date | Type.Time => JDateT | JTextT
-    case Type.Interval => JPeriodT | JTextT
-    case Type.Id => JTextT
-    case Type.Arr(tpes) =>
-      val mapped: Map[Int, JType] =
-        tpes.map(fromType).zipWithIndex.map(_.swap)(collection.breakOut)
+  def fromType(tpe: Type): JType = {
+    tpe match {
+      case Type.Null => JNullT
+      case Type.Str => JTextT
+      case Type.Int | Type.Dec | Type.Binary => JNumberT
+      case Type.Bool => JBooleanT
+      case Type.OffsetDateTime => JOffsetDateTimeT | JTextT
+      case Type.OffsetTime => JOffsetTimeT | JTextT
+      case Type.OffsetDate => JOffsetDateT | JTextT
+      case Type.LocalDateTime => JLocalDateTimeT | JTextT
+      case Type.LocalTime => JLocalTimeT | JTextT
+      case Type.LocalDate => JLocalDateT | JTextT
+      case Type.Interval => JIntervalT | JTextT
+      case Type.Id => JTextT
+      case Type.Arr(tpes) =>
+        val mapped: Map[Int, JType] =
+          tpes.map(fromType).zipWithIndex.map(_.swap)(collection.breakOut)
 
-      JArrayFixedT(mapped)
+        JArrayFixedT(mapped)
 
-    case Type.FlexArr(_, _, _) => JArrayUnfixedT
+      case Type.FlexArr(_, _, _) => JArrayUnfixedT
 
-    case Type.Obj(tpes, unknowns) =>
-      if (unknowns.isEmpty) {
-        val mapped: Map[String, JType] = tpes map {
-          case (field, tpe) => field -> fromType(tpe)
+      case Type.Obj(tpes, unknowns) =>
+        if (unknowns.isEmpty) {
+          val mapped: Map[String, JType] = tpes map {
+            case (field, tpe) => field -> fromType(tpe)
+          }
+
+          JObjectFixedT(mapped)
+        } else {
+          JObjectUnfixedT
         }
 
-        JObjectFixedT(mapped)
-      } else {
-        JObjectUnfixedT
-      }
+      case Type.Coproduct(left, right) => fromType(left) | fromType(right)
 
-    case Type.Coproduct(left, right) => fromType(left) | fromType(right)
+      case Type.Top => JUniverseT
+      case Type.Bottom => JUniverseT
 
-    case Type.Top => JUniverseT
-    case Type.Bottom => JUniverseT
-
-    case Type.Const(_) => JUniverseT
+      case Type.Const(_) => JUniverseT
+    }
   }
 }
 

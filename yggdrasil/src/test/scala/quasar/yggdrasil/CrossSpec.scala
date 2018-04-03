@@ -19,6 +19,7 @@ package quasar.yggdrasil
 import quasar.blueeyes.json._
 import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
+import quasar.precog.common._
 
 trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
   import SampleData._
@@ -34,18 +35,18 @@ trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike 
       case v                      => v
     }
 
-    val expected: Stream[JValue] = for {
+    val expected: Stream[RValue] = for {
       lv <- l.data
       rv <- r.data
     } yield {
-      JObject(JField("left", removeUndefined(lv)) :: JField("right", removeUndefined(rv)) :: Nil)
+      RValue.fromJValueRaw(JObject(JField("left", removeUndefined(lv.toJValueRaw)) :: JField("right", removeUndefined(rv.toJValueRaw)) :: Nil))
     }
 
     val result = ltable.cross(rtable)(
       InnerObjectConcat(WrapObject(Leaf(SourceLeft), "left"), WrapObject(Leaf(SourceRight), "right"))
     )
 
-    val jsonResult: M[Stream[JValue]] = toJson(result)
+    val jsonResult: M[Stream[RValue]] = toJson(result)
     jsonResult.copoint must_== expected
   }
 

@@ -16,7 +16,9 @@
 
 package quasar.qscript.qsu
 
-import quasar.{Data, DataArbitrary, Type, Qspec}
+import slamdata.Predef._
+
+import quasar.{Data, DataGenerators, Type, Qspec}
 import quasar.Planner.PlannerError
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
@@ -43,10 +45,9 @@ import quasar.std.{
   RelationsLib,
   SetLib,
   StringLib,
-  StructuralLib,
-  TemporalPart
+  StructuralLib
 }
-import slamdata.Predef._
+import quasar.time.TemporalPart
 
 import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
@@ -55,7 +56,7 @@ import scalaz.syntax.bifunctor._
 import scalaz.syntax.show._
 import pathy.Path, Path.{file, Sandboxed}
 
-object ReadLPSpec extends Qspec with CompilerHelpers with DataArbitrary with QSUTTypes[Fix] {
+object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]

@@ -117,7 +117,6 @@ object normalization {
   }
 
   /** Normalizes EJson literals by
-    *   - Converting constant strings to arrays of characters.
     *   - Replacing `Meta` nodes with their value component.
     */
   def normalizeEJson[J: Order, T](
@@ -127,7 +126,7 @@ object normalization {
     JR: Recursive.Aux[J, EJson]
   ): TypeF[J, T] => TypeF[J, T] = {
     val norm: J => J =
-      _.transCata[J](EJson.replaceString[J] <<< EJson.elideMetadata[J])
+      _.transCata[J](EJson.elideMetadata[J])
 
     totally {
       case Const(j)     => const[J, T](norm(j))

@@ -25,14 +25,13 @@ trait Instructions {
 class InstructionSet[Lib <: Library](val library: Lib) {
   import library._
 
-  private def DateNumUnion         = JUnionT(JNumberT, JDateT)
   private def BinOpType(tp: JType) = BinaryOperationType(tp, tp, tp)
   import JType.JUniverseT
 
   sealed abstract class UnaryOperation(val tpe: UnaryOperationType)
   sealed abstract class BinaryOperation(val tpe: BinaryOperationType)
   sealed abstract class NumericBinaryOperation     extends BinaryOperation(BinOpType(JNumberT))
-  sealed abstract class NumericComparisonOperation extends BinaryOperation(BinaryOperationType(DateNumUnion, DateNumUnion, JBooleanT))
+  sealed abstract class NumericComparisonOperation extends BinaryOperation(BinaryOperationType(JNumberT, JNumberT, JBooleanT))
   sealed abstract class BooleanBinaryOperation     extends BinaryOperation(BinOpType(JBooleanT))
   sealed abstract class EqualityOperation          extends BinaryOperation(BinaryOperationType(JUniverseT, JUniverseT, JBooleanT))
 

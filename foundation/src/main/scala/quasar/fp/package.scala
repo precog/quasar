@@ -22,8 +22,8 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import monocle.Lens
-import scalaz.{Lens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
+import monocle.{Lens, PLens}
+import scalaz.{Lens => _, PLens => _, _}, BijectionT._, Kleisli._, Liskov._, Scalaz._
 import shapeless.{Fin, Nat, Sized, Succ}
 
 sealed abstract class ListMapInstances {
@@ -246,6 +246,11 @@ package object fp
 
   implicit val symbolShow: Show[Symbol] = Show.showFromToString
   implicit val symbolOrder: Order[Symbol] = Order.orderBy(_.name)
+
+  implicit final class LensOps[S, T, A, B](val plens: PLens[S, T, A, B]) extends scala.AnyVal {
+    def store(s: S): IndexedStore[A, B, T] =
+      IndexedStoreT.indexedStore(plens.get(s))((b: B) => plens.set(b)(s))
+  }
 
   implicit final class QuasarFreeOps[F[_], A](val self: Free[F, A]) extends scala.AnyVal {
     type Self    = Free[F, A]

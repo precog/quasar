@@ -25,7 +25,6 @@ import scalaz.std.anyVal._
 import scalaz.std.math.bigInt._
 import scalaz.std.math.bigDecimal._
 import scalaz.std.option._
-import scalaz.std.string._
 import scalaz.syntax.apply._
 import scalaz.syntax.order._
 import scalaz.scalacheck.ScalaCheckBinding._
@@ -44,8 +43,7 @@ trait TypeStatArbitrary {
       genColl[A],
       arbitrary[A] map (count[A](_)),
       (arbitrary[A] |@| genRange[SByte])((a, r) => byte(a, r._1, r._2)),
-      (arbitrary[A] |@| genRange[SChar])((a, r) => char(a, r._1, r._2)),
-      (arbitrary[A] |@| genRange[A] |@| genRange[String])((c, r, s) => str[A](c, r._1, r._2, s._1, s._2)),
+      (arbitrary[SampleStats[A]] |@| genRange[SChar])((s, r) => char(s, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[BigInt])((s, r) => int[A](s, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[BigDecimal])((s, r) => dec[A](s, r._1, r._2)))
 

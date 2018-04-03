@@ -38,8 +38,10 @@ trait MetaStoreAccess {
   def mounts: ConnectionIO[List[PathedMountConfig]] =
     Queries.mounts.list
 
-  def mountsHavingPrefix(dir: ADir): ConnectionIO[Map[APath, MountType]] =
-    Queries.mountsHavingPrefix(dir).list.map(_.toMap)
+  def mountsHavingPrefix(dir: ADir): ConnectionIO[Map[APath, MountingError \/ MountType]] =
+    Queries.mountsHavingPrefix(dir).list map { xs =>
+      xs.toMap.mapValues(m => Mount.toMountConfig(m) as m.`type`)
+    }
 
   def lookupMountType(path: APath): ConnectionIO[Option[MountType]] =
     Queries.lookupMountType(path).option

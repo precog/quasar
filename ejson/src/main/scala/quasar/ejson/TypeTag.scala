@@ -25,11 +25,14 @@ import scalaz.std.string._
 final case class TypeTag(value: String) extends scala.AnyVal
 
 object TypeTag {
-  val Binary    = TypeTag("_ejson.binary")
-  val Date      = TypeTag("_ejson.date")
-  val Interval  = TypeTag("_ejson.interval")
-  val Time      = TypeTag("_ejson.time")
-  val Timestamp = TypeTag("_ejson.timestamp")
+  val Binary         = TypeTag("_ejson.binary")
+  val Interval       = TypeTag("_ejson.interval")
+  val OffsetDateTime = TypeTag("_ejson.offsetdatetime")
+  val OffsetTime     = TypeTag("_ejson.offsettime")
+  val OffsetDate     = TypeTag("_ejson.offsetdate")
+  val LocalDateTime  = TypeTag("_ejson.localdatetime")
+  val LocalTime      = TypeTag("_ejson.localtime")
+  val LocalDate      = TypeTag("_ejson.localdate")
 
   val stringIso: Iso[TypeTag, String] =
     Iso[TypeTag, String](_.value)(TypeTag(_))

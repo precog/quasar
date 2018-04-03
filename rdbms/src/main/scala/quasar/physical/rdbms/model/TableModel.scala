@@ -168,9 +168,12 @@ object TableModel {
       case t.Int     => IntCol
       case t.Bool    => BoolCol
       case t.Dec     => DecCol
-      case t.Timestamp => JsonCol
-      case t.Date => JsonCol
-      case t.Time => JsonCol
+      case t.OffsetDateTime => JsonCol
+      case t.OffsetDate => JsonCol
+      case t.OffsetTime => JsonCol
+      case t.LocalDateTime => JsonCol
+      case t.LocalDate => JsonCol
+      case t.LocalTime => JsonCol
       case t.Id      => JsonCol
       case _         => NullCol // TODO support all types
     }

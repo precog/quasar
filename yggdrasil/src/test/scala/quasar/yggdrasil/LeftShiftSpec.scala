@@ -34,7 +34,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(0), JArray(JNum(0), JNum(12))),
         toRecord(Array(0), JArray(JNum(1), JNum(13))))
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1)).getJValues mustEqual expected
   }
 
   def testTrivialObjectLeftShift = {
@@ -46,7 +46,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(0), JArray(JString("bar"), JNum(13))),
         toRecord(Array(0), JArray(JString("foo"), JNum(12))))
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1)).getJValues mustEqual expected
   }
 
   def testTrivialObjectArrayLeftShift = {
@@ -64,7 +64,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(1), JArray(JNum(0), JNum(42))),
         toRecord(Array(1), JArray(JNum(1), JNum(43))))
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint.toVector mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1)).copoint.toVector.map(_.toJValueRaw) mustEqual expected
   }
 
   def testSetArrayLeftShift = {
@@ -80,7 +80,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expectedAll = (0 until 100).toVector.flatMap(expected)
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expectedAll
+    toJson(table.leftShift(CPath.Identity \ 1)).getJValues mustEqual expectedAll
   }
 
   def testHeteroArrayLeftShift = {
@@ -102,7 +102,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(1), JArray(JNum(2), JNum(24))),
         toRecord(Array(1), JArray(JNum(3), JNum(25))))
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1)).getJValues mustEqual expected
   }
 
   def testTrivialArrayLeftShiftWithInnerObject = {
@@ -115,7 +115,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(0), JArray(JNum(1), JNum(13))),
         toRecord(Array(0), JArray(JNum(2), JObject(JField("a", JNum(42))))))
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1)).getJValues mustEqual expected
   }
 
   // replaces SampleData.toRecord to avoid ordering issues

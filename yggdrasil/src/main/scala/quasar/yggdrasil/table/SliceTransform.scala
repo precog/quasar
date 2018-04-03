@@ -968,31 +968,31 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
 
         case (sta: SliceTransform1S[_], stb: SliceTransform1M[_]) =>
           val st = SliceTransform1SMS(sta, stb, Identity)
-          st.mapState({ case (a, b, _) => (a, b) }, { case (a, b) => (a, b, ()) })
+          st.mapState[(A, B)]({ case (a, b, _) => (a, b) }, { case (a, b) => (a, b, ()) })
 
         case (sta: SliceTransform1M[_], stb: SliceTransform1S[_]) =>
           val st = SliceTransform1SMS(Identity, sta, stb)
-          st.mapState({ case (_, a, b) => (a, b) }, { case (a, b) => ((), a, b) })
+          st.mapState[(A, B)]({ case (_, a, b) => (a, b) }, { case (a, b) => ((), a, b) })
 
         case (sta: SliceTransform1S[_], SliceTransform1SMS(stb, stc, std)) =>
           val st = SliceTransform1SMS(chainS(sta, stb), stc, std)
-          st.mapState({ case ((a, b), c, d) => (a, (b, c, d)) }, { case (a, (b, c, d)) => ((a, b), c, d) })
+          st.mapState[(A, (Any, Any, Any))]({ case ((a, b), c, d) => (a, (b, c, d)) }, { case (a, (b, c, d)) => ((a, b), c, d) })
 
         case (SliceTransform1SMS(sta, stb, stc), std: SliceTransform1S[_]) =>
           val st = SliceTransform1SMS(sta, stb, chainS(stc, std))
-          st.mapState({ case (a, b, (c, d)) => ((a, b, c), d) }, { case ((a, b, c), d) => (a, b, (c, d)) })
+          st.mapState[((Any, Any, Any), B)]({ case (a, b, (c, d)) => ((a, b, c), d) }, { case ((a, b, c), d) => (a, b, (c, d)) })
 
         case (sta: SliceTransform1M[_], SliceTransform1SMS(stb, stc, std)) =>
           val st = SliceTransform1SMS(Identity, sta andThen stb andThen stc, std)
-          st.mapState({ case (_, ((a, b), c), d) => (a, (b, c, d)) }, { case (a, (b, c, d)) => ((), ((a, b), c), d) })
+          st.mapState[(A, (Any, Any, Any))]({ case (_, ((a, b), c), d) => (a, (b, c, d)) }, { case (a, (b, c, d)) => ((), ((a, b), c), d) })
 
         case (SliceTransform1SMS(sta, stb, stc), std: SliceTransform1M[_]) =>
           val st = SliceTransform1SMS(sta, stb andThen stc andThen std, Identity)
-          st.mapState({ case (a, ((b, c), d), _) => ((a, b, c), d) }, { case ((a, b, c), d) => (a, ((b, c), d), ()) })
+          st.mapState[((Any, Any, Any), B)]({ case (a, ((b, c), d), _) => ((a, b, c), d) }, { case ((a, b, c), d) => (a, ((b, c), d), ()) })
 
         case (SliceTransform1SMS(sta, stb, stc), SliceTransform1SMS(std, ste, stf)) =>
           val st = SliceTransform1SMS(sta, stb andThen stc andThen std andThen ste, stf)
-          st.mapState({ case (a, (((b, c), d), e), f) => ((a, b, c), (d, e, f)) }, { case ((a, b, c), (d, e, f)) => (a, (((b, c), d), e), f) })
+          st.mapState[((Any, Any, Any), (Any, Any, Any))]({ case (a, (((b, c), d), e), f) => ((a, b, c), (d, e, f)) }, { case ((a, b, c), (d, e, f)) => (a, (((b, c), d), e), f) })
 
         case (MappedState1(sta, f, g), stb) =>
           (sta andThen stb).mapState(f <-: _, g <-: _)
@@ -1220,11 +1220,11 @@ trait SliceTransforms[M[+ _]] extends TableModule[M] with ColumnarTableTypes[M] 
 
         case (SliceTransform2SM(sta, stb), stc) =>
           val st = SliceTransform2SM(sta, stb andThen stc)
-          st.mapState({ case (a, (b, c)) => ((a, b), c) }, { case ((a, b), c) => (a, (b, c)) })
+          st.mapState[((Any, Any), B)]({ case (a, (b, c)) => ((a, b), c) }, { case ((a, b), c) => (a, (b, c)) })
 
         case (SliceTransform2MS(sta, stb), stc) =>
           val st = chain(sta, stb andThen stc)
-          st.mapState({ case (a, (b, c)) => ((a, b), c) }, { case ((a, b), c) => (a, (b, c)) })
+          st.mapState[((Any, Any), B)]({ case (a, (b, c)) => ((a, b), c) }, { case ((a, b), c) => (a, (b, c)) })
 
         case (MappedState2(sta, f, g), stb) =>
           chain(sta, stb).mapState(f <-: _, g <-: _)

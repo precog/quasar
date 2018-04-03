@@ -187,11 +187,11 @@ object hierarchical {
       case Delete(path) =>
         refineType(path).fold(deleteDir, deleteFile)
 
-      case TempFile(near) =>
+      case TempFile(near, prefix) =>
         EitherT.fromDisjunction[M](
           lookup(near) toRightDisjunction noMountError(near)
         ).flatMapF { case (_, g) =>
-          g(TempFile(near))
+          g(TempFile(near, prefix))
         }.run
     }
   }

@@ -20,8 +20,9 @@ package table
 import quasar.blueeyes._
 import quasar.precog.BitSet
 import quasar.precog.common._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.annotation.tailrec
 
@@ -258,14 +259,39 @@ object ArraySetColumn {
           def apply(row: Int): BigDecimal = backing(firstDefinedIndexAt(row)).asInstanceOf[NumColumn].apply(row)
         }
 
-      case CDate =>
-        new ArraySetColumn[DateColumn](ctype, columnSet.map(_.asInstanceOf[DateColumn])) with DateColumn {
-          def apply(row: Int): ZonedDateTime = backing(firstDefinedIndexAt(row)).asInstanceOf[DateColumn].apply(row)
+      case COffsetDateTime =>
+        new ArraySetColumn[OffsetDateTimeColumn](ctype, columnSet.map(_.asInstanceOf[OffsetDateTimeColumn])) with OffsetDateTimeColumn {
+          def apply(row: Int): OffsetDateTime = backing(firstDefinedIndexAt(row)).asInstanceOf[OffsetDateTimeColumn].apply(row)
         }
 
-      case CPeriod =>
-        new ArraySetColumn[PeriodColumn](ctype, columnSet.map(_.asInstanceOf[PeriodColumn])) with PeriodColumn {
-          def apply(row: Int): Period = backing(firstDefinedIndexAt(row)).asInstanceOf[PeriodColumn].apply(row)
+      case COffsetTime =>
+        new ArraySetColumn[OffsetTimeColumn](ctype, columnSet.map(_.asInstanceOf[OffsetTimeColumn])) with OffsetTimeColumn {
+          def apply(row: Int): OffsetTime = backing(firstDefinedIndexAt(row)).asInstanceOf[OffsetTimeColumn].apply(row)
+        }
+
+      case COffsetDate =>
+        new ArraySetColumn[OffsetDateColumn](ctype, columnSet.map(_.asInstanceOf[OffsetDateColumn])) with OffsetDateColumn {
+          def apply(row: Int): OffsetDate = backing(firstDefinedIndexAt(row)).asInstanceOf[OffsetDateColumn].apply(row)
+        }
+
+      case CLocalDateTime =>
+        new ArraySetColumn[LocalDateTimeColumn](ctype, columnSet.map(_.asInstanceOf[LocalDateTimeColumn])) with LocalDateTimeColumn {
+          def apply(row: Int): LocalDateTime = backing(firstDefinedIndexAt(row)).asInstanceOf[LocalDateTimeColumn].apply(row)
+        }
+
+      case CLocalTime =>
+        new ArraySetColumn[LocalTimeColumn](ctype, columnSet.map(_.asInstanceOf[LocalTimeColumn])) with LocalTimeColumn {
+          def apply(row: Int): LocalTime = backing(firstDefinedIndexAt(row)).asInstanceOf[LocalTimeColumn].apply(row)
+        }
+
+      case CLocalDate =>
+        new ArraySetColumn[LocalDateColumn](ctype, columnSet.map(_.asInstanceOf[LocalDateColumn])) with LocalDateColumn {
+          def apply(row: Int): LocalDate = backing(firstDefinedIndexAt(row)).asInstanceOf[LocalDateColumn].apply(row)
+        }
+
+      case CInterval =>
+        new ArraySetColumn[IntervalColumn](ctype, columnSet.map(_.asInstanceOf[IntervalColumn])) with IntervalColumn {
+          def apply(row: Int): DateTimeInterval = backing(firstDefinedIndexAt(row)).asInstanceOf[IntervalColumn].apply(row)
         }
 
       case ctype: CArrayType[a] =>

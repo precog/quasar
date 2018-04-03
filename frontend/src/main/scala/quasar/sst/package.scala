@@ -76,7 +76,7 @@ package object sst {
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson]
     ): SST[J, A] =
-      fromEJson0(count, ejson.transCata[J](elideNonTypeMetadata[J]))
+      fromEJson0(count, ejson.transAna[J](elideNonTypeMetadata[J]))
 
     def size[J, A: AdditiveSemigroup](sst: SST[J, A]): A =
       sst.copoint.size
@@ -133,6 +133,7 @@ package object sst {
   def primaryTagOf[J](ejs: J)(implicit J: Recursive.Aux[J, EJson]): PrimaryTag =
     ejs.project match {
       case E(Meta(_, Embed(EType(tag)))) => tag.right
+      case C(Str(_))                     => strings.StructuralString.right
       case _                             => primaryTypeOf(ejs).left
     }
 

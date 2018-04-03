@@ -40,21 +40,26 @@ object data {
       jObjectFields(EJsonTypeKey -> jString(typ.shows), EJsonValueKey -> value.asJson)
 
     {
-      case Data.Binary(bytes) => typedObj(DT.Binary   , base64Bytes(bytes))
-      case Data.Bool(b)       => jBool(b)
-      case Data.Date(d)       => typedObj(DT.Date     , isoLocalDate(d))
-      case Data.Dec(d)        => typedObj(DT.Decimal  , d)
-      case Data.Id(id)        => typedObj(DT.Id       , id)
-      case Data.Int(i)        => typedObj(DT.Integer  , i)
-      case Data.Interval(d)   => typedObj(DT.Interval , isoDuration(d))
-      case Data.NA            => jSingleObject(EJsonTypeKey, jString((DT.NA: DataType).shows))
-      case Data.Null          => jNull
-      case Data.Str(s)        => jString(s)
-      case Data.Time(t)       => typedObj(DT.Time     , isoLocalTime(t))
-      case Data.Timestamp(ts) => typedObj(DT.Timestamp, isoInstant(ts))
+      case Data.Binary(bytes)     => typedObj(DT.Binary   , base64Bytes(bytes))
+      case Data.Bool(b)           => jBool(b)
+      case Data.Dec(d)            => typedObj(DT.Decimal  , d)
+      case Data.Id(id)            => typedObj(DT.Id       , id)
+      case Data.Int(i)            => typedObj(DT.Integer  , i)
+      case Data.NA                => jSingleObject(EJsonTypeKey, jString((DT.NA: DataType).shows))
+      case Data.Null              => jNull
+      case Data.Str(s)            => jString(s)
 
-      case Data.Arr(elements) => jArray(elements map encodeJson)
-      case Data.Obj(entries)  => jObject(JsonObject.fromTraversableOnce(entries mapValues encodeJson))
+      case Data.Interval(d)       => typedObj(DT.Interval      , isoDuration(d))
+      case Data.LocalDate(d)      => typedObj(DT.LocalDate     , isoLocalDate(d))
+      case Data.LocalDateTime(t)  => typedObj(DT.LocalDateTime , isoLocalDateTime(t))
+      case Data.LocalTime(t)      => typedObj(DT.LocalTime     , isoLocalTime(t))
+      case Data.OffsetDate(d)     => typedObj(DT.OffsetDate    , isoOffsetDate(d))
+      case Data.OffsetDateTime(t) => typedObj(DT.OffsetDateTime, isoOffsetDateTime(t))
+      case Data.OffsetTime(t)     => typedObj(DT.OffsetTime    , isoOffsetTime(t))
+
+      case Data.Arr(elements)     => jArray(elements map encodeJson)
+      case Data.Obj(entries)      => jObject(JsonObject.fromTraversableOnce(entries mapValues encodeJson))
+      case _ => ???
     }
   }
 
@@ -96,26 +101,30 @@ object data {
       }
 
       elementName => {
-        case Data.Binary(bytes) => elem(elementName, DT.Binary   , Text(base64Bytes(bytes))     ).success
-        case Data.Bool(b)       => elem(elementName, DT.Boolean  , Text(b.fold("true", "false"))).success
-        case Data.Date(d)       => elem(elementName, DT.Date     , Text(isoLocalDate(d))        ).success
-        case Data.Dec(d)        => elem(elementName, DT.Decimal  , Text(d.toString)             ).success
-        case Data.Id(id)        => elem(elementName, DT.Id       , Text(id)                     ).success
-        case Data.Int(i)        => elem(elementName, DT.Integer  , Text(i.toString)             ).success
-        case Data.Interval(d)   => elem(elementName, DT.Interval , Text(isoDuration(d))         ).success
-        case Data.NA            => elem(elementName, DT.NA       , Nil                          ).success
-        case Data.Null          => elem(elementName, DT.Null     , Nil                          ).success
-        case Data.Str(s)        => elem(elementName, DT.String   , Text(s)                      ).success
-        case Data.Time(t)       => elem(elementName, DT.Time     , Text(isoLocalTime(t))        ).success
-        case Data.Timestamp(ts) => elem(elementName, DT.Timestamp, Text(isoInstant(ts))         ).success
+        case Data.Binary(bytes)      => elem(elementName, DT.Binary        , Text(base64Bytes(bytes))     ).success
+        case Data.Bool(b)            => elem(elementName, DT.Boolean       , Text(b.fold("true", "false"))).success
+        case Data.Dec(d)             => elem(elementName, DT.Decimal       , Text(d.toString)             ).success
+        case Data.Id(id)             => elem(elementName, DT.Id            , Text(id)                     ).success
+        case Data.Int(i)             => elem(elementName, DT.Integer       , Text(i.toString)             ).success
+        case Data.NA                 => elem(elementName, DT.NA            , Nil                          ).success
+        case Data.Null               => elem(elementName, DT.Null          , Nil                          ).success
+        case Data.Str(s)             => elem(elementName, DT.String        , Text(s)                      ).success
 
-        case Data.Arr(elements) =>
+        case Data.Interval(d)        => elem(elementName, DT.Interval      , Text(isoDuration(d))       ).success
+        case Data.LocalDate(d)       => elem(elementName, DT.LocalDate     , Text(isoLocalDate(d))      ).success
+        case Data.LocalDateTime(dt)  => elem(elementName, DT.LocalDateTime , Text(isoLocalDateTime(dt)) ).success
+        case Data.LocalTime(t)       => elem(elementName, DT.LocalTime     , Text(isoLocalTime(t))      ).success
+        case Data.OffsetDate(d)      => elem(elementName, DT.OffsetDate    , Text(isoOffsetDate(d))     ).success
+        case Data.OffsetDateTime(dt) => elem(elementName, DT.OffsetDateTime, Text(isoOffsetDateTime(dt))).success
+        case Data.OffsetTime(t)      => elem(elementName, DT.OffsetTime    , Text(isoOffsetTime(t))     ).success
+
+        case Data.Arr(elements)      =>
           elements traverse loop(ejsonArrayElt) map (elem(elementName, DT.Array, _))
 
-        case Data.Obj(entries)  =>
+        case Data.Obj(entries)       =>
           entries.toList traverse (mapEntryToXml andThen (_.validation)) map (elem(elementName, DT.Object, _))
 
-        case other              => s"No representation for '$other' in XML.".failureNel[Elem]
+        case other                   => s"No representation for '$other' in XML.".failureNel[Elem]
       }
     }
 
@@ -141,10 +150,6 @@ object data {
         b64.string.flatMap(base64Bytes.getOption(_)).map(Data._binary(_)).cata(
           _.point[F], error(s"Expected Base64-encoded binary data, found: $b64"))
 
-      case EJsonTyped(DT.Date, dt) =>
-        dt.string.flatMap(isoLocalDate.getOption(_)).map(Data._date(_)).cata(
-          _.point[F], error(s"Expected ISO-8601 formatted local date, found: $dt"))
-
       case EJsonTyped(DT.Decimal, d) =>
         d.as[BigDecimal].toOption.map(Data._dec(_)).cata(
           _.point[F], error(s"Expected a decimal number, found: $d"))
@@ -161,19 +166,35 @@ object data {
         ivl.string.flatMap(isoDuration.getOption(_)).map(Data._interval(_)).cata(
           _.point[F], error(s"Expected an ISO-8601 formatted duration, found: $ivl"))
 
-      case EJsonTyped(DT.Time, t) =>
-        t.string.flatMap(isoLocalTime.getOption(_)).map(Data._time(_)).cata(
-          _.point[F], error(s"Expected an ISO-8601 formatted local time, found: $t"))
+      case EJsonTyped(DT.LocalDate, dt) =>
+        dt.string.flatMap(isoLocalDate.getOption(_)).map(Data._localDate(_)).cata(
+          _.point[F], error(s"Expected ISO-8601 formatted local date, found: $dt"))
 
-      case EJsonTyped(DT.Timestamp, ts) =>
-        ts.string.flatMap(isoInstant.getOption(_)).map(Data._timestamp(_)).cata(
-          _.point[F], error(s"Expected an ISO-8601 formatted datetime, found: $ts"))
+      case EJsonTyped(DT.LocalDateTime, dt) =>
+        dt.string.flatMap(isoLocalDateTime.getOption(_)).map(Data._localDateTime(_)).cata(
+          _.point[F], error(s"Expected ISO-8601 formatted local datetime, found: $dt"))
+
+      case EJsonTyped(DT.LocalTime, t) =>
+        t.string.flatMap(isoLocalTime.getOption(_)).map(Data._localTime(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted local time, found: $t"))
 
       case EJsType(DT.NA) => (Data.NA: Data).point[F]
 
       // NB: Because sometimes we need to encode `Null` as an object due to
       //     MarkLogic losing map entries where the value is a literal `null`.
       case EJsType(DT.Null) => (Data.Null: Data).point[F]
+
+      case EJsonTyped(DT.OffsetDateTime, dt) =>
+        dt.string.flatMap(isoOffsetDateTime.getOption(_)).map(Data._offsetDateTime(_)).cata(
+          _.point[F], error(s"Expected ISO-8601 formatted offset datetime, found: $dt"))
+
+      case EJsonTyped(DT.OffsetDate, dt) =>
+        dt.string.flatMap(isoOffsetDate.getOption(_)).map(Data._offsetDate(_)).cata(
+          _.point[F], error(s"Expected ISO-8601 formatted offset date, found: $dt"))
+
+      case EJsonTyped(DT.OffsetTime, t) =>
+        t.string.flatMap(isoOffsetTime.getOption(_)).map(Data._offsetTime(_)).cata(
+          _.point[F], error(s"Expected an ISO-8601 formatted offset time, found: $t"))
 
       case other =>
         other.toList traverse { case (k, v) => decodeJson[F](v) strengthL k } map (Data.Obj(_: _*))
@@ -222,12 +243,6 @@ object data {
       case DataNode(DT.Boolean, LeafText("true"))  => Data._bool(true).success.point[F]
       case DataNode(DT.Boolean, LeafText("false")) => Data._bool(false).success.point[F]
 
-      case DataNode(DT.Date, LeafText(d)) =>
-        isoLocalDate.getOption(d)
-          .map(Data._date(_))
-          .toSuccessNel(s"Expected an ISO-8601 formatted local date, found: $d")
-          .point[F]
-
       case DataNode(DT.Decimal, LeafText(d)) =>
         Validation.fromTryCatchNonFatal(BigDecimal(d))
           .map(Data._dec(_))
@@ -248,9 +263,45 @@ object data {
           .toSuccessNel(s"Expected an ISO-8601 formatted duration, found: $ivl")
           .point[F]
 
+      case DataNode(DT.LocalDate, LeafText(d)) =>
+        isoLocalDate.getOption(d)
+          .map(Data._localDate(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted local date, found: $d")
+          .point[F]
+
+      case DataNode(DT.LocalDateTime, LeafText(d)) =>
+        isoLocalDateTime.getOption(d)
+          .map(Data._localDateTime(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted local datetime, found: $d")
+          .point[F]
+
+      case DataNode(DT.LocalTime, LeafText(t)) =>
+        isoLocalTime.getOption(t)
+          .map(Data._localTime(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
+          .point[F]
+
       case DataNode(DT.NA, Seq()) => (Data.NA: Data).success.point[F]
 
       case DataNode(DT.Null, Seq()) => (Data.Null: Data).success.point[F]
+
+      case DataNode(DT.OffsetDate, LeafText(d)) =>
+        isoOffsetDate.getOption(d)
+          .map(Data._offsetDate(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted offset date, found: $d")
+          .point[F]
+
+      case DataNode(DT.OffsetDateTime, LeafText(d)) =>
+        isoOffsetDateTime.getOption(d)
+          .map(Data._offsetDateTime(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted offset datetime, found: $d")
+          .point[F]
+
+      case DataNode(DT.OffsetTime, LeafText(t)) =>
+        isoOffsetTime.getOption(t)
+          .map(Data._offsetTime(_))
+          .toSuccessNel(s"Expected an ISO-8601 formatted offset time, found: $t")
+          .point[F]
 
       case DataNode(DT.Object, children) =>
         elements(children).toList
@@ -258,18 +309,6 @@ object data {
           .map(entries => Data._obj(ListMap(entries: _*)))
 
       case DataNode(DT.String, LeafText(s)) => Data._str(s).success.point[F]
-
-      case DataNode(DT.Time, LeafText(t)) =>
-        isoLocalTime.getOption(t)
-          .map(Data._time(_))
-          .toSuccessNel(s"Expected an ISO-8601 formatted local time, found: $t")
-          .point[F]
-
-      case DataNode(DT.Timestamp, LeafText(ts)) =>
-        isoInstant.getOption(ts)
-          .map(Data._timestamp(_))
-          .toSuccessNel(s"Expected an ISO-8601 formatted datetime, found: $ts")
-          .point[F]
 
       case untyped =>
         recover(untyped) map (_.point[V]) handleError (_.failure[Data].point[F])
@@ -296,54 +335,63 @@ object data {
   }
 
   private object DataType {
-    case object Array     extends DataType
-    case object Binary    extends DataType
-    case object Boolean   extends DataType
-    case object Date      extends DataType
-    case object Decimal   extends DataType
-    case object Id        extends DataType
-    case object Integer   extends DataType
-    case object Interval  extends DataType
-    case object NA        extends DataType
-    case object Null      extends DataType
-    case object Object    extends DataType
-    case object Set       extends DataType
-    case object String    extends DataType
-    case object Time      extends DataType
-    case object Timestamp extends DataType
+    case object Array          extends DataType
+    case object Binary         extends DataType
+    case object Boolean        extends DataType
+    case object Decimal        extends DataType
+    case object Id             extends DataType
+    case object Integer        extends DataType
+    case object Interval       extends DataType
+    case object LocalDate      extends DataType
+    case object LocalDateTime  extends DataType
+    case object LocalTime      extends DataType
+    case object NA             extends DataType
+    case object Null           extends DataType
+    case object Object         extends DataType
+    case object OffsetDate     extends DataType
+    case object OffsetDateTime extends DataType
+    case object OffsetTime     extends DataType
+    case object Set            extends DataType
+    case object String         extends DataType
 
     val stringCodec = Prism.partial[String, DataType] {
-      case "array"     => Array
-      case "binary"    => Binary
-      case "boolean"   => Boolean
-      case "date"      => Date
-      case "decimal"   => Decimal
-      case "id"        => Id
-      case "integer"   => Integer
-      case "interval"  => Interval
-      case "na"        => NA
-      case "null"      => Null
-      case "object"    => Object
-      case "set"       => Set
-      case "string"    => String
-      case "time"      => Time
-      case "timestamp" => Timestamp
+      case "array"          => Array
+      case "binary"         => Binary
+      case "boolean"        => Boolean
+      case "decimal"        => Decimal
+      case "id"             => Id
+      case "integer"        => Integer
+      case "interval"       => Interval
+      case "localdate"      => LocalDate
+      case "localdatetime"  => LocalDateTime
+      case "localtime"      => LocalTime
+      case "na"             => NA
+      case "null"           => Null
+      case "object"         => Object
+      case "offsetdate"     => OffsetDate
+      case "offsetdatetime" => OffsetDateTime
+      case "offsettime"     => OffsetTime
+      case "set"            => Set
+      case "string"         => String
     } {
-      case Array       => "array"
-      case Binary      => "binary"
-      case Boolean     => "boolean"
-      case Date        => "date"
-      case Decimal     => "decimal"
-      case Id          => "id"
-      case Integer     => "integer"
-      case Interval    => "interval"
-      case NA          => "na"
-      case Null        => "null"
-      case Object      => "object"
-      case Set         => "set"
-      case String      => "string"
-      case Time        => "time"
-      case Timestamp   => "timestamp"
+      case Array          => "array"
+      case Binary         => "binary"
+      case Boolean        => "boolean"
+      case Decimal        => "decimal"
+      case Id             => "id"
+      case Integer        => "integer"
+      case Interval       => "interval"
+      case LocalDate      => "localdate"
+      case LocalDateTime  => "localdatetime"
+      case LocalTime      => "localtime"
+      case NA             => "na"
+      case Null           => "null"
+      case Object         => "object"
+      case OffsetDate     => "offsetdate"
+      case OffsetDateTime => "offsetdatetime"
+      case OffsetTime     => "offsettime"
+      case Set            => "set"
+      case String         => "string"
     }
 
     implicit val show: Show[DataType] =

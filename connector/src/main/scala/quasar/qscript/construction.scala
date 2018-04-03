@@ -22,7 +22,7 @@ import quasar.{ejson, qscript}
 import quasar.ejson.EJson
 import quasar.qscript.qsu.{Access, QAccess}
 import quasar.qscript.qsu.QScriptUniform.ShiftTarget
-import quasar.std.TemporalPart
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -42,8 +42,22 @@ object construction {
       rollCore(MapFuncsCore.Undefined())
     def Now[A]: FreeMapA[T, A] =
       rollCore(MapFuncsCore.Now())
+    def NowDate[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.NowDate())
+    def NowTime[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.NowTime())
+    def CurrentTimeZone[A]: FreeMapA[T, A] =
+      rollCore(MapFuncsCore.CurrentTimeZone())
+    def ToLocal[A](a: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToLocal(a))
     def JoinSideName[A](sym: Symbol): FreeMapA[T, A] =
       rollCore(MapFuncsCore.JoinSideName(sym))
+    def SetTimeZone[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.SetTimeZone(a1, a2))
+    def SetTimeZoneHour[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.SetTimeZoneHour(a1, a2))
+    def SetTimeZoneMinute[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.SetTimeZoneMinute(a1, a2))
     def ExtractCentury[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractCentury(a1))
     def ExtractDayOfMonth[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
@@ -62,12 +76,12 @@ object construction {
       rollCore(MapFuncsCore.ExtractIsoDayOfWeek(a1))
     def ExtractIsoYear[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractIsoYear(a1))
-    def ExtractMicroseconds[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractMicroseconds(a1))
+    def ExtractMicrosecond[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractMicrosecond(a1))
     def ExtractMillennium[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractMillennium(a1))
-    def ExtractMilliseconds[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractMilliseconds(a1))
+    def ExtractMillisecond[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractMillisecond(a1))
     def ExtractMinute[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractMinute(a1))
     def ExtractMonth[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
@@ -76,22 +90,28 @@ object construction {
       rollCore(MapFuncsCore.ExtractQuarter(a1))
     def ExtractSecond[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractSecond(a1))
-    def ExtractTimezone[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractTimezone(a1))
-    def ExtractTimezoneHour[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractTimezoneHour(a1))
-    def ExtractTimezoneMinute[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ExtractTimezoneMinute(a1))
+    def ExtractTimeZone[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractTimeZone(a1))
+    def ExtractTimeZoneHour[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractTimeZoneHour(a1))
+    def ExtractTimeZoneMinute[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ExtractTimeZoneMinute(a1))
     def ExtractWeek[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractWeek(a1))
     def ExtractYear[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.ExtractYear(a1))
-    def Date[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.Date(a1))
-    def Time[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.Time(a1))
-    def Timestamp[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.Timestamp(a1))
+    def LocalDateTime[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.LocalDateTime(a1))
+    def OffsetDateTime[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.OffsetDateTime(a1))
+    def LocalDate[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.LocalDate(a1))
+    def OffsetDate[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.OffsetDate(a1))
+    def LocalTime[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.LocalTime(a1))
+    def OffsetTime[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.OffsetTime(a1))
     def Interval[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Interval(a1))
     def StartOfDay[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =

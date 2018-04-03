@@ -93,8 +93,13 @@ trait ScalacheckSupport {
   def mapOfN[K, V](len: Int, k: Gen[K], v: Gen[V]): Gen[sciMap[K, V]] =
     (setOfN(len, k) -> listOfN(len, v)) >> (_ zip _ toMap)
 
-  def genAlphaNumString: Gen[String]   = alphaNumChar.list ^^ (_.mkString)
-  def genBigDecimal: Gen[BigDecimal]   = Arbitrary.arbBigDecimal.arbitrary
+  def genAlphaNumString: Gen[String] = alphaNumChar.list ^^ (_.mkString)
+  def genBigDecimal: Gen[BigDecimal] = Arbitrary.arbBigDecimal.arbitrary
+
+  // This is a hack to avoid underflow and overflow exceptions during tests. It's still a problem.
+  def genSmallScaleBigDecimal: Gen[BigDecimal] =
+    genBigDecimal.map(_.setScale(100, BigDecimal.RoundingMode.DOWN))
+
   def genBigInt: Gen[BigInt]           = Arbitrary.arbBigInt.arbitrary
   def genBool: Gen[Boolean]            = oneOf(true, false)
   def genByte: Gen[Byte]               = choose(Byte.MinValue, Byte.MaxValue) ^^ (_.toByte)
@@ -110,6 +115,23 @@ trait ScalacheckSupport {
   def genPosLong: Gen[Long]            = choose(1L, Long.MaxValue)
   def genStartAndEnd: Gen[Int -> Int]  = genMinus10To10 >> (s => (0 upTo 20) ^^ (e => s -> e))
   def genString: Gen[String]           = Arbitrary.arbString.arbitrary
+
+  // mostly copied from scalacheck excluding control characters
+  def genJSONChar: Gen[Char]           = {
+    // exclude 0xFFFE due to this bug: http://bit.ly/1QryQZy
+    // also exclude 0xFFFF as it is not unicode: http://bit.ly/2cVBrzK
+    // excludes
+    val validRangesInclusive = List[(Char, Char)](
+      (0x0020, 0xD7FF),
+      (0xE000, 0xFFFD)
+    )
+
+    Gen.frequency((validRangesInclusive.map {
+      case (first, last) => (last + 1 - first, Gen.choose[Char](first, last))
+    }: List[(Int, Gen[Char])]): _*)
+  }
+
+  def genJSONString: Gen[String]       = Gen.listOf(genJSONChar).map(_.mkString)
 
   implicit class ScalacheckIntOps(private val n: Int) {
     def upTo(end: Int): Gen[Int] = choose(n, end)

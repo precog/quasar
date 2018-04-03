@@ -19,7 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data => QData}
 import quasar.common.{JoinType, SortDir}, SortDir._
-import quasar.DataArbitrary._
+import quasar.DataGenerators._
 import quasar.physical.couchbase.N1QL.{Eq, Id, Split, _}, Case._, Select.{Value, _}
 
 import scala.Predef.$conforms

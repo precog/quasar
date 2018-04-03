@@ -1,5 +1,5 @@
 {
-    "name": "select map keys",
+    "name": "shift map keys",
     "backends": {
         "marklogic_xml":     "pending",
         "mongodb_3_2":       "pending",

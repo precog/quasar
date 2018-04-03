@@ -38,6 +38,7 @@ import org.http4s.dsl._
 import org.http4s.server.HttpMiddleware
 import org.http4s.server.middleware.{CORS, CORSConfig, GZip}
 import org.http4s.server.syntax._
+import org.slf4j.LoggerFactory
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
@@ -112,7 +113,8 @@ object RestApi {
     RFC5987ContentDispositionRender compose
     HeaderParam                     compose
     passOptions                     compose
-    errorHandling
+    errorHandling                   compose
+    requestLogging
 
   val cors: HttpMiddleware =
     CORS(_, CORSConfig(
@@ -137,4 +139,7 @@ object RestApi {
           .toResponse[Task]
           .toHttpResponse(liftMT[Task, FailedResponseT])
     })
+
+  val requestLogging: HttpMiddleware =
+    RequestLogging(LoggerFactory.getLogger("quasar.api.services.request"), Set.empty)
 }

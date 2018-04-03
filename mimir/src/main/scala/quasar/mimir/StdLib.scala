@@ -17,13 +17,14 @@
 package quasar.mimir
 
 import quasar.precog.common._
+import quasar.time.OffsetDate
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
-import scalaz._, Scalaz._
-
-import java.time.ZonedDateTime
+import scalaz._
+import Scalaz._
+import java.time._
 
 trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   type Lib <: TableLib
@@ -318,7 +319,47 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => String) extends Map1Column(c) with StrColumn {
+    class ODTM(c: OffsetDateTimeColumn, defined: OffsetDateTime => Boolean, f: OffsetDateTime => String) extends Map1Column(c) with StrColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class OTM(c: OffsetTimeColumn, defined: OffsetTime => Boolean, f: OffsetTime => String) extends Map1Column(c) with StrColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class ODT(c: OffsetDateColumn, defined: OffsetDate => Boolean, f: OffsetDate => String) extends Map1Column(c) with StrColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LDTM(c: LocalDateTimeColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => String) extends Map1Column(c) with StrColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LTM(c: LocalTimeColumn, defined: LocalTime => Boolean, f: LocalTime => String) extends Map1Column(c) with StrColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LDT(c: LocalDateColumn, defined: LocalDate => Boolean, f: LocalDate => String) extends Map1Column(c) with StrColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -396,7 +437,47 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Long) extends Map1Column(c) with LongColumn {
+    class ODTM(c: OffsetDateTimeColumn, defined: OffsetDateTime => Boolean, f: OffsetDateTime => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class OTM(c: OffsetTimeColumn, defined: OffsetTime => Boolean, f: OffsetTime => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class ODT(c: OffsetDateColumn, defined: OffsetDate => Boolean, f: OffsetDate => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LDTM(c: LocalDateTimeColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LTM(c: LocalTimeColumn, defined: LocalTime => Boolean, f: LocalTime => Long) extends Map1Column(c) with LongColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LDT(c: LocalDateColumn, defined: LocalDate => Boolean, f: LocalDate => Long) extends Map1Column(c) with LongColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -799,7 +880,7 @@ object StdLib {
       def apply(row: Int) = f(c1(row), c2(row))
     }
 
-    class Dt(c: DateColumn, defined: ZonedDateTime => Boolean, f: ZonedDateTime => Boolean) extends Map1Column(c) with BoolColumn {
+    class Ldtm(c: LocalDateTimeColumn, defined: LocalDateTime => Boolean, f: LocalDateTime => Boolean) extends Map1Column(c) with BoolColumn {
 
       override def isDefinedAt(row: Int) =
         super.isDefinedAt(row) && defined(c(row))
@@ -807,8 +888,98 @@ object StdLib {
       def apply(row: Int) = f(c(row))
     }
 
-    class DtDt(c1: DateColumn, c2: DateColumn, defined: (ZonedDateTime, ZonedDateTime) => Boolean, f: (ZonedDateTime, ZonedDateTime) => Boolean)
+    class LdtmLdtm(c1: LocalDateTimeColumn, c2: LocalDateTimeColumn, defined: (LocalDateTime, LocalDateTime) => Boolean, f: (LocalDateTime, LocalDateTime) => Boolean)
         extends Map2Column(c1, c2)
+        with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c1(row), c2(row))
+
+      def apply(row: Int) = f(c1(row), c2(row))
+    }
+
+    class Ltm(c: LocalTimeColumn, defined: LocalTime => Boolean, f: LocalTime => Boolean) extends Map1Column(c) with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LtmLtm(c1: LocalTimeColumn, c2: LocalTimeColumn, defined: (LocalTime, LocalTime) => Boolean, f: (LocalTime, LocalTime) => Boolean)
+        extends Map2Column(c1, c2)
+        with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c1(row), c2(row))
+
+      def apply(row: Int) = f(c1(row), c2(row))
+    }
+
+    class Ldt(c: LocalDateColumn, defined: LocalDate => Boolean, f: LocalDate => Boolean) extends Map1Column(c) with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class LdtLdt(c1: LocalDateColumn, c2: LocalDateColumn, defined: (LocalDate, LocalDate) => Boolean, f: (LocalDate, LocalDate) => Boolean)
+        extends Map2Column(c1, c2)
+        with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c1(row), c2(row))
+
+      def apply(row: Int) = f(c1(row), c2(row))
+    }
+
+    class Odtm(c: OffsetDateTimeColumn, defined: OffsetDateTime => Boolean, f: OffsetDateTime => Boolean) extends Map1Column(c) with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class OdtmOdtm(c1: OffsetDateTimeColumn, c2: OffsetDateTimeColumn, defined: (OffsetDateTime, OffsetDateTime) => Boolean, f: (OffsetDateTime, OffsetDateTime) => Boolean)
+      extends Map2Column(c1, c2)
+        with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c1(row), c2(row))
+
+      def apply(row: Int) = f(c1(row), c2(row))
+    }
+
+    class Otm(c: OffsetTimeColumn, defined: OffsetTime => Boolean, f: OffsetTime => Boolean) extends Map1Column(c) with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class OtmOtm(c1: OffsetTimeColumn, c2: OffsetTimeColumn, defined: (OffsetTime, OffsetTime) => Boolean, f: (OffsetTime, OffsetTime) => Boolean)
+      extends Map2Column(c1, c2)
+        with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c1(row), c2(row))
+
+      def apply(row: Int) = f(c1(row), c2(row))
+    }
+
+    class Odt(c: OffsetDateColumn, defined: OffsetDate => Boolean, f: OffsetDate => Boolean) extends Map1Column(c) with BoolColumn {
+
+      override def isDefinedAt(row: Int) =
+        super.isDefinedAt(row) && defined(c(row))
+
+      def apply(row: Int) = f(c(row))
+    }
+
+    class OdtOdt(c1: OffsetDateColumn, c2: OffsetDateColumn, defined: (OffsetDate, OffsetDate) => Boolean, f: (OffsetDate, OffsetDate) => Boolean)
+      extends Map2Column(c1, c2)
         with BoolColumn {
 
       override def isDefinedAt(row: Int) =
@@ -818,10 +989,38 @@ object StdLib {
     }
   }
 
-  val StrAndDateT = JUnionT(JTextT, JDateT)
+  val StrAndLocalDateTimeT = JUnionT(JTextT, JLocalDateTimeT)
+  val StrAndLocalTimeT = JUnionT(JTextT, JLocalTimeT)
+  val StrAndLocalDateT = JUnionT(JTextT, JLocalDateT)
 
-  def dateToStrCol(c: DateColumn): StrColumn = new StrColumn {
+  def offsetDateTimeToStrCol(c: OffsetDateTimeColumn): StrColumn = new StrColumn {
     def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
     def apply(row: Int): String        = c(row).toString
   }
+
+  def offsetTimeToStrCol(c: OffsetTimeColumn): StrColumn = new StrColumn {
+    def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
+    def apply(row: Int): String        = c(row).toString
+  }
+
+  def offsetDateToStrCol(c: OffsetDateColumn): StrColumn = new StrColumn {
+    def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
+    def apply(row: Int): String        = c(row).toString
+  }
+
+  def localDateTimeToStrCol(c: LocalDateTimeColumn): StrColumn = new StrColumn {
+    def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
+    def apply(row: Int): String        = c(row).toString
+  }
+
+  def localTimeToStrCol(c: LocalTimeColumn): StrColumn = new StrColumn {
+    def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
+    def apply(row: Int): String        = c(row).toString
+  }
+
+  def localDateToStrCol(c: LocalDateColumn): StrColumn = new StrColumn {
+    def isDefinedAt(row: Int): Boolean = c.isDefinedAt(row)
+    def apply(row: Int): String        = c(row).toString
+  }
+
 }

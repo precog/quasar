@@ -94,24 +94,4 @@ object EJson {
   ): EJson[T] => EJson[T] = totally {
     case ExtEJson(Meta(v, _)) => v.project
   }
-
-  /** Replace a string with an array of characters. */
-  def replaceString[T](
-    implicit T: Corecursive.Aux[T, EJson]
-  ): EJson[T] => EJson[T] = totally {
-    case CommonEJson(Str(s)) =>
-      optics.arr[T](s.toList map (c => char[T](c)))
-  }
-
-  /** Replace an array of characters with a string. */
-  def restoreString[T](
-    implicit
-    TC: Corecursive.Aux[T, EJson],
-    TR: Recursive.Aux[T, EJson]
-  ): EJson[T] => EJson[T] = totally {
-    case a @ CommonEJson(Arr(t :: ts)) =>
-      (t :: ts)
-        .traverse(Fixed[T].char.getOption)
-        .fold(a)(cs => optics.str[T](cs.mkString))
-  }
 }

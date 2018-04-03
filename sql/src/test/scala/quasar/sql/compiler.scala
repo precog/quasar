@@ -66,15 +66,19 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
           "b" -> lpf.constant(Data.Str("abc"))))
     }
 
-    "compile expression with timestamp, date, time, and interval" in {
-      import java.time.{Instant, LocalDate, LocalTime}
+    "compile expression with datetime, date, time, and interval" in {
+      import java.time.{
+        LocalDate => JLocalDate,
+        LocalTime => JLocalTime,
+        OffsetDateTime => JOffsetDateTime
+      }
 
       testTypedLogicalPlanCompile(
         sqlE"""select timestamp("2014-11-17T22:00:00Z") + interval("PT43M40S"), date("2015-01-19"), time("14:21")""",
         lpf.constant(Data.Obj(ListMap(
-          "0" -> Data.Timestamp(Instant.parse("2014-11-17T22:43:40Z")),
-          "1" -> Data.Date(LocalDate.parse("2015-01-19")),
-          "2" -> Data.Time(LocalTime.parse("14:21:00.000"))))))
+          "0" -> Data.OffsetDateTime(JOffsetDateTime.parse("2014-11-17T22:43:40Z")),
+          "1" -> Data.LocalDate(JLocalDate.parse("2015-01-19")),
+          "2" -> Data.LocalTime(JLocalTime.parse("14:21:00.000"))))))
     }
 
     "compile simple constant from collection" in {
@@ -92,13 +96,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
             lpf.typecheck(lpf.free('__tmp0), Type.Obj(Map(), Some(Type.Top)),
               lpf.let('__tmp1,
                 lpf.invoke2(MapProject, lpf.free('__tmp0), lpf.constant(Data.Str("pop"))),
-                lpf.typecheck(lpf.free('__tmp1), Type.Coproduct(Type.Coproduct(Type.Int, Type.Dec), Type.Interval),
-                  lpf.let('__tmp2,
-                    lpf.invoke2(Divide, lpf.free('__tmp1), lpf.constant(Data.Int(10000))),
-                    lpf.typecheck(lpf.free('__tmp2), Type.Dec,
-                      lpf.invoke3(Substring, lpf.constant(Data.Str("abcdefg")), lpf.constant(Data.Int(0)), lpf.invoke1(Trunc, lpf.free('__tmp2))),
-                      lpf.constant(Data.NA))
-                  ),
+                lpf.typecheck(lpf.free('__tmp1), Type.Coproduct(Type.Int, Type.Dec),
+                  lpf.invoke3(Substring, 
+                    lpf.constant(Data.Str("abcdefg")), 
+                    lpf.constant(Data.Int(0)), 
+                    lpf.invoke1(Trunc, lpf.invoke2(Divide, lpf.free('__tmp1), lpf.constant(Data.Int(10000))))),
                   lpf.constant(Data.NA))),
               lpf.constant(Data.NA)))))
     }

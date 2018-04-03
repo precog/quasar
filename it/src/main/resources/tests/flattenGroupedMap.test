@@ -1,5 +1,5 @@
 {
-    "name": "flatten a grouped object with filter",
+    "name": "flatten a grouped map with filter",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "pendingIgnoreFieldOrder",

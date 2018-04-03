@@ -44,6 +44,8 @@ trait RdbmsManageFile
   this: Rdbms =>
   implicit def MonadM: Monad[M]
 
+  val defaultPrefix = TempFilePrefix("__quasar_tmp_table_")
+
   def dropTableIfExists(table: TablePath): ConnectionIO[Unit]
 
   def dropTable(table: TablePath): ConnectionIO[Unit] = {
@@ -158,17 +160,9 @@ trait RdbmsManageFile
         .getOrElse(().point[Backend])
     }
 
-    override def tempFile(near: APath): Backend[AFile] = {
-      MonotonicSeq
-        .Ops[Eff]
-        .next
-        .map { i =>
-          val tmpFilename = file(s"__quasar_tmp_table_$i")
-          refineType(near).fold(d => {
-            d </> tmpFilename
-          }, f => fileParent(f) </> tmpFilename)
-        }
-        .liftB
-    }
+    override def tempFile(near: APath, prefix: Option[TempFilePrefix]): Backend[AFile] =
+      MonotonicSeq.Ops[Eff].next.map(
+        TmpFile.tmpFile0(near, prefix.getOrElse(defaultPrefix), _)).liftB
+
   }
 }

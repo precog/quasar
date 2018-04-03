@@ -39,7 +39,7 @@ private[qscript] final class MapFuncCorePlanner[
   import expr.{emptySeq, if_, let_, some, try_}, XQuery.flwor
 
   // wart: uses `eq` (3x) and `ne`
-  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
+  @SuppressWarnings(Array("org.wartremover.warts.Equals", "org.wartremover.warts.NonUnitStatements"))
   val plan: AlgebraM[F, MapFuncCore[T, ?], XQuery] = {
     case Constant(ejson)              => EJsonPlanner.plan[T[EJson], F, FMT](ejson)
     case Undefined()                  => emptySeq.point[F]
@@ -47,18 +47,26 @@ private[qscript] final class MapFuncCorePlanner[
     case JoinSideName(n)              => MonadPlanErr[F].raiseError(MarkLogicPlannerError.unreachable(s"JoinSideName(${Show[Symbol].shows(n)})"))
 
     case Length(arrOrstr)             => lib.length[F] apply arrOrstr
+    case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
 
     // time
-    case Date(s)                      => lib.asDate[F] apply s
-    case Time(s)                      => xs.time(s).point[F]
-    case Timestamp(s)                 => xs.dateTime(s).point[F]
+    case OffsetDateTime(s)            => xs.dateTime(s).point[F]
+    case OffsetDate(s)                => lib.asDate[F] apply s
+    case OffsetTime(s)                => xs.time(s).point[F]
+    case LocalDateTime(s)             => xs.dateTime(s).point[F]
+    case LocalDate(s)                 => lib.asDate[F] apply s
+    case LocalTime(s)                 => xs.time(s).point[F]
     case Interval(s)                  => xs.dayTimeDuration(s).point[F]
     case StartOfDay(date)             => lib.startOfDay[F] apply date
     case TemporalTrunc(part, src)     => lib.temporalTrunc[F](part) apply src
     case TimeOfDay(dt)                => asDateTime(dt) map xs.time
     case ToTimestamp(millis)          => SP.castIfNode(millis) >>= (lib.timestampToDateTime[F] apply _)
-    case TypeOf(x)                    => lib.typeOf[F, FMT] apply x
+    case ToLocal(millis)              => ??? // TODO
+
     case Now()                        => fn.currentDateTime.point[F]
+    case NowDate()                    => fn.currentDate.point[F]
+    case NowTime()                    => fn.currentTime.point[F]
+    case CurrentTimeZone()            => fn.implicitTimeZone.point[F]
 
     case ExtractCentury(time)         => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 100.xqy))
@@ -71,23 +79,27 @@ private[qscript] final class MapFuncCorePlanner[
     case ExtractHour(time)            => asDateTime(time) map fn.hoursFromDateTime
     case ExtractIsoDayOfWeek(time)    => asDate(time) map (xdmp.weekdayFromDate)
     case ExtractIsoYear(time)         => asDateTime(time) flatMap (lib.isoyearFromDateTime[F].apply(_))
-    case ExtractMicroseconds(time)    => asDateTime(time) map (dt =>
+    case ExtractMicrosecond(time)    => asDateTime(time) map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000000.xqy))
     case ExtractMillennium(time)      => asDateTime(time) map (dt =>
                                            fn.ceiling(fn.yearFromDateTime(dt) div 1000.xqy))
-    case ExtractMilliseconds(time)    => asDateTime(time) map (dt =>
+    case ExtractMillisecond(time)    => asDateTime(time) map (dt =>
                                            mkSeq_(fn.secondsFromDateTime(dt) * 1000.xqy))
     case ExtractMinute(time)          => asDateTime(time) map fn.minutesFromDateTime
     case ExtractMonth(time)           => asDateTime(time) map fn.monthFromDateTime
     case ExtractQuarter(time)         => asDate(time) map (xdmp.quarterFromDate)
     case ExtractSecond(time)          => asDateTime(time) map fn.secondsFromDateTime
-    case ExtractTimezone(time)        => asDateTime(time) flatMap (lib.timezoneOffsetSeconds[F].apply(_))
-    case ExtractTimezoneHour(time)    => asDateTime(time) map (dt =>
+    case ExtractTimeZone(time)        => asDateTime(time) flatMap (lib.timezoneOffsetSeconds[F].apply(_))
+    case ExtractTimeZoneHour(time)    => asDateTime(time) map (dt =>
                                            fn.hoursFromDuration(fn.timezoneFromDateTime(dt)))
-    case ExtractTimezoneMinute(time)  => asDateTime(time) map (dt =>
+    case ExtractTimeZoneMinute(time)  => asDateTime(time) map (dt =>
                                            fn.minutesFromDuration(fn.timezoneFromDateTime(dt)))
     case ExtractWeek(time)            => asDate(time) map (xdmp.weekFromDate)
     case ExtractYear(time)            => asDateTime(time) map fn.yearFromDateTime
+
+    case SetTimeZone(s, t)            => ??? // TODO
+    case SetTimeZoneMinute(m, t)      => ??? // TODO
+    case SetTimeZoneHour(h, t)        => ??? // TODO
 
     // math
     case Negate(x)                    => SP.castIfNode(x) map (-_)

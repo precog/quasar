@@ -18,7 +18,7 @@ package quasar.fs
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary}
+import quasar.{Data, DataGenerators}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.foldable._
@@ -32,7 +32,7 @@ import scalaz.stream._
 
 /** FIXME: couldn't make this one work with Qspec. */
 class WriteFileSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with FileSystemFixture {
-  import DataArbitrary._, FileSystemError._, PathError._, InMemory.InMemState
+  import DataGenerators._, FileSystemError._, PathError._, InMemory.InMemState
 
   type DataWriter = (AFile, Process0[Data]) => Process[write.M, FileSystemError]
 

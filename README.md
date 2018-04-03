@@ -203,7 +203,7 @@ As with the plugins directory approach, you will need to run the `assembly` task
 java -jar [<path to jar>] [-c <config file>] --backend:quasar.physical.mongodb.MongoDb\$=.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar
 ```
 
-Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax.
+Replace the JAR file in the above with the path to the backend whose `assembly` you ran.  The `--backend` switch may be repeated as many times as necessary: once for each backend you wish to add.  The value to the left of the `=` is the `BackendModule` object *class name* which defines the backend in question.  Note that we need to escape the `$` character which will be present in each class name, solely because of bash syntax. If you are invoking the `--backend` option within `sbt` (for example running `web/run` or `repl/run`) you do not need to escape the `$`.
 
 What follows is a list of class names for each supported backend:
 
@@ -730,6 +730,7 @@ a schema document might look like
 ```json
 {
   "measure" : {
+    "kind" : "collection",
     "count" : 1000.0,
     "minLength" : 5.0,
     "maxLength" : 5.0
@@ -739,17 +740,33 @@ a schema document might look like
     "of" : {
       "city" : {
         "measure" : {
+          "kind" : "collection",
           "count" : 1000.0,
-          "min" : "ABBEVILLE",
-          "max" : "YOUNGSVILLE",
           "minLength" : 3.0,
           "maxLength" : 16.0
         },
         "structure" : {
+          "tag" : "_structural.string",
           "type" : "array",
           "of" : {
             "measure" : {
-              "count" : 1000.0
+              "count" : 8693.0,
+              "distribution" : {
+                "state" : {
+                  "centralMoment4" : 893992600.3364398,
+                  "size" : 8693.0,
+                  "centralMoment3" : -18773123.74002289,
+                  "centralMoment2" : 876954.1582882765,
+                  "centralMoment1" : 74.29506499482345
+                },
+                "variance" : 100.89210288636407,
+                "kurtosis" : 10.111128909991152,
+                "mean" : 74.29506499482345,
+                "skewness" : -2.1317240928957726
+              },
+              "min" : " ",
+              "max" : "Z",
+              "kind" : "char"
             },
             "structure" : {
               "type" : "character"
@@ -759,17 +776,33 @@ a schema document might look like
       },
       "state" : {
         "measure" : {
+          "kind" : "collection",
           "count" : 1000.0,
-          "min" : "AK",
-          "max" : "WY",
           "minLength" : 2.0,
           "maxLength" : 2.0
         },
         "structure" : {
+          "tag" : "_structural.string",
           "type" : "array",
           "of" : {
             "measure" : {
-              "count" : 1000.0
+              "count" : 2000.0,
+              "distribution" : {
+                "state" : {
+                  "centralMoment4" : 11285757.38865178,
+                  "size" : 2000.0,
+                  "centralMoment3" : 11979.395483999382,
+                  "centralMoment2" : 103139.03800000004,
+                  "centralMoment1" : 76.19100000000014
+                },
+                "variance" : 51.59531665832919,
+                "kurtosis" : 2.1271635715970967,
+                "mean" : 76.19100000000014,
+                "skewness" : 0.01618606190840656
+              },
+              "min" : "A",
+              "max" : "Z",
+              "kind" : "char"
             },
             "structure" : {
               "type" : "character"
@@ -781,31 +814,55 @@ a schema document might look like
         "measure" : {
           "count" : 1000.0,
           "distribution" : {
-            "mean" : 8560.410999999996,
-            "variance" : 153498226.66073978,
-            "skewness" : 2.1932119902818976,
-            "kurtosis" : 8.145272163842572
+            "state" : {
+              "centralMoment4" : 2.323080620322664E+20,
+              "size" : 1000.0,
+              "centralMoment3" : 4322812032420233.5,
+              "centralMoment2" : 150795281801.8999,
+              "centralMoment1" : 8721.71000000001
+            },
+            "variance" : 150946228.02992985,
+            "kurtosis" : 10.267451061747597,
+            "mean" : 8721.71000000001,
+            "skewness" : 2.337959182172043
           },
           "min" : 0,
-          "max" : 83158
+          "max" : 94317,
+          "kind" : "decimal"
         },
         "structure" : {
-          "type" : "integer"
+          "type" : "decimal"
         }
       },
       "_id" : {
         "measure" : {
+          "kind" : "collection",
           "count" : 1000.0,
-          "min" : "01342",
-          "max" : "99744",
           "minLength" : 5.0,
           "maxLength" : 5.0
         },
         "structure" : {
+          "tag" : "_structural.string",
           "type" : "array",
           "of" : {
             "measure" : {
-              "count" : 1000.0
+              "count" : 5000.0,
+              "distribution" : {
+                "state" : {
+                  "centralMoment4" : 556673.1571508175,
+                  "size" : 5000.0,
+                  "centralMoment3" : 7962.505025040006,
+                  "centralMoment2" : 38822.78220000003,
+                  "centralMoment1" : 52.24340000000003
+                },
+                "variance" : 7.766109661932393,
+                "kurtosis" : 1.8485506875431554,
+                "mean" : 52.24340000000003,
+                "skewness" : 0.07362665279751003
+              },
+              "min" : "0",
+              "max" : "9",
+              "kind" : "char"
             },
             "structure" : {
               "type" : "character"
@@ -815,6 +872,7 @@ a schema document might look like
       },
       "loc" : {
         "measure" : {
+          "kind" : "collection",
           "count" : 1000.0,
           "minLength" : 2.0,
           "maxLength" : 2.0
@@ -826,13 +884,21 @@ a schema document might look like
               "measure" : {
                 "count" : 1000.0,
                 "distribution" : {
-                  "mean" : -90.75566306399999,
-                  "variance" : 215.8880504119835,
-                  "skewness" : -1.3085274289304345,
-                  "kurtosis" : 5.671392237003005
+                  "state" : {
+                    "centralMoment4" : 281712013.3937695,
+                    "size" : 1000.0,
+                    "centralMoment3" : -4328243.124174622,
+                    "centralMoment2" : 212160.04270665144,
+                    "centralMoment1" : -90.52571468599996
+                  },
+                  "variance" : 212.3724151217732,
+                  "kurtosis" : 6.290020275246902,
+                  "mean" : -90.52571468599996,
+                  "skewness" : -1.4027118290018674
                 },
                 "min" : -170.293408,
-                "max" : -68.031686
+                "max" : -67.396382,
+                "kind" : "decimal"
               },
               "structure" : {
                 "type" : "decimal"
@@ -842,13 +908,21 @@ a schema document might look like
               "measure" : {
                 "count" : 1000.0,
                 "distribution" : {
-                  "mean" : 39.02678901400003,
-                  "variance" : 26.66316872053294,
-                  "skewness" : -0.030243876777278023,
-                  "kurtosis" : 4.447095871155061
+                  "state" : {
+                    "centralMoment4" : 3748702.702983835,
+                    "size" : 1000.0,
+                    "centralMoment3" : 15799.696678343358,
+                    "centralMoment2" : 26853.295673558245,
+                    "centralMoment1" : 39.09175202499995
+                  },
+                  "variance" : 26.880175849407653,
+                  "kurtosis" : 5.224679782347093,
+                  "mean" : 39.09175202499995,
+                  "skewness" : 0.1137115453464455
                 },
-                "min" : 20.027748,
-                "max" : 64.840238
+                "min" : 20.907097,
+                "max" : 65.824542,
+                "kind" : "decimal"
               },
               "structure" : {
                 "type" : "decimal"
@@ -1108,11 +1182,13 @@ decimal   | `2.1`           | *same*   |
 object    | `{ "a": 1 }`    | *same*   |
 object    | `{ "$foo": 2 }` | `{ "$obj": { "$foo": 2 } }` | Requires a type-specifier if any key starts with `$`.
 array     | `[1, 2, 3]`     | *same*   |
-set       | `[1, 2, 3]`     | `{ "$set": [1, 2, 3] }` |
-timestamp | `"2015-01-31T10:30:00Z"` | `{ "$timestamp": "2015-01-31T10:30:00Z" }` |
-date      | `"2015-01-31"`  | `{ "$date": "2015-01-31" }` |
-time      | `"10:30:05"`    | `{ "$time": "10:30:05" }` | HH:MM[:SS[:.SSS]]
-interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | Note: year/month not currently supported.
+localdatetime  | `"2015-01-31T10:30:00"`    | `{ "$localdatetime": "2015-01-31T10:30" }` |
+localdate      | `"2015-01-31"`    | `{ "$localdate": "2015-01-31" }` |
+localtime      | `"10:30:00.000"`    | `{ "$localtime": "10:30" }` |
+offsetdatetime | `"2015-01-31T10:30:00Z"`    | `{ "$offsetdatetime": "2015-01-31T10:30Z" }` |
+offsetdate | `"2015-01-31Z"`    | `{ "$offsetdate": "2015-01-31Z" }` |
+offsettime | `"10:30:00.000Z"`    | `{ "$offsettime": "10:30Z" }` |
+interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | 
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
 object id | `"abc"`         | `{ "$oid": "abc" }` |
 

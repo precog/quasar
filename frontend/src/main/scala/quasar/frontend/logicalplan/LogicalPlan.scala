@@ -23,7 +23,7 @@ import quasar.contrib.pathy.{FPath, refineTypeAbs}
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
-import quasar.std.TemporalPart
+import quasar.time.TemporalPart
 
 import scala.Symbol
 import scala.Predef.$conforms

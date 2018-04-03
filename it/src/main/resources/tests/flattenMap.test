@@ -1,8 +1,8 @@
 {
-    "name": "flatten object",
+    "name": "flatten map",
     "backends": {
-        "couchbase":  "ignoreFieldOrder",
-        "mimir":"ignoreFieldOrder"
+        "couchbase": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",

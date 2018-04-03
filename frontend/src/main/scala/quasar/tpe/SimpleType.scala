@@ -32,6 +32,7 @@ object SimpleType {
   final case object Bool extends SimpleType
   final case object Byte extends SimpleType
   final case object Char extends SimpleType
+  final case object Str  extends SimpleType
   final case object Int  extends SimpleType
   final case object Dec  extends SimpleType
 
@@ -41,6 +42,7 @@ object SimpleType {
       case "boolean"   => Bool
       case "byte"      => Byte
       case "character" => Char
+      case "string"    => Str
       case "integer"   => Int
       case "decimal"   => Dec
     } {
@@ -48,6 +50,7 @@ object SimpleType {
       case Bool        => "boolean"
       case Byte        => "byte"
       case Char        => "character"
+      case Str         => "string"
       case Int         => "integer"
       case Dec         => "decimal"
     }
@@ -62,7 +65,8 @@ object SimpleType {
         case Bool => Null
         case Byte => Bool
         case Char => Byte
-        case Int  => Char
+        case Str  => Char
+        case Int  => Str
         case Dec  => Int
       }
 
@@ -70,7 +74,8 @@ object SimpleType {
         case Null => Bool
         case Bool => Byte
         case Byte => Char
-        case Char => Int
+        case Char => Str
+        case Str  => Int
         case Int  => Dec
         case Dec  => Null
       }
@@ -88,8 +93,9 @@ object SimpleType {
         case Bool => 1
         case Byte => 2
         case Char => 3
-        case Int  => 4
-        case Dec  => 5
+        case Str  => 4
+        case Int  => 5
+        case Dec  => 6
       }
     }
 

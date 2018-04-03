@@ -18,10 +18,10 @@ package quasar.datagen
 
 import slamdata.Predef._
 import quasar.contrib.spire.random.dist._
-import quasar.ejson.{EJson, Type => EType}
+import quasar.ejson.{DecodeEJson, EJson, Type => EType}
 import quasar.fp.numeric.SampleStats
 import quasar.fp.ski.ι
-import quasar.sst.{Population, PopulationSST, SST, StructuralType, Tagged, TypeStat}
+import quasar.sst.{strings, Population, PopulationSST, SST, StructuralType, Tagged, TypeStat}
 import quasar.tpe.TypeF
 
 import scala.Char
@@ -33,12 +33,12 @@ import monocle.syntax.fields.{_2, _3}
 import monocle.std.option.{some => someP}
 import scalaz.{-\/, \/-, ==>>, Bifunctor, Equal, INil, NonEmptyList, Order, Tags}
 import scalaz.Scalaz._
-import scalaz.syntax.tag._
-import spire.algebra.{AdditiveMonoid, Field, NRoot}
+import spire.algebra.{AdditiveMonoid, Field, IsReal, NRoot}
 import spire.math.ConvertableFrom
 import spire.random.{Dist, Gaussian}
 import spire.syntax.convertableFrom._
 import spire.syntax.field._
+import spire.syntax.isReal._
 
 object dist {
   import StructuralType.{ST, STF}
@@ -47,32 +47,35 @@ object dist {
   val BigDecimalMaxScale = 34
   val StringMaxLength    = 128
 
-  def population[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: NRoot](
+  def population[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal: NRoot](
       maxCollLen: A,
       src: PopulationSST[J, A])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Option[Dist[J]] =
     sst(maxCollLen, Population.unsubst(src)) { ss =>
       ss.populationStddev strengthL ss.mean
     }
 
-  def sample[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: NRoot](
+  def sample[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal: NRoot](
       maxCollLen: A,
       src: SST[J, A])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Option[Dist[J]] =
     sst(maxCollLen, src) { ss =>
       ss.stddev strengthL ss.mean
     }
 
-  def sst[J: Order, A: ConvertableFrom: Equal: Field: Gaussian](
+  def sst[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal](
       maxCollLen: A,
       src: SST[J, A])(
       gaussian: SampleStats[A] => Option[(A, A)])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Option[Dist[J]] =
     hylo((SST.size(src), src))(typeDistƒ[J, A](maxCollLen, gaussian), relativeProbƒ[J, A]) map (_._2)
 
@@ -88,11 +91,12 @@ object dist {
   /** Returns an EJson distribution based on an SST node and the probability it
     * exists in its parent.
     */
-  def typeDistƒ[J: Order, A: ConvertableFrom: Equal: Field: Gaussian](
+  def typeDistƒ[J: Order, A: ConvertableFrom: Equal: Field: Gaussian: IsReal](
       maxCollLen: A,
       gaussian: SampleStats[A] => Option[(A, A)])(
       implicit
-      J: Corecursive.Aux[J, EJson])
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
       : Algebra[STF[J, (A, TypeStat[A]), ?], Option[(A, Dist[J])]] =
     _.run.traverse(_.run.swap) map {
       case (_, TypeF.Bottom()) =>
@@ -121,7 +125,7 @@ object dist {
 
         some((p, Dist.weightedMix(arrDists._2 : _*) map (EJson.arr(_ : _*))))
 
-      case ((p, s), TypeF.Arr(\/-(x))) if TypeStat.str[A].isEmpty(s) =>
+      case ((p, s), TypeF.Arr(\/-(x))) =>
         val (minl, maxl) = collBounds(s, maxCollLen).umap(_.toInt)
         x map { case (_, d) => (p, Dist.list(minl, maxl)(d) map (EJson.arr(_ : _*))) }
 
@@ -150,6 +154,13 @@ object dist {
         typeStatDist(gaussian, s) strengthL p
 
     } valueOr {
+      case Tagged(strings.StructuralString, dist) =>
+        dist.map(_.map(_.map { j =>
+          DecodeEJson[List[Char]].decode(j)
+            .map(_.mkString)
+            .fold((_, _) => j, EJson.str(_))
+        }))
+
       /** TODO: Inspect Tagged values for known types (esp. temporal) for
         *       more declarative generation.
         */
@@ -158,9 +169,6 @@ object dist {
     }
 
   ////
-
-  private def charRange(min: Char, max: Char): Dist[Char] =
-    Dist.intrange(min.toInt, max.toInt) map (_.toChar)
 
   private def clamp[A: Order](min: A, max: A): A => A =
     _.min(max).max(min)
@@ -214,7 +222,7 @@ object dist {
   /** Attempt to build a `Dist` from a `TypeStat`, given a function to
     * extract the mean and stddev from `SampleStats`.
     */
-  private def typeStatDist[J, A: ConvertableFrom: Field: Gaussian](
+  private def typeStatDist[J, A: ConvertableFrom: Field: Gaussian: IsReal](
       gaussian: SampleStats[A] => Option[(A, A)],
       stat: TypeStat[A])(
       implicit
@@ -231,21 +239,10 @@ object dist {
       case TypeStat.Byte(_, bn, bx) =>
         Dist.intrange(bn.toInt, bx.toInt) map (i => EJson.byte(i.toByte))
 
-      case TypeStat.Char(_, cn, cx) =>
-        charRange(cn, cx) map (EJson.char(_))
-
-      /** TODO: Improve this, possibly by recognizing known patterns in strings
-        *       and/or retaining more information about character distribution
-        *       when turning strings into SSTs.
-        */
-      case TypeStat.Str(_, ln, lx, sn, sx) =>
-        val minmax =
-          (sn + sx).toList.foldMap(c => some((Tags.MinVal(c), Tags.MaxVal(c))))
-
-        val (minc, maxc) =
-          minmax.fold((Char.MinValue, Char.MaxValue))(_.bimap(_.unwrap, _.unwrap))
-
-        Dist.list(ln.toInt, lx.toInt)(charRange(minc, maxc)) map (cs => EJson.str(cs.mkString))
+      case TypeStat.Char(ss, cn, cx) =>
+        gaussian(ss)
+          .cata((Dist.gaussian[A] _).tupled, Dist.constant(ss.mean))
+          .map((EJson.char[J](_)) <<< ((_: Int).toChar) <<< clamp(cn.toInt, cx.toInt) <<< ((_: A).round.toInt))
 
       case TypeStat.Int(ss, mn, mx) =>
         gaussian(ss)

@@ -40,7 +40,7 @@ class WriteFilesSpec extends FileSystemTest[BackendEffect](
   val writesPrefix: ADir = rootDir </> dir("w")
 
   def deleteForWriting(run: Run): FsTask[Unit] =
-    runT(run)(manage.delete(writesPrefix))
+    doDelete(run, writesPrefix)
 
   fileSystemShould { (fs, _) =>
     implicit val run = fs.testInterpM

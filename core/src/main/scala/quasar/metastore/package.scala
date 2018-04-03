@@ -23,7 +23,6 @@ import quasar.fs.FileSystemType
 import quasar.fs.mount.cache.ViewCache
 import quasar.fs.mount.{ConnectionUri, MountType, MountConfig}
 
-import java.sql.Timestamp
 import java.time.Instant
 
 import doobie.imports._
@@ -107,8 +106,6 @@ package object metastore {
       str => unsafeSandboxAbs(
         posixCodec.parseAbsDir(str).getOrElse(unexpectedValue("not an absolute dir path: " + str))),
       posixCodec.printPath(_))
-
-  implicit val instantMeta: Meta[Instant] = Meta[Timestamp].xmap(_.toInstant, Timestamp.from)
 
   implicit val viewCacheStatusMeta: Meta[ViewCache.Status] = Meta[String].xmap(
     {

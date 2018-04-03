@@ -135,11 +135,6 @@ object MongoDbIO {
   def dropCollection(c: Collection): MongoDbIO[Unit] =
     collection(c) flatMap (mc => async(mc.drop).void)
 
-  def dropDatabase(named: DatabaseName): MongoDbIO[Unit] =
-    database(named) flatMap (d => async(d.drop).void)
-
-  def dropAllDatabases: MongoDbIO[Unit] =
-    databaseNames.map(dropDatabase).eval.run
 
   /** Ensure the given collection exists, creating it if not. */
   def ensureCollection(c: Collection): MongoDbIO[Unit] =

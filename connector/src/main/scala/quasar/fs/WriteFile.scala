@@ -218,7 +218,7 @@ object WriteFile {
       def cleanupTmp(tmp: AFile)(t: Throwable): Process[M, Nothing] =
         Process.eval_(MF.deleteOrIgnore(tmp).liftM[FileSystemErrT]).causedBy(Cause.Error(t))
 
-      MF.tempFile(dst).liftM[Process] flatMap { tmp =>
+      MF.tempFile(dst, none).liftM[Process] flatMap { tmp =>
         appendChunked(tmp, src)
           .map(some).append(Process.emit(none))
           // Since `appendChunked` only streams errors we only need to look at the first one
@@ -236,7 +236,7 @@ object WriteFile {
                           (implicit MF: ManageFile.Ops[S])
                           : M[Unit] = {
       for {
-        tmp  <- MF.tempFile(dst)
+        tmp  <- MF.tempFile(dst, none)
         errs <- appendThese(tmp, data)
         _    <- errs.headOption.fold(
                   MF.moveFile(tmp, dst, sem))(

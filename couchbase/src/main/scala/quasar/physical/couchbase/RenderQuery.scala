@@ -21,7 +21,7 @@ import quasar.{Data => QData, DataCodec}
 import quasar.fp.ski.κ
 import quasar.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
-import quasar.DataCodec.Precise.{DateKey, TimeKey, TimestampKey}
+import quasar.DataCodec.PreciseKeys.{LocalDateKey, LocalTimeKey}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -55,11 +55,11 @@ object RenderQuery {
     case Arr(l) =>
       l.mkString("[", ", ", "]").right
     case Date(a1) =>
-      s"""{ "$DateKey": $a1 }""".right
+      s"""{ "$LocalDateKey": $a1 }""".right
     case Time(a1) =>
-      s"""{ "$TimeKey": $a1 }""".right
+      s"""{ "$LocalTimeKey": $a1 }""".right
     case Timestamp(a1) =>
-      s"""{ "$TimestampKey": $a1 }""".right
+      ??? // TODO
     case Null() =>
       s"null".right
     case Unreferenced() =>

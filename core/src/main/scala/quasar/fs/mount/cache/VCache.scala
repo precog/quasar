@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.pathy.AFile
 import quasar.effect.{Failure, KeyValueStore, Read, Write}
 import quasar.fp.free.injectFT
-import quasar.fs.{FileSystemError, FileSystemFailure, ManageFile}
+import quasar.fs.{FileSystemError, FileSystemFailure, ManageFile, TempFilePrefix}
 import quasar.fs.FileSystemError.PathErr
 import quasar.fs.PathError.PathNotFound
 import quasar.metastore._, KeyValueStore._, MetaStoreAccess._
@@ -57,6 +57,14 @@ object VCache {
   object Expiration {
     implicit val order: Order[Expiration] =
       Order.order((a, b) => Ordering.fromInt(a.v compareTo b.v))
+  }
+
+  def cacheFile[S[_]](
+    viewPath: AFile)(
+    implicit MF: ManageFile.Ops[S])
+      : EitherT[Free[S, ?], FileSystemError, AFile]  = {
+    val f = pathy.Path.fileName(viewPath).value
+    MF.tempFile(viewPath, TempFilePrefix(s"cache_${f}_").some)
   }
 
   def deleteFiles[S[_]](

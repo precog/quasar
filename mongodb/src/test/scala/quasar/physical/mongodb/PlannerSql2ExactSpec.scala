@@ -304,9 +304,13 @@ class PlannerSql2ExactSpec extends
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $and(
-                 $lt($literal(Bson.Null), $field("val2")),
-                 $lt($field("val2"), $literal(Bson.Text("")))),
+               $or(
+                 $and(
+                   $lt($literal(Bson.Null), $field("val2")),
+                   $lt($field("val2"), $literal(Bson.Text("")))),
+                 $and(
+                   $lte($literal(Check.minDate), $field("val2")),
+                   $lt($field("val2"), $literal(Check.minTimestamp)))),
                $cond(
                  $or(
                    $and(
@@ -320,7 +324,6 @@ class PlannerSql2ExactSpec extends
                $literal(Bson.Undefined))),
            ExcludeId)))
     }
-
 
     "plan concat (3.2+)" in {
       plan3_2(sqlE"select concat(city, state) from extraSmallZips") must
@@ -713,12 +716,16 @@ class PlannerSql2ExactSpec extends
              sigil.Quasar ->
                $cond(
                  $or(
-                   $and(
-                     $lt($literal(Bson.Null), $field("pop")),
-                     $lt($field("pop"), $literal(Bson.Doc()))),
+                   $or(
+                     $and(
+                       $lt($literal(Bson.Null), $field("pop")),
+                       $lt($field("pop"), $literal(Bson.Doc()))),
+                     $and(
+                       $lte($literal(Check.minDate), $field("pop")),
+                       $lt($field("pop"), $literal(Check.minTimestamp)))),
                    $and(
                      $lte($literal(Bson.Bool(false)), $field("pop")),
-                     $lt($field("pop"), $literal(Bson.Regex("", ""))))),
+                     $lte($field("pop"), $literal(Bson.Bool(true))))),
                  $cond($lt($field("pop"), $literal(Bson.Int32(10000))),
                    $field("city"),
                    $field("loc")),
@@ -772,9 +779,13 @@ class PlannerSql2ExactSpec extends
          $project(
            reshape(sigil.Quasar ->
              $cond(
-               $and(
-                 $lt($literal(Bson.Null), $field("val3")),
-                 $lt($field("val3"), $literal(Bson.Text("")))),
+               $or(
+                 $and(
+                   $lt($literal(Bson.Null), $field("val3")),
+                   $lt($field("val3"), $literal(Bson.Text("")))),
+                 $and(
+                   $lte($literal(Check.minDate), $field("val3")),
+                   $lt($field("val3"), $literal(Check.minTimestamp)))),
                $cond(
                  $or(
                    $and(
@@ -1743,19 +1754,11 @@ class PlannerSql2ExactSpec extends
       plan(sqlE"""select * from days where date < timestamp("2014-11-17T22:00:00Z") and date - interval("PT12H") > timestamp("2014-11-17T00:00:00Z")""") must
         beWorkflow0(chain[Workflow](
           $read(collection("db", "days")),
-          $match(Selector.And(
-            Selector.Or(
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date))),
-            Selector.Or(
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Text)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)),
-              Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Bool))))),
+          $match(Selector.Or(
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int32)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Int64)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Dec)),
+            Selector.Doc(BsonField.Name("date") -> Selector.Type(BsonType.Date)))),
           $project(
             reshape(
               "0" -> $field("date"),

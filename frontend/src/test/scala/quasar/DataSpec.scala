@@ -18,15 +18,16 @@ package quasar
 
 import slamdata.Predef._
 import quasar.ejson.EJson
+import quasar.time.DateTimeInterval
 
 import matryoshka.implicits._
 import matryoshka.patterns._
 
 import scalaz._, Scalaz._
 
-import java.time.{Duration, LocalDate, LocalTime}
+import java.time.{LocalDate, LocalTime}
 
-class DataSpec extends Qspec with DataArbitrary {
+class DataSpec extends Qspec with DataGenerators {
 
   def roundtrip(data: Data): Option[Data] =
     data.hyloM[Option, CoEnv[Data, EJson, ?], Data](
@@ -38,22 +39,22 @@ class DataSpec extends Qspec with DataArbitrary {
       Data.toEJson[EJson].apply(_).some)
 
   "round trip a date" >> {
-    val data: Data = Data.Date(LocalDate.of(1992, 6, 30))
+    val data: Data = Data.LocalDate(LocalDate.of(1992, 6, 30))
     roundtrip(data) must_=== data.some
   }
 
   "round trip a time" >> {
-    val data: Data = Data.Time(LocalTime.of(7, 16, 30, 17))
+    val data: Data = Data.LocalTime(LocalTime.of(7, 16, 30, 17))
+    roundtrip(data) must_=== data.some
+  }
+
+  "round trip an interval" >> {
+    val data: Data = Data.Interval(DateTimeInterval.make(1982, 4, 12, 18, 123456789))
     roundtrip(data) must_=== data.some
   }
 
   "round trip an interval to nano precision" >> {
-    val data: Data = Data.Interval(Duration.ofNanos(1811451749862000000L))
-    roundtrip(data) must_=== data.some
-  }
-
-  "round trip an interval with 9 digits of nanos" >> {
-    val data: Data = Data.Interval(Duration.ofSeconds(246, 123456789))
+    val data: Data = Data.Interval(DateTimeInterval.ofNanos(1811451749862000000L))
     roundtrip(data) must_=== data.some
   }
 

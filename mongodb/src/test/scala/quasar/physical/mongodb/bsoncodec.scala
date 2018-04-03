@@ -28,7 +28,7 @@ class BsonCodecSpecs_1_1 extends BsonCodecSpecs(BsonVersion.`1.1`)
 abstract class BsonCodecSpecs(v: BsonVersion) extends quasar.Qspec {
   import BsonCodec._
 
-  import DataArbitrary._
+  import DataGenerators._
 
   implicit val ShowData = new Show[Data] {
     override def show(v: Data) = Cord(v.toString)
@@ -63,13 +63,17 @@ abstract class BsonCodecSpecs(v: BsonVersion) extends quasar.Qspec {
       import Data._
 
       def preserved(d: Data): Boolean = d match {
-        case Int(x)           => x.isValidLong
-        case Interval(_)      => false
-        case Date(_)          => false
-        case Time(_)          => false
-        case Arr(value)       => value.forall(preserved)
-        case Obj(value)       => value.values.forall(preserved)
-        case _                => true
+        case Int(x)            => x.isValidLong
+        case Interval(i)       => false
+        case OffsetDateTime(_) => false
+        case OffsetDate(_)     => false
+        case OffsetTime(_)     => false
+        case LocalDateTime(_)  => false
+        case LocalDate(_)      => false
+        case LocalTime(_)      => false
+        case Arr(value)        => value.forall(preserved)
+        case Obj(value)        => value.values.forall(preserved)
+        case _                 => true
       }
 
       preserved(data) ==> {

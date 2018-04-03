@@ -23,9 +23,9 @@ import quasar.{Data, DataCodec}
 import quasar.physical.rdbms.model._
 
 package object postgres {
-  
+
   implicit val codec: DataCodec = DataCodec.Precise
-  import DataCodec.Precise._
+  import DataCodec.PreciseKeys._
 
   implicit val typeMapper: TypeMapper = TypeMapper(
     {
@@ -70,10 +70,8 @@ package object postgres {
       case (Data.Str(txt), _) => s"'${escapeStr(txt)}'"
       case (Data.Dec(num), _) => s"$num"
       case (Data.Bool(bool), _) => s"$bool"
-      case (Data.Timestamp(i), _) => s"""'{"$TimestampKey": "${tsFormatter.format(i)}"}'"""
-      case (Data.Date(dt), _) => s"""'{"$DateKey": "${tsFormatter.format(dt)}"}'"""
-      case (Data.Time(t), _) => s"""'{"$TimeKey": "${DataCodec.timeFormatter.format(t)}"}'"""
       case (Data.Id(oid), _) => s"""'{"$IdKey": "$oid"}'"""
-      case (other, _) => s"""'{"$n": "unsupported ($other)"}'""" // TODO
+      // TODO support datetimes
+      case (other, _) => s"""'{"$n": "unsupported ($other)"}'"""
     })
 }

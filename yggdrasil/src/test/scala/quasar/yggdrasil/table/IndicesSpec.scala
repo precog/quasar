@@ -90,23 +90,23 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
     val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
 
     "determine unique groupkey values" in {
-      index.getUniqueKeys(0) must_== Set[RValue](CLong(1), CLong(2), CLong(3), CString("foo"))
-      index.getUniqueKeys(1) must_== Set[RValue](CLong(2), CLong(999), CString("bar"), CString(""))
+      index.getUniqueKeys(0) must_== Set[RValue](CNum(1), CNum(2), CNum(3), CString("foo"))
+      index.getUniqueKeys(1) must_== Set[RValue](CNum(2), CNum(999), CString("bar"), CString(""))
     }
 
     "determine unique groupkey sets" in {
       index.getUniqueKeys() must_== Set[Seq[RValue]](
-        Array(CLong(1), CLong(2)),
-        Array(CLong(2), CLong(2)),
+        Array(CNum(1), CNum(2)),
+        Array(CNum(2), CNum(2)),
         Array(CString("foo"), CString("bar")),
-        Array(CLong(3), CString("")),
-        Array(CLong(3), CLong(2)),
-        Array(CString("foo"), CLong(999))
+        Array(CNum(3), CString("")),
+        Array(CNum(3), CNum(2)),
+        Array(CString("foo"), CNum(999))
       )
     }
 
     def subtableSet(index: TableIndex, ids: Seq[Int], vs: Seq[RValue]): Set[RValue] =
-      index.getSubTable(ids, vs).toJson.copoint.toSet.flatMap(RValue.fromJValue)
+      index.getSubTable(ids, vs).toJson.copoint.toSet
 
     def test(vs: Seq[RValue], result: Set[RValue]) =
       subtableSet(index, Array(0, 1), vs) must_== result
@@ -114,29 +114,29 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
     "generate subtables based on groupkeys" in {
       def empty = Set.empty[RValue]
 
-      test(Array(CLong(1), CLong(1)), empty)
+      test(Array(CLong(1), CNum(1)), empty)
 
-      test(Array(CLong(1), CLong(2)), s1)
+      test(Array(CNum(1), CNum(2)), s1)
       def s1 = Set[RValue](
-        CLong(3),
-        CLong(999),
+        CNum(3),
+        CNum(999),
         CString("cat"),
-        RObject(Map("cat" -> CLong(13), "dog" -> CLong(12)))
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
-      test(Array(CLong(2), CLong(2)), s2)
-      def s2 = Set[RValue](CLong(3), CLong(13))
+      test(Array(CNum(2), CNum(2)), s2)
+      def s2 = Set[RValue](CNum(3), CNum(13))
 
       test(Array(CString("foo"), CString("bar")), s3)
-      def s3 = Set[RValue](CLong(3))
+      def s3 = Set[RValue](CNum(3))
 
-      test(Array(CLong(3), CString("")), s4)
-      def s4 = Set[RValue](CLong(333))
+      test(Array(CNum(3), CString("")), s4)
+      def s4 = Set[RValue](CNum(333))
 
-      test(Array(CLong(3), CLong(2)), s5)
-      def s5 = Set[RValue](RArray(CLong(1), CLong(2), CLong(3), CLong(4)))
+      test(Array(CNum(3), CNum(2)), s5)
+      def s5 = Set[RValue](RArray(CNum(1), CNum(2), CNum(3), CNum(4)))
 
-      test(Array(CString("foo"), CLong(999)), empty)
+      test(Array(CString("foo"), CNum(999)), empty)
     }
 
     val index1 = TableIndex.createFromTable(
@@ -149,56 +149,56 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 
     "efficiently combine to produce unions" in {
 
-      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: JValue*) = {
+      def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: RValue*) = {
         val table = TableIndex.joinSubTables(tpls.toList)
         table.toJson.copoint.toSet must_== expected.toSet
       }
 
       // both disjunctions have data
       tryit(
-        (index1, Seq(0), Seq(CLong(1))),
-        (index2, Seq(0), Seq(CLong(2)))
+        (index1, Seq(0), Seq(CNum(1))),
+        (index2, Seq(0), Seq(CNum(2)))
       )(
-        JNum(3),
-        JNum(999),
-        JNum(9876),
-        JString("cat"),
-        JNum(13),
-        JArray(JNum(1), JNum(2), JNum(3), JNum(4)),
-        JArray(JNum(666)),
-        JObject(Map("cat" -> JNum(13), "dog" -> JNum(12)))
+        CNum(3),
+        CNum(999),
+        CNum(9876),
+        CString("cat"),
+        CNum(13),
+        RArray(List(CNum(1), CNum(2), CNum(3), CNum(4))),
+        RArray(List(CNum(666))),
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
       // only first disjunction has data
       tryit(
-        (index1, Seq(0), Seq(CLong(1))),
-        (index2, Seq(0), Seq(CLong(1234567)))
+        (index1, Seq(0), Seq(CNum(1))),
+        (index2, Seq(0), Seq(CNum(1234567)))
       )(
-        JNum(3),
-        JNum(999),
-        JString("cat"),
-        JArray(JNum(666)),
-        JObject(Map("cat" -> JNum(13), "dog" -> JNum(12)))
+        CNum(3),
+        CNum(999),
+        CString("cat"),
+        RArray(List(CNum(666))),
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
       // only second disjunction has data
       tryit(
-        (index1, Seq(0), Seq(CLong(-8000))),
-        (index2, Seq(0), Seq(CLong(2)))
+        (index1, Seq(0), Seq(CNum(-8000))),
+        (index2, Seq(0), Seq(CNum(2)))
       )(
-        JNum(3),
-        JNum(999),
-        JNum(9876),
-        JString("cat"),
-        JNum(13),
-        JArray(JNum(1), JNum(2), JNum(3), JNum(4)),
-        JObject(Map("cat" -> JNum(13), "dog" -> JNum(12)))
+        CNum(3),
+        CNum(999),
+        CNum(9876),
+        CString("cat"),
+        CNum(13),
+        RArray(List(CNum(1), CNum(2), CNum(3), CNum(4))),
+        RObject(Map("cat" -> CNum(13), "dog" -> CNum(12)))
       )
 
       // neither disjunction has data
       tryit(
-        (index1, Seq(0), Seq(CLong(-8000))),
-        (index2, Seq(0), Seq(CLong(1234567)))
+        (index1, Seq(0), Seq(CNum(-8000))),
+        (index2, Seq(0), Seq(CNum(1234567)))
       )()
     }
   }

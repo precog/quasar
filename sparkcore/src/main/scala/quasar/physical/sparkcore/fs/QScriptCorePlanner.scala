@@ -45,21 +45,24 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: ShowT, S[_]]
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def dataOrder: Order[Data] = new Order[Data] with Serializable {
     def order(d1: Data, d2: Data) = (d1, d2) match {
-      case Data.Null -> Data.Null                 => Ordering.EQ
-      case Data.Str(a) -> Data.Str(b)             => a cmp b
-      case Data.Bool(a) -> Data.Bool(b)           => a cmp b
-      case Data.Number(a) -> Data.Number(b)       => a cmp b
-      case Data.Obj(a) -> Data.Obj(b)             => a.toList cmp b.toList
-      case Data.Arr(a) -> Data.Arr(b)             => a cmp b
-      case Data.Set(a) -> Data.Set(b)             => a cmp b
-      case Data.Timestamp(a) -> Data.Timestamp(b) => Ordering fromInt (a compareTo b)
-      case Data.Date(a) -> Data.Date(b)           => Ordering fromInt (a compareTo b)
-      case Data.Time(a) -> Data.Time(b)           => Ordering fromInt (a compareTo b)
-      case Data.Interval(a) -> Data.Interval(b)   => Ordering fromInt (a compareTo b)
-      case Data.Binary(a) -> Data.Binary(b)       => a.toArray.toList cmp b.toArray.toList
-      case Data.Id(a) -> Data.Id(b)               => a cmp b
-      case Data.NA -> Data.NA                 => Ordering.EQ
-      case a -> b                       => a.getClass.## cmp b.getClass.##
+      case Data.Null -> Data.Null                           => Ordering.EQ
+      case Data.Str(a) -> Data.Str(b)                       => a cmp b
+      case Data.Bool(a) -> Data.Bool(b)                     => a cmp b
+      case Data.Number(a) -> Data.Number(b)                 => a cmp b
+      case Data.Obj(a) -> Data.Obj(b)                       => a.toList cmp b.toList
+      case Data.Arr(a) -> Data.Arr(b)                       => a cmp b
+      case Data.Set(a) -> Data.Set(b)                       => a cmp b
+      case Data.OffsetDateTime(a) -> Data.OffsetDateTime(b) => Ordering fromInt (a compareTo b)
+      case Data.OffsetDate(a) -> Data.OffsetDate(b)         => Ordering fromInt (a compareTo b)
+      case Data.OffsetTime(a) -> Data.OffsetTime(b)         => Ordering fromInt (a compareTo b)
+      case Data.LocalDateTime(a) -> Data.LocalDateTime(b)   => Ordering fromInt (a compareTo b)
+      case Data.LocalDate(a) -> Data.LocalDate(b)           => Ordering fromInt (a compareTo b)
+      case Data.LocalTime(a) -> Data.LocalTime(b)           => Ordering fromInt (a compareTo b)
+      case Data.Interval(a) -> Data.Interval(b)             => Ordering fromInt (a compareTo b)
+      case Data.Binary(a) -> Data.Binary(b)                 => a.toArray.toList cmp b.toArray.toList
+      case Data.Id(a) -> Data.Id(b)                         => a cmp b
+      case Data.NA -> Data.NA                               => Ordering.EQ
+      case a -> b                                           => a.getClass.## cmp b.getClass.##
     }
   }
 

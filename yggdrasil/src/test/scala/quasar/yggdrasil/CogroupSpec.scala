@@ -88,7 +88,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
 
     val keyOrder = Order[JValue].contramap((_: JValue) \ "key")
 
-    val expected = computeCogroup(l.data, r.data, Stream())(keyOrder) map {
+    val expected = computeCogroup(l.data.map(_.toJValueRaw), r.data.map(_.toJValueRaw), Stream())(keyOrder) map {
       case Left3(jv) => jv
       case Middle3((jv1, jv2)) =>
         JObject(
@@ -105,7 +105,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
 
     val jsonResult = toJson(result)
 
-    jsonResult.copoint must_== expected
+    jsonResult.getJValues must_== expected
   }
 
   def testTrivialCogroup(f: Table => Table = identity[Table]) = {
@@ -115,7 +115,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     val ltable = fromSample(SampleData(Stream(recl)))
     val rtable = fromSample(SampleData(Stream(recr)))
 
-    val expected = Vector(toRecord(Array(0), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
+    val expected = Stream(toRecord(Array(0), JArray(JNum(12) :: JUndefined :: JNum(13) :: Nil)))
 
     val result: Table = ltable.cogroup(SourceKey.Single, SourceKey.Single, rtable)(
       Leaf(Source),
@@ -124,7 +124,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     )
 
     val jsonResult = toJson(f(result))
-    jsonResult.copoint must_== expected
+    jsonResult.copoint must_== expected.map(RValue.fromJValueRaw)
   }
 
   def testTrivialNoRecordCogroup(f: Table => Table = identity[Table]) = {
@@ -134,7 +134,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     val ltable = fromSample(SampleData(Stream(recl)))
     val rtable = fromSample(SampleData(Stream(recr)))
 
-    val expected = Vector(JNum(12), JNum(13))
+    val expected = Stream(JNum(12), JNum(13))
 
     val result: Table = ltable.cogroup(Leaf(Source), Leaf(Source), rtable)(
       Leaf(Source),
@@ -142,7 +142,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
       OuterArrayConcat(SourceValue.Left, SourceValue.Right))
 
     val jsonResult = toJson(f(result))
-    jsonResult.copoint must_== expected
+    jsonResult.getJValues must_== expected
   }
 
   def testSimpleCogroup(f: Table => Table = identity[Table]) = {
@@ -177,7 +177,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     )
 
     val jsonResult = toJson(f(result))
-    jsonResult.copoint must_== expected
+    jsonResult.getJValues must_== expected
   }
 
   def testUnionCogroup = {
@@ -199,7 +199,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     )
 
     val jsonResult = toJson(result)
-    jsonResult.copoint must_== expected
+    jsonResult.getJValues must_== expected
   }
 
   def testAnotherSimpleCogroup = {
@@ -228,7 +228,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     )
 
     val jsonResult = toJson(result)
-    jsonResult.copoint must_== expected
+    jsonResult.getJValues must_== expected
   }
 
   def testAnotherSimpleCogroupSwitched = {
@@ -257,7 +257,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     )
 
     val jsonResult = toJson(result)
-    jsonResult.copoint must_== expected
+    jsonResult.getJValues must_== expected
   }
 
   def testUnsortedInputs = {
@@ -425,7 +425,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
                         WrapObject(DerefObjectStatic(Leaf(SourceLeft), CPathField("val")), "left"),
                         WrapObject(DerefObjectStatic(Leaf(SourceRight), CPathField("val")), "right")))
 
-    toJson(result).copoint must_== expected
+    toJson(result).getJValues must_== expected
   }
 
   def testLongEqualSpansOnRight = {
@@ -444,7 +444,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
       DerefObjectStatic(Leaf(SourceRight), CPathField("value"))
     )
 
-    val jsonResult = toJson(result).copoint
+    val jsonResult = toJson(result).getJValues
     jsonResult must_== expected
   }
 
@@ -464,7 +464,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
       DerefObjectStatic(Leaf(SourceLeft), CPathField("value"))
     )
 
-    val jsonResult = toJson(result).copoint
+    val jsonResult = toJson(result).getJValues
     jsonResult must_== expected
   }
 
@@ -490,7 +490,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
       )
     )
 
-    val jsonResult = toJson(result).copoint
+    val jsonResult = toJson(result).getJValues
     jsonResult must_== expected
   }
 
@@ -518,7 +518,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
       )
     )
 
-    val jsonResult = toJson(result).copoint
+    val jsonResult = toJson(result).getJValues
     jsonResult must_== expected
   }
 }

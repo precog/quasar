@@ -98,7 +98,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
     val results = toJson(table1.concat(table2))
     val expected = data1 ++ data2
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   lazy val xlogger = LoggerFactory.getLogger("quasar.yggdrasil.table.ColumnarTableModuleSpec")
@@ -184,7 +184,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
 
       val dataset = fromJson(sample.toStream)
       val results = dataset.toJson
-      results.copoint.toList must_== sample
+      results.copoint.toList.map(_.toJValue) must_== sample
     }
 
     "verify bijection from JSON" in checkMappings(this)
@@ -193,7 +193,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       implicit val gen = sample(schema)
 
       prop { data: SampleData =>
-        testRenderJson(data.data)
+        testRenderJson(data.data.map(_.toJValueRaw))
       }.set(minTestsOk = 20000, workers = Runtime.getRuntime.availableProcessors)
     }
 
@@ -351,7 +351,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "perform an array dereference" in checkArrayDeref
       "perform metadata dereference on data without metadata" in checkMetaDeref
 
-      "perform a trivial map2 add" in checkMap2Add.pendingUntilFixed
+      "perform a trivial map2 add" in checkMap2Add
       "perform a trivial map2 eq" in checkMap2Eq
       "perform a map2 add over but not into arrays and objects" in testMap2ArrayObject
 
@@ -420,7 +420,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
           {"bar" :23, "baz": 24}
         ]""")
 
-        results.copoint mustEqual expected.toStream
+        results.getJValues mustEqual expected.toStream
       }
 
       "perform a basic IsType transformation" in testIsTypeTrivial

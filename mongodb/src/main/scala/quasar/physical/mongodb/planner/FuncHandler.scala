@@ -93,7 +93,7 @@ object FuncHandler {
               case Multiply(a1, a2)      => $multiply(a1, a2)
               case Subtract(a1, a2)      => $subtract(a1, a2)
               case Divide(a1, a2)        =>
-                // NB: It’s apparently intential that division by zero crashes
+                // NB: It’s apparently intentional that division by zero crashes
                 //     the query in MongoDB. See
                 //     https://jira.mongodb.org/browse/SERVER-29410
                 // TODO: It would be nice if we would be able to generate simply
@@ -108,7 +108,7 @@ object FuncHandler {
                   $divide(a1, a2))
               case Modulo(a1, a2)        => $mod(a1, a2)
               case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
-              case MapFuncsCore.Eq(a1, a2)   => $eq(a1, a2)
+              case MapFuncsCore.Eq(a1, a2) => $eq(a1, a2)
               case Neq(a1, a2)           => $neq(a1, a2)
               case Lt(a1, a2)            => $lt(a1, a2)
               case Lte(a1, a2)           => $lte(a1, a2)
@@ -153,8 +153,7 @@ object FuncHandler {
                 $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
                   $literal(Bson.Int32(7)),
                   $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))))
-              // TODO: case ExtractIsoYear(a1) =>
-              case ExtractMicroseconds(a1) =>
+              case ExtractMicrosecond(a1) =>
                 $multiply(
                   $add(
                     $multiply($second(a1), $literal(Bson.Int32(1000))),
@@ -162,7 +161,7 @@ object FuncHandler {
                   $literal(Bson.Int32(1000)))
               case ExtractMillennium(a1) =>
                 $trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
-              case ExtractMilliseconds(a1) =>
+              case ExtractMillisecond(a1) =>
                 $add(
                   $multiply($second(a1), $literal(Bson.Int32(1000))),
                   $millisecond(a1))

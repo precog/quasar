@@ -84,8 +84,8 @@ trait AggLib extends Library {
   val Avg = UnaryFunc(
     Reduction,
     "Finds the average in a set of numeric values",
-    MathRel,
-    Func.Input1(MathRel),
+    Type.Numeric,
+    Func.Input1(Type.Numeric),
     noSimplification,
     partialTyperV[nat._1] {
       case Sized(t) if MathRel.contains(t) =>
@@ -101,8 +101,6 @@ trait AggLib extends Library {
     noSimplification,
     widenConstTyper(_(0)),
     reflexiveUntyper)
-
-  ////
 }
 
 object AggLib extends AggLib

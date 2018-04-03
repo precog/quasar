@@ -17,14 +17,14 @@
 package quasar.datagen
 
 import slamdata.Predef.{Option, String}
-import quasar.{Data, DataArbitrary, DataCodec}
+import quasar.{Data, DataGenerators, DataCodec}
 import quasar.ejson._
 
 import fs2.{Pure, Stream}
 import matryoshka.data.Fix
 import scalaz.std.list._
 
-final class PreciseDataCodecSpec extends quasar.Qspec with DataArbitrary {
+final class PreciseDataCodecSpec extends quasar.Qspec with DataGenerators {
   type J = Fix[EJson]
 
   def parsePrecise(s: String): Option[Data] =

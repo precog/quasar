@@ -49,6 +49,7 @@ abstract class MetaStoreAccessSpec extends Specification with TaskChecker with M
     val viewCache = ViewCache(
       MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
       0, instant, ViewCache.Status.Pending, None, f, None)
+
     val pathedMountConfig = PathedMountConfig(
       rootDir </> file("mimir"),
       MountType.fileSystemMount(FileSystemType("local")),

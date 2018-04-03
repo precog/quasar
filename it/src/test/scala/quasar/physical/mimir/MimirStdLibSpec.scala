@@ -19,20 +19,20 @@ package quasar.mimir
 import slamdata.Predef._
 
 import quasar.Data
-import quasar.blueeyes.json.JValue
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
 import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
+import quasar.time.{DateGenerators, DateTimeInterval}
 
 import org.scalacheck.{Arbitrary, Gen}
 
 import org.specs2.execute.{Result, Skipped}
 import org.specs2.specification.{AfterAll, Scope}
 
-import java.time.LocalDate
+import java.time.{Duration => _, _}
 
 import matryoshka.AlgebraM
 import matryoshka.data.Fix
@@ -58,26 +58,15 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
       case (ExtractFunc(MapFuncsCore.ConcatArrays(_,_)), Data.Arr(_), Data.Str(_)) => notImplemented
       case (ExtractFunc(MapFuncsCore.ConcatArrays(_,_)), Data.Str(_), Data.Arr(_)) => notImplemented
 
-      case (ExtractFunc(MapFuncsCore.Eq(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
-
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Lt(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
-
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Lte(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
-
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Gt(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
-
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Str(_), Data.Str(_)) => notImplemented
-      case (ExtractFunc(MapFuncsCore.Gte(_,_)), Data.Date(_), Data.Timestamp(_)) => notImplemented
-
       case (ExtractFunc(MapFuncsCore.Add(_,_)), Data.Int(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
       case (ExtractFunc(MapFuncsCore.Add(_,_)), Data.Dec(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
+      case (ExtractFunc(MapFuncsCore.Add(_,_)), Data.Dec(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
 
       case (ExtractFunc(MapFuncsCore.Subtract(_,_)), Data.Dec(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
       case (ExtractFunc(MapFuncsCore.Subtract(_,_)), Data.Int(_), Data.Dec(_)) => notImplemented // FIXME implemented: should be working
       case (ExtractFunc(MapFuncsCore.Subtract(_,_)), Data.Dec(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
+
+      case (ExtractFunc(MapFuncsCore.Divide(_,_)), Data.Int(_), Data.Int(_)) => notImplemented // FIXME implemented: should be working
 
       case (ExtractFunc(MapFuncsCore.Power(_,_)), Data.Int(_), Data.Int(one)) if one.toInt == 1 => notImplemented // FIXME implemented: should be working
       case (ExtractFunc(MapFuncsCore.Power(_,_)), Data.Dec(_), Data.Int(one)) if one.toInt == 1 => notImplemented // FIXME implemented: should be working
@@ -94,25 +83,13 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
   }
 
   private val shortCircuitCore: AlgebraM[Result \/ ?, MapFuncCore[Fix, ?], Unit] = {
-    case MapFuncsCore.ExtractCentury(_) => notImplemented.left
-    case MapFuncsCore.ExtractDecade(_) => notImplemented.left
-    case MapFuncsCore.ExtractEpoch(_) => notImplemented.left
-    case MapFuncsCore.ExtractIsoDayOfWeek(_) => notImplemented.left
-    case MapFuncsCore.ExtractIsoYear(_) => notImplemented.left
-    case MapFuncsCore.ExtractSecond(_) => notImplemented.left
-    case MapFuncsCore.ExtractMicroseconds(_) => notImplemented.left
-    case MapFuncsCore.ExtractMillennium(_) => notImplemented.left
-    case MapFuncsCore.ExtractMilliseconds(_) => notImplemented.left
-    case MapFuncsCore.ExtractTimezoneHour(_) => notImplemented.left
-    case MapFuncsCore.ExtractTimezoneMinute(_) => notImplemented.left
-    case MapFuncsCore.ExtractWeek(_) => notImplemented.left
-    case MapFuncsCore.Timestamp(_) => notImplemented.left
-    case MapFuncsCore.Interval(_) => notImplemented.left
-    case MapFuncsCore.StartOfDay(_) => notImplemented.left
-    case MapFuncsCore.TemporalTrunc(part, _) => notImplemented.left
-    case MapFuncsCore.TimeOfDay(_) => notImplemented.left
-    case MapFuncsCore.ToTimestamp(_) => notImplemented.left
     case MapFuncsCore.Now() => notImplemented.left
+    case MapFuncsCore.NowTime() => notImplemented.left
+    case MapFuncsCore.NowDate() => notImplemented.left
+    case MapFuncsCore.CurrentTimeZone() => notImplemented.left
+    case MapFuncsCore.ToTimestamp(_) => notImplemented.left
+    case MapFuncsCore.ToLocal(_) => notImplemented.left
+    case MapFuncsCore.Interval(_) => notImplemented.left
     case MapFuncsCore.TypeOf(_) => notImplemented.left
     case MapFuncsCore.Negate(_) => notImplemented.left // TODO this isn't passing because -Long.MinValue == Long.MinValue, so basically a limitation in ColumnarTable
     // case MapFuncsCore.ToString(Data.Date(_) | Data.Timestamp(_) | Data.Time(_) | Data.Interval(_)) => notImplemented.left
@@ -138,15 +115,12 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     cake.Table.constString(Set("")).transform(transSpec)
 
   private def dataToTransSpec(data: Data): cake.trans.TransSpec1 = {
-    val jvalue: JValue = JValue.fromData(data)
-
-    RValue.fromJValue(jvalue) map { rvalue =>
-      cake.trans.transRValue(rvalue, cake.trans.TransSpec1.Id)
-    } getOrElse cake.trans.TransSpec1.Undef
+    val rvalue: Option[RValue] = MapFuncCorePlanner.dataToRValue(data)
+    rvalue.map(cake.trans.transRValue(_, cake.trans.TransSpec1.Id)).getOrElse(cake.trans.TransSpec1.Undef)
   }
 
   private def actual(table: cake.Table): List[Data] =
-    Await.result(table.toJson.map(_.toList.map(JValue.toData)), Duration.Inf)
+    Await.result(table.toJson.map(_.toList.map(MapFuncCorePlanner.rValueToData)), Duration.Inf)
 
   def runner = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data): Result =
@@ -239,6 +213,10 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
         LocalDate.of(1, 1, 1).toEpochDay,
         LocalDate.of(9999, 12, 31).toEpochDay
       ) ∘ (LocalDate.ofEpochDay(_))
+
+    def timeDomain: Gen[LocalTime] = DateGenerators.genLocalTime
+    def intervalDomain: Gen[DateTimeInterval] = DateGenerators.genInterval
+    def timezoneDomain: Gen[ZoneOffset] = DateGenerators.genZoneOffset
   }
 
   tests(runner)

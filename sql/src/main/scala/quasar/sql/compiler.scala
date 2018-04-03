@@ -17,8 +17,18 @@
 package quasar.sql
 
 import slamdata.Predef._
-import quasar.{Data, Func, GenericFunc, HomomorphicFunction, Reduction, SemanticError, UnaryFunc, VarName}
-import SemanticError._
+import quasar.{
+  Data,
+  Func,
+  GenericFunc,
+  HomomorphicFunction,
+  Reduction,
+  RenderTree,
+  SemanticError,
+  UnaryFunc,
+  VarName
+}
+import quasar.SemanticError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
@@ -26,9 +36,8 @@ import quasar.common.SortDir
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, Let => LPLet, _}
 import quasar.std.StdLib, StdLib._
-import quasar.std.TemporalPart
 import quasar.sql.{SemanticAnalysis => SA}, SA._
-import quasar.RenderTree
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data._
@@ -202,20 +211,29 @@ final class Compiler[M[_], T: Equal]
       CIName("avg")                     -> agg.Avg,
       CIName("arbitrary")               -> agg.Arbitrary,
       CIName("array_length")            -> array.ArrayLength,
-      CIName("date")                    -> date.Date,
+      CIName("localdatetime")           -> date.LocalDateTime,
+      CIName("date")                    -> date.LocalDate,
+      CIName("localdate")               -> date.LocalDate,
+      CIName("time")                    -> date.LocalTime,
+      CIName("localtime")               -> date.LocalTime,
+      CIName("offsetdatetime")          -> date.OffsetDateTime,
+      CIName("offsetdate")              -> date.OffsetDate,
+      CIName("offsettime")              -> date.OffsetTime,
       CIName("clock_timestamp")         -> date.Now, // Postgres (instantaneous)
       CIName("current_timestamp")       -> date.Now, // *, SQL92
-      CIName("getdate")                 -> date.Now, // SQL Server
+      CIName("current_time")            -> date.NowTime, // *, SQL92
+      CIName("current_date")            -> date.NowDate, // *, SQL92
+      CIName("getdate")                 -> date.NowDate, // SQL Server
       CIName("localtimestamp")          -> date.Now, // MySQL, Postgres (trans start)
       CIName("now")                     -> date.Now, // MySQL, Postgres (trans start)
       CIName("statement_timestamp")     -> date.Now, // Postgres (statement start)
       CIName("transaction_timestamp")   -> date.Now, // Postgres (trans start)
-      CIName("time")                    -> date.Time,
-      CIName("timestamp")               -> date.Timestamp,
+      CIName("timestamp")               -> date.OffsetDateTime,
       CIName("interval")                -> date.Interval,
       CIName("start_of_day")            -> date.StartOfDay,
       CIName("time_of_day")             -> date.TimeOfDay,
       CIName("to_timestamp")            -> date.ToTimestamp,
+      CIName("to_local")                -> date.ToLocal,
       CIName("squash")                  -> identity.Squash,
       CIName("oid")                     -> identity.ToId,
       CIName("type_of")                 -> identity.TypeOf,
@@ -398,9 +416,9 @@ final class Compiler[M[_], T: Equal]
         case "hour"         => date.ExtractHour
         case "isodow"       => date.ExtractIsoDayOfWeek
         case "isoyear"      => date.ExtractIsoYear
-        case "microseconds" => date.ExtractMicroseconds
+        case "microseconds" => date.ExtractMicrosecond
         case "millennium"   => date.ExtractMillennium
-        case "milliseconds" => date.ExtractMilliseconds
+        case "milliseconds" => date.ExtractMillisecond
         case "minute"       => date.ExtractMinute
         case "month"        => date.ExtractMonth
         case "quarter"      => date.ExtractQuarter

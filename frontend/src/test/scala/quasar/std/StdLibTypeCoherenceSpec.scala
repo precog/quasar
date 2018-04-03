@@ -30,7 +30,7 @@ import scalaz.syntax.traverse._
 import scalaz.std.list._
 import shapeless.{Nat, Sized}
 
-class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
+class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeGenerators {
   def testInputCoherence[N <: Nat](func: GenericFunc[N])(input: Func.Input[Type, N]): Result = {
     func.tpe(input).toEither.right.map { o =>
       val unconst = o match {
@@ -77,23 +77,30 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
     }.right.getOrElse(success)
   }
 
-  def testCoherence[N <: Nat](name: String, func: GenericFunc[N]): Fragment =
+  def testCoherence[N <: Nat](name: String, func: GenericFunc[N]): Fragment = {
     s"$name coherence" >> {
       locally {
         implicit val arbitraryTypes: Arbitrary[Func.Domain[N]] =
-          Arbitrary(func.domain.unsized.traverse(k => Gen.sized(s => TypeArbitrary.genSubtypesWithConst(k, s/25))).map(Sized.wrap[List[Type], N]))
+          Arbitrary(
+            func.domain.unsized
+              .traverse(k => Gen.sized(s => genSubtypesWithConst(k, s/25)))
+              .map(Sized.wrap[List[Type], N]))
+
         "input coherence" in Prop.forAll { (is: Func.Domain[N]) =>
           testInputCoherence[N](func)(is)
         }
       }
+
       locally {
         implicit val arbitraryType: Arbitrary[Type] =
-          Arbitrary(Gen.sized(s => TypeArbitrary.genSubtypes(func.codomain, s/25)))
+          Arbitrary(Gen.sized(s => genSubtypes(func.codomain, s/25)))
+
         "output coherence" in Prop.forAll { (t: Type) =>
           testOutputCoherence[N](func)(t)
         }
       }
     }
+  }
 
   "AggLib" >> {
     testCoherence("Count", AggLib.Count)
@@ -126,8 +133,6 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
   }
 
   "MathLib" >> {
-    testCoherence("Divide", MathLib.Divide)
-
     testCoherence("Add", MathLib.Add)
 
     testCoherence("Multiply", MathLib.Multiply)
@@ -238,6 +243,9 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
   }
 
   "DateLib" >> {
+    testCoherence("SetTimeZone", DateLib.SetTimeZone)  
+    testCoherence("SetTimeZoneMinute", DateLib.SetTimeZoneMinute)  
+    testCoherence("SetTimeZoneHour", DateLib.SetTimeZoneHour)  
     testCoherence("ExtractCentury", DateLib.ExtractCentury)
     testCoherence("ExtractDayOfMonth", DateLib.ExtractDayOfMonth)
     testCoherence("ExtractDecade", DateLib.ExtractDecade)
@@ -247,26 +255,31 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeArbitrary {
     testCoherence("ExtractHour", DateLib.ExtractHour)
     testCoherence("ExtractIsoDayOfWeek", DateLib.ExtractIsoDayOfWeek)
     testCoherence("ExtractIsoYear", DateLib.ExtractIsoYear)
-    testCoherence("ExtractMicroseconds", DateLib.ExtractMicroseconds)
+    testCoherence("ExtractMicrosecond", DateLib.ExtractMicrosecond)
     testCoherence("ExtractMillennium", DateLib.ExtractMillennium)
-    testCoherence("ExtractMilliseconds", DateLib.ExtractMilliseconds)
+    testCoherence("ExtractMillisecond", DateLib.ExtractMillisecond)
     testCoherence("ExtractMinute", DateLib.ExtractMinute)
     testCoherence("ExtractMonth", DateLib.ExtractMonth)
     testCoherence("ExtractQuarter", DateLib.ExtractQuarter)
     testCoherence("ExtractSecond", DateLib.ExtractSecond)
-    testCoherence("ExtractTimezone", DateLib.ExtractTimezone)
-    testCoherence("ExtractTimezoneHour", DateLib.ExtractTimezoneHour)
-    testCoherence("ExtractTimezoneMinute", DateLib.ExtractTimezoneMinute)
+    testCoherence("ExtractTimeZone", DateLib.ExtractTimeZone)
+    testCoherence("ExtractTimeZoneHour", DateLib.ExtractTimeZoneHour)
+    testCoherence("ExtractTimeZoneMinute", DateLib.ExtractTimeZoneMinute)
     testCoherence("ExtractWeek", DateLib.ExtractWeek)
     testCoherence("ExtractYear", DateLib.ExtractYear)
 
-    testCoherence("Date", DateLib.Date)
+    testCoherence("LocalDate", DateLib.LocalDate)
+    testCoherence("OffsetDate", DateLib.OffsetDate)
+
+    testCoherence("LocalDateTime", DateLib.LocalDateTime)
+    testCoherence("OffsetDateTime", DateLib.OffsetDateTime)
 
     testCoherence("Now", DateLib.Now)
+    testCoherence("NowTime", DateLib.NowTime)
+    testCoherence("NowDate", DateLib.NowDate)
 
-    testCoherence("Time", DateLib.Time)
-
-    testCoherence("Timestamp", DateLib.Timestamp)
+    testCoherence("LocalTime", DateLib.LocalTime)
+    testCoherence("OffsetTime", DateLib.OffsetTime)
 
     testCoherence("Interval", DateLib.Interval)
 

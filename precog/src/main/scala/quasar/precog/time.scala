@@ -16,14 +16,11 @@
 
 package quasar.precog
 
-import java.time.LocalDateTime
+import java.time.{Duration, Instant, Period, LocalDateTime}
 import java.time.ZoneOffset.UTC
 import java.time.format.DateTimeFormatter.ISO_DATE_TIME
 
 trait PackageTime {
-  type Instant  = java.time.Instant
-  type Period   = java.time.Period
-  type Duration = java.time.Duration
 
   implicit class QuasarDurationOps(private val x: Duration) {
     def getMillis: Long = x.toMillis

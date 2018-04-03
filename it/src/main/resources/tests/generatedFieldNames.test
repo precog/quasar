@@ -3,7 +3,7 @@
 
   "backends": {
     "couchbase": "ignoreFieldOrder",
-    "mimir":"pendingIgnoreFieldOrder"
+    "mimir": "ignoreFieldOrder"
   },
 
   "data": "smallZips.data",

@@ -42,7 +42,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
     val expected = sample.data.zipWithIndex collect { case (v, i) if i % 2 == 0 && i % 3 == 0 => v }
 
     val finalResults = for {
-      results <- Table.align(fromJson(lstream), SourceKey.Single, fromJson(rstream), SourceKey.Single)
+      results <- Table.align(fromJson(lstream.map(_.toJValueRaw)), SourceKey.Single, fromJson(rstream.map(_.toJValueRaw)), SourceKey.Single)
       leftResult  <- results._1.toJson
       rightResult <- results._2.toJson
       leftResult2 <- results._1.toJson
@@ -90,7 +90,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
         }]
     """)
 
-    val sample = SampleData(elements.toStream, Some((2,List((JPath(".q"),CNum), (JPath(".hw"),CEmptyArray), (JPath(".fr8y"),CNum)))))
+    val sample = SampleData(elements.toStream.flatMap(RValue.fromJValue), Some((2,List((JPath(".q"),CNum), (JPath(".hw"),CEmptyArray), (JPath(".fr8y"),CNum)))))
 
     testAlign(sample.sortBy(_ \ "key"))
   }
@@ -279,7 +279,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
       }]
     """)
 
-    val sample = SampleData(elements.toStream, Some((3,List((JPath(".xb5hs2ckjajs0k44x"),CDouble), (JPath(".zzTqxfzwzacakwjqeGFcnhpkzd5akfobsg2nxump"),CEmptyArray), (JPath(".sp7hpv"),CEmptyObject)))))
+    val sample = SampleData(elements.toStream.map(RValue.fromJValueRaw), Some((3,List((JPath(".xb5hs2ckjajs0k44x"),CDouble), (JPath(".zzTqxfzwzacakwjqeGFcnhpkzd5akfobsg2nxump"),CEmptyArray), (JPath(".sp7hpv"),CEmptyObject)))))
     testAlign(sample.sortBy(_ \ "key"))
   }
 

@@ -19,13 +19,12 @@ package quasar.mimir
 import slamdata.Predef._
 
 import quasar._
-import quasar.blueeyes.json.JNum
 import quasar.common._
 import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
-import quasar.precog.common.{ColumnRef, CPath, CPathField, CPathIndex}
+import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 import quasar.yggdrasil.TableModule
@@ -342,7 +341,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
         back <- {
           def result = for {
             vals <- countRepr.table.toJson
-            nums = vals collect { case n: JNum => n.toLong.toInt } // TODO error if we get something strange
+            nums = vals collect { case n: CNumericValue[_] => n.toCNum.value.toInt } // TODO error if we get something strange
             number = nums.head
             compacted = fromRepr.table.compact(fromRepr.P.trans.TransSpec1.Id)
             retainsOrder = op != Sample

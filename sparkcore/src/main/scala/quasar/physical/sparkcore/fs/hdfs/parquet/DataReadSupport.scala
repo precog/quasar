@@ -221,31 +221,31 @@ private[parquet] class DataReadSupport extends ReadSupport[Data] with Serializab
   private class DataDateConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
     override def addInt(v: Int): Unit =
-      save(name, Data.Date(LocalDate.of(1970,1,1).plusDays(v.toLong)) : Data)
+      save(name, Data.LocalDate(LocalDate.of(1970,1,1).plusDays(v.toLong)) : Data)
   }
 
   private class DataTimestampConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
     override def addLong(v: Long): Unit =
-      save(name, Data.Timestamp(Instant.ofEpochMilli(v)) : Data)
+      save(name, Data.LocalDateTime(LocalDateTime.ofEpochSecond(v / 1000, ((v % 1000) * 1000000).toInt, ZoneOffset.UTC)) : Data)
   }
 
   private class DataTimestampMicroConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
     override def addLong(v: Long): Unit =
-      save(name, Data.Timestamp(Instant.ofEpochMilli(v / 1000)) : Data)
+      save(name, Data.LocalDateTime(LocalDateTime.ofEpochSecond(v / 1000000, ((v % 1000000) * 1000).toInt, ZoneOffset.UTC)) : Data)
   }
 
   private class DataTimeConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
     override def addInt(v: Int): Unit =
-      save(name, Data.Time(LocalTime.ofNanoOfDay(v.toLong * 1000000)) : Data)
+      save(name, Data.LocalTime(LocalTime.ofNanoOfDay(v.toLong * 1000000)) : Data)
   }
 
   private class DataTimeMicroConverter(name: String, save: (String, Data) => Unit)
       extends PrimitiveConverter {
     override def addLong(v: Long): Unit =
-      save(name, Data.Time(LocalTime.ofNanoOfDay(v * 1000)) : Data)
+      save(name, Data.LocalTime(LocalTime.ofNanoOfDay(v * 1000)) : Data)
   }
 
   private class DataPrimitiveConverter(name: String, save: (String, Data) => Unit)

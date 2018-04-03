@@ -28,8 +28,8 @@ class StructuralSpecs extends quasar.Qspec with ValidationMatchers {
 
   import StructuralLib._
 
-  import DataArbitrary._
-  import TypeArbitrary._
+  import DataGenerators._
+  import TypeGenerators._
 
   "ConcatOp" should {
     // NB: the func's domain is the type assigned to any argument if nothing

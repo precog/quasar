@@ -20,11 +20,11 @@ import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.precog.{MimeType, MimeTypes}
 
-import scalaz._, Scalaz._
+import scalaz._
+import Scalaz._
 import ExtractorDecomposer.by
-
 import java.util.UUID
-import java.time.LocalDateTime
+import java.time.{Duration, Instant, LocalDateTime}
 
 /** Decomposes the value into a JSON object.
   */

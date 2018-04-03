@@ -19,8 +19,9 @@ package quasar.std
 import slamdata.Predef._
 import quasar.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
+import quasar.time.DateTimeInterval
 
-import java.time.LocalDate
+import java.time._
 
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -74,8 +75,21 @@ trait StdLibTestRunner {
     */
   def stringDomain: Gen[String]
 
-  /** Defines the domain of values for `Data.Date` for which the implementation is
+  /** Defines the domain of values for `Data.LocalDate` for which the implementation is
     * well-behaved.
     */
   def dateDomain: Gen[LocalDate]
+
+  /** Defines the domain of values for `Data.LocalTime` for which the implementation is
+    * well-behaved.
+    */
+  def timeDomain: Gen[LocalTime]
+
+  /** Defines the domain of time zones for which the implementation is well-behaved.
+    */
+  def timezoneDomain: Gen[ZoneOffset]
+
+  /** Defines the domain of datetime intervals for which the implementation is well-behaved.
+    */
+  def intervalDomain: Gen[DateTimeInterval]
 }

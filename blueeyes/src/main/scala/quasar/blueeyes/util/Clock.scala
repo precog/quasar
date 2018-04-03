@@ -17,8 +17,9 @@
 package quasar.blueeyes.util
 
 import quasar.blueeyes._
+
 import scala.concurrent.Future
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime, Period}
 
 trait Clock {
 

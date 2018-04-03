@@ -23,7 +23,7 @@ import matryoshka.Delay
 import matryoshka.data.Fix
 import org.specs2.execute.Result
 import quasar.ejson.{EJson, Extension}
-import quasar.std.TemporalPart
+import quasar.time.TemporalPart
 import quasar.qscript.RenderQScriptDSL.RenderQScriptDSL
 import quasar.common.{JoinType, SortDir}
 import pathy.Path._
@@ -47,7 +47,7 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     """
       |import quasar.{Data, Type}
       |import quasar.common.{JoinType, SortDir}
-      |import quasar.std.TemporalPart
+      |import quasar.time.TemporalPart
       |import quasar.qscript._
       |import quasar.ejson.{EJson, Fixed}
       |import quasar.fp._
@@ -89,8 +89,15 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
     List(
       func.Constant(EJson.nul[Fix[EJson]]),
       func.Now,
+      func.NowDate,
+      func.NowTime,
+      func.CurrentTimeZone,
+      func.ToLocal(h),
       func.Undefined,
       func.Length(h),
+      func.SetTimeZone(h, h),
+      func.SetTimeZoneMinute(h, h),
+      func.SetTimeZoneHour(h, h),
       func.ExtractCentury(h),
       func.ExtractDayOfMonth(h),
       func.ExtractDecade(h),
@@ -100,21 +107,24 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       func.ExtractHour(h),
       func.ExtractIsoDayOfWeek(h),
       func.ExtractIsoYear(h),
-      func.ExtractMicroseconds(h),
+      func.ExtractMicrosecond(h),
       func.ExtractMillennium(h),
-      func.ExtractMilliseconds(h),
+      func.ExtractMillisecond(h),
       func.ExtractMinute(h),
       func.ExtractMonth(h),
       func.ExtractQuarter(h),
       func.ExtractSecond(h),
-      func.ExtractTimezone(h),
-      func.ExtractTimezoneHour(h),
-      func.ExtractTimezoneMinute(h),
+      func.ExtractTimeZone(h),
+      func.ExtractTimeZoneHour(h),
+      func.ExtractTimeZoneMinute(h),
       func.ExtractWeek(h),
       func.ExtractYear(h),
-      func.Date(h),
-      func.Time(h),
-      func.Timestamp(h),
+      func.LocalDateTime(h),
+      func.LocalDate(h),
+      func.LocalTime(h),
+      func.OffsetDateTime(h),
+      func.OffsetDate(h),
+      func.OffsetTime(h),
       func.Interval(h),
       func.StartOfDay(h),
       func.TemporalTrunc(TemporalPart.Day, h),

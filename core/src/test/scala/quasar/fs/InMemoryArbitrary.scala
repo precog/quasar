@@ -18,7 +18,7 @@ package quasar.fs
 
 import scala.Predef.$conforms
 import slamdata.Predef._
-import quasar._, DataArbitrary._
+import quasar._, DataGenerators._
 import quasar.contrib.pathy._
 import quasar.fs.InMemory.InMemState
 

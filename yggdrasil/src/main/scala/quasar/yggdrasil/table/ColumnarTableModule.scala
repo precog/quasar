@@ -17,7 +17,7 @@
 package quasar.yggdrasil
 package table
 
-import quasar.blueeyes._, json._
+import quasar.blueeyes._
 import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
@@ -25,6 +25,7 @@ import quasar.precog.util.RawBitSet
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import TransSpecModule._
 import org.slf4j.Logger
@@ -34,7 +35,7 @@ import scalaz._, Scalaz._, Ordering._
 
 import java.io.File
 import java.nio.CharBuffer
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -390,10 +391,41 @@ trait ColumnarTableModule[M[+ _]]
       Table(Slice(Map(ColumnRef(CPath.Identity, CString) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
 
-    def constDate(v: collection.Set[ZonedDateTime]): Table = {
-      val column = ArrayDateColumn(v.toArray)
-      Table(Slice(Map(ColumnRef(CPath.Identity, CDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    def constOffsetDateTime(v: collection.Set[OffsetDateTime]): Table = {
+      val column = ArrayOffsetDateTimeColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, COffsetDateTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
     }
+
+    def constOffsetTime(v: collection.Set[OffsetTime]): Table = {
+      val column = ArrayOffsetTimeColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, COffsetTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    }
+
+    def constOffsetDate(v: collection.Set[OffsetDate]): Table = {
+      val column = ArrayOffsetDateColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, COffsetDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    }
+
+    def constLocalDateTime(v: collection.Set[LocalDateTime]): Table = {
+      val column = ArrayLocalDateTimeColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDateTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    }
+
+    def constLocalTime(v: collection.Set[LocalTime]): Table = {
+      val column = ArrayLocalTimeColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, CLocalTime) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    }
+
+    def constLocalDate(v: collection.Set[LocalDate]): Table = {
+      val column = ArrayLocalDateColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, CLocalDate) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    }
+
+    def constInterval(v: collection.Set[DateTimeInterval]): Table = {
+      val column = ArrayIntervalColumn(v.toArray)
+      Table(Slice(Map(ColumnRef(CPath.Identity, CInterval) -> column), v.size) :: StreamT.empty[M, Slice], ExactSize(v.size))
+    }
+
 
     def constNull: Table =
       Table(Slice(Map(ColumnRef(CPath.Identity, CNull) -> new InfiniteColumn with NullColumn), 1) :: StreamT.empty[M, Slice], ExactSize(1))
@@ -1866,8 +1898,13 @@ trait ColumnarTableModule[M[+ _]]
           case CBoolean               => JBooleanT
           case CLong | CDouble | CNum => JNumberT
           case CString                => JTextT
-          case CDate                  => JDateT
-          case CPeriod                => JPeriodT
+          case COffsetDateTime        => JOffsetDateTimeT
+          case COffsetTime            => JOffsetTimeT
+          case COffsetDate            => JOffsetDateT
+          case CLocalDateTime         => JLocalDateTimeT
+          case CLocalTime             => JLocalTimeT
+          case CLocalDate             => JLocalDateT
+          case CInterval              => JIntervalT
           case CArrayType(elemType)   => leafType(elemType)
           case CEmptyObject           => JObjectFixedT(Map.empty)
           case CEmptyArray            => JArrayFixedT(Map.empty)
@@ -1990,9 +2027,11 @@ trait ColumnarTableModule[M[+ _]]
       }
     }
 
-    def toJson: M[Iterable[JValue]] = {
+    def toJson: M[Iterable[RValue]] = {
       toEvents { (slice, row) =>
-        slice.toJson(row)
+        val rvalue = slice.toRValue(row)
+        if (rvalue != CUndefined) Some(rvalue)
+        else None
       }
     }
 

@@ -25,7 +25,7 @@ import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
 trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
-  import CValueGenerators._
+  import SJValueGenerators._
   import SampleData._
   import trans._
 
@@ -46,7 +46,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val table = fromSample(SampleData(sample))
     val results = toJson(table.transform { Map1(Leaf(Source), lookupF1(Nil, "negate")) })
 
-    results.copoint must_== (-10 to 10).map(x => JNum(-x))
+    results.getJValues must_== (-10 to 10).map(x => JNum(-x))
   }
 
   def testMap1ArrayObject = {
@@ -61,7 +61,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val results = toJson(table.transform { Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "negate")) })
     val expected = Stream(JNum(-20))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testDeepMap1CoerceToDouble = {
@@ -81,7 +81,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     results.copoint must haveSize(5)
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testMap1CoerceToDouble = {
@@ -101,7 +101,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     results.copoint must haveSize(4)
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def checkMap1 = {
@@ -115,7 +115,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           lookupF2(Nil, "mod").applyr(CLong(2)) andThen lookupF2(Nil, "eq").applyr(CLong(0)))
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         (jv \ "value") match {
           case JNum(x) if x % 2 == 0 => Some(JBool(true))
           case JNum(_) => Some(JBool(false))
@@ -123,7 +123,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -139,7 +139,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      results.copoint must_== sample.data
+      results.getJValues must_== sample.data
     }
   }
   */
@@ -173,14 +173,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         (jv \ "value") match {
           case JNum(x) if x % 2 == 0 => Some(jv)
           case _ => None
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }.set(minTestsOk =  200)
   }
 
@@ -218,7 +218,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def checkMetaDeref = {
@@ -229,7 +229,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         DerefMetadataStatic(Leaf(Source), CPathMeta("foo"))
       })
 
-      results.copoint must_== Stream()
+      results.getJValues must_== Stream()
     }
   }
 
@@ -246,12 +246,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         })
       })
 
-      val expected = sample.data.map { jv => jv(JPath(fieldHead)) } flatMap {
+      val expected = sample.data.map { jv => jv.toJValue(JPath(fieldHead)) } flatMap {
         case JUndefined => None
         case jv       => Some(jv)
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -268,12 +268,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         })
       })
 
-      val expected = sample.data.map { jv => jv(JPath(fieldHead)) } flatMap {
+      val expected = sample.data.map { jv => jv.toJValue(JPath(fieldHead)) } flatMap {
         case JUndefined => None
         case jv       => Some(jv)
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -289,7 +289,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
           case (JNum(x), JNum(y)) if x == y => Some(JBool(true))
           case (JNum(x), JNum(y)) => Some(JBool(false))
@@ -297,7 +297,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -313,14 +313,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
           case (JNum(x), JNum(y)) => Some(JNum(x + y))
           case _ => None
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -342,7 +342,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     })
     val expected = Stream(JNum(80))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testMapNAddThree = {
@@ -367,7 +367,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JNum(6))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def checkEqualSelf = {
@@ -378,7 +378,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         Equal(Leaf(Source), Leaf(Source))
       })
 
-      results.copoint must_== (Stream.tabulate(sample.data.size) { _ => JBool(true) })
+      results.getJValues must_== (Stream.tabulate(sample.data.size) { _ => JBool(true) })
     }
   }
 
@@ -423,7 +423,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       case _ => sys.error("unreachable case")
     }).toStream
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testSimpleEqual = {
@@ -465,7 +465,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testAnotherSimpleEqual = {
@@ -504,7 +504,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testYetAnotherSimpleEqual = {
@@ -546,7 +546,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testASimpleNonEqual = {
@@ -582,7 +582,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testEqual(sample: SampleData) = {
@@ -594,7 +594,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       )
     })
 
-    val expected = sample.data flatMap { jv =>
+    val expected = sample.data.map(_.toJValue) flatMap { jv =>
       ((jv \ "value" \ "value1"), (jv \ "value" \ "value2")) match {
         case (JUndefined, JUndefined) =>
           None
@@ -603,7 +603,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       }
     }
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def checkEqual = {
@@ -613,7 +613,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
-          sd.data.zipWithIndex map {
+          sd.data.map(_.toJValue).zipWithIndex map {
             case (jv, i) if i%2 == 0 =>
               if (hasVal1Val2(jv)) {
                 jv.set(JPath(JPathField("value"), JPathField("value1")), jv(JPath(JPathField("value"), JPathField("value2"))))
@@ -674,7 +674,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
-          sd.data.zipWithIndex map {
+          sd.data.map(_.toJValue).zipWithIndex map {
             case (jv, i) if i%2 == 0 =>
               if ((jv \? ".value.value1").nonEmpty) {
                 jv.set(JPath(JPathField("value"), JPathField("value1")), JNum(0))
@@ -704,14 +704,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           false)
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         jv \ "value" \ "value1" match {
           case JUndefined => None
           case x => Some(JBool(x == JNum(0)))
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
   def checkNotEqualLiteral = {
@@ -719,7 +719,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     implicit val gen: Arbitrary[SampleData] = Arbitrary {
       genBase map { sd =>
         SampleData(
-          sd.data.zipWithIndex map {
+          sd.data.map(_.toJValue).zipWithIndex map {
             case (jv, i) if i%2 == 0 =>
               if ((jv \? ".value.value1").nonEmpty) {
                 jv.set(JPath(JPathField("value"), JPathField("value1")), JNum(0))
@@ -749,14 +749,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           true)
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         jv \ "value" \ "value1" match {
           case JUndefined => None
           case x => Some(JBool(x != JNum(0)))
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -768,7 +768,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         Within(Leaf(Source), WrapArray(Leaf(Source)))
       })
 
-      results.copoint must_== (Stream.tabulate(sample.data.size) { _ => JBool(true) })
+      results.getJValues must_== (Stream.tabulate(sample.data.size) { _ => JBool(true) })
     }
   }
 
@@ -780,7 +780,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         Within(Leaf(Source), WrapArray(ConstLiteral(CString("derp!!"), Leaf(Source))))
       })
 
-      results.copoint must_== (Stream.tabulate(sample.data.size) { _ => JBool(false) })
+      results.getJValues must_== (Stream.tabulate(sample.data.size) { _ => JBool(false) })
     }
   }
 
@@ -834,7 +834,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       false
     ]""")
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def checkWrapObject = {
@@ -845,9 +845,9 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         WrapObject(Leaf(Source), "foo")
       })
 
-      val expected = sample.data map { jv => JObject(JField("foo", jv) :: Nil) }
+      val expected = sample.data map { rv => JObject(JField("foo", rv.toJValue) :: Nil) }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -898,8 +898,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       OuterObjectConcat(Leaf(Source))
     })
 
-    resultsInner.copoint must_== Stream(JObject(Nil))
-    resultsOuter.copoint must_== Stream(JObject(Nil))
+    resultsInner.copoint must_== Stream(CEmptyObject)
+    resultsOuter.copoint must_== Stream(CEmptyObject)
   }
 
   def testInnerObjectConcatEmptyObject = {
@@ -941,7 +941,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JObject(JField("ook", JNum(3)) :: JField("ack", JNum(9)) :: Nil),
       JObject(JField("ack", JNum(0)) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testOuterObjectConcatEmptyObject = {
@@ -988,7 +988,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JObject(JField("ook", JNum(3)) :: JField("ack", JNum(9)) :: Nil),
       JObject(JField("ack", JNum(0)) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testInnerObjectConcatUndefined = {
@@ -1012,7 +1012,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JObject(JField("baz", JNum(4)) :: JField("ack", JNum(12)) :: Nil),
       JObject(JField("baz", JNum(7)) :: JField("ack", JNum(23)) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testOuterObjectConcatUndefined = {
@@ -1038,7 +1038,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JObject(JField("ack", JNum(45)) :: Nil),
       JObject(JField("baz", JNum(7)) :: JField("ack", JNum(23)) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testInnerObjectConcatLeftEmpty = {
@@ -1060,7 +1060,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected: Stream[JValue] = Stream()
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testOuterObjectConcatLeftEmpty = {
@@ -1085,7 +1085,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JObject(JField("ack", JNum(45)) :: Nil),
       JObject(JField("ack", JNum(23)) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def checkObjectConcat = {
@@ -1106,7 +1106,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
+      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
         case obj @ JObject(_) =>
           if (obj \ "value" == JUndefined)
             None
@@ -1143,7 +1143,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data map { _ \ "value" } collect {
+      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1171,7 +1171,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data map { _ \ "value" } collect {
+      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1201,7 +1201,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val results = toJson(table.transform(spec))
 
-    results.copoint mustEqual Stream(JObject("a" -> JNum(1)))
+    results.getJValues mustEqual Stream(JObject("a" -> JNum(1)))
   }
 
   def testInnerObjectConcatJoinSemantics = {
@@ -1235,9 +1235,9 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       which is incorrect but is what the code currently does
       */
 
-      val sample = SampleData(sample0.data flatMap { jv =>
-        (jv \ "value") match {
-          case JArray(x :: Nil) => None
+      val sample = SampleData(sample0.data flatMap { rv =>
+        (rv.toJValue \ "value") match {
+          case JArray(_ :: Nil) => None
           case z => Some(z)
         }
       })
@@ -1263,7 +1263,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[JValue]]) = results.copoint must_== (sample.data flatMap {
+      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
         case obj @ JObject(fields) => {
           (obj \ "value") match {
             case JArray(inner) if inner.length >= 2 =>
@@ -1302,7 +1302,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JArray(JNum(4) :: JNum(12) :: Nil),
       JArray(JNum(7) :: JNum(23) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testOuterArrayConcatUndefined = {
@@ -1328,7 +1328,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JArray(JUndefined :: JNum(45) :: Nil),
       JArray(JNum(7) :: JNum(23) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testInnerArrayConcatEmptyArray = {
@@ -1373,7 +1373,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JArray(JNum(3) :: JNum(9) :: Nil),
       JArray(JUndefined :: JNum(0) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testOuterArrayConcatEmptyArray = {
@@ -1422,7 +1422,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JArray(JNum(3) :: JNum(9) :: Nil),
       JArray(JUndefined :: JNum(0) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testInnerArrayConcatLeftEmpty = {
@@ -1444,7 +1444,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected: Stream[JValue] = Stream()
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def testOuterArrayConcatLeftEmpty = {
@@ -1469,13 +1469,13 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JArray(JNum(45) :: Nil),
       JArray(JNum(23) :: Nil))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def checkObjectDelete = {
     implicit val gen = sample(objectSchema(_, 3))
 
-    def randomDeletionMask(schema: CValueGenerators.JSchema): Option[JPathField] = {
+    def randomDeletionMask(schema: SJValueGenerators.JSchema): Option[JPathField] = {
       Random.shuffle(schema).headOption.map({ case (JPath((x @ JPathField(_)) :: _), _) => x })
     }
 
@@ -1490,9 +1490,9 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           ObjectDelete(DerefObjectStatic(Leaf(Source), CPathField("value")), Set(CPathField(field.name)))
         })
 
-        val expected = sample.data.flatMap { jv => (jv \ "value").delete(JPath(field)) }
+        val expected = sample.data.flatMap { rv => (rv.toJValueRaw \ "value").delete(JPath(field)) }
 
-        result.copoint must_== expected
+        result.getJValues must_== expected
       }
     }
   }
@@ -1522,7 +1522,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse, JFalse, JFalse, JTrue)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeUnionTrivial = {
@@ -1549,7 +1549,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JFalse, JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeUnion = {
@@ -1581,7 +1581,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JTrue, JFalse, JFalse)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeUnfixed = {
@@ -1611,7 +1611,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JFalse, JTrue, JTrue, JTrue, JFalse, JFalse, JTrue, JFalse, JFalse, JFalse, JFalse)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeObject = {
@@ -1638,7 +1638,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JTrue, JTrue, JFalse, JFalse, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeObjectEmpty = {
@@ -1662,7 +1662,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JFalse, JFalse, JTrue, JFalse, JFalse, JFalse, JFalse)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeArrayEmpty = {
@@ -1686,7 +1686,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JTrue, JFalse, JFalse, JFalse, JFalse, JFalse, JFalse)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeObjectUnfixed = {
@@ -1710,7 +1710,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JFalse, JFalse, JTrue, JFalse, JTrue, JFalse, JTrue)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeArrayUnfixed = {
@@ -1734,7 +1734,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = Stream(JTrue, JFalse, JFalse, JFalse, JTrue, JTrue, JFalse)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testIsTypeTrivial = {
@@ -1743,7 +1743,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key":[2,2,2],"value":{"dx":[8.342062585288287E+307]}}]
     """)
 
-    val sample = SampleData(elements.toStream, Some((3, Seq((NoJPath, CEmptyArray)))))
+    val sample = SampleData(elements.toStream.map(RValue.fromJValueRaw), Some((3, Seq((NoJPath, CEmptyArray)))))
 
     testIsType(sample)
   }
@@ -1761,12 +1761,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val table                           = fromSample(sample)
     val results                         = toJson(table.transform(IsType(Leaf(Source), jtpe)))
-    val schemasSeq: Stream[Seq[JValue]] = toJson(table).copoint.map(Seq(_))
+    val schemasSeq: Stream[Seq[JValue]] = toJson(table).copoint.map(rv => Seq(rv.toJValueRaw))
     val schemas0                        = schemasSeq map { inferSchema(_) }
     val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPath(jpath), ctype) } }
     val expected                        = schemas map (schema => JBool(Schema.subsumes(schema, jtpe)))
 
-    results.copoint mustEqual expected
+    results.getJValues mustEqual expected
   }
 
   def checkIsType = {
@@ -1786,7 +1786,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValueRaw) flatMap { jv =>
         val value1 = jv \ "value" \ "value1"
         val value3 = jv \ "value" \ "value3"
 
@@ -1803,7 +1803,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -1821,9 +1821,9 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val table    = fromSample(sample)
     val results  = toJson(table.transform(Typed(Leaf(Source), jtpe)))
     val included = schema.groupBy(_._1).mapValues(_.map(_._2).toSet)
-    val expected = expectedResult(sample.data, included)
+    val expected = expectedResult(sample.data.map(_.toJValueRaw), included)
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def checkTyped = {
@@ -1846,7 +1846,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         { "value":{ "lvf":-1, "vbeu":true, "dAc":0 }, "key":[4,3,4] }
       ]""")
 
-      val sample = SampleData(data.toStream, Some((3,List((JPath(".n"),CEmptyObject)))))
+      val sample = SampleData(data.toStream.map(RValue.fromJValueRaw), Some((3,List((JPath(".n"),CEmptyObject)))))
 
       testTyped(sample)
   }
@@ -1867,7 +1867,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key":[2]}
     ]""")
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def testTypedObject = {
@@ -1889,7 +1889,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key":[2, 4]}
     ]""")
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def testTypedObject2 = {
@@ -1905,7 +1905,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     })
 
     val expected = Stream(JObject(List(JField("value", JObject(List(JField("bar", JNum(77))))), JField("key", JArray(List(JNum(1)))))))
-    results.copoint must_== expected
+    results.getJValues must_== expected.toStream
   }
 
   def testTypedObjectUnfixed = {
@@ -1921,7 +1921,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     })
 
     val resultStream = results.copoint
-    resultStream must_== data
+    resultStream.map(_.toJValueRaw) must_== data
   }
 
   def testTypedArray = {
@@ -1942,7 +1942,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key": [3, 4] }
     ]""")
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def testTypedArray2 = {
@@ -1963,7 +1963,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
               JField("value", JArray(JUndefined :: JBool(true) :: Nil)) ::
               Nil))
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testTypedArray3 = {
@@ -1985,7 +1985,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JPath(List(JPathIndex(1))) -> Set(CEmptyArray),
       JPath(List(JPathIndex(2))) -> Set(CNull))
 
-    results.copoint must_== expectedResult(data, included)
+    results.getJValues must_== expectedResult(data, included)
   }
 
   def testTypedArray4 = {
@@ -2005,7 +2005,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       JPath(List(JPathIndex(2))) -> Set(CBoolean),
       JPath(List(JPathIndex(3))) -> Set(CEmptyArray))
 
-    results.copoint must_== expectedResult(data, included)
+    results.getJValues must_== expectedResult(data, included)
   }
 
   def testTypedNumber = {
@@ -2027,7 +2027,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key": [3, 4] }
     ]""")
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def testTypedNumber2 = {
@@ -2045,7 +2045,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = data
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testTypedEmpty = {
@@ -2064,7 +2064,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       {"key":[1] }
     ]""")
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def testTrivialScan = {
@@ -2080,14 +2080,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
-        (jv \ "value") match {
+        (jv.toJValue \ "value") match {
           case JNum(i) => (a + i, s :+ JNum(a + i))
           case _ => (a, s)
         }
       }
     }
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected
   }
 
   def testHetScan = {
@@ -2104,14 +2104,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
       case ((a, s), jv) => {
-        (jv \ "value") match {
+        (jv.toJValue \ "value") match {
           case JNum(i) => (a + i, s :+ JNum(a + i))
           case _ => (a, s)
         }
       }
     }
 
-    results.copoint must_== expected.toStream
+    results.getJValues must_== expected.toStream
   }
 
   def checkScan = {
@@ -2124,14 +2124,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
       val (_, expected) = sample.data.foldLeft((BigDecimal(0), Vector.empty[JValue])) {
         case ((a, s), jv) => {
-          (jv \ "value") match {
+          (jv.toJValue \ "value") match {
             case JNum(i) => (a + i, s :+ JNum(a + i))
             case _ => (a, s)
           }
         }
       }
 
-      results.copoint must_== expected.toStream
+      results.getJValues must_== expected.toStream
     }
   }
 
@@ -2150,7 +2150,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val expected = JNum(1) #:: JNum(2) #:: JNum(3) #:: Stream.empty[JValue]
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def checkArraySwap = {
@@ -2165,7 +2165,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       so the test ignores this case
       */
       val sample = SampleData(sample0.data flatMap { jv =>
-        (jv \ "value") match {
+        (jv.toJValue \ "value") match {
           case JArray(x :: Nil) => None
           case JArray(x :: y :: Nil) => None
           case z => Some(z)
@@ -2177,13 +2177,13 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       })
 
       val expected = sample.data flatMap { jv =>
-        (jv \ "value") match {
+        (jv.toJValue \ "value") match {
           case JArray(x :: y :: z :: xs) => Some(JArray(z :: y :: x :: xs))
           case _ => None
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -2205,12 +2205,12 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
                 CPathField("value")),
               CPathField("field")))))
 
-      val expected = sample.data flatMap {
+      val expected = sample.data.map(_.toJValue) flatMap {
         case jv if jv \ "value" \ "field" == JUndefined => None
         case _ => Some(JString("foo"))
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }
   }
 
@@ -2227,14 +2227,14 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
           ConstLiteral(CBoolean(false), Leaf(Source)))
       })
 
-      val expected = sample.data flatMap { jv =>
+      val expected = sample.data.map(_.toJValue) flatMap { jv =>
         (jv \ "value") match {
           case jv @ JNum(x) => Some(if (x % 2 == 0) jv else JBool(false))
           case _ => None
         }
       }
 
-      results.copoint must_== expected
+      results.getJValues must_== expected
     }.set(minTestsOk =  200)
   }
 

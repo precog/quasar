@@ -39,15 +39,15 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
       implicit val nt = NaturalTransformation.refl[M]
       val evaluator   = Evaluator(M)
       val result      = evaluator.eval(graph, ctx, optimize)
-      val json = result.flatMap(_.toJson).copoint filterNot { jvalue =>
-        (jvalue \ "value") == JUndefined
+      val json = result.flatMap(_.toJson).copoint filterNot { rvalue =>
+        (rvalue.toJValue \ "value") == JUndefined
       }
 
       var extractIdTime: Long      = 0L
       var jvalueToSValueTime: Long = 0L
 
-      val events = json map { jvalue =>
-        (Vector(extractIds(jvalue \ "key"): _*), jvalueToSValue(jvalue \ "value"))
+      val events = json map { rvalue =>
+        (Vector(extractIds(rvalue.toJValue \ "key"): _*), jvalueToSValue(rvalue.toJValue \ "value"))
       }
 
       val back = events.toSet

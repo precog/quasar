@@ -2,6 +2,8 @@
     "name": "variable with a non-trivial value",
 
     "backends": {
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
         "mimir":"pending"
     },
 

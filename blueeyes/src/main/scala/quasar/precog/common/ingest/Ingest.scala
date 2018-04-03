@@ -26,6 +26,8 @@ import shapeless.HNil
 
 import java.util.UUID
 
+import java.time.Instant
+
 sealed trait Event {
   def fold[A](ingest: Ingest => A, archive: Archive => A): A
   def split(n: Int): List[Event]

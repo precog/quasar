@@ -9,7 +9,7 @@
     "query": "select cc[*], ts from `../daysWithArray`",
     "predicate": "exactly",
 
-    "expected": [{"cc": "a", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }},
-                 {"cc": "b", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }},
-                 {"cc": "c", "ts":{ "$timestamp": "2014-08-17T06:00:00.000Z" }}]
+    "expected": [{"cc": "a", "ts":{ "$offsetdatetime": "2014-08-17T06:00:00.000000000Z" }},
+                 {"cc": "b", "ts":{ "$offsetdatetime": "2014-08-17T06:00:00.000000000Z" }},
+                 {"cc": "c", "ts":{ "$offsetdatetime": "2014-08-17T06:00:00.000000000Z" }}]
 }

@@ -56,27 +56,20 @@ object common {
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def generateTypeCheck[In, Out](or: (Out, Out) => Out)(f: PartialFunction[Type, In => Out]):
       Type => Option[In => Out] =
-        typ => f.lift(typ).fold(
-          typ match {
-            case Type.Interval => generateTypeCheck(or)(f)(Type.Dec)
-            case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
-            case Type.Timestamp
-               | Type.Timestamp ⨿ Type.Date
-               | Type.Timestamp ⨿ Type.Date ⨿ Type.Time =>
-              generateTypeCheck(or)(f)(Type.Date)
-            case Type.Timestamp ⨿ Type.Date ⨿ Type.Time ⨿ Type.Interval =>
-              // Just repartition to match the right cases
-              generateTypeCheck(or)(f)(Type.Interval ⨿ Type.Date)
-            case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Timestamp ⨿ Type.Date ⨿ Type.Time) ⨿ Type.Bool =>
-              // Just repartition to match the right cases
-              generateTypeCheck(or)(f)(
-                Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str ⨿ (Type.Date ⨿ Type.Bool))
-            case a ⨿ b =>
-              (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
-                (a, b) => ((expr: In) => or(a(expr), b(expr))))
-            case _ => None
-          })(
-          Some(_))
-
+    typ => f.lift(typ).fold(
+      typ match {
+        case Type.Temporal =>
+          generateTypeCheck(or)(f)(Type.OffsetDateTime)
+        case Type.LocalDateTime ⨿ OffsetDateTime =>  // time_of_day
+          generateTypeCheck(or)(f)(Type.OffsetDateTime)
+        case Type.OffsetDateTime ⨿ Type.OffsetDate ⨿
+            Type.LocalDateTime ⨿ Type.LocalDate =>  // date_part
+          generateTypeCheck(or)(f)(Type.OffsetDateTime)
+        case Type.Arr(_) => generateTypeCheck(or)(f)(Type.AnyArray)
+        case a ⨿ b =>
+          (generateTypeCheck(or)(f)(a) ⊛ generateTypeCheck(or)(f)(b))(
+            (a, b) => ((expr: In) => or(a(expr), b(expr))))
+        case _ => None
+      })(Some(_))
 
 }

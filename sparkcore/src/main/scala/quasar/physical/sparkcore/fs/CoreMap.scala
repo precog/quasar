@@ -17,15 +17,15 @@
 package quasar.physical.sparkcore.fs
 
 import slamdata.Predef.{Eq => _, _}
-import quasar.{Data, DataCodec}
+import quasar.{datetime, Data, DateTimeInterval, TemporalPart}
 import quasar.Planner._
 import quasar.common.PrimaryType
 import quasar.fp.ski._
 import quasar.qscript._, MapFuncsCore._
 import quasar.std.{DateLib, StringLib}
-import quasar.std.TemporalPart
 
-import java.time._, ZoneOffset.UTC
+import java.time.{LocalTime=>JLocalTime}, java.time.ZoneOffset.UTC
+import java.time.{OffsetDateTime=>JOffsetDateTime, Instant}
 import scala.math
 import scala.util.matching.Regex
 
@@ -34,6 +34,7 @@ import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{Divide => _,Split => _, _}, Scalaz._
+import quasar.DataDateTimeExtractors._
 
 object CoreMap extends Serializable {
 
@@ -78,16 +79,28 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
 
-    case Date(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseDate(v).getOrElse(undefined)
+    case OffsetDate(f) => (f >>> {
+      case Data.Str(v) => DateLib.parseOffsetDate(v).getOrElse(undefined)
       case _ => undefined
     }).right
-    case Time(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseTime(v).getOrElse(undefined)
+    case OffsetTime(f) => (f >>> {
+      case Data.Str(v) => DateLib.parseOffsetTime(v).getOrElse(undefined)
       case _ => undefined
     }).right
-    case Timestamp(f) => (f >>> {
-      case Data.Str(v) => DateLib.parseTimestamp(v).getOrElse(undefined)
+    case OffsetDateTime(f) => (f >>> {
+      case Data.Str(v) => DateLib.parseOffsetDateTime(v).getOrElse(undefined)
+      case _ => undefined
+    }).right
+    case LocalDate(f) => (f >>> {
+      case Data.Str(v) => DateLib.parseLocalDate(v).getOrElse(undefined)
+      case _ => undefined
+    }).right
+    case LocalTime(f) => (f >>> {
+      case Data.Str(v) => DateLib.parseLocalTime(v).getOrElse(undefined)
+      case _ => undefined
+    }).right
+    case LocalDateTime(f) => (f >>> {
+      case Data.Str(v) => DateLib.parseLocalDateTime(v).getOrElse(undefined)
       case _ => undefined
     }).right
     case Interval(f) => (f >>> {
@@ -95,145 +108,111 @@ object CoreMap extends Serializable {
       case _ => undefined
     }).right
     case StartOfDay(f) => (f >>> {
-      case d @ Data.Timestamp(_) => temporalTrunc(TemporalPart.Day, d).fold(κ(undefined), ι)
-      case Data.Date(v)          => Data.Timestamp(v.atStartOfDay(ZoneOffset.UTC).toInstant)
+      case CanAddTime(g) => g(JLocalTime.MIN)
       case _ => undefined
     }).right
-    case TemporalTrunc(p, f) => (f >>> (d => temporalTrunc(p, d).fold(κ(undefined), ι))).right
+    case TemporalTrunc(p, f) => (f >>> (temporalTrunc(p, _))).right
     case TimeOfDay(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Time(v.atZone(ZoneOffset.UTC).toLocalTime)
+      case Data.LocalDateTime(v) => Data.LocalTime(v.toLocalTime)
+      case Data.OffsetDateTime(v) => Data.OffsetTime(v.toOffsetTime)
       case _ => undefined
     }).right
     case ToTimestamp(f) => (f >>> {
-      case Data.Int(epoch) => Data.Timestamp(Instant.ofEpochMilli(epoch.toLong))
+      case Data.Int(epoch) => Data.OffsetDateTime(Instant.ofEpochMilli(epoch.toLong).atOffset(UTC))
       case _ => undefined
     }).right
     case ExtractCentury(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => century(dt.getYear()))
-      case Data.Date(v) => century(v.getYear())
+      case CanLensDate(i) => Data.Int(datetime.extractCentury(i.pos))
       case _ => undefined
     }).right
     case ExtractDayOfMonth(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfMonth()))
-      case Data.Date(v) => Data.Int(v.getDayOfMonth())
+      case CanLensDate(i) => Data.Int(datetime.extractDayOfMonth(i.pos))
       case _ => undefined
     }).right
     case ExtractDecade(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getYear() / 10))
-      case Data.Date(v) => Data.Int(v.getYear() / 10)
+      case CanLensDate(i) => Data.Int(datetime.extractDecade(i.pos))
       case _ => undefined
     }).right
     case ExtractDayOfWeek(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        fromDateTime(v)(dt => Data.Int(dt.getDayOfWeek().getValue() % 7))
-      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue() % 7)
+      case CanLensDate(i) => Data.Int(datetime.extractDayOfWeek(i.pos))
       case _ => undefined
     }).right
     case ExtractDayOfYear(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfYear()))
-      case Data.Date(v) => Data.Int(v.getDayOfYear())
+      case CanLensDate(i) => Data.Int(datetime.extractDayOfYear(i.pos))
       case _ => undefined
     }).right
     case ExtractEpoch(f) => (f >>> {
-      case Data.Timestamp(v) => Data.Int(v.toEpochMilli() / 1000)
-      case Data.Date(v) => Data.Int(v.atStartOfDay(ZoneOffset.UTC).toEpochSecond())
+      case Data.OffsetDateTime(v) => Data.Dec(v.toEpochSecond())
       case _ => undefined
     }).right
     case ExtractHour(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getHour()))
-      case Data.Time(v) => Data.Int(v.getHour())
-      case Data.Date(_) => Data.Int(0)
+      case CanLensTime(i) => Data.Int(datetime.extractHour(i.pos))
       case _ => undefined
     }).right
     case ExtractIsoDayOfWeek(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfWeek().getValue()))
-      case Data.Date(v) => Data.Int(v.getDayOfWeek().getValue())
+      case CanLensDate(i) => Data.Int(datetime.extractIsoDayOfWeek(i.pos))
       case _ => undefined
     }).right
     case ExtractIsoYear(f) => (f >>> {
+      case CanLensDate(i) => Data.Int(datetime.extractIsoYear(i.pos))
       case _ => undefined
     }).right
-    case ExtractMicroseconds(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        fromDateTime(v) { dt =>
-          val sec = dt.getSecond() * 1000000
-          val milli = dt.getNano() / 1000
-          Data.Int(sec + milli)
-        }
-      case Data.Time(v) =>
-        val sec = v.getSecond() * 1000000
-        val milli = v.getNano() / 1000
-        Data.Int(sec + milli)
-      case Data.Date(_) => Data.Dec(0)
+    case ExtractMicrosecond(f) => (f >>> {
+      case CanLensTime(i) => Data.Int(datetime.extractMicrosecond(i.pos))
       case _ => undefined
     }).right
     case ExtractMillennium(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        fromDateTime(v)(dt => Data.Int(((dt.getYear() - 1) / 1000) + 1))
-      case Data.Date(v) => Data.Int(((v.getYear() - 1) / 1000) + 1)
+      case CanLensDate(i) => Data.Int(datetime.extractMillennium(i.pos))
       case _ => undefined
     }).right
-    case ExtractMilliseconds(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        fromDateTime(v) { dt =>
-          val sec = dt.getSecond() * 1000
-          val milli = dt.getNano() / 1000000
-          Data.Int(sec + milli)
-        }
-      case Data.Time(v) =>
-        val sec = v.getSecond() * 1000
-        val milli = v.getNano() / 1000000
-        Data.Int(sec + milli)
-      case Data.Date(_) => Data.Dec(0)
+    case ExtractMillisecond(f) => (f >>> {
+      case CanLensTime(i) => Data.Int(datetime.extractMillisecond(i.pos))
       case _ => undefined
     }).right
     case ExtractMinute(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getMinute()))
-      case Data.Time(v) => Data.Int(v.getMinute())
-      case Data.Date(_) => Data.Int(0)
+      case CanLensTime(i) => Data.Int(datetime.extractMinute(i.pos))
       case _ => undefined
     }).right
     case ExtractMonth(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getMonth().getValue()))
-      case Data.Date(v) => Data.Int(v.getMonth().getValue())
+      case CanLensDate(i) => Data.Int(datetime.extractMonth(i.pos))
       case _ => undefined
     }).right
     case ExtractQuarter(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        fromDateTime(v)(dt => Data.Int(((dt.getMonth().getValue - 1) / 3) + 1))
-      case Data.Date(v) => Data.Int(((v.getMonth().getValue - 1) / 3) + 1)
+      case CanLensDate(i) => Data.Int(datetime.extractQuarter(i.pos))
       case _ => undefined
     }).right
     case ExtractSecond(f) => (f >>> {
-      case Data.Timestamp(v) =>
-        fromDateTime(v) { dt =>
-          val sec = dt.getSecond()
-          val milli = dt.getNano() / 1000
-          Data.Dec(BigDecimal(s"$sec.$milli"))
-        }
-      case Data.Time(v) =>
-        val sec = v.getSecond()
-        val milli = v.getNano() / 1000
-        Data.Dec(BigDecimal(s"$sec.$milli"))
-      case Data.Date(_) => Data.Dec(0)
+      case CanLensTime(i) =>
+        Data.Dec(datetime.extractSecond(i.pos))
       case _ => undefined
     }).right
     case ExtractWeek(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getDayOfYear() / 7))
-      case Data.Date(v) => Data.Int(v.getDayOfYear() / 7)
+      case CanLensDate(i) => Data.Int(datetime.extractWeek(i.pos))
       case _ => undefined
     }).right
     case ExtractYear(f) => (f >>> {
-      case Data.Timestamp(v) => fromDateTime(v)(dt => Data.Int(dt.getYear()))
-      case Data.Date(v) => Data.Int(v.getYear())
+      case CanLensDate(i) => Data.Int(datetime.extractYear(i.pos))
       case _ => undefined
     }).right
-    case Now() => κ(Data.Timestamp(Instant.now())).right
+    case ExtractTimeZone(f) => (f >>> {
+      case CanLensTimeZone(i) => Data.Int(datetime.extractTimeZone(i.pos))
+      case _ => undefined
+    }).right
+    case ExtractTimeZoneMinute(f) => (f >>> {
+      case CanLensTimeZone(i) => Data.Int(datetime.extractTimeZoneMinute(i.pos))
+      case _ => undefined
+    }).right
+    case ExtractTimeZoneHour(f) => (f >>> {
+      case CanLensTimeZone(i) => Data.Int(datetime.extractTimeZoneHour(i.pos))
+      case _ => undefined
+    }).right
+
+    case Now() => κ(Data.OffsetDateTime(JOffsetDateTime.now())).right
 
     case Negate(f) => (f >>> {
       case Data.Int(v) => Data.Int(-v)
       case Data.Dec(v) => Data.Dec(-v)
-      case Data.Interval(v) => Data.Interval(v.negated())
+      case Data.Interval(v) => Data.Interval(v.multiply(-1))
       case _ => undefined
     }).right
     case Add(f1, f2) => ((x: A) => add(f1(x), f2(x))).right
@@ -354,9 +333,12 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a + BigDecimal(b))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a + b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.plus(b))
-    case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.plus(b))
-    case (Data.Date(a), Data.Interval(b)) => Data.Date(a.plus(b))
-    case (Data.Time(a), Data.Interval(b)) => Data.Time(a.plus(b))
+    case (Data.Interval(b), CanLensDateTime(a)) => a.peeks(b.addTo)
+    case (Data.Interval(DateTimeInterval.DateLike(b)), CanLensDate(a)) => a.peeks(_.plus(b))
+    case (Data.Interval(DateTimeInterval.TimeLike(b)), CanLensTime(a)) => a.peeks(_.plus(b))
+    case (CanLensDateTime(a), Data.Interval(b)) => a.peeks(b.addTo)
+    case (CanLensDate(a), Data.Interval(DateTimeInterval.DateLike(b))) => a.peeks(_.plus(b))
+    case (CanLensTime(a), Data.Interval(DateTimeInterval.TimeLike(b))) => a.peeks(_.plus(b))
     case _ => undefined
   }
 
@@ -366,9 +348,9 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a - BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a - b)
     case (Data.Interval(a), Data.Interval(b)) => Data.Interval(a.minus(b))
-    case (Data.Date(a), Data.Interval(b)) => Data.Date(a.minus(b))
-    case (Data.Time(a), Data.Interval(b)) => Data.Time(a.minus(b))
-    case (Data.Timestamp(a), Data.Interval(b)) => Data.Timestamp(a.minus(b))
+    case (CanLensDateTime(a), Data.Interval(b)) => a.peeks(b.subtractFrom)
+    case (CanLensDate(a), Data.Interval(DateTimeInterval.DateLike(b))) => a.peeks(_.minus(b))
+    case (CanLensTime(a), Data.Interval(DateTimeInterval.TimeLike(b))) => a.peeks(_.minus(b))
     case _ => undefined
   }
 
@@ -377,8 +359,10 @@ object CoreMap extends Serializable {
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) * b)
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a * BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Int(a * b)
-    case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
-    case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
+    case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multiply(b.toInt))
+    case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multiply(b.toInt))
+    case (Data.Dec(a), Data.Interval(b)) => Data.Interval(b.multiply(a.toInt))
+    case (Data.Int(a), Data.Interval(b)) => Data.Interval(b.multiply(a.toInt))
     case _ => undefined
   }
 
@@ -389,19 +373,14 @@ object CoreMap extends Serializable {
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a) / b)
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a(BigDecimal.defaultMathContext) / BigDecimal(b))
     case (Data.Int(a), Data.Int(b)) => Data.Dec(BigDecimal(a) / BigDecimal(b))
-    case (Data.Interval(a), Data.Dec(b)) => Data.Interval(a.multipliedBy(b.toLong))
-    case (Data.Interval(a), Data.Int(b)) => Data.Interval(a.multipliedBy(b.toLong))
     case _ => undefined
   }
 
-  // TODO interval cases?
   private def modulo(d1: Data, d2: Data) = (d1, d2) match {
     case (Data.Int(a), Data.Int(b)) => Data.Int(a % b)
     case (Data.Int(a), Data.Dec(b)) => Data.Dec(BigDecimal(a).remainder(b))
     case (Data.Dec(a), Data.Int(b)) => Data.Dec(a.remainder(BigDecimal(b)))
     case (Data.Dec(a), Data.Dec(b)) => Data.Dec(a.remainder(b))
-    case (Data.Interval(a), Data.Int(b)) => ???
-    case (Data.Interval(a), Data.Dec(b)) => ???
     case _ => undefined
   }
 
@@ -421,9 +400,12 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Bool(a < BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) < 0)
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) < 0)
-    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) < 0)
-    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.OffsetDateTime(a), Data.OffsetDateTime(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.OffsetDate(a), Data.OffsetDate(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.OffsetTime(a), Data.OffsetTime(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.LocalDateTime(a), Data.LocalDateTime(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.LocalDate(a), Data.LocalDate(b)) => Data.Bool(a.compareTo(b) < 0)
+    case (Data.LocalTime(a), Data.LocalTime(b)) => Data.Bool(a.compareTo(b) < 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
       case (false, true) => Data.Bool(true)
       case _ => Data.Bool(false)
@@ -438,9 +420,12 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Bool(a <= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) <= 0)
-    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.OffsetDateTime(a), Data.OffsetDateTime(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.OffsetDate(a), Data.OffsetDate(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.OffsetTime(a), Data.OffsetTime(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.LocalDateTime(a), Data.LocalDateTime(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.LocalDate(a), Data.LocalDate(b)) => Data.Bool(a.compareTo(b) <= 0)
+    case (Data.LocalTime(a), Data.LocalTime(b)) => Data.Bool(a.compareTo(b) <= 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
       case (true, false) => Data.Bool(false)
       case _ => Data.Bool(true)
@@ -455,9 +440,12 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Bool(a > BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) > 0)
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) > 0)
-    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) > 0)
-    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.OffsetDateTime(a), Data.OffsetDateTime(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.OffsetDate(a), Data.OffsetDate(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.OffsetTime(a), Data.OffsetTime(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.LocalDateTime(a), Data.LocalDateTime(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.LocalDate(a), Data.LocalDate(b)) => Data.Bool(a.compareTo(b) > 0)
+    case (Data.LocalTime(a), Data.LocalTime(b)) => Data.Bool(a.compareTo(b) > 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
       case (true, false) => Data.Bool(true)
       case _ => Data.Bool(false)
@@ -472,9 +460,12 @@ object CoreMap extends Serializable {
     case (Data.Dec(a), Data.Int(b)) => Data.Bool(a >= BigDecimal(b))
     case (Data.Interval(a), Data.Interval(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Str(a), Data.Str(b)) => Data.Bool(a.compareTo(b) >= 0)
-    case (Data.Timestamp(a), Data.Timestamp(b)) => Data.Bool(a.compareTo(b) >= 0)
-    case (Data.Date(a), Data.Date(b)) => Data.Bool(a.compareTo(b) >= 0)
-    case (Data.Time(a), Data.Time(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.OffsetDateTime(a), Data.OffsetDateTime(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.OffsetDate(a), Data.OffsetDate(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.OffsetTime(a), Data.OffsetTime(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.LocalDateTime(a), Data.LocalDateTime(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.LocalDate(a), Data.LocalDate(b)) => Data.Bool(a.compareTo(b) >= 0)
+    case (Data.LocalTime(a), Data.LocalTime(b)) => Data.Bool(a.compareTo(b) >= 0)
     case (Data.Bool(a), Data.Bool(b)) => (a, b) match {
       case (false, true) => Data.Bool(false)
       case _ => Data.Bool(true)
@@ -491,16 +482,23 @@ object CoreMap extends Serializable {
       Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
     case (Data.Str(a), Data.Str(b), Data.Str(c)) =>
       Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
-    case (Data.Timestamp(a), Data.Timestamp(b), Data.Timestamp(c)) =>
+    case (Data.OffsetDateTime(a), Data.OffsetDateTime(b), Data.OffsetDateTime(c)) =>
       Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
-    case (Data.Date(a), Data.Date(b), Data.Date(c)) =>
+    case (Data.OffsetDate(a), Data.OffsetDate(b), Data.OffsetDate(c)) =>
       Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
-    case (Data.Time(a), Data.Time(b), Data.Time(c)) =>
+    case (Data.OffsetTime(a), Data.OffsetTime(b), Data.OffsetTime(c)) =>
       Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
-    case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => (a,b,c) match {
+    case (Data.LocalDateTime(a), Data.LocalDateTime(b), Data.LocalDateTime(c)) =>
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
+    case (Data.LocalDate(a), Data.LocalDate(b), Data.LocalDate(c)) =>
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
+    case (Data.LocalTime(a), Data.LocalTime(b), Data.LocalTime(c)) =>
+      Data.Bool(b.compareTo(a) <= 0 && a.compareTo(c) <= 0)
+    case (Data.Bool(a), Data.Bool(b), Data.Bool(c)) => (b,a,c) match {
       case (false, false, true) => Data.Bool(true)
       case (false, true, true) => Data.Bool(true)
       case (true, true, true) => Data.Bool(true)
+      case (false, false, false) => Data.Bool(true)
       case _ => Data.Bool(false)
     }
     case _ => undefined
@@ -512,9 +510,12 @@ object CoreMap extends Serializable {
     case Data.Bool(v) => Data.Str(v.toString)
     case Data.Dec(v) => Data.Str(v.toString)
     case Data.Int(v) => Data.Str(v.toString)
-    case Data.Timestamp(v) => Data.Str(v.atZone(UTC).format(DataCodec.dateTimeFormatter))
-    case Data.Date(v) => Data.Str(v.toString)
-    case Data.Time(v) => Data.Str(v.format(DataCodec.timeFormatter))
+    case Data.OffsetDateTime(v) => Data.Str(v.toString)
+    case Data.OffsetDate(v) => Data.Str(v.toString)
+    case Data.OffsetTime(v) => Data.Str(v.toString)
+    case Data.LocalDateTime(v) => Data.Str(v.toString)
+    case Data.LocalDate(v) => Data.Str(v.toString)
+    case Data.LocalTime(v) => Data.Str(v.toString)
     case Data.Interval(v) => Data.Str(v.toString)
     case Data.Binary(v) => Data.Str(v.toList.mkString(""))
     case Data.Id(s) => Data.Str(s)
@@ -523,14 +524,13 @@ object CoreMap extends Serializable {
 
   private def century(year: Int): Data = Data.Int(((year - 1) / 100) + 1)
 
-  private def temporalTrunc(part: TemporalPart, src: Data): PlannerError \/ Data =
-    (src match {
-      case d @ Data.Date(_)      => DateLib.truncDate(part, d)
-      case t @ Data.Time(_)      => DateLib.truncTime(part, t)
-      case t @ Data.Timestamp(_) => DateLib.truncTimestamp(part, t)
-      case _ =>
-        undefined.right
-    }).leftMap(e => InternalError.fromMsg(e.shows))
+  private def temporalTrunc(part: TemporalPart, src: Data): Data =
+    src match {
+      case CanLensDateTime(i) => i.peeks(datetime.truncDateTime(part, _))
+      case CanLensDate(i)     => i.peeks(datetime.truncDate(part, _))
+      case CanLensTime(i)     => i.peeks(datetime.truncTime(part, _))
+      case _                  => undefined
+    }
 
   private def search(dStr: Data, dPattern: Data, dInsen: Data): Data =
     (dStr, dPattern, dInsen) match {
@@ -552,8 +552,5 @@ object CoreMap extends Serializable {
         \/.fromTryCatchNonFatal(Data.Arr(str.split(Regex.quote(delim), -1).toList.map(Data.Str(_)))).fold(κ(Data.NA), ι)
       case _ => undefined
     }
-
-  private def fromDateTime(v: Instant)(f: ZonedDateTime => Data): Data =
-    \/.fromTryCatchNonFatal(v.atZone(ZoneOffset.UTC)).fold(κ(Data.NA), f)
 
 }

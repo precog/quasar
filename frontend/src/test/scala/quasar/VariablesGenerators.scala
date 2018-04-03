@@ -22,7 +22,7 @@ import quasar.sql.ExprArbitrary
 
 import org.scalacheck.Arbitrary, Arbitrary.{arbitrary => arb}
 
-trait VariablesArbitrary {
+trait VariablesGenerators {
   implicit val arbitraryVarName: Arbitrary[VarName] =
     Arbitrary(arb[String].map(VarName(_)))
 
@@ -33,4 +33,4 @@ trait VariablesArbitrary {
     Arbitrary(arb[Map[VarName, VarValue]].map(Variables(_)))
 }
 
-object VariablesArbitrary extends VariablesArbitrary
+object VariablesGenerators extends VariablesGenerators

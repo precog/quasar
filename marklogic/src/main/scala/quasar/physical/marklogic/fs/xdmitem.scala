@@ -23,6 +23,7 @@ import quasar.physical.marklogic.{ErrorMessages, MonadErrMsgs}
 import quasar.physical.marklogic.optics._
 import quasar.physical.marklogic.xml
 import quasar.physical.marklogic.xml.SecureXML
+import quasar.time.DateTimeInterval
 
 import scala.collection.JavaConverters._
 import scala.xml.Elem
@@ -30,7 +31,10 @@ import scala.xml.Elem
 import argonaut._
 import com.marklogic.xcc.types.{Duration => _, _}
 import java.time._
-import scalaz._, Scalaz._
+import java.math.RoundingMode
+
+import scalaz._
+import Scalaz._
 
 object xdmitem {
   @SuppressWarnings(Array("org.wartremover.warts.Recursion", "org.wartremover.warts.ToString"))
@@ -80,8 +84,8 @@ object xdmitem {
     case item: XSAnyURI                 => Data._str(item.asString).point[F]
     case item: XSBase64Binary           => bytesToData[F](item.asBinaryData)
     case item: XSBoolean                => Data._bool(item.asPrimitiveBoolean).point[F]
-    case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._date(_))
-    case item: XSDateTime               => Data._timestamp(ZonedDateTime.parse(item.asString).toInstant).point[F]
+    case item: XSDate                   => parseLocalDate[F](item.asString) map (Data._localDate(_))
+    case item: XSDateTime               => Data._localDateTime(LocalDateTime.parse(item.asString)).point[F]
     case item: XSDecimal                => Data._dec(item.asBigDecimal).point[F]
     case item: XSDouble                 => Data._dec(item.asBigDecimal).point[F]
     case item: XSDuration               => Data._interval(convertDuration(item)).point[F]
@@ -95,7 +99,7 @@ object xdmitem {
     case item: XSInteger                => Data._int(item.asBigInteger).point[F]
     case item: XSQName                  => Data._str(item.asString).point[F]
     case item: XSString                 => Data._str(item.asString).point[F]
-    case item: XSTime                   => parseLocalTime[F](item.asString) map (Data._time(_))
+    case item: XSTime                   => parseLocalTime[F](item.asString) map (Data._localTime(_))
     case item: XSUntypedAtomic          => Data._str(item.asString).point[F]
     case other                          => noReprError[F, Data](other.toString)
   }
@@ -112,19 +116,20 @@ object xdmitem {
   private def jsonToData[F[_]: MonadErrMsgs](jsonString: String): F[Data] =
     Parse.decodeWithMessage(jsonString, data.decodeJson[F], _.wrapNel.raiseError[F, Data])
 
-  private def convertDuration(xsd: XSDuration): Duration = {
+  private def convertDuration(xsd: XSDuration): DateTimeInterval = {
     val xdd   = xsd.asDuration
     val days  = (xdd.getYears * 365L) + (xdd.getMonths * 30) + xdd.getDays
     val rsecs = BigDecimal(xdd.getSeconds)
     val secs  = rsecs.toLong
     val nanos = (rsecs - secs) / 1000000000
-    val dur   = Duration.ofDays(days)
-                  .plusHours(xdd.getHours.toLong)
-                  .plusMinutes(xdd.getMinutes.toLong)
-                  .plusSeconds(secs)
-                  .plusNanos(nanos.toLong)
+    val dur = DateTimeInterval.make(
+      xdd.getYears,
+      xdd.getMonths,
+      xdd.getDays,
+      xdd.getWholeSeconds,
+      (xdd.getSeconds.setScale(0, RoundingMode.DOWN).intValue - xdd.getWholeSeconds) * 100000000)
 
-    if (xdd.isPositive) dur else dur.negated
+    if (xdd.isPositive) dur else dur.multiply(-1)
   }
 
   private def parseLocalDate[F[_]: MonadErrMsgs](s: String): F[LocalDate] =

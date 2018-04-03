@@ -55,6 +55,30 @@ object JValue {
 
   def apply(p: JPath, v: JValue) = JUndefined.set(p, v)
 
+  def coerceNumerics(v: JValue): JValue = v match {
+    case JNum(d) =>
+      val isLong = try {
+        d.toLongExact
+        true
+      } catch {
+        case _: ArithmeticException => false
+      }
+
+      lazy val isDouble =
+        try decimal(d.toDouble.toString) == d
+        catch { case _: NumberFormatException | _: ArithmeticException => false }
+
+      if (isLong)
+        JNumLong(d.toLong)
+      else if (isDouble)
+        JNumDouble(d.toDouble)
+      else
+        JNumBigDec(d)
+    case JArray(vs) => JArray(vs.map(coerceNumerics))
+    case JObject(vs) => JObject(vs.map { case (k, v) => k -> coerceNumerics(v) })
+    case x => x
+  }
+
   def fromData(data: Data): JValue = data match {
     case Data.Null => JNull
     case Data.Str(value) => JString(value)
@@ -63,9 +87,12 @@ object JValue {
     case Data.Int(value) => JNumStr(value.toString)
     case Data.Obj(fields) => JObject(fields.mapValues(fromData))
     case Data.Arr(values) => JArray(values.map(fromData))
-    case Data.Timestamp(value) => JString(value.toString)
-    case Data.Date(value) => JString(value.toString)
-    case Data.Time(value) => JString(value.toString)
+    case Data.OffsetDateTime(value) => JString(value.toString)
+    case Data.OffsetDate(value) => JString(value.toString)
+    case Data.OffsetTime(value) => JString(value.toString)
+    case Data.LocalDateTime(value) => JString(value.toString)
+    case Data.LocalDate(value) => JString(value.toString)
+    case Data.LocalTime(value) => JString(value.toString)
     case Data.Interval(value) => JString(value.toString)
     case Data.Binary(values) => JArray(values.map(JNumLong(_)): _*)
     case Data.Id(value) => JString(value)

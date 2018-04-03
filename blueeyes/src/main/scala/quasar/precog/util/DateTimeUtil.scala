@@ -16,9 +16,10 @@
 
 package quasar.precog.util
 
+import quasar.time.OffsetDate
+
 import java.time._
 import java.time.format._
-
 import java.util.regex.Pattern
 
 object DateTimeUtil {
@@ -29,49 +30,71 @@ object DateTimeUtil {
 
   def looksLikeIso8601(s: String): Boolean = dateTimeRegex.matcher(s).matches
 
-  // FIXME ok this really sucks.  Instant ≠ ZonedDateTime
-  def parseDateTime(value: String): ZonedDateTime = {
-    val utc = ZoneId.of("UTC")
+  def parseInstant(value: String): Instant = Instant.parse(value)
 
-    try {
-      Instant.parse(value).atZone(utc)
-    } catch {
-      case _: Throwable => try {
-        ZonedDateTime.of(
-          LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE),
-          LocalTime.of(0, 0, 0, 0),
-          utc)
-      } catch {
-        case _: Throwable =>
-          ZonedDateTime.of(
-            LocalDate.now(utc), // FIXME what is the expected default?
-            LocalTime.parse(value, DateTimeFormatter.ISO_TIME),
-            utc)
-      }
-    }
+  def parseOffsetDateTime(value: String): OffsetDateTime = OffsetDateTime.parse(value)
+
+  def parseOffsetTime(value: String): OffsetTime = OffsetTime.parse(value)
+
+  def parseOffsetDate(value: String): OffsetDate = OffsetDate.parse(value)
+
+  def parseLocalDateTime(value: String): LocalDateTime = LocalDateTime.parse(value)
+
+  def parseLocalTime(value: String): LocalTime = LocalTime.parse(value)
+
+  def parseLocalDate(value: String): LocalDate = LocalDate.parse(value)
+
+  def isValidTimestamp(str: String): Boolean = try {
+    parseInstant(str); true
+  } catch {
+    case _:IllegalArgumentException => false
   }
 
-  def isValidISO(str: String): Boolean = try {
-    parseDateTime(str); true
+  def isValidOffsetDateTime(str: String): Boolean = try {
+    parseOffsetDateTime(str); true
   } catch {
-    case e:IllegalArgumentException => { false }
+    case _:IllegalArgumentException => false
   }
 
-  def isValidTimeZone(str: String): Boolean = try {
-    ZoneId.of(str); true
+  def isValidOffsetTime(str: String): Boolean = try {
+    parseOffsetTime(str); true
   } catch {
-    case e:IllegalArgumentException => { false }
+    case _:IllegalArgumentException => false
+  }
+
+  def isValidOffsetDate(str: String): Boolean = try {
+    parseOffsetDate(str); true
+  } catch {
+    case _:IllegalArgumentException => false
+  }
+
+  def isValidLocalDateTime(str: String): Boolean = try {
+    parseLocalDateTime(str); true
+  } catch {
+    case _:IllegalArgumentException => false
+  }
+
+  def isValidLocalTime(str: String): Boolean = try {
+    parseLocalTime(str); true
+  } catch {
+    case _:IllegalArgumentException => false
+  }
+
+  def isValidLocalDate(str: String): Boolean = try {
+    parseLocalDate(str); true
+  } catch {
+    case _:IllegalArgumentException => false
   }
 
   def isValidFormat(time: String, fmt: String): Boolean = try {
     DateTimeFormatter.ofPattern(fmt)./*withOffsetParsed().*/parse(time); true
   } catch {
-    case e: IllegalArgumentException => { false }
+    case _: IllegalArgumentException => false
   }
 
-  def isValidPeriod(period: String): Boolean = try {
-    Period.parse(period); true
+  def isValidDuration(period: String): Boolean = try {
+    Duration.parse(period); true
   } catch {
-    case e: IllegalArgumentException => { false }
+    case _: IllegalArgumentException => false
   }
 }

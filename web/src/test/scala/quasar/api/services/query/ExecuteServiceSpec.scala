@@ -25,7 +25,6 @@ import quasar.api.services.VCacheFixture
 import quasar.api.services.Fixture._
 import quasar.common.{Map => _, _}
 import quasar.contrib.pathy._, PathArbitrary._
-import quasar.DateArbitrary._
 import quasar.effect.ScopeExecution
 import quasar.fp._
 import quasar.fp.free.{foldMapNT, injectNT, liftFT}
@@ -37,6 +36,7 @@ import quasar.fs.mount.MountConfig.viewConfig0
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanR}
 import quasar.main.CoreEffIO
 import quasar.sql.{Positive => _, _}
+import quasar.time.DateGenerators._
 
 import java.time.{Instant, Duration}
 

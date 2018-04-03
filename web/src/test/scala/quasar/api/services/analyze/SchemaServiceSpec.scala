@@ -17,7 +17,7 @@
 package quasar.api.services.analyze
 
 import slamdata.Predef._
-import quasar.{Data, DataArbitrary, DataCodec}
+import quasar.{Data, DataGenerators, DataCodec}
 import quasar.api._, ApiErrorEntityDecoder._, PathUtils._
 import quasar.api.matchers._
 import quasar.contrib.matryoshka.arbitrary._
@@ -57,7 +57,7 @@ import spire.std.double._
 
 final class SchemaServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
   import SchemaServiceSpec._
-  import DataArbitrary._
+  import DataGenerators._
 
   type J = Fix[EJson]
 

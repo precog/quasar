@@ -25,13 +25,13 @@ import org.scalacheck.Shrink
 
 import scala.annotation.tailrec
 
-class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators {
+class RowFormatSpec extends Specification with ScalaCheck with SJValueGenerators {
   import Arbitrary._
 
   // This should generate some jpath ids, then generate CTypes for these.
   def genJpathIds: Gen[List[String]] = Gen.alphaStr filter (_.length > 0) list
   def genColumnRefs: Gen[List[ColumnRef]] = genJpathIds >> { ids =>
-    val generators = ids.distinct map (id => listOf(genCType) ^^ (_.distinct map (tp => ColumnRef(CPath(id), tp))))
+    val generators = ids.distinct map (id => listOf(ctype) ^^ (_.distinct map (tp => ColumnRef(CPath(id), tp))))
     Gen.sequence(generators) ^^ (_.flatten.toList)
   }
 
@@ -66,17 +66,23 @@ class RowFormatSpec extends Specification with ScalaCheck with CValueGenerators 
   def verify(rows: List[List[CValue]], cols: List[Column]) = {
     rows.zipWithIndex foreach { case (values, row) =>
       (values zip cols) foreach (_ must beLike {
-        case (CUndefined, col) if !col.isDefinedAt(row)                              => ok
-        case (_, col) if !col.isDefinedAt(row)                                       => ko
-        case (CString(s), col: StrColumn)                                            => col(row) must_== s
-        case (CBoolean(x), col: BoolColumn)                                          => col(row) must_== x
-        case (CLong(x), col: LongColumn)                                             => col(row) must_== x
-        case (CDouble(x), col: DoubleColumn)                                         => col(row) must_== x
-        case (CNum(x), col: NumColumn)                                               => col(row) must_== x
-        case (CDate(x), col: DateColumn)                                             => col(row) must_== x
-        case (CNull, col: NullColumn)                                                => ok
-        case (CEmptyObject, col: EmptyObjectColumn)                                  => ok
-        case (CEmptyArray, col: EmptyArrayColumn)                                    => ok
+        case (CUndefined, col) if !col.isDefinedAt(row)      => ok
+        case (_, col) if !col.isDefinedAt(row)               => ko
+        case (CString(s), col: StrColumn)                    => col(row) must_== s
+        case (CBoolean(x), col: BoolColumn)                  => col(row) must_== x
+        case (CLong(x), col: LongColumn)                     => col(row) must_== x
+        case (CDouble(x), col: DoubleColumn)                 => col(row) must_== x
+        case (CNum(x), col: NumColumn)                       => col(row) must_== x
+        case (COffsetDateTime(x), col: OffsetDateTimeColumn) => col(row) must_== x
+        case (COffsetTime(x), col: OffsetTimeColumn)         => col(row) must_== x
+        case (COffsetDate(x), col: OffsetDateColumn)         => col(row) must_== x
+        case (CLocalDateTime(x), col: LocalDateTimeColumn)   => col(row) must_== x
+        case (CLocalTime(x), col: LocalTimeColumn)           => col(row) must_== x
+        case (CLocalDate(x), col: LocalDateColumn)           => col(row) must_== x
+        case (CInterval(x), col: IntervalColumn)             => col(row) must_== x
+        case (CNull, col: NullColumn)                        => ok
+        case (CEmptyObject, col: EmptyObjectColumn)          => ok
+        case (CEmptyArray, col: EmptyArrayColumn)            => ok
         case (CArray(xs, cType), col: HomogeneousArrayColumn[_]) if cType == col.tpe => col(row) must_== xs
       })
     }

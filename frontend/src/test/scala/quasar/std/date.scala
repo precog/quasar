@@ -17,16 +17,16 @@
 package quasar.std
 
 import slamdata.Predef._
+import quasar._
+import quasar.time.DateTimeInterval
 
-import java.time._
 import scalaz._
-import quasar._, SemanticError._
 
 class DateSpecs extends quasar.Qspec {
   import DateLib._
 
   "parseInterval" should {
-    def fromMillis(millis: Long) = \/-(Data.Interval(Duration.ofMillis(millis)))
+    def fromMillis(millis: Long) = \/-(Data.Interval(DateTimeInterval.ofMillis(millis)))
 
     def hms(hours: Int, minutes: Int, seconds: Int, millis: Int) =
       fromMillis((((hours.toLong*60) + minutes)*60 + seconds)*1000 + millis)
@@ -46,15 +46,11 @@ class DateSpecs extends quasar.Qspec {
     }.pendingUntilFixed("SD-720")
 
     "parse days" in {
-      parseInterval("P1D") must_=== hms(24, 0, 0, 0)
+      parseInterval("P1D") must_=== \/-(Data.Interval(DateTimeInterval.ofDays(1)))
     }
 
     "parse ymd" in {
-      val msg = parseInterval("P1Y1M1D") match {
-        case -\/(DateFormatError(_, _, hint)) => hint
-        case _ => None
-      }
-      msg must beSome.which(_ contains "year/month not currently supported")
+      parseInterval("P1Y1M1D") must_=== \/-(Data.Interval(DateTimeInterval.make(1, 1, 1, 0, 0)))
     }
   }
 }

@@ -18,7 +18,6 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes.json._
-import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
 trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike {
@@ -39,7 +38,7 @@ trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       JArray(JNum(12.4) :: Nil),
       JArray(JNum(-12.4) :: Nil))
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 
   def testToArrayHeterogeneous = {
@@ -56,8 +55,6 @@ trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
     val expected = Stream(JArray(JNum(18.8) :: JNum(23.4) :: Nil))
 
-    results.copoint must_== expected
+    results.getJValues must_== expected
   }
 }
-
-

@@ -20,7 +20,7 @@ import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
 import quasar.precog.util.BitSetUtil.Implicits._
-
+import quasar.RCValueGenerators
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
 import org.scalacheck._
@@ -28,14 +28,12 @@ import org.scalacheck._
 import scalaz._
 
 import scala.collection.mutable
-import scala.reflect.ClassTag
 
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels._
-import java.time.{Instant, ZonedDateTime, ZoneOffset}
 
-trait SegmentFormatSupport {
+trait SegmentFormatSupport extends RCValueGenerators {
   import Gen._
   import Arbitrary.arbitrary
 
@@ -51,42 +49,13 @@ trait SegmentFormatSupport {
     seeds <- Gen.listOfN(length, arbitrary[Double])
   } yield BitSetUtil.create(seeds.map(_ < density).zipWithIndex.map(_._2))
 
-  private def genForCTypeArray[A](elemType: CValueType[A]): Gen[Array[A]] =
-      listOf(genForCType(elemType)) map (_.toArray(elemType.classTag))
-
-  def genForCType[A](ctype: CValueType[A]): Gen[A] = ctype match {
-    case CPeriod => ??? // arbitrary[Long].map(new Period(_))
-    case CBoolean => arbitrary[Boolean]
-    case CString => arbitrary[String]
-    case CLong => arbitrary[Long]
-    case CDouble => arbitrary[Double]
-    case CNum => arbitrary[BigDecimal]
-    case CDate =>
-      Gen.choose[Long](0, 1494284624296L).map(t =>
-        ZonedDateTime.ofInstant(Instant.ofEpochSecond(t % Instant.MAX.getEpochSecond), ZoneOffset.UTC))
-    case CArrayType(elemType) => genForCTypeArray(elemType)
-  }
-
-  def genCValueType(maxDepth: Int = 2): Gen[CValueType[_]] = {
-    val basic: Gen[CValueType[_]] = oneOf(Seq(CBoolean, CString, CLong, CDouble, CNum, CDate))
-    if (maxDepth > 0) {
-      frequency(6 -> basic, 1 -> (genCValueType(maxDepth - 1) map (CArrayType(_))))
-    } else {
-      basic
-    }
-  }
-
-  def genArray[A: ClassTag](length: Int, g: Gen[A]): Gen[Array[A]] = for {
-    values <- listOfN(length, g)
-  } yield values.toArray
-
   def genArraySegmentForCType[A](ctype: CValueType[A], length: Int): Gen[ArraySegment[_]] = {
-    val g = genForCType(ctype)
+    val g = genValueForCValueType(ctype)
     for {
       blockId <- arbitrary[Long]
       cpath <- genCPath
       defined <- genBitSet(length, 0.5)
-      values <- genArray(length, g)(ctype.classTag) // map (toCTypeArray(ctype)) // (_.toArray(ctype.manifest))
+      values <- listOfN(length, g.map(_.value)).map(_.toArray(ctype.classTag))
     } yield ArraySegment(blockId, cpath, ctype, defined, values)
   }
 

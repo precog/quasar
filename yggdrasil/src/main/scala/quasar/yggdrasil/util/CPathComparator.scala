@@ -19,11 +19,12 @@ package util
 
 import quasar.blueeyes._
 import quasar.precog.common._
+import quasar.time.OffsetDate
 import quasar.yggdrasil.table._
 
 import scalaz._, Scalaz._
 
-import java.time.ZonedDateTime
+import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.reflect.ClassTag
 import scala.specialized
@@ -64,8 +65,32 @@ trait CPathComparator { self =>
 object CPathComparator {
   import MaybeOrdering._
 
-  implicit object DateTimeOrder extends spire.algebra.Order[ZonedDateTime] {
-    def compare(a: ZonedDateTime, b: ZonedDateTime) = a compareTo b
+  implicit object InstantOrder extends spire.algebra.Order[Instant] {
+    def compare(a: Instant, b: Instant) = a compareTo b
+  }
+
+  implicit object OffsetDateTimeOrder extends spire.algebra.Order[OffsetDateTime] {
+    def compare(a: OffsetDateTime, b: OffsetDateTime) = a compareTo b
+  }
+
+  implicit object OffsetTimeOrder extends spire.algebra.Order[OffsetTime] {
+    def compare(a: OffsetTime, b: OffsetTime) = a compareTo b
+  }
+
+  implicit object OffsetDateOrder extends spire.algebra.Order[OffsetDate] {
+    def compare(a: OffsetDate, b: OffsetDate) = a compareTo b
+  }
+
+  implicit object LocalDateTimeOrder extends spire.algebra.Order[LocalDateTime] {
+    def compare(a: LocalDateTime, b: LocalDateTime) = a compareTo b
+  }
+
+  implicit object LocalTimeOrder extends spire.algebra.Order[LocalTime] {
+    def compare(a: LocalTime, b: LocalTime) = a compareTo b
+  }
+
+  implicit object LocalDateOrder extends spire.algebra.Order[LocalDate] {
+    def compare(a: LocalDate, b: LocalDate) = a compareTo b
   }
 
   def apply[@specialized(Boolean, Long, Double, AnyRef) A, @specialized(Boolean, Long, Double, AnyRef) B](lCol: Int => A, rCol: Int => B)(implicit order: HetOrder[A, B]) = {
@@ -87,11 +112,16 @@ object CPathComparator {
     case (lCol: NumColumn, rCol: DoubleColumn)                              => CPathComparator(lCol(_), rCol(_))
     case (lCol: NumColumn, rCol: NumColumn)                                 => CPathComparator(lCol(_), rCol(_))
     case (lCol: StrColumn, rCol: StrColumn)                                 => CPathComparator(lCol(_), rCol(_))
-    case (lCol: DateColumn, rCol: DateColumn)                               => CPathComparator(lCol(_), rCol(_))
+    case (lCol: OffsetDateTimeColumn, rCol: OffsetDateTimeColumn)           => CPathComparator(lCol(_), rCol(_))
+    case (lCol: OffsetTimeColumn, rCol: OffsetTimeColumn)                   => CPathComparator(lCol(_), rCol(_))
+    case (lCol: OffsetDateColumn, rCol: OffsetDateColumn)                   => CPathComparator(lCol(_), rCol(_))
+    case (lCol: LocalDateTimeColumn, rCol: LocalDateTimeColumn)             => CPathComparator(lCol(_), rCol(_))
+    case (lCol: LocalTimeColumn, rCol: LocalTimeColumn)                     => CPathComparator(lCol(_), rCol(_))
+    case (lCol: LocalDateColumn, rCol: LocalDateColumn)                     => CPathComparator(lCol(_), rCol(_))
     case (lCol: HomogeneousArrayColumn[_], rCol: HomogeneousArrayColumn[_]) => CPathComparator(lPath, lCol, rPath, rCol)
-    case (lCol: HomogeneousArrayColumn[_], rCol)                            => CPathComparator(lPath, lCol, rPath, rCol)
-    case (lCol, rCol: HomogeneousArrayColumn[_])                            => CPathComparator(rPath, rCol, lPath, lCol).swap
-    case (lCol, rCol) =>
+    case (lCol: HomogeneousArrayColumn[_], _)                               => CPathComparator(lPath, lCol, rPath, rCol)
+    case (_, rCol: HomogeneousArrayColumn[_])                               => CPathComparator(rPath, rCol, lPath, lCol).swap
+    case _ =>
       val ordering = MaybeOrdering.fromInt {
         implicitly[scalaz.Order[CType]].apply(lCol.tpe, rCol.tpe).toInt
       }
@@ -102,18 +132,23 @@ object CPathComparator {
 
   def apply(lPath: CPath, lCol: HomogeneousArrayColumn[_], rPath: CPath, rCol: HomogeneousArrayColumn[_]): CPathComparator = {
     (lCol.leafTpe, rCol.leafTpe) match {
-      case (CLong, CLong)       => new ArrayCPathComparator[Long, Long](lPath, lCol, rPath, rCol)
-      case (CLong, CDouble)     => new ArrayCPathComparator[Long, Double](lPath, lCol, rPath, rCol)
-      case (CLong, CNum)        => new ArrayCPathComparator[Long, BigDecimal](lPath, lCol, rPath, rCol)
-      case (CDouble, CLong)     => new ArrayCPathComparator[Double, Long](lPath, lCol, rPath, rCol)
-      case (CDouble, CDouble)   => new ArrayCPathComparator[Double, Double](lPath, lCol, rPath, rCol)
-      case (CDouble, CNum)      => new ArrayCPathComparator[Double, BigDecimal](lPath, lCol, rPath, rCol)
-      case (CNum, CLong)        => new ArrayCPathComparator[BigDecimal, Long](lPath, lCol, rPath, rCol)
-      case (CNum, CDouble)      => new ArrayCPathComparator[BigDecimal, Double](lPath, lCol, rPath, rCol)
-      case (CNum, CNum)         => new ArrayCPathComparator[BigDecimal, BigDecimal](lPath, lCol, rPath, rCol)
-      case (CBoolean, CBoolean) => new ArrayCPathComparator[Boolean, Boolean](lPath, lCol, rPath, rCol)
-      case (CString, CString)   => new ArrayCPathComparator[String, String](lPath, lCol, rPath, rCol)
-      case (CDate, CDate)       => new ArrayCPathComparator[ZonedDateTime, ZonedDateTime](lPath, lCol, rPath, rCol)
+      case (CLong, CLong)                     => new ArrayCPathComparator[Long, Long](lPath, lCol, rPath, rCol)
+      case (CLong, CDouble)                   => new ArrayCPathComparator[Long, Double](lPath, lCol, rPath, rCol)
+      case (CLong, CNum)                      => new ArrayCPathComparator[Long, BigDecimal](lPath, lCol, rPath, rCol)
+      case (CDouble, CLong)                   => new ArrayCPathComparator[Double, Long](lPath, lCol, rPath, rCol)
+      case (CDouble, CDouble)                 => new ArrayCPathComparator[Double, Double](lPath, lCol, rPath, rCol)
+      case (CDouble, CNum)                    => new ArrayCPathComparator[Double, BigDecimal](lPath, lCol, rPath, rCol)
+      case (CNum, CLong)                      => new ArrayCPathComparator[BigDecimal, Long](lPath, lCol, rPath, rCol)
+      case (CNum, CDouble)                    => new ArrayCPathComparator[BigDecimal, Double](lPath, lCol, rPath, rCol)
+      case (CNum, CNum)                       => new ArrayCPathComparator[BigDecimal, BigDecimal](lPath, lCol, rPath, rCol)
+      case (CBoolean, CBoolean)               => new ArrayCPathComparator[Boolean, Boolean](lPath, lCol, rPath, rCol)
+      case (CString, CString)                 => new ArrayCPathComparator[String, String](lPath, lCol, rPath, rCol)
+      case (COffsetDateTime, COffsetDateTime) => new ArrayCPathComparator[OffsetDateTime, OffsetDateTime](lPath, lCol, rPath, rCol)
+      case (COffsetTime, COffsetTime)         => new ArrayCPathComparator[OffsetTime, OffsetTime](lPath, lCol, rPath, rCol)
+      case (COffsetDate, COffsetDate)         => new ArrayCPathComparator[OffsetDate, OffsetDate](lPath, lCol, rPath, rCol)
+      case (CLocalDateTime, CLocalDateTime)   => new ArrayCPathComparator[LocalDateTime, LocalDateTime](lPath, lCol, rPath, rCol)
+      case (CLocalTime, CLocalTime)           => new ArrayCPathComparator[LocalTime, LocalTime](lPath, lCol, rPath, rCol)
+      case (CLocalDate, CLocalDate)           => new ArrayCPathComparator[LocalDate, LocalDate](lPath, lCol, rPath, rCol)
       case (tpe1, tpe2) =>
         val ordering = MaybeOrdering.fromInt(implicitly[scalaz.Order[CType]].apply(lCol.tpe, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {
@@ -141,18 +176,23 @@ object CPathComparator {
 
   def apply(lPath: CPath, lCol: HomogeneousArrayColumn[_], rPath: CPath, rCol: Column): CPathComparator = {
     (lCol.leafTpe, rCol) match {
-      case (CLong, rCol: LongColumn)     => new HalfArrayCPathComparator[Long, Long](lPath, lCol, rCol(_))
-      case (CLong, rCol: DoubleColumn)   => new HalfArrayCPathComparator[Long, Double](lPath, lCol, rCol(_))
-      case (CLong, rCol: NumColumn)      => new HalfArrayCPathComparator[Long, BigDecimal](lPath, lCol, rCol(_))
-      case (CDouble, rCol: LongColumn)   => new HalfArrayCPathComparator[Double, Long](lPath, lCol, rCol(_))
-      case (CDouble, rCol: DoubleColumn) => new HalfArrayCPathComparator[Double, Double](lPath, lCol, rCol(_))
-      case (CDouble, rCol: NumColumn)    => new HalfArrayCPathComparator[Double, BigDecimal](lPath, lCol, rCol(_))
-      case (CNum, rCol: LongColumn)      => new HalfArrayCPathComparator[BigDecimal, Long](lPath, lCol, rCol(_))
-      case (CNum, rCol: DoubleColumn)    => new HalfArrayCPathComparator[BigDecimal, Double](lPath, lCol, rCol(_))
-      case (CNum, rCol: NumColumn)       => new HalfArrayCPathComparator[BigDecimal, BigDecimal](lPath, lCol, rCol(_))
-      case (CBoolean, rCol: BoolColumn)  => new HalfArrayCPathComparator[Boolean, Boolean](lPath, lCol, rCol(_))
-      case (CString, rCol: StrColumn)    => new HalfArrayCPathComparator[String, String](lPath, lCol, rCol(_))
-      case (CDate, rCol: DateColumn)     => new HalfArrayCPathComparator[ZonedDateTime, ZonedDateTime](lPath, lCol, rCol(_))
+      case (CLong, rCol: LongColumn)                 => new HalfArrayCPathComparator[Long, Long](lPath, lCol, rCol(_))
+      case (CLong, rCol: DoubleColumn)               => new HalfArrayCPathComparator[Long, Double](lPath, lCol, rCol(_))
+      case (CLong, rCol: NumColumn)                  => new HalfArrayCPathComparator[Long, BigDecimal](lPath, lCol, rCol(_))
+      case (CDouble, rCol: LongColumn)               => new HalfArrayCPathComparator[Double, Long](lPath, lCol, rCol(_))
+      case (CDouble, rCol: DoubleColumn)             => new HalfArrayCPathComparator[Double, Double](lPath, lCol, rCol(_))
+      case (CDouble, rCol: NumColumn)                => new HalfArrayCPathComparator[Double, BigDecimal](lPath, lCol, rCol(_))
+      case (CNum, rCol: LongColumn)                  => new HalfArrayCPathComparator[BigDecimal, Long](lPath, lCol, rCol(_))
+      case (CNum, rCol: DoubleColumn)                => new HalfArrayCPathComparator[BigDecimal, Double](lPath, lCol, rCol(_))
+      case (CNum, rCol: NumColumn)                   => new HalfArrayCPathComparator[BigDecimal, BigDecimal](lPath, lCol, rCol(_))
+      case (CBoolean, rCol: BoolColumn)              => new HalfArrayCPathComparator[Boolean, Boolean](lPath, lCol, rCol(_))
+      case (CString, rCol: StrColumn)                => new HalfArrayCPathComparator[String, String](lPath, lCol, rCol(_))
+      case (COffsetDateTime, rCol: OffsetDateTimeColumn) => new HalfArrayCPathComparator[OffsetDateTime, OffsetDateTime](lPath, lCol, rCol(_))
+      case (COffsetTime, rCol: OffsetTimeColumn)     => new HalfArrayCPathComparator[OffsetTime, OffsetTime](lPath, lCol, rCol(_))
+      case (COffsetDate, rCol: OffsetDateColumn)     => new HalfArrayCPathComparator[OffsetDate, OffsetDate](lPath, lCol, rCol(_))
+      case (CLocalDateTime, rCol: LocalDateTimeColumn)   => new HalfArrayCPathComparator[LocalDateTime, LocalDateTime](lPath, lCol, rCol(_))
+      case (CLocalTime, rCol: LocalTimeColumn)       => new HalfArrayCPathComparator[LocalTime, LocalTime](lPath, lCol, rCol(_))
+      case (CLocalDate, rCol: LocalDateColumn)       => new HalfArrayCPathComparator[LocalDate, LocalDate](lPath, lCol, rCol(_))
       case (tpe1, _) =>
         val ordering = MaybeOrdering.fromInt(implicitly[scalaz.Order[CType]].apply(tpe1, rCol.tpe).toInt)
         new CPathComparator with ArrayCPathComparatorSupport {

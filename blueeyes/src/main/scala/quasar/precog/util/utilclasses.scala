@@ -21,6 +21,7 @@ import quasar.blueeyes.json.JValue
 import quasar.blueeyes.json.serialization.{Decomposer, Extractor}
 import quasar.blueeyes.json.serialization.DefaultSerialization._
 import quasar.blueeyes.json.serialization.Extractor._
+import quasar.time.OffsetDate
 
 import org.slf4s.Logging
 
@@ -39,7 +40,7 @@ import java.io.{File, FileReader, IOException}
 import java.io.RandomAccessFile
 import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 import java.nio.file.Files
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 import java.util.Arrays.fill
 import java.util.Properties
 
@@ -336,12 +337,48 @@ object NumericComparisons {
 
   @inline def compare(a: BigDecimal, b: BigDecimal): Int = a compare b
 
-  @inline def compare(a: ZonedDateTime, b: ZonedDateTime): Int = {
+  @inline def compare(a: OffsetDateTime, b: OffsetDateTime): Int = {
     val res: Int = a compareTo b
     if (res < 0) -1
     else if (res > 0) 1
     else 0
   }
+
+  @inline def compare(a: OffsetTime, b: OffsetTime): Int = {
+    val res: Int = a compareTo b
+    if (res < 0) -1
+    else if (res > 0) 1
+    else 0
+  }
+
+  @inline def compare(a: OffsetDate, b: OffsetDate): Int = {
+    val res: Int = a compareTo b
+    if (res < 0) -1
+    else if (res > 0) 1
+    else 0
+  }
+
+  @inline def compare(a: LocalDateTime, b: LocalDateTime): Int = {
+    val res: Int = a compareTo b
+    if (res < 0) -1
+    else if (res > 0) 1
+    else 0
+  }
+
+  @inline def compare(a: LocalTime, b: LocalTime): Int = {
+    val res: Int = a compareTo b
+    if (res < 0) -1
+    else if (res > 0) 1
+    else 0
+  }
+
+  @inline def compare(a: LocalDate, b: LocalDate): Int = {
+    val res: Int = a compareTo b
+    if (res < 0) -1
+    else if (res > 0) 1
+    else 0
+  }
+
 
   @inline def eps(b: Double): Double = math.abs(b * 2.220446049250313E-16)
 
@@ -380,7 +417,22 @@ object NumericComparisons {
   @inline def order(a: BigDecimal, b: BigDecimal): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 
-  @inline def order(a: ZonedDateTime, b: ZonedDateTime): scalaz.Ordering =
+  @inline def order(a: LocalDateTime, b: LocalDateTime): scalaz.Ordering =
+    scalaz.Ordering.fromInt(compare(a, b))
+
+  @inline def order(a: LocalDate, b: LocalDate): scalaz.Ordering =
+    scalaz.Ordering.fromInt(compare(a, b))
+
+  @inline def order(a: LocalTime, b: LocalTime): scalaz.Ordering =
+    scalaz.Ordering.fromInt(compare(a, b))
+
+  @inline def order(a: OffsetDateTime, b: OffsetDateTime): scalaz.Ordering =
+    scalaz.Ordering.fromInt(compare(a, b))
+
+  @inline def order(a: OffsetDate, b: OffsetDate): scalaz.Ordering =
+    scalaz.Ordering.fromInt(compare(a, b))
+
+  @inline def order(a: OffsetTime, b: OffsetTime): scalaz.Ordering =
     scalaz.Ordering.fromInt(compare(a, b))
 }
 

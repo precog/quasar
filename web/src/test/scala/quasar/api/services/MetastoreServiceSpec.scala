@@ -99,10 +99,9 @@ class MetastoreServiceSpec extends quasar.Qspec {
         MountType.fileSystemMount(FileSystemType("local")),
         ConnectionUri("/tmp/local"))
       val (svc, srcMeta) = serviceWithMetaStore()
-      val instant = Instant.ofEpochSecond(0)
       val viewCache = ViewCache(
         MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
-        0, instant, ViewCache.Status.Pending, None, f, None)
+        0, Instant.ofEpochSecond(0), ViewCache.Status.Pending, None, f, None)
       val pvc = PathedViewCache(f, viewCache)
 
       (for {

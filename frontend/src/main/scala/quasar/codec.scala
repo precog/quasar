@@ -20,9 +20,6 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.fp.ski._
 
-import java.time.format.DateTimeFormatter
-import java.time.ZoneOffset.UTC
-
 import argonaut._, Argonaut._
 import scalaz._, Scalaz._
 
@@ -57,6 +54,7 @@ trait DataCodec {
   def encode(data: Data): Option[Json]
   def decode(json: Json): DataEncodingError \/ Data
 }
+
 object DataCodec {
   import DataEncodingError._
 
@@ -66,13 +64,8 @@ object DataCodec {
   def render(data: Data)(implicit C: DataCodec): Option[String] =
     C.encode(data).map(_.pretty(minspace))
 
-  val dateTimeFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
-
-  val timeFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
-
-  val Precise = new DataCodec {
+  // this is just copy-pasted from the old version; we should remove it eventually
+  def OldPrecise(recDecode: Json => DataEncodingError \/ Data) = new DataCodec {
     val TimestampKey = "$timestamp"
     val DateKey = "$date"
     val TimeKey = "$time"
@@ -81,9 +74,113 @@ object DataCodec {
     val ObjKey = "$obj"
     val IdKey = "$oid"
 
+    // we really only care about decoding old precise
+    def encode(data: Data): Option[Json] = None
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def decode(json: Json): DataEncodingError \/ Data =
+      json.fold(
+        \/-(Data.Null),
+        bool => \/-(Data.Bool(bool)),
+        num => num match {
+          case JsonLong(x) => \/-(Data.Int(x))
+          case _           => \/-(Data.Dec(num.toBigDecimal))
+        },
+        str => \/-(Data.Str(str)),
+        arr => arr.traverse(recDecode).map(Data.Arr(_)),
+        obj => {
+          import std.DateLib._
+
+          def unpack[A](a: Option[A], expected: String)(f: A => DataEncodingError \/ Data) =
+            (a \/> UnexpectedValueError(expected, json)) flatMap f
+
+          def decodeObj(obj: JsonObject): DataEncodingError \/ Data =
+            obj.toList.traverse { case (k, v) => recDecode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
+
+          obj.toList match {
+            case (`TimestampKey`, value) :: Nil => unpack(value.string, "string value for $timestamp")(parseTimestamp(_).leftMap(err => ParseError(err.message)))
+            case (`DateKey`, value) :: Nil      => unpack(value.string, "string value for $date")(parseLocalDate(_).leftMap(err => ParseError(err.message)))
+            case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseLocalTime(_).leftMap(err => ParseError(err.message)))
+            case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
+            case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
+            case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
+              \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
+            }
+            case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
+            case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
+          }
+        })
+  }
+
+  object PreciseKeys {
+    val LocalDateTimeKey = "$localdatetime"
+    val LocalDateKey = "$localdate"
+    val LocalTimeKey = "$localtime"
+    val OffsetDateTimeKey = "$offsetdatetime"
+    val OffsetDateKey = "$offsetdate"
+    val OffsetTimeKey = "$offsettime"
+    val IntervalKey = "$interval"
+    val BinaryKey = "$binary"
+    val ObjKey = "$obj"
+    val IdKey = "$oid"
+  }
+
+  object VerboseDateTimeFormatters {
+    import java.time.format._
+    import java.time.temporal.ChronoField
+
+    val LocalTimeFormatter = new DateTimeFormatterBuilder()
+      .appendValue(ChronoField.HOUR_OF_DAY, 2)
+      .appendLiteral(':')
+      .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+      .appendLiteral(':')
+      .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+      .appendFraction(ChronoField.NANO_OF_SECOND, 9, 9, true)
+      .toFormatter()
+
+    val OffsetTimeFormatter = new DateTimeFormatterBuilder()
+      .parseCaseInsensitive()
+      .append(LocalTimeFormatter)
+      .appendOffsetId()
+      .toFormatter()
+
+    val LocalDateTimeFormatter = new DateTimeFormatterBuilder()
+      .parseCaseInsensitive()
+      .append(DateTimeFormatter.ISO_LOCAL_DATE)
+      .appendLiteral('T')
+      .append(LocalTimeFormatter)
+      .toFormatter()
+
+    val OffsetDateTimeFormatter = new DateTimeFormatterBuilder()
+      .parseCaseInsensitive()
+      .append(LocalDateTimeFormatter)
+      .appendOffsetId()
+      .toFormatter()
+  }
+
+  /*
+   * The purpose behind the explicit fixed-point here is to allow interleaved
+   * composition at depth.  Specifically, we want to be able to write the `orElse`
+   * combinator and have it apply not just at the top level, but also at *every*
+   * level of the recursive hierarchy.  Thus, we need to ensure that recursive
+   * calls to decode delegate to the orElse'd codec, and not the current
+   * specialized one.  This is the difference between singular backtracking and
+   * recursive backtracking.  Take note of the "decode timestamp AND localdatetimp
+   * within array" test, which is impossible to satisfy without this trick.
+   *
+   * Note that only decoding is composed in this way.  Encoding is still singular
+   * in its backtracking.  This is mostly because I'm lazy and we relaly don't
+   * need recursive backtracking on encoding... YET.  If you need to add this
+   * (i.e. because of a situation analogous to the decoding test I referenced),
+   * then you can add it using a very similar trick.
+   */
+  def NewPrecise(recDecode: Json => DataEncodingError \/ Data) = new DataCodec {
+    import PreciseKeys._
+
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def encode(data: Data): Option[Json] = {
       import Data._
+      import VerboseDateTimeFormatters._
       data match {
         case d@(Null | Bool(_) | Int(_) | Dec(_) | Str(_)) => Readable.encode(d)
         // For Object, if we find one of the above keys, which means we serialized something particular
@@ -94,16 +191,26 @@ object DataCodec {
 
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
 
-        case Timestamp(value) => Json.obj(TimestampKey -> jString(value.atZone(UTC).format(dateTimeFormatter))).some
-        case Date(value)      => Json.obj(DateKey      -> jString(value.toString)).some
-        case Time(value)      => Json.obj(TimeKey      -> jString(value.format(timeFormatter))).some
-        case Interval(value)  => Json.obj(IntervalKey  -> jString(value.toString)).some
+        case OffsetDateTime(value)  =>
+          Json.obj(OffsetDateTimeKey -> jString(OffsetDateTimeFormatter.format(value))).some
+        case Data.OffsetDate(value) =>
+          Json.obj(OffsetDateKey     -> jString(value.toString)).some
+        case OffsetTime(value)      =>
+          Json.obj(OffsetTimeKey     -> jString(OffsetTimeFormatter.format(value))).some
+        case LocalDateTime(value)   =>
+          Json.obj(LocalDateTimeKey  -> jString(LocalDateTimeFormatter.format(value))).some
+        case LocalDate(value)       =>
+          Json.obj(LocalDateKey      -> jString(value.toString)).some
+        case LocalTime(value)       =>
+          Json.obj(LocalTimeKey      -> jString(LocalTimeFormatter.format(value))).some
+        case Interval(value)        =>
+          Json.obj(IntervalKey       -> jString(value.toString)).some
 
-        case bin @ Binary(_)  => Json.obj(BinaryKey    -> jString(bin.base64)).some
+        case bin @ Binary(_)        => Json.obj(BinaryKey         -> jString(bin.base64)).some
 
-        case Id(value)        => Json.obj(IdKey        -> jString(value)).some
+        case Id(value)              => Json.obj(IdKey             -> jString(value)).some
 
-        case NA               => None
+        case NA                     => None
       }
     }
 
@@ -117,7 +224,7 @@ object DataCodec {
           case _           => \/-(Data.Dec(num.toBigDecimal))
         },
         str => \/-(Data.Str(str)),
-        arr => arr.traverse(decode).map(Data.Arr(_)),
+        arr => arr.traverse(recDecode).map(Data.Arr(_)),
         obj => {
           import std.DateLib._
 
@@ -125,22 +232,27 @@ object DataCodec {
             (a \/> UnexpectedValueError(expected, json)) flatMap f
 
           def decodeObj(obj: JsonObject): DataEncodingError \/ Data =
-            obj.toList.traverse { case (k, v) => decode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
+            obj.toList.traverse { case (k, v) => recDecode(v).map(k -> _) }.map(pairs => Data.Obj(ListMap(pairs: _*)))
 
           obj.toList match {
-            case (`TimestampKey`, value) :: Nil => unpack(value.string, "string value for $timestamp")(parseTimestamp(_).leftMap(err => ParseError(err.message)))
-            case (`DateKey`, value) :: Nil      => unpack(value.string, "string value for $date")(parseDate(_).leftMap(err => ParseError(err.message)))
-            case (`TimeKey`, value) :: Nil      => unpack(value.string, "string value for $time")(parseTime(_).leftMap(err => ParseError(err.message)))
-            case (`IntervalKey`, value) :: Nil  => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
-            case (`ObjKey`, value) :: Nil       => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`BinaryKey`, value) :: Nil    => unpack(value.string, "string value for $binary") { str =>
+            case (`OffsetDateTimeKey`, value) :: Nil => unpack(value.string, "string value for $offsetdatetime")(parseOffsetDateTime(_).leftMap(err => ParseError(err.message)))
+            case (`OffsetTimeKey`, value) :: Nil     => unpack(value.string, "string value for $offsettime")(parseOffsetTime(_).leftMap(err => ParseError(err.message)))
+            case (`OffsetDateKey`, value) :: Nil     => unpack(value.string, "string value for $offsetdate")(parseOffsetDate(_).leftMap(err => ParseError(err.message)))
+            case (`LocalDateTimeKey`, value) :: Nil  => unpack(value.string, "string value for $localdatetime")(parseLocalDateTime(_).leftMap(err => ParseError(err.message)))
+            case (`LocalTimeKey`, value) :: Nil      => unpack(value.string, "string value for $localtime")(parseLocalTime(_).leftMap(err => ParseError(err.message)))
+            case (`LocalDateKey`, value) :: Nil      => unpack(value.string, "string value for $localdate")(parseLocalDate(_).leftMap(err => ParseError(err.message)))
+            case (`IntervalKey`, value) :: Nil       => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
+            case (`ObjKey`, value) :: Nil            => unpack(value.obj,    "object value for $obj")(decodeObj)
+            case (`BinaryKey`, value) :: Nil         => unpack(value.string, "string value for $binary") { str =>
               \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
             }
-            case (`IdKey`, value) :: Nil        => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
+            case (`IdKey`, value) :: Nil             => unpack(value.string, "string value for $oid")(str => \/-(Data.Id(str)))
             case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
         })
   }
+
+  val Precise = orElse(NewPrecise _, OldPrecise _)
 
   val Readable = new DataCodec {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -159,10 +271,13 @@ object DataCodec {
         case Obj(value) => Json.obj(value.toList.map({ case (k, v) => encode(v) strengthL k }).unite: _*).some
         case Arr(value) => Json.array(value.map(encode).unite: _*).some
 
-        case Timestamp(value) => jString(value.toString).some
-        case Date(value)      => jString(value.toString).some
-        case Time(value)      => jString(value.toString).some
-        case Interval(value)  => jString(value.toString).some
+        case OffsetDateTime(value)  => jString(value.toString).some
+        case OffsetTime(value)      => jString(value.toString).some
+        case Data.OffsetDate(value) => jString(value.toString).some
+        case LocalDateTime(value)   => jString(value.toString).some
+        case LocalTime(value)       => jString(value.toString).some
+        case LocalDate(value)       => jString(value.toString).some
+        case Interval(value)        => jString(value.toString).some
 
         case bin @ Binary(_)  => jString(bin.base64).some
 
@@ -184,10 +299,14 @@ object DataCodec {
         str => {
           import std.DateLib._
 
+          // TODO: make this not stupidly slow
           val converted = List(
-              parseTimestamp(str),
-              parseDate(str),
-              parseTime(str),
+              parseOffsetDateTime(str),
+              parseOffsetTime(str),
+              parseOffsetDate(str),
+              parseLocalDateTime(str),
+              parseLocalTime(str),
+              parseLocalDate(str),
               parseInterval(str))
           \/-(converted.flatMap(_.toList).headOption.getOrElse(Data.Str(str)))
         },
@@ -208,10 +327,21 @@ object DataCodec {
     case Data.Int(x)                                        => x.isValidLong
     case Data.Arr(list)                                     => list.forall(representable(_, codec))
     case Data.Obj(map)                                      => map.values.forall(representable(_, codec))
-    // Unfortunately currently there is a bug where intervals do not serialize/deserialize properly
-    // and although it would appear to work for a human observer,
-    // the runtime instances are not found to be "equal" which is breaking tests
-    case Data.Interval(_)                                   => false
     case _                                                  => true
+  }
+
+  // TODO enable support for fixpoint encoding as well
+  private def orElse(
+      selfF: (Json => DataEncodingError \/ Data) => DataCodec,
+      otherF: (Json => DataEncodingError \/ Data) => DataCodec): DataCodec = new DataCodec {
+
+    private lazy val self = selfF(decode)
+    private lazy val other = otherF(decode)
+
+    def encode(data: Data): Option[Json] =
+      self.encode(data).orElse(other.encode(data))
+
+    def decode(json: Json): DataEncodingError \/ Data =
+      self.decode(json).orElse(other.decode(json))
   }
 }

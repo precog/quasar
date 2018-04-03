@@ -28,7 +28,7 @@ import scalaz.Scalaz._
 
 class TypesSpec extends quasar.Qspec {
   import Type._
-  import TypeArbitrary._, DataArbitrary._
+  import TypeGenerators._, DataGenerators._
 
   val LatLong = Obj(Map("lat" -> Dec, "long" -> Dec), Some(Top))
   val Azim = Obj(Map("az" -> Dec), Some(Top))
@@ -608,7 +608,9 @@ class TypesSpec extends quasar.Qspec {
     val exIndexed = Arr(List(Int))
 
     val examples =
-      List(Top, Bottom, Null, Str, Int, Dec, Bool, Binary, Timestamp, Date, Time, Interval,
+      List(Top, Bottom, Null, Str, Int, Dec, Bool, Binary,
+        OffsetDateTime, Type.OffsetDate, OffsetTime,
+        LocalDateTime, LocalDate, LocalTime, Interval,
           Const(Data.Int(0)),
           Int ⨯ Str, Int ⨿ Str,
           exField, exNamed, exConstObj, exElem, exIndexed)
@@ -725,11 +727,14 @@ class TypesSpec extends quasar.Qspec {
       (typJson(Dec)       must_= jString("Dec"))       and
       (typJson(Bool)      must_= jString("Bool"))      and
       (typJson(Binary)    must_= jString("Binary"))    and
-      (typJson(Timestamp) must_= jString("Timestamp")) and
-      (typJson(Date)      must_= jString("Date"))      and
-      (typJson(Time)      must_= jString("Time"))      and
-      (typJson(Interval)  must_= jString("Interval"))  and
-      (typJson(Id)        must_= jString("Id"))
+      (typJson(LocalDateTime)   must_= jString("LocalDateTime")) and
+      (typJson(LocalDate)       must_= jString("LocalDate")) and
+      (typJson(LocalTime)       must_= jString("LocalTime")) and
+      (typJson(OffsetDateTime)  must_= jString("OffsetDateTime")) and
+      (typJson(Type.OffsetDate) must_= jString("OffsetDate")) and
+      (typJson(OffsetTime)      must_= jString("OffsetTime")) and
+      (typJson(Interval)        must_= jString("Interval"))  and
+      (typJson(Id)              must_= jString("Id"))
     }
 
     "encode constant types as their data encoding" >> prop { data: Data =>

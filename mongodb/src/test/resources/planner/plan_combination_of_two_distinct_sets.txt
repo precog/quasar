@@ -12,9 +12,23 @@ Chain
    ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$cond": [
    │         {
-   │           "$and": [
-   │             { "$lt": [{ "$literal": null }, "$_id.0.baz"] },
-   │             { "$lt": ["$_id.0.baz", { "$literal": "" }] }]
+   │           "$or": [
+   │             {
+   │               "$and": [
+   │                 { "$lt": [{ "$literal": null }, "$_id.0.baz"] },
+   │                 { "$lt": ["$_id.0.baz", { "$literal": "" }] }]
+   │             },
+   │             {
+   │               "$and": [
+   │                 {
+   │                   "$lte": [
+   │                     { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
+   │                     "$_id.0.baz"]
+   │                 },
+   │                 {
+   │                   "$lt": ["$_id.0.baz", { "$literal": Timestamp(-2147483648, 0) }]
+   │                 }]
+   │             }]
    │         },
    │         {
    │           "$cond": [

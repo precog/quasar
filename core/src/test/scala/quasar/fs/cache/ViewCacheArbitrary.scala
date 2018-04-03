@@ -17,11 +17,10 @@
 package quasar.fs.mount.cache
 
 import quasar.contrib.pathy._
-import quasar.DateArbitrary._
 import quasar.fs.mount._
 import slamdata.Predef._
 
-import java.time.Instant
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 
 import org.scalacheck.Arbitrary.{arbitrary => arb}
 import org.scalacheck._
@@ -30,6 +29,20 @@ import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
 
 trait ViewCacheArbitrary {
+
+  implicit val arbPostgresInstant: Arbitrary[Instant] = {
+    // postgres defines the Timestamp range to be 4713 BC to 294276 AD
+    val minTimestamp: Long =
+      LocalDateTime.of(-4713, 1, 1, 0, 0, 0).toEpochSecond(ZoneOffset.UTC)
+
+    val maxTimestamp: Long =
+      LocalDateTime.of(294276, 12, 31, 23, 59, 59).toEpochSecond(ZoneOffset.UTC)
+
+    val time: Gen[Long] = Gen.choose(minTimestamp, maxTimestamp)
+
+    Arbitrary(time.map(Instant.ofEpochSecond))
+  }
+
   implicit val arbViewCacheStatus: Arbitrary[ViewCache.Status] =
     Arbitrary(Gen.oneOf(
       ViewCache.Status.Pending,

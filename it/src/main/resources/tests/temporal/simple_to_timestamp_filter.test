@@ -1,0 +1,22 @@
+{
+    "name": "simple filter using to_timestamp",
+    "backends": {
+        "marklogic_json": "pending",
+        "mimir": "pending"
+    },
+    "data":  "../days.data",
+    "query": "select ts from `../days`
+              where ts > to_timestamp(1408399200)",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected":
+      [
+        { "$offsetdatetime": "2014-08-17T06:00:00.000000000Z" },
+        { "$offsetdatetime": "2014-08-18T07:00:00.000000000Z" },
+        { "$offsetdatetime": "2014-08-19T08:00:00.000000000Z" },
+        { "$offsetdatetime": "2014-08-20T09:00:00.000000000Z" },
+        { "$offsetdatetime": "2014-08-21T10:00:00.000000000Z" },
+        { "$offsetdatetime": "2014-08-22T11:00:00.000000000Z" },
+        { "$offsetdatetime": "2014-08-23T12:00:00.000000000Z" }
+      ]
+}

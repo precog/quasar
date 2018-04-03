@@ -113,8 +113,10 @@ object Bson {
       case Binary(value2) => value ≟ value2
       case _ => false
     }
+
     override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
   }
+
   object Binary {
     def fromArray(array: Array[Byte]): Binary = Binary(ImmutableArray.fromArray(array))
   }
@@ -133,16 +135,20 @@ object Bson {
       codecRegistry: org.bson.codecs.configuration.CodecRegistry) =
       repr
   }
+
   object Doc {
     def apply(pairs: (String, Bson)*): Bson.Doc = Doc(ListMap(pairs: _*))
   }
+
   final case class Arr(value: List[Bson]) extends Bson {
     def repr = new BsonArray((value ∘ (_.repr)).asJava)
     def toJs = Js.AnonElem(value ∘ (_.toJs))
   }
+
   object Arr {
     def apply(elems: Bson*): Bson.Arr = Arr(elems.toList)
   }
+
   final case class ObjectId(value: ImmutableArray[Byte]) extends Bson {
     private def oid = new org.bson.types.ObjectId(value.toArray[Byte])
     def repr = new BsonObjectId(oid)
@@ -157,8 +163,10 @@ object Bson {
       case ObjectId(value2) => value ≟ value2
       case _ => false
     }
+
     override def hashCode = java.util.Arrays.hashCode(value.toArray[Byte])
   }
+
   object ObjectId {
     def fromArray(array: Array[Byte]): ObjectId = ObjectId(ImmutableArray.fromArray(array))
 
@@ -166,10 +174,12 @@ object Bson {
       \/.fromTryCatchNonFatal(new types.ObjectId(str)).toOption.map(oid => ObjectId.fromArray(oid.toByteArray))
     }
   }
+
   final case class Bool(value: Boolean) extends Bson {
     def repr = new BsonBoolean(value)
     def toJs = Js.Bool(value)
   }
+
   /** NB: Can’t use `Instant`, because it encodes values outside the range of
     *     Bson DateTimes.
     */
@@ -177,6 +187,7 @@ object Bson {
     def repr = new BsonDateTime(millis)
     def toJs = Js.Call(Js.Ident("ISODate"), List(Js.Str(Instant.ofEpochMilli(millis).toString)))
   }
+
   object Date {
     val minInstant = Instant.ofEpochMilli(Long.MinValue)
     val maxInstant = Instant.ofEpochMilli(Long.MaxValue)
@@ -195,14 +206,17 @@ object Bson {
     def repr = new BsonUndefined
     override def toJs = Js.Undefined
   }
+
   final case class Regex(value: String, options: String) extends Bson {
     def repr = new BsonRegularExpression(value, options)
     def toJs = Js.New(Js.Call(Js.Ident("RegExp"), List(Js.Str(value), Js.Str(options))))
   }
+
   final case class JavaScript(value: Js.Expr) extends Bson {
     def repr = new BsonJavaScript(value.pprint(0))
     def toJs = value
   }
+
   final case class JavaScriptScope(code: Js.Expr, doc: ListMap[String, Bson])
       extends Bson {
     def repr =
@@ -212,10 +226,12 @@ object Bson {
     // FIXME: this loses scope, but I don’t know what it should look like
     def toJs = code
   }
+
   final case class Symbol(value: String) extends Bson {
     def repr = new BsonSymbol(value)
     def toJs = Js.Ident(value)
   }
+
   final case class Int32(value: Int) extends Bson {
     def repr = new BsonInt32(value)
     def toJs = Js.Call(Js.Ident("NumberInt"), List(Js.Str(value.shows)))
@@ -248,10 +264,12 @@ object Bson {
       List(Js.num(epochSecond.toLong), Js.num(ordinal.toLong)))
     override def toString = s"Timestamp(${Instant.ofEpochSecond(epochSecond.toLong)}, ${ordinal.shows})"
   }
+
   final case object MinKey extends Bson {
     def repr = new BsonMinKey()
     def toJs = Js.Ident("MinKey")
   }
+
   final case object MaxKey extends Bson {
     def repr = new BsonMaxKey()
     def toJs = Js.Ident("MaxKey")

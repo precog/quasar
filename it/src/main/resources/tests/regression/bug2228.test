@@ -4,7 +4,7 @@
   "backends": {
     "couchbase":         "skip",
     "marklogic_json":    "ignoreFieldOrder",
-    "mimir":             "pendingIgnoreFieldOrder"
+    "mimir":             "ignoreFieldOrder"
   },
   "query": "SELECT o.order_key AS OrderKey, o.purchase_date AS PurchaseDate, c.last_name, c.city AS City, c.state AS State, oi.qty AS Quantity, i.price AS UnitPrice
             FROM customers AS c JOIN orders AS o ON c.customer_key = o.customer_key JOIN ordered_items AS oi ON oi.order_key = o.order_key JOIN inventory_items AS i ON i.item_key = oi.item_key

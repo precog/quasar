@@ -121,7 +121,12 @@ object RenderQScriptDSL {
     case Data.Arr(a) => a.map(showData).mkString("Data.Arr(List(", ", ", "))")
     case Data.Binary(b) => b.mkString("Data.Binary(scalaz.ImmutableArray.fromArray(Array[Byte](", ", ", ")))")
     case Data.Bool(b) => "Data.Bool(" + b.shows + ")"
-    case Data.Date(d) => "Data.Date(java.time.LocalDate.parse(\"" + d.toString + "\"))"
+    case Data.LocalDateTime(d) => "Data.LocalDateTime(java.time.LocalDateTime.parse(\"" + d.toString + "\"))"
+    case Data.LocalDate(d) => "Data.LocalDate(java.time.LocalDate.parse(\"" + d.toString + "\"))"
+    case Data.LocalTime(d) => "Data.LocalTime(java.time.LocalTime.parse(\"" + d.toString + "\"))"
+    case Data.OffsetDateTime(d) => "Data.OffsetDateTime(java.time.OffsetDateTime.parse(\"" + d.toString + "\"))"
+    case Data.OffsetDate(d) => "Data.OffsetDate(quasar.OffsetDate.parse(\"" + d.toString + "\"))"
+    case Data.OffsetTime(d) => "Data.OffsetTime(java.time.OffsetTime.parse(\"" + d.toString + "\"))"
     case Data.Dec(d) => "Data.Dec(BigDecimal(\"" + d.toString + "\"))"
     case Data.Id(id) => "Data.Id(" + id + ")"
     case Data.Int(i) => "Data.Int(BigInt(\"" + i.toString + "\"))"
@@ -130,8 +135,6 @@ object RenderQScriptDSL {
     case Data.Null => "Data.Null"
     case Data.Obj(o) => o.mapValues(showData).mkString("Data.Obj(", ", ", ")")
     case Data.Str(s) => "Data.Str(\"" + s + "\")"
-    case Data.Time(t) => "Data.Time(java.time.LocalTime.parse(\"" + t.toString + "\"))"
-    case Data.Timestamp(ts) => "Data.Timestamp(java.time.Instant.parse(\"" + ts.toString + "\"))"
   }
 
   def mapFuncRenderQScriptDSLDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, MapFunc[T, ?]] =
@@ -145,7 +148,12 @@ object RenderQScriptDSL {
             case Undefined()     => ("Undefined", none)
             case JoinSideName(n) => ("JoinSideName", (n.shows.left :: Nil).some)
             case Now()           => ("Now", none)
-
+            case NowTime()       => ("NowTime", none)
+            case NowDate()       => ("NowDate", none)
+            case CurrentTimeZone() => ("CurrentTimeZone", none)
+            case SetTimeZone(a1, a2) => ("SetTimeZone", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case SetTimeZoneMinute(a1, a2) => ("SetTimeZoneMinute", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+            case SetTimeZoneHour(a1, a2) => ("SetTimeZoneHour", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
             case ExtractCentury(a1)        => ("ExtractCentury", (fa(base, a1).right :: Nil).some)
             case ExtractDayOfMonth(a1)     => ("ExtractDayOfMonth", (fa(base, a1).right :: Nil).some)
             case ExtractDecade(a1)         => ("ExtractDecade", (fa(base, a1).right :: Nil).some)
@@ -155,26 +163,30 @@ object RenderQScriptDSL {
             case ExtractHour(a1)           => ("ExtractHour", (fa(base, a1).right :: Nil).some)
             case ExtractIsoDayOfWeek(a1)   => ("ExtractIsoDayOfWeek", (fa(base, a1).right :: Nil).some)
             case ExtractIsoYear(a1)        => ("ExtractIsoYear", (fa(base, a1).right :: Nil).some)
-            case ExtractMicroseconds(a1)   => ("ExtractMicroseconds", (fa(base, a1).right :: Nil).some)
+            case ExtractMicrosecond(a1)    => ("ExtractMicrosecond", (fa(base, a1).right :: Nil).some)
             case ExtractMillennium(a1)     => ("ExtractMillennium", (fa(base, a1).right :: Nil).some)
-            case ExtractMilliseconds(a1)   => ("ExtractMilliseconds", (fa(base, a1).right :: Nil).some)
+            case ExtractMillisecond(a1)    => ("ExtractMillisecond", (fa(base, a1).right :: Nil).some)
             case ExtractMinute(a1)         => ("ExtractMinute", (fa(base, a1).right :: Nil).some)
             case ExtractMonth(a1)          => ("ExtractMonth", (fa(base, a1).right :: Nil).some)
             case ExtractQuarter(a1)        => ("ExtractQuarter", (fa(base, a1).right :: Nil).some)
             case ExtractSecond(a1)         => ("ExtractSecond", (fa(base, a1).right :: Nil).some)
-            case ExtractTimezone(a1)       => ("ExtractTimezone", (fa(base, a1).right :: Nil).some)
-            case ExtractTimezoneHour(a1)   => ("ExtractTimezoneHour", (fa(base, a1).right :: Nil).some)
-            case ExtractTimezoneMinute(a1) => ("ExtractTimezoneMinute", (fa(base, a1).right :: Nil).some)
+            case ExtractTimeZone(a1)       => ("ExtractTimeZone", (fa(base, a1).right :: Nil).some)
+            case ExtractTimeZoneHour(a1)   => ("ExtractTimeZoneHour", (fa(base, a1).right :: Nil).some)
+            case ExtractTimeZoneMinute(a1) => ("ExtractTimeZoneMinute", (fa(base, a1).right :: Nil).some)
             case ExtractWeek(a1)           => ("ExtractWeek", (fa(base, a1).right :: Nil).some)
             case ExtractYear(a1)           => ("ExtractYear", (fa(base, a1).right :: Nil).some)
-            case Date(a1)                  => ("Date", (fa(base, a1).right :: Nil).some)
-            case Time(a1)                  => ("Time", (fa(base, a1).right :: Nil).some)
-            case Timestamp(a1)             => ("Timestamp", (fa(base, a1).right :: Nil).some)
+            case LocalDateTime(a1)         => ("LocalDateTime", (fa(base, a1).right :: Nil).some)
+            case LocalDate(a1)             => ("LocalDate", (fa(base, a1).right :: Nil).some)
+            case LocalTime(a1)             => ("LocalTime", (fa(base, a1).right :: Nil).some)
+            case OffsetDateTime(a1)        => ("OffsetDateTime", (fa(base, a1).right :: Nil).some)
+            case OffsetDate(a1)            => ("OffsetDate", (fa(base, a1).right :: Nil).some)
+            case OffsetTime(a1)            => ("OffsetTime", (fa(base, a1).right :: Nil).some)
             case Interval(a1)              => ("Interval", (fa(base, a1).right :: Nil).some)
             case StartOfDay(a1)            => ("StartOfDay", (fa(base, a1).right :: Nil).some)
             case TemporalTrunc(a1, a2)     => ("TemporalTrunc", (DSLTree("TemporalPart", a1.shows, none).right :: fa(base, a2).right :: Nil).some)
             case TimeOfDay(a1)             => ("TimeOfDay", (fa(base, a1).right :: Nil).some)
             case ToTimestamp(a1)           => ("ToTimestamp", (fa(base, a1).right :: Nil).some)
+            case ToLocal(a1)               => ("ToLocal", (fa(base, a1).right :: Nil).some)
             case TypeOf(a1)                => ("TypeOf", (fa(base, a1).right :: Nil).some)
             case ToId(a1)                  => ("ToId", (fa(base, a1).right :: Nil).some)
             case Negate(a1)                => ("Negate", (fa(base, a1).right :: Nil).some)

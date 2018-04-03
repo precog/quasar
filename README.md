@@ -1182,11 +1182,13 @@ decimal   | `2.1`           | *same*   |
 object    | `{ "a": 1 }`    | *same*   |
 object    | `{ "$foo": 2 }` | `{ "$obj": { "$foo": 2 } }` | Requires a type-specifier if any key starts with `$`.
 array     | `[1, 2, 3]`     | *same*   |
-set       | `[1, 2, 3]`     | `{ "$set": [1, 2, 3] }` |
-timestamp | `"2015-01-31T10:30:00Z"` | `{ "$timestamp": "2015-01-31T10:30:00Z" }` |
-date      | `"2015-01-31"`  | `{ "$date": "2015-01-31" }` |
-time      | `"10:30:05"`    | `{ "$time": "10:30:05" }` | HH:MM[:SS[:.SSS]]
-interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | Note: year/month not currently supported.
+localdatetime  | `"2015-01-31T10:30:00"`    | `{ "$localdatetime": "2015-01-31T10:30" }` |
+localdate      | `"2015-01-31"`    | `{ "$localdate": "2015-01-31" }` |
+localtime      | `"10:30:00.000"`    | `{ "$localtime": "10:30" }` |
+offsetdatetime | `"2015-01-31T10:30:00Z"`    | `{ "$offsetdatetime": "2015-01-31T10:30Z" }` |
+offsetdate | `"2015-01-31Z"`    | `{ "$offsetdate": "2015-01-31Z" }` |
+offsettime | `"10:30:00.000Z"`    | `{ "$offsettime": "10:30Z" }` |
+interval  | `"PT12H34M"`    | `{ "$interval": "P7DT12H34M" }` | 
 binary    | `"TE1OTw=="`    | `{ "$binary": "TE1OTw==" }` | BASE64-encoded.
 object id | `"abc"`         | `{ "$oid": "abc" }` |
 

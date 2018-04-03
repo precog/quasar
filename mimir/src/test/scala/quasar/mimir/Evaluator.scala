@@ -308,7 +308,12 @@ trait EvaluatorModule[M[+ _]]
 
               case CNull => Table.constNull
 
-              case CDate(d) => Table.constDate(Set(d))
+              case COffsetDateTime(d) => Table.constOffsetDateTime(Set(d))
+              case COffsetTime(d)     => Table.constOffsetTime(Set(d))
+              case COffsetDate(d)     => Table.constOffsetDate(Set(d))
+              case CLocalDateTime(d)  => Table.constLocalDateTime(Set(d))
+              case CLocalTime(d)      => Table.constLocalTime(Set(d))
+              case CLocalDate(d)      => Table.constLocalDate(Set(d))
 
               case RObject.empty => Table.constEmptyObject
               case RArray.empty  => Table.constEmptyArray

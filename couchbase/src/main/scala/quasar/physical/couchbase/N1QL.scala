@@ -36,9 +36,12 @@ object N1QL extends N1QLInstances {
   final case class Id[A](v: String)                               extends N1QL[A]
   final case class Obj[A](m: List[(A, A)])                        extends N1QL[A]
   final case class Arr[A](l: List[A])                             extends N1QL[A]
+
+  // These types are not in line with current quasar datetime types
   final case class Date[A](a1: A)                                 extends N1QL[A]
   final case class Time[A](a1: A)                                 extends N1QL[A]
   final case class Timestamp[A](a1: A)                            extends N1QL[A]
+
   final case class Null[A]()                                      extends N1QL[A]
   final case class Unreferenced[A]()                              extends N1QL[A]
 

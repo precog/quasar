@@ -17,250 +17,364 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, Func, NullaryFunc, UnaryFunc, Mapping, Type, SemanticError}, SemanticError._
+import quasar._
+import quasar.DataDateTimeExtractors._
+import quasar.SemanticError._
 import quasar.fp.ski._
+import quasar.time.{OffsetDate => QOffsetDate, _}
 
-import java.time._
-import java.time.temporal.{ChronoUnit => CU}
-import java.time.ZoneOffset.UTC
-import scalaz._, Validation.success
-import scalaz.syntax.bind._
-import shapeless.{Data => _, _}
-
-sealed abstract class TemporalPart extends Serializable
-
-object TemporalPart {
-  final case object Century     extends TemporalPart
-  final case object Day         extends TemporalPart
-  final case object Decade      extends TemporalPart
-  final case object Hour        extends TemporalPart
-  final case object Microsecond extends TemporalPart
-  final case object Millennium  extends TemporalPart
-  final case object Millisecond extends TemporalPart
-  final case object Minute      extends TemporalPart
-  final case object Month       extends TemporalPart
-  final case object Quarter     extends TemporalPart
-  final case object Second      extends TemporalPart
-  final case object Week        extends TemporalPart
-  final case object Year        extends TemporalPart
-
-  implicit val equal: Equal[TemporalPart] = Equal.equalRef
-  implicit val show: Show[TemporalPart] = Show.showFromToString
+import java.time.{
+  Instant,
+  LocalDate => JLocalDate,
+  LocalDateTime => JLocalDateTime,
+  LocalTime => JLocalTime,
+  OffsetDateTime => JOffsetDateTime,
+  OffsetTime => JOffsetTime,
+  ZoneOffset
 }
 
+import scalaz._
+import scalaz.Validation.success
+import scalaz.syntax.either._
+import shapeless.{Data => _, _}
 
 trait DateLib extends Library with Serializable {
-  import TemporalPart._
 
-  def parseTimestamp(str: String): SemanticError \/ Data.Timestamp =
-    \/.fromTryCatchNonFatal(Instant.parse(str)).bimap(
-      κ(DateFormatError(Timestamp, str, None)),
-      Data.Timestamp.apply)
+  // legacy function for parsing Instants
+  def parseTimestamp(str: String): SemanticError \/ Data.OffsetDateTime =
+    \/.fromTryCatchNonFatal(Instant.parse(str).atOffset(ZoneOffset.UTC)).bimap(
+      κ(DateFormatError(OffsetDateTime, str, None)),
+      Data.OffsetDateTime.apply)
 
-  def parseDate(str: String): SemanticError \/ Data.Date =
-    \/.fromTryCatchNonFatal(LocalDate.parse(str)).bimap(
-      κ(DateFormatError(Date, str, None)),
-      Data.Date.apply)
+  def parseOffsetDateTime(str: String): SemanticError \/ Data.OffsetDateTime =
+    \/.fromTryCatchNonFatal(JOffsetDateTime.parse(str)).bimap(
+      κ(DateFormatError(OffsetDateTime, str, None)),
+      Data.OffsetDateTime.apply)
 
-  def parseTime(str: String): SemanticError \/ Data.Time =
-    \/.fromTryCatchNonFatal(LocalTime.parse(str)).bimap(
-      κ(DateFormatError(Time, str, None)),
-      Data.Time.apply)
+  def parseOffsetTime(str: String): SemanticError \/ Data.OffsetTime =
+    \/.fromTryCatchNonFatal(JOffsetTime.parse(str)).bimap(
+      κ(DateFormatError(OffsetTime, str, None)),
+      Data.OffsetTime.apply)
 
-  def parseInterval(str: String): SemanticError \/ Data.Interval = {
-    \/.fromTryCatchNonFatal(Duration.parse(str)).bimap(
-      κ(DateFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S; note: year/month not currently supported"))),
-      Data.Interval.apply)
-  }
+  def parseOffsetDate(str: String): SemanticError \/ Data.OffsetDate =
+    \/.fromTryCatchNonFatal(QOffsetDate.parse(str)).bimap(
+      κ(DateFormatError(OffsetDate, str, None)),
+      Data.OffsetDate.apply)
 
-  def startOfDayInstant(date: LocalDate): Instant =
+  def parseLocalDateTime(str: String): SemanticError \/ Data.LocalDateTime =
+    \/.fromTryCatchNonFatal(JLocalDateTime.parse(str)).bimap(
+      κ(DateFormatError(OffsetDate, str, None)),
+      Data.LocalDateTime.apply)
+
+  def parseLocalTime(str: String): SemanticError \/ Data.LocalTime =
+    \/.fromTryCatchNonFatal(JLocalTime.parse(str)).bimap(
+      κ(DateFormatError(LocalTime, str, None)),
+      Data.LocalTime.apply)
+
+  def parseLocalDate(str: String): SemanticError \/ Data.LocalDate =
+    \/.fromTryCatchNonFatal(JLocalDate.parse(str)).bimap(
+      κ(DateFormatError(LocalDate, str, None)),
+      Data.LocalDate.apply)
+
+  def parseInterval(str: String): SemanticError \/ Data.Interval =
+    DateTimeInterval.parse(str) match {
+      case Some(i) => Data.Interval(i).right
+      case None => DateFormatError(Interval, str, Some("expected, e.g. P3DT12H30M15.0S")).left
+    }
+
+  def startOfDayInstant(date: JLocalDate): Instant =
     date.atStartOfDay.atZone(ZoneOffset.UTC).toInstant
 
-  def startOfDay(date: Data.Date): Data.Timestamp =
-    Data.Timestamp(startOfDayInstant(date.value))
+  def startOfDay[I, O](in: I)(setter: SetTime[I, O]): O =
+    setter(in, JLocalTime.MIN)
 
-  def startOfNextDay(date: Data.Date): Data.Timestamp =
-    Data.Timestamp(startOfDayInstant(date.value.plus(Period.ofDays(1))))
-
-  def truncLocalTime(part: TemporalPart, t: LocalTime): SemanticError \/ LocalTime =
-    \/.fromTryCatchNonFatal(
-      part match {
-        case Century | Day | Decade | Millennium |
-             Month | Quarter | Week | Year       => t.truncatedTo(CU.DAYS)
-        case Hour                                => t.truncatedTo(CU.HOURS)
-        case Microsecond                         => t.truncatedTo(CU.MICROS)
-        case Millisecond                         => t.truncatedTo(CU.MILLIS)
-        case Minute                              => t.truncatedTo(CU.MINUTES)
-        case Second                              => t.truncatedTo(CU.SECONDS)
-      }
-    ).leftMap(err => GenericError(s"truncLocalTime: $err"))
-
-  def truncZonedDateTime(part: TemporalPart, zdt: ZonedDateTime):  SemanticError \/ ZonedDateTime =
-    truncLocalTime(part, zdt.toLocalTime) >>= (t => \/.fromTryCatchNonFatal {
-      val truncTime: ZonedDateTime =
-        ZonedDateTime.of(zdt.toLocalDate, t, zdt.getZone)
-
-      part match {
-        case Century =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-            .withYear((zdt.getYear / 100) * 100)
-        case Day =>
-          truncTime
-        case Decade =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-            .withYear((zdt.getYear / 10) * 10)
-        case Hour =>
-          truncTime
-        case Microsecond =>
-          truncTime
-        case Millennium =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-            .withYear((zdt.getYear / 1000) * 1000)
-        case Millisecond =>
-          truncTime
-        case Minute =>
-          truncTime
-        case Month =>
-          truncTime
-            .withDayOfMonth(1)
-        case Quarter =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(zdt.getMonth.firstMonthOfQuarter().getValue)
-        case Second =>
-          truncTime
-        case Week =>
-          truncTime
-            .`with`(java.time.DayOfWeek.MONDAY)
-        case Year =>
-          truncTime
-            .withDayOfMonth(1)
-            .withMonth(1)
-      }
-    }.leftMap(err => GenericError(s"truncZonedDateTime: $err")))
-
-  def truncDate(part: TemporalPart, d: Data.Date): SemanticError \/ Data.Date =
-    truncZonedDateTime(part, d.value.atStartOfDay(UTC)) ∘ (t => Data.Date(t.toLocalDate))
-
-  def truncTime(part: TemporalPart, t: Data.Time): SemanticError \/ Data.Time =
-    truncLocalTime(part, t.value) ∘ (Data.Time(_))
-
-  def truncTimestamp(part: TemporalPart, ts: Data.Timestamp): SemanticError \/ Data.Timestamp =
-    truncZonedDateTime(part, ts.value.atZone(UTC)) ∘ (t => Data.Timestamp(t.toInstant))
-
+  def startOfNextDay[I, O](in: I)(dateLens: LensDate[I], setTime: SetTime[I, O]): O = {
+    val updateDate = dateLens.modify(_.plusDays(1))(in)
+    val updateTime = startOfDay[I, O](updateDate)(setTime)
+    updateTime
+  }
 
   // NB: SQL specifies a function called `extract`, but that doesn't have comma-
   //     separated arguments. `date_part` is Postgres’ name for the same thing
   //     with commas.
 
-  private def extract(help: String) =
+  private def dateFunc(help: String, outputType: Type, f: JLocalDate => Data) =
     UnaryFunc(
       Mapping, help,
-      Type.Numeric,
-      Func.Input1(Type.Temporal),
+      outputType,
+      Func.Input1(Type.HasDate),
       noSimplification,
-      constTyper[nat._1](Type.Numeric),
+      partialTyper[nat._1] {
+        case Sized(Type.Const(DataDateTimeExtractors.CanLensDate(i))) => Type.Const(f(i.pos))
+        case Sized(t) if Type.HasDate contains t => Type.Numeric
+      },
       basicUntyper)
 
-  val ExtractCentury      = extract(
-    "Pulls out the century subfield from a date/time value (currently year/100).")
-  val ExtractDayOfMonth   = extract(
-    "Pulls out the day of month (`day`) subfield from a date/time value (1-31).")
-  val ExtractDecade       = extract(
-    "Pulls out the decade subfield from a date/time value (year/10).")
-  val ExtractDayOfWeek    = extract(
-    "Pulls out the day of week (`dow`) subfield from a date/time value " +
-    "(Sunday: 0 to Saturday: 7).")
-  val ExtractDayOfYear    = extract(
-    "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).")
-  val ExtractEpoch        = extract(
-    "Pulls out the epoch subfield from a date/time value. For dates and " +
-    "timestamps, this is the number of seconds since midnight, 1970-01-01. " +
-    "For intervals, the number of seconds in the interval.")
-  val ExtractHour         = extract(
-    "Pulls out the hour subfield from a date/time value (0-23).")
-  val ExtractIsoDayOfWeek       = extract(
-    "Pulls out the ISO day of week (`isodow`) subfield from a date/time value " +
-    "(Monday: 1 to Sunday: 7).")
-  val ExtractIsoYear      = extract(
-    "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based " +
-    "on the first week containing Jan. 4).")
-  val ExtractMicroseconds = extract(
-    "Pulls out the microseconds subfield from a date/time value (including seconds).")
-  val ExtractMillennium    = extract(
-    "Pulls out the millennium subfield from a date/time value (currently year/1000).")
-  val ExtractMilliseconds = extract(
-    "Pulls out the milliseconds subfield from a date/time value (including seconds).")
-  val ExtractMinute       = extract(
-    "Pulls out the minute subfield from a date/time value (0-59).")
-  val ExtractMonth        = extract(
-    "Pulls out the month subfield from a date/time value (1-12).")
-  val ExtractQuarter      = extract(
-    "Pulls out the quarter subfield from a date/time value (1-4).")
-  val ExtractSecond = extract(
-    "Pulls out the second subfield from a date/time value (0-59, with fractional parts).")
-  val ExtractTimezone = extract(
-    "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).")
-  val ExtractTimezoneHour = extract(
-    "Pulls out the hour component of the timezone subfield from a date/time value.")
-  val ExtractTimezoneMinute = extract(
-    "Pulls out the minute component of the timezone subfield from a date/time value.")
-  val ExtractWeek = extract(
-    "Pulls out the week subfield from a date/time value (1-53).")
-  val ExtractYear = extract(
-    "Pulls out the year subfield from a date/time value.")
+  private def timeFunc(help: String, outputType: Type, f: JLocalTime => Data) =
+    UnaryFunc(
+      Mapping, help,
+      outputType,
+      Func.Input1(Type.HasTime),
+      noSimplification,
+      partialTyper[nat._1] {
+        case Sized(Type.Const(DataDateTimeExtractors.CanLensTime(i))) => Type.Const(f(i.pos))
+        case Sized(t) if Type.HasTime contains t => Type.Numeric
+      },
+      basicUntyper)
 
-  val Date = UnaryFunc(
+  private def timeZoneFunc(help: String, f: ZoneOffset => Data) =
+    UnaryFunc(
+      Mapping, help,
+      Type.Int,
+      Func.Input1(Type.HasOffset),
+      noSimplification,
+      partialTyper[nat._1] {
+        case Sized(Type.Const(DataDateTimeExtractors.CanLensTimeZone(i))) => Type.Const(f(i.pos))
+        case Sized(t) if Type.HasOffset contains t => Type.Numeric
+      },
+      basicUntyper)
+
+  val ExtractCentury = dateFunc(
+    "Pulls out the century subfield from a date/time value (currently (year - 1)/100 + 1).",
+    Type.Int,
+    (extractCentury _).andThen(Data.Int(_)))
+
+  val ExtractDayOfMonth = dateFunc(
+    "Pulls out the day of month (`day`) subfield from a date/time value (1-31).",
+    Type.Int,
+    (extractDayOfMonth _).andThen(Data.Int(_)))
+
+  val ExtractDecade = dateFunc(
+    "Pulls out the decade subfield from a date/time value (year/10).",
+    Type.Int,
+    (extractDecade _).andThen(Data.Int(_)))
+
+  val ExtractDayOfWeek = dateFunc(
+    "Pulls out the day of week (`dow`) subfield from a date/time value " + "(Sunday: 0 to Saturday: 6).",
+    Type.Int,
+    (extractDayOfWeek  _).andThen(Data.Int(_)))
+
+  val ExtractDayOfYear = dateFunc(
+    "Pulls out the day of year (`doy`) subfield from a date/time value (1-365 or -366).",
+    Type.Int,
+    (extractDayOfYear  _).andThen(Data.Int(_)))
+
+  val ExtractEpoch = UnaryFunc(
     Mapping,
-    "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Date,
-    Func.Input1(Type.Str),
+    "Pulls out the epoch subfield from a datetime value with timezone offset. " +
+    "This is the number of seconds since midnight, 1970-01-01.",
+    Type.Dec,
+    Func.Input1(Type.OffsetDateTime),
     noSimplification,
-    partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseDate(str).map(Type.Const(_)).validation.toValidationNel
-      case Sized(Type.Str)                  => success(Type.Date)
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.OffsetDateTime(k))) => Type.Const(Data.Dec(time.extractEpoch(k)))
+      case Sized(Type.OffsetDateTime) => Type.Dec
     },
     basicUntyper)
+
+  val ExtractHour = timeFunc(
+    "Pulls out the hour subfield from a date/time value (0-23).",
+    Type.Int,
+    (extractHour _).andThen(Data.Int(_)))
+
+  val ExtractIsoDayOfWeek = dateFunc(
+    "Pulls out the ISO day of week (`isodow`) subfield from a date/time value (Monday: 1 to Sunday: 7).",
+    Type.Int,
+    (extractIsoDayOfWeek _).andThen(Data.Int(_)))
+
+  val ExtractIsoYear = dateFunc(
+    "Pulls out the ISO year (`isoyear`) subfield from a date/time value (based on the first week (Monday is the first day of the week) containing Jan. 4).",
+    Type.Int,
+    (extractIsoYear _).andThen(Data.Int(_)))
+
+  val ExtractMicrosecond = timeFunc(
+    "Computes the microseconds of a date/time value (including seconds).",
+    Type.Int, (extractMicrosecond _).andThen(Data.Int(_)))
+
+  val ExtractMillennium = dateFunc(
+    "Pulls out the millennium subfield from a date/time value (currently (year - 1)/1000 + 1).",
+    Type.Int,
+    (extractMillennium _).andThen(Data.Int(_)))
+
+  val ExtractMillisecond = timeFunc(
+    "Computes the milliseconds of a date/time value (including seconds).",
+    Type.Int, (extractMillisecond _).andThen(Data.Int(_)))
+
+  val ExtractMinute = timeFunc(
+    "Pulls out the minute subfield from a date/time value (0-59).",
+    Type.Int, (extractMinute _).andThen(Data.Int(_)))
+
+  val ExtractMonth = dateFunc(
+    "Pulls out the month subfield from a date/time value (1-12).",
+    Type.Int,
+    (extractMonth _).andThen(Data.Int(_)))
+
+  val ExtractQuarter = dateFunc(
+    "Pulls out the quarter subfield from a date/time value (1-4).",
+    Type.Int,
+    (extractQuarter _).andThen(Data.Int(_)))
+
+  val ExtractSecond = timeFunc(
+    "Pulls out the second subfield from a date/time value (0-59, with fractional parts).",
+    Type.Dec,
+    (extractSecond _).andThen(Data.Dec(_)))
+
+  val ExtractTimeZone = timeZoneFunc(
+    "Pulls out the timezone subfield from a date/time value (in seconds east of UTC).",
+    (extractTimeZone _).andThen(Data.Int(_)))
+
+  val ExtractTimeZoneHour = timeZoneFunc(
+    "Pulls out the hour component of the timezone subfield from a date/time value.",
+    (extractTimeZoneHour _).andThen(Data.Int(_)))
+
+  val ExtractTimeZoneMinute = timeZoneFunc(
+    "Pulls out the minute component of the timezone subfield from a date/time value.",
+    (extractTimeZoneMinute _).andThen(Data.Int(_)))
+
+  val ExtractWeek = dateFunc(
+    "Pulls out the week subfield from a date/time value (1-53).",
+    Type.Int,
+    (extractWeek _).andThen(Data.Int(_)))
+
+  val ExtractYear = dateFunc(
+    "Pulls out the year subfield from a date/time value.",
+    Type.Int,
+    (extractYear _).andThen(Data.Int(_)))
+
+  private def setTimeZone(help: String, out: Int => ZoneOffset, outTimeZone: (Int, ZoneOffset) => ZoneOffset) =
+    BinaryFunc(
+      Mapping, help,
+      Type.Temporal,
+      Func.Input2(Type.Temporal, Type.Int),
+      noSimplification,
+      partialTyper[nat._2] {
+        case Sized(Type.OffsetDate | Type.OffsetDateTime | Type.OffsetTime, Type.Numeric) => Type.Numeric
+        case Sized(Type.Const(DataDateTimeExtractors.CanLensTimeZone(i)), Type.Const(Data.Int(input))) =>
+          Type.Const(i.peeks(outTimeZone(input.toInt, _)))
+        case Sized(Type.Const(DataDateTimeExtractors.CanSetTimeZone(k)), Type.Const(Data.Int(input))) =>
+          Type.Const(k(out(input.toInt)))
+      },
+      basicUntyper)
+
+  // FIXME `ZoneOffset.ofTotalSeconds` throws an exception if the integer
+  // input is not in the range [-64800, 64800]
+  val SetTimeZone = setTimeZone(
+    "Sets the timezone subfield in a date/time value (in seconds east of UTC).",
+    ZoneOffset.ofTotalSeconds,
+    (i, _) => ZoneOffset.ofTotalSeconds(i))
+
+  val SetTimeZoneMinute = setTimeZone(
+    "Sets the minute component of the timezone subfield in a date/time value.",
+    ZoneOffset.ofHoursMinutes(0, _),
+    (i, zo) => setTimeZoneMinute(zo, i))
+
+  val SetTimeZoneHour = setTimeZone(
+    "Sets the hour component of the timezone subfield in a date/time value.",
+    ZoneOffset.ofHours,
+    (i, zo) => setTimeZoneHour(zo, i))
 
   val Now = NullaryFunc(
     Mapping,
-    "Returns the current timestamp – this must always return the same value within the same execution of a query.",
-    Type.Timestamp,
+    "Returns the current datetime in the current time zone – this must always return the same value within the same execution of a query.",
+    Type.OffsetDateTime,
     noSimplification)
 
-  val Time = UnaryFunc(
+  val NowTime = NullaryFunc(
+    Mapping,
+    "Returns the current time in the current time zone – this must always return the same value within the same execution of a query.",
+    Type.OffsetTime,
+    noSimplification)
+
+  val NowDate = NullaryFunc(
+    Mapping,
+    "Returns the current date in the current time zone – this must always return the same value within the same execution of a query.",
+    Type.OffsetDate,
+    noSimplification)
+
+  val CurrentTimeZone = NullaryFunc(
+    Mapping,
+    "Returns the current time zone offset in total seconds - this must always return the same value within the same execution of a query.",
+    Type.Int,
+    noSimplification)
+
+  val OffsetDateTime = UnaryFunc(
+    Mapping,
+    "Converts a string in the format (YYYY-MM-DDTHH:MM:SS((+/-)HH[:MM[:SS]])/Z) to a timestamp value with a time zone offset. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.OffsetDateTime,
+    Func.Input1(Type.Str),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseOffsetDateTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.OffsetDateTime)
+    },
+    basicUntyper)
+
+  val OffsetTime = UnaryFunc(
+    Mapping,
+    "Converts a string in the format (HH:MM:SS[.SSS]((+/-)HH:MM:SS)/Z) to a time value with a time zone offset. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.OffsetTime,
+    Func.Input1(Type.Str),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseOffsetTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.OffsetTime)
+    },
+    basicUntyper)
+
+  val OffsetDate = UnaryFunc(
+    Mapping,
+    "Converts a string in the format (YYYY-MM-DD((+/-)HH:MM:SS)/Z) to a date value with a time zone offset. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.OffsetDate,
+    Func.Input1(Type.Str),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseOffsetDate(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.OffsetDate)
+    },
+    basicUntyper)
+
+  val LocalDateTime = UnaryFunc(
+    Mapping,
+    "Converts a string in the format (YYYY-MM-DDTHH:MM:SS) to a date value paired with a time. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.LocalDateTime,
+    Func.Input1(Type.Str),
+    noSimplification,
+    partialTyperV[nat._1] {
+      case Sized(Type.Const(Data.Str(str))) => parseLocalDateTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.LocalDateTime)
+    },
+    basicUntyper)
+
+  val LocalTime = UnaryFunc(
     Mapping,
     "Converts a string in the format (HH:MM:SS[.SSS]) to a time value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Time,
+    Type.LocalTime,
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseTime(str).map(Type.Const(_)).validation.toValidationNel
-      case Sized(Type.Str)                  => success(Type.Time)
+      case Sized(Type.Const(Data.Str(str))) => parseLocalTime(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.LocalTime)
     },
     basicUntyper)
 
-  val Timestamp = UnaryFunc(
+  val LocalDate = UnaryFunc(
     Mapping,
-    "Converts a string in the format (ISO 8601, UTC, e.g. 2015-05-12T12:22:00Z) to a timestamp value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
-    Type.Timestamp,
+    "Converts a string in the format (YYYY-MM-DD) to a date value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    Type.LocalDate,
     Func.Input1(Type.Str),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Str(str))) => parseTimestamp(str).map(Type.Const(_)).validation.toValidationNel
-      case Sized(Type.Str) => success(Type.Timestamp)
+      case Sized(Type.Const(Data.Str(str))) => parseLocalDate(str).map(Type.Const(_)).validation.toValidationNel
+      case Sized(Type.Str)                  => success(Type.LocalDate)
     },
     basicUntyper)
 
+  /**
+    * TODO: document behavior change, now that years and months work
+    */
   val Interval = UnaryFunc(
     Mapping,
-    "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. Note: year/month not currently supported. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
+    "Converts a string in the format (ISO 8601, e.g. P3DT12H30M15.0S) to an interval value. This is a partial function – arguments that don’t satisify the constraint have undefined results.",
     Type.Interval,
     Func.Input1(Type.Str),
     noSimplification,
@@ -270,51 +384,78 @@ trait DateLib extends Library with Serializable {
     },
     basicUntyper)
 
+  /**
+   * TODO: document behavior change, `StartOfDay` only makes `OffsetDateTime`s out of other `OffsetDateTime`s.
+   */
   val StartOfDay = UnaryFunc(
     Mapping,
-    "Converts a Date or Timestamp to a Timestamp at the start of that day.",
-    Type.Timestamp,
-    Func.Input1(Type.Date ⨿ Type.Timestamp),
+    "Converts a DateTime or Date to a DateTime at the start of that day.",
+    Type.LocalDateTime ⨿ Type.OffsetDateTime,
+    Func.Input1(Type.HasDate),
     noSimplification,
     partialTyperV[nat._1] {
-      case Sized(Type.Const(Data.Date(v))) =>
-        success(Type.Const(Data.Timestamp(startOfDayInstant(v))))
-      case Sized(Type.Date) =>
-        success(Type.Timestamp)
-      case Sized(Type.Const(Data.Timestamp(v))) =>
-        truncZonedDateTime(TemporalPart.Day, v.atZone(UTC))
-          .map(t => Type.Const(Data.Timestamp(t.toInstant))).validation.toValidationNel
-      case Sized(Type.Timestamp) =>
-        success(Type.Timestamp)
+      case Sized(Type.Const(CanAddTime(f))) =>
+        success(Type.Const(f(JLocalTime.MIN)))
+      case Sized(Type.LocalDate | Type.LocalDateTime) =>
+        success(Type.LocalDateTime)
+      case Sized(Type.OffsetDate | Type.OffsetDateTime) =>
+        success(Type.OffsetDateTime)
     },
-    untyper[nat._1] {
-      case Type.Timestamp                 => success(Func.Input1(Type.Date))
-      case t                              => success(Func.Input1(t))
+    partialUntyper[nat._1] {
+      case Type.OffsetDateTime => Func.Input1(Type.OffsetDate ⨿ Type.OffsetDateTime)
+      case Type.LocalDateTime  => Func.Input1(Type.LocalDate ⨿ Type.LocalDateTime)
     })
 
   val TimeOfDay = UnaryFunc(
     Mapping,
-    "Extracts the time of day from a (UTC) timestamp value.",
-    Type.Time,
-    Func.Input1(Type.Timestamp),
+    "Extracts the time of day from a datetime value. Preserves time zone information.",
+    Type.LocalTime ⨿ Type.OffsetTime,
+    Func.Input1(Type.LocalDateTime ⨿ Type.OffsetDateTime),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Type.Const(Data.Timestamp(value))) => Type.Const(Data.Time(value.atZone(ZoneOffset.UTC).toLocalTime))
-      case Sized(Type.Timestamp) => Type.Time
+      case Sized(Type.Const(Data.OffsetDateTime(odt))) => Type.Const(Data.OffsetTime(odt.toOffsetTime))
+      case Sized(Type.Const(Data.LocalDateTime(ldt))) => Type.Const(Data.LocalTime(ldt.toLocalTime))
+      case Sized(Type.LocalDateTime) => Type.LocalTime
+      case Sized(Type.OffsetDateTime) => Type.OffsetTime
     },
-    basicUntyper)
+    partialUntyper[nat._1] {
+      case Type.OffsetTime => Func.Input1(Type.OffsetDateTime)
+      case Type.LocalTime => Func.Input1(Type.LocalDateTime)
+    })
 
   val ToTimestamp = UnaryFunc(
     Mapping,
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
-    Type.Timestamp,
+    Type.OffsetDateTime,
     Func.Input1(Type.Int),
     noSimplification,
     partialTyper[nat._1] {
-      case Sized(Type.Const(Data.Int(millis))) => Type.Const(Data.Timestamp(Instant.ofEpochMilli(millis.toLong)))
-      case Sized(Type.Int) => Type.Timestamp
+      case Sized(Type.Const(Data.Int(millis))) => Type.Const(Data.OffsetDateTime(JOffsetDateTime.ofInstant(Instant.ofEpochMilli(millis.toLong), ZoneOffset.UTC)))
+      case Sized(Type.Int) => Type.OffsetDateTime
     },
-    basicUntyper)
+    partialUntyperV[nat._1] {
+      case Type.OffsetDateTime => success(Func.Input1(Type.Int))
+    })
+
+  val ToLocal = UnaryFunc(
+    Mapping,
+    "Removes the time zone offset from a date, time, or datetime value.",
+    Type.LocalDateTime ⨿ Type.LocalTime ⨿ Type.LocalDate,
+    Func.Input1(Type.OffsetDateTime ⨿ Type.OffsetTime ⨿ Type.OffsetDate),
+    noSimplification,
+    partialTyper[nat._1] {
+      case Sized(Type.Const(Data.OffsetDate(od))) => Type.Const(Data.LocalDate(od.date))
+      case Sized(Type.Const(Data.OffsetTime(ot))) => Type.Const(Data.LocalTime(ot.toLocalTime))
+      case Sized(Type.Const(Data.OffsetDateTime(odt))) => Type.Const(Data.LocalDateTime(odt.toLocalDateTime))
+      case Sized(Type.OffsetDateTime) => Type.LocalDateTime
+      case Sized(Type.OffsetTime) => Type.LocalTime
+      case Sized(Type.OffsetDate) => Type.LocalDate
+    },
+    partialUntyperV[nat._1] {
+      case Type.LocalDateTime => success(Func.Input1(Type.OffsetDateTime))
+      case Type.LocalTime => success(Func.Input1(Type.OffsetTime))
+      case Type.LocalDate => success(Func.Input1(Type.OffsetDate))
+    })
 }
 
 object DateLib extends DateLib

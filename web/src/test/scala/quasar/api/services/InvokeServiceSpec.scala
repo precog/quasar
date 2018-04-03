@@ -19,7 +19,7 @@ package quasar.api.services
 import scala.Predef.$conforms
 import slamdata.Predef._
 import quasar.Data
-import quasar.DataArbitrary._
+import quasar.DataGenerators._
 import quasar.api._
 import quasar.api.ApiError._
 import quasar.api.ApiErrorEntityDecoder._

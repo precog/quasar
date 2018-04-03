@@ -16,11 +16,10 @@
 
 package quasar.yggdrasil
 
+import quasar.precog.common._
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.bytecode.JType
-import quasar.precog.common._
-
-import quasar.blueeyes.json._
+import quasar.time.{DateTimeInterval, OffsetDate}
 
 import scala.collection.Set
 
@@ -28,7 +27,7 @@ import scalaz._
 import scalaz.syntax.monad._
 
 import java.nio.CharBuffer
-import java.time.ZonedDateTime
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
@@ -139,7 +138,13 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def constLong(v: Set[Long]): Table
     def constDouble(v: Set[Double]): Table
     def constDecimal(v: Set[BigDecimal]): Table
-    def constDate(v: Set[ZonedDateTime]): Table
+    def constOffsetDateTime(v: Set[OffsetDateTime]): Table
+    def constOffsetTime(v: Set[OffsetTime]): Table
+    def constOffsetDate(v: Set[OffsetDate]): Table
+    def constLocalDateTime(v: Set[LocalDateTime]): Table
+    def constLocalTime(v: Set[LocalTime]): Table
+    def constLocalDate(v: Set[LocalDate]): Table
+    def constInterval(v: Set[DateTimeInterval]): Table
     def constBoolean(v: Set[Boolean]): Table
     def constNull: Table
 
@@ -296,7 +301,7 @@ trait TableModule[M[+ _]] extends TransSpecModule {
     def renderCsv(): StreamT[M, CharBuffer]
 
     // for debugging only!!
-    def toJson: M[Iterable[JValue]]
+    def toJson: M[Iterable[RValue]]
 
     def printer(prelude: String = "", flag: String = ""): Table
 

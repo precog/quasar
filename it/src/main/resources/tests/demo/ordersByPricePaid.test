@@ -4,7 +4,7 @@
     "backends": {
         "couchbase":         "skip",
         "marklogic_json":    "pendingIgnoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
+        "mimir":             "ignoreFieldOrder",
         "mongodb_3_2":       "skip",
         "mongodb_3_4":       "skip",
         "mongodb_3_4_13":    "skip",
@@ -12,7 +12,6 @@
         "mongodb_read_only": "skip",
         "postgres":          "pending"
     },
-    "NB": "mimir pending due to mangling of timestamp string",
     "NB2": "mongo skipped due to timeout",
     "NB3": "pending for Postgres due to unsupported nested MakeMaps",
     "query": "

@@ -166,7 +166,7 @@ sealed abstract class PreferProjectionInstances {
             O.outlineƒ(LeftShift(srcShape, struct, idStatus, shiftType, undef, Free.point(joinSide)))
           }
 
-          BtoF(LeftShift(u, prjFreeMap(srcShape, struct), idStatus, shiftType, undef, prjRepair))
+          BtoF(LeftShift(u, RecFreeS.fromFree(prjFreeMap(srcShape, struct.linearize)), idStatus, shiftType, undef, prjRepair))
 
         case Reduce((srcShape, u), buckets, reducers, repair) =>
           val prjBuckets = buckets map (prjFreeMap(srcShape, _))

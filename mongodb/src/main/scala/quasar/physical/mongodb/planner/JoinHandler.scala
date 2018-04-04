@@ -177,7 +177,7 @@ object JoinHandler {
         lookup(
           src, key, LeftName,
           coll.collection, field, RightName).liftM[OptionT] ∘
-          (FlatteningBuilder(_, Set(StructureType.Array(DocField(RightName), ExcludeId)), None))
+          (FlatteningBuilder(_, Set(StructureType.Array(RightName, ExcludeId)), None))
 
       case (JoinType.LeftOuter, JoinSource(src, List(key)), IsLookupFrom(coll, field))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -187,7 +187,7 @@ object JoinHandler {
           (look =>
             FlatteningBuilder(
               buildProjection(look, LeftName, n => $var(DocField(n)), RightName, padEmpty),
-              Set(StructureType.Array(DocField(RightName), ExcludeId)),
+              Set(StructureType.Array(RightName, ExcludeId)),
               None))
 
       case (JoinType.Inner, IsLookupFrom(coll, field), JoinSource(src, List(key)))
@@ -195,7 +195,7 @@ object JoinHandler {
         lookup(
           src, key, RightName,
           coll.collection, field, LeftName).liftM[OptionT] ∘
-          (FlatteningBuilder(_, Set(StructureType.Array(DocField(LeftName), ExcludeId)), None))
+          (FlatteningBuilder(_, Set(StructureType.Array(LeftName, ExcludeId)), None))
 
       case (JoinType.RightOuter, IsLookupFrom(coll, field), JoinSource(src, List(key)))
             if unsharded(coll) && indexed(coll, field) && src.cata(sourceDb) ≟ coll.database.some =>
@@ -205,7 +205,7 @@ object JoinHandler {
           (look =>
             FlatteningBuilder(
               buildProjection(look, LeftName, padEmpty, RightName, n => $var(DocField(n))),
-              Set(StructureType.Array(DocField(LeftName), ExcludeId)),
+              Set(StructureType.Array(LeftName, ExcludeId)),
               None))
 
       case _ => OptionT.none
@@ -312,8 +312,8 @@ object JoinHandler {
           FlatteningBuilder(
             buildProjection(src, leftField, padEmpty, rightField, padEmpty),
             Set(
-              StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)),
+              StructureType.Array(leftField, ExcludeId),
+              StructureType.Array(rightField, ExcludeId)),
             None)
         case JoinType.LeftOuter =>
           FlatteningBuilder(
@@ -324,8 +324,8 @@ object JoinHandler {
               leftField, n => $var(DocField(n)),
               rightField, padEmpty),
             Set(
-              StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)),
+              StructureType.Array(leftField, ExcludeId),
+              StructureType.Array(rightField, ExcludeId)),
             None)
         case JoinType.RightOuter =>
           FlatteningBuilder(
@@ -337,8 +337,8 @@ object JoinHandler {
               leftField, padEmpty,
               rightField, n => $var(DocField(n))),
             Set(
-              StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)),
+              StructureType.Array(leftField, ExcludeId),
+              StructureType.Array(rightField, ExcludeId)),
             None)
         case JoinType.Inner =>
           FlatteningBuilder(
@@ -352,8 +352,8 @@ object JoinHandler {
                   Selector.Doc(ListMap(l -> nonEmpty, r -> nonEmpty))
               }),
             Set(
-              StructureType.Array(DocField(leftField), ExcludeId),
-              StructureType.Array(DocField(rightField), ExcludeId)),
+              StructureType.Array(leftField, ExcludeId),
+              StructureType.Array(rightField, ExcludeId)),
             None)
       }
 

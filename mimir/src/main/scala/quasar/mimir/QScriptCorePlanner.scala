@@ -219,7 +219,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       import src.P.trans._
 
       for {
-        structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct)
+        structTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(struct.linearize)
         wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
 
         repairTrans <- repair.cataM[F, TransSpec1](

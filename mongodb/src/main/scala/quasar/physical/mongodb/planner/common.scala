@@ -72,4 +72,7 @@ object common {
         case _ => None
       })(Some(_))
 
+  object Keys {
+    val wrap = "wrap"
+  }
 }

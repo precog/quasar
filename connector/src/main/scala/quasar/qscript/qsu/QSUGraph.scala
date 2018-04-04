@@ -22,7 +22,7 @@ import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.qscript.{FreeMapA, IdStatus, OnUndefined}
+import quasar.qscript.{FreeMapA, IdStatus, OnUndefined, RecFreeMap}
 
 import monocle.macros.Lenses
 import matryoshka._
@@ -70,8 +70,34 @@ final case class QSUGraph[T[_[_]]](
     inner(this).eval(Set())
   }
 
+  def foldMapDownM[F[_]: Monad, A: Monoid](f: QSUGraph[T] => F[A]): F[A] = {
+    type VisitedT[X[_], A] = StateT[X, Set[Symbol], A]
+    type G[A] = VisitedT[F, A]
+    val MS = MonadState[G, Set[Symbol]]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(g: QSUGraph[T]): G[A] =
+      for {
+        visited <- MS.get
+
+        a <- if (visited(g.root))
+          mzero[A].point[G]
+        else
+          for {
+            _ <- MS.put(visited + g.root)
+            aG <- f(g).liftM[VisitedT]
+            aSub <- g.unfold.foldMapM(inner)
+          } yield aG |+| aSub
+      } yield a
+
+    inner(this).eval(Set())
+  }
+
   def foldMapUp[A: Monoid](f: QSUGraph[T] => A): A =
     foldMapUpM[Id, A](f)
+
+  def foldMapDown[A: Monoid](f: QSUGraph[T] => A): A =
+    foldMapDownM[Id, A](f)
 
   def refocus(node: Symbol): QSUGraph[T] =
     copy(root = node)
@@ -434,7 +460,7 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget[T]], QSU.Rotation)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget[T]], QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
         case _ => None
       }
@@ -618,7 +644,7 @@ sealed abstract class QSUGraphInstances extends QSUGraphInstances0 {
 
   implicit def show[T[_[_]]: ShowT]: Show[QSUGraph[T]] =
     Show.shows { g =>
-      val assocs = g.foldMapUp(sg => DList((sg.root, sg.vertices(sg.root))))
+      val assocs = g.foldMapDown(sg => DList((sg.root, sg.vertices(sg.root))))
 
       s"QSUGraph(${g.root.shows})[\n" +
       printMultiline(assocs.toList) +

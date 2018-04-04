@@ -85,7 +85,7 @@ final class QScriptCorePlanner[
         id1 <- genId[T[N1QL], F]
         id2 <- genId[T[N1QL], F]
         id3 <- genId[T[N1QL], F]
-        s   <- struct.cataM(interpretM(
+        s   <- struct.linearize.cataM(interpretM(
                  κ(id1.embed.η[F]),
                  mapFuncPlanner[T, F].plan))
         sr  =  ArrRange(int(0), LengthArr(s).embed, none)

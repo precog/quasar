@@ -154,7 +154,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     // Unify (Map, LeftShift)
     def unifyMapRightSideShift(
-      struct: FreeMap,
+      struct: RecFreeMap,
       status: IdStatus,
       shiftType: ShiftType,
       onUndefined: OnUndefined,
@@ -170,11 +170,11 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
             case RightSide => RightSideF
           }
         }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
+      } (func => QC.inj(LeftShift(src, struct >> RecFreeS.fromFree(shiftSrc), status, shiftType, onUndefined, func)).some)
 
     // Unify (LeftShift, Map)
     def unifyMapLeftSideShift(
-      struct: FreeMap,
+      struct: RecFreeMap,
       status: IdStatus,
       shiftType: ShiftType,
       onUndefined: OnUndefined,
@@ -190,7 +190,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
           }
           case RightSide => mapFn >> LeftSideF  // references `src`
         }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
+      } (func => QC.inj(LeftShift(src, struct >> RecFreeS.fromFree(shiftSrc), status, shiftType, onUndefined, func)).some)
 
     (left.resumeTwice, right.resumeTwice) match {
       // left side is the data while the right side shifts the same data
@@ -407,7 +407,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       (QCToF: PrismNT[F, QScriptCore])
       : QScriptCore[T[F]] => Option[F[T[F]]] = {
     case qs @ LeftShift(Embed(src), struct, ExcludeId, shiftType, OnUndefined.Emit, joinFunc) =>
-      (QCToF.get(src), struct.resume) match {
+      (QCToF.get(src), struct.linearize.resume) match {
         // LeftShift(Map(_, MakeArray(_)), Hole, ExcludeId, _)
         case (Some(Map(innerSrc, fm)), \/-(SrcHole)) =>
           fm.resume match {

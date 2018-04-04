@@ -175,8 +175,7 @@ class CardinalitySpec extends quasar.Qspec with QScriptHelpers with DisjunctionM
           */
         "returns cardinality of 10 x cardinality of already processed part of qscript" in {
           val cardinality = 60
-          val fun: FreeMap =
-            func.Eq(func.ProjectKeyS(func.Hole, "key"), func.Constant(json.str("value")))
+          val fun = recFunc.Eq(recFunc.ProjectKeyS(recFunc.Hole, "key"), recFunc.Constant(json.str("value")))
           val joinFunc: JoinFunc = func.LeftSide
           val leftShift = LeftShift(cardinality, fun, IdOnly, ShiftType.Array, OnUndefined.Omit, joinFunc)
           compile(leftShift) must_== cardinality * 10

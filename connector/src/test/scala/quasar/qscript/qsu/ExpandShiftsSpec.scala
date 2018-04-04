@@ -42,17 +42,19 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
   val hole: Hole = SrcHole
+
   def index(i: Int): FreeMapA[QAccess[Hole] \/ Int] =
     i.right[QAccess[Hole]].pure[FreeMapA]
 
   "convert singly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
-      func.Hole,
+      recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
       func.RightTarget,
@@ -98,13 +100,13 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           func.Add(
             func.ProjectKeyS(func.Hole, "0"),
             func.ProjectKeyS(func.Hole, "1")))
-        projectBar must beTreeEqual(
+        projectBar.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
         )
-        projectFoo must beTreeEqual(
+        projectFoo.linearize must beTreeEqual(
           func.ProjectKeyS(func.Hole, "foo")
         )
-        shiftedReadStruct must beTreeEqual(
+        shiftedReadStruct.linearize must beTreeEqual(
           func.Hole
         )
         shiftedReadRepair must beTreeEqual(
@@ -140,7 +142,7 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
-      func.Hole,
+      recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
       func.RightTarget,
@@ -190,7 +192,7 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   "convert doubly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
       qsu.read(rootDir </> file("dataset")),
-      func.Hole,
+      recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
       func.RightTarget,
@@ -246,16 +248,16 @@ object eshSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               func.ProjectKeyS(func.Hole, "0"),
               func.ProjectKeyS(func.Hole, "1")),
             func.ProjectKeyS(func.Hole, "2")))
-        projectBaz must beTreeEqual(
+        projectBaz.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "baz")
         )
-        projectBar must beTreeEqual(
+        projectBar.linearize must beTreeEqual(
           func.ProjectKeyS(func.ProjectKeyS(func.Hole, "original"), "bar")
         )
-        projectFoo must beTreeEqual(
+        projectFoo.linearize must beTreeEqual(
           func.ProjectKeyS(func.Hole, "foo")
         )
-        shiftedReadStruct must beTreeEqual(
+        shiftedReadStruct.linearize must beTreeEqual(
           func.Hole
         )
         shiftedReadRepair must beTreeEqual(

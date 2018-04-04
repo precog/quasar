@@ -143,8 +143,8 @@ def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
               })
         case QC(LeftShift(src, struct, id, stpe, onUndef, repair))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
-            (elide(struct) ⊛
-              elideJoinFunc(true, LeftSide, repair))((s, r) => GtoF.reverseGet(QC(LeftShift(src, s, id, stpe, onUndef, r))))
+            (elide(struct.linearize) ⊛
+              elideJoinFunc(true, LeftSide, repair))((s, r) => GtoF.reverseGet(QC(LeftShift(src, RecFreeS.fromFree(s), id, stpe, onUndef, r))))
         case QC(qscript.Map(src, mf))
           if (isRewrite[T, F, G, A](GtoF, src.project)) =>
             elide(mf) ∘

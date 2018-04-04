@@ -101,7 +101,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.Map(
             fix.Unreferenced,
             func.Constant(json.bool(true))),
-          func.Hole,
+          recFunc.Hole,
           ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -111,7 +111,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       equal(
         fix.LeftShift(
           fix.Unreferenced,
-          func.Constant(json.bool(true)),
+          recFunc.Constant(json.bool(true)),
           ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -202,7 +202,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             free.Map(
               free.Root,
               func.ProjectKey(func.Hole, func.Constant(json.str("city")))),
-            func.Hole,
+            recFunc.Hole,
             IncludeId,
             ShiftType.Array,
             OnUndefined.Omit,
@@ -225,7 +225,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         chainQS(
           fix.Root,
           fix.LeftShift(_,
-            func.ProjectKeyS(func.Hole, "city"),
+            recFunc.ProjectKeyS(recFunc.Hole, "city"),
             ExcludeId,
             ShiftType.Array,
             OnUndefined.Omit,
@@ -262,7 +262,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
             free.Root,
             free.LeftShift(
               free.Hole,
-              func.Hole,
+              recFunc.Hole,
               IncludeId,
               ShiftType.Array,
               OnUndefined.Omit,
@@ -288,7 +288,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
         equal(
           fix.LeftShift(
             fix.Root,
-            func.Hole,
+            recFunc.Hole,
             IncludeId,
             ShiftType.Array,
             OnUndefined.Omit,
@@ -412,7 +412,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val originalQScript =
         fix.LeftShift(
           fix.ShiftedRead[AFile](sampleFile, IncludeId),
-          func.ProjectKeyS(func.ProjectIndexI(func.Hole, 1), "foo"),
+          recFunc.ProjectKeyS(recFunc.ProjectIndexI(recFunc.Hole, 1), "foo"),
           ExcludeId,
           ShiftType.Map,
           OnUndefined.Omit,
@@ -423,7 +423,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
       val expectedQScript =
         fix.LeftShift(
           fix.ShiftedRead[AFile](sampleFile, ExcludeId),
-          func.ProjectKeyS(func.Hole, "foo"),
+          recFunc.ProjectKeyS(recFunc.Hole, "foo"),
           ExcludeId,
           ShiftType.Map,
           OnUndefined.Omit,
@@ -441,7 +441,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.Map(
             fix.Root,
             func.MakeArray(func.Add(func.Hole, func.Constant(json.int(3))))),
-          func.Hole,
+          recFunc.Hole,
           ExcludeId,
           ShiftType.Array,
           OnUndefined.Emit,
@@ -466,7 +466,7 @@ class RewriteSpec extends quasar.Qspec with CompilerHelpers with QScriptHelpers 
           fix.Map(
             fix.Root,
             func.Add(func.Hole, func.Constant(json.int(3)))),
-          func.MakeArray(func.Subtract(func.Hole, func.Constant(json.int(5)))),
+          recFunc.MakeArray(recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5)))),
           ExcludeId,
           ShiftType.Array,
           OnUndefined.Emit,

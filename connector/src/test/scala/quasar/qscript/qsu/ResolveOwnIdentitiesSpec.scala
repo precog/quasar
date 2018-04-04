@@ -39,6 +39,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
 
   val qsu = QScriptUniform.AnnotatedDsl[Fix, Symbol]
   val func = construction.Func[Fix]
+  val recFunc = construction.RecFunc[Fix]
 
   val foo: AFile = rootDir </> file("foo")
 
@@ -81,7 +82,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
       val (remap, lshift) = QSUGraph.fromAnnotatedTree[Fix](
         qsu.leftShift('ls, (
           qsu.read('r, foo),
-          func.ProjectKeyS(func.Hole, "bar"),
+          recFunc.ProjectKeyS(recFunc.Hole, "bar"),
           ExcludeId,
           OnUndefined.Omit,
           initialRepair,
@@ -102,7 +103,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
       val (remap, lshift) = QSUGraph.fromAnnotatedTree[Fix](
         qsu.leftShift('ls, (
           qsu.read('r, foo),
-          func.ProjectKeyS(func.Hole, "bar"),
+          recFunc.ProjectKeyS(recFunc.Hole, "bar"),
           IdOnly,
           OnUndefined.Omit,
           initialRepair,

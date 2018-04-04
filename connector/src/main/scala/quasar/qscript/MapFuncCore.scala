@@ -125,6 +125,18 @@ object MapFuncCore {
       }
   }
 
+  object RecStaticMap {
+    def apply[T[_[_]]: BirecursiveT, A](elems: List[(T[EJson], RecFreeMapA[T, A])]): RecFreeMapA[T, A] = {
+      val recFunc = construction.RecFunc[T]
+      val json = ejson.Fixed[T[EJson]]
+
+      elems.map { case (k, v) => recFunc.MakeMapJ(k, v) } match {
+        case x :: xs => xs.foldLeft(x)(recFunc.ConcatMaps(_, _))
+        case _ => recFunc.Constant(json.map(List()))
+      }
+    }
+  }
+
   object StaticMapSuffix {
     def apply[T[_[_]]: BirecursiveT, A](
         dyn: List[StaticAssoc[T, A] \/ FreeMapA[T, A]],

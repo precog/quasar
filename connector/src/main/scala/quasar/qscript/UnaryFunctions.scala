@@ -63,7 +63,7 @@ object UnaryFunctions {
               case Map(src, fm) =>
                 (f(fm)).map(Map(src, _))
               case LeftShift(src, struct, id, stpe, undef, repair) =>
-                (f(struct)).map(LeftShift(src, _, id, stpe, undef, repair))
+                (f(struct.linearize).map(RecFreeS.fromFree(_))).map(LeftShift(src, _, id, stpe, undef, repair))
               case Reduce(src, bucket, red, repair) =>
                 (bucket.traverse(f) |@| red.traverse(_.traverse(f)))(Reduce(src, _, _, repair))
               case Sort(src, bucket, order) =>

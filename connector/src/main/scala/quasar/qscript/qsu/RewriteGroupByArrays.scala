@@ -16,6 +16,7 @@
 
 package quasar.qscript.qsu
 
+import quasar.ejson
 import quasar.NameGenerator
 import quasar.qscript.{SrcHole, LeftSide, MapFuncsCore, MFC, RightSide}
 import quasar.qscript.qsu.{QScriptUniform => QSU}
@@ -26,6 +27,8 @@ import scalaz.{Monad, Scalaz, StateT}, Scalaz._
 
 final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
+
+  val json = ejson.Fixed[T[ejson.EJson]]
 
   // recognize the pattern generated in LP of squishing groupbys together
   def apply[F[_]: Monad: NameGenerator](qgraph: QSUGraph): F[QSUGraph] = {
@@ -52,12 +55,21 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def unapplySeq(qgraph: QSUGraph): Option[Vector[QSUGraph]] = qgraph match {
+      // TODO: the commuted cases should be just as important,
+      //       we're just ignoring them for now because this is
+      //       how LP always associates flattened group keys
       case AutoJoin2C(
         NAryArray(elems @ _*),
         Unary(last, MFC(MapFuncsCore.MakeArray(SrcHole))),
         MapFuncsCore.ConcatArrays(LeftSide, RightSide)) => Some(elems.toVector :+ last)
 
+      case AutoJoin2C(
+        NAryArray(elems @ _*),
+        c @ Unary(_, MFC(MapFuncsCore.Constant(json.arr(_)))),
+        MapFuncsCore.ConcatArrays(LeftSide, RightSide)) => Some(elems.toVector :+ c)
+
       case Unary(last, MFC(MapFuncsCore.MakeArray(SrcHole))) => Some(Vector(last))
+      case c @ Unary(_, MFC(MapFuncsCore.Constant(json.arr(_)))) => Some(Vector(c))
 
       case _ => None
     }

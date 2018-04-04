@@ -5,7 +5,7 @@
     },
     "data": "nested.data",
     "query": "select topObj.midObj{_:} from nested",
-    "predicate": "atLeast",
+    "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": ["botArr", "botObj"]
 }

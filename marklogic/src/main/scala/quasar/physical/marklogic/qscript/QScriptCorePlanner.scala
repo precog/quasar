@@ -75,7 +75,7 @@ private[qscript] final class QScriptCorePlanner[
         r       <- freshName[F]
         i       <- freshName[F]
         src     <- elimSearch[Q](src0)
-        extract <- mapFuncXQuery[T, F, FMT](struct, ~l)
+        extract <- mapFuncXQuery[T, F, FMT](struct.linearize, ~l)
         lshift  <- SP.leftShift(~ext)
         chkArr  <- SP.isArray(~ext)
         getId   =  if_ (~isArr) then_ ~i else_ fn.nodeName(~r0)

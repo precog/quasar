@@ -141,6 +141,9 @@ package object qscript {
       Inject[MapFuncDerived[T, ?], MapFunc[T, ?]].prj(mf)
   }
 
+  type RecFreeMapA[T[_[_]], A] = Free[RecFreeS[MapFunc[T, ?], ?], A]
+  type RecFreeMap[T[_[_]]]     = RecFreeMapA[T, Hole]
+
   type FreeQS[T[_[_]]]      = Free[QScriptTotal[T, ?], Hole]
   type FreeMapA[T[_[_]], A] = Free[MapFunc[T, ?], A]
   type FreeMap[T[_[_]]]     = FreeMapA[T, Hole]

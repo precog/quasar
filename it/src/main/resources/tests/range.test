@@ -8,8 +8,10 @@
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending"
+        "mongodb_read_only": "pending",
+        "postgres":          "pending"
     },
+    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "nested.data",
     "query": "select (topArr[1].botArr[*] .. 9) from nested",
     "predicate": "exactly",

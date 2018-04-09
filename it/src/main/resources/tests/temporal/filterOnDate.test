@@ -3,8 +3,10 @@
     "backends": {
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
-        "mimir":             "pending"
+        "mimir":             "pending",
+        "postgres":           "pending"
     },
+    "NB": "Pending for postgres connector due to unimplemented errors qz-3735",
     "data":  "../days.data",
     "query": "select day from `../days`
               where

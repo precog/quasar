@@ -2,8 +2,9 @@
     "name": "splice a wildcard with multiple constants",
 
     "backends": {
+        "postgres": "pending"
     },
-
+    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "largeZips.data",
 
     "query": "select *, '1' as one, '2' as two from largeZips",

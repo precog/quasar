@@ -1,10 +1,12 @@
 {
     "name": "select partially-applied substring",
     "backends": {
+        "postgres":          "pending",
         "spark_hdfs":        "pending",
         "spark_local":       "pending",
         "spark_cassandra":   "pending"
     },
+    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "extraSmallZips.data",
     "query": "select substring(\"abcdefghijklmnop\", 5, trunc(pop / 10000)) from extraSmallZips",
     "predicate": "exactly",

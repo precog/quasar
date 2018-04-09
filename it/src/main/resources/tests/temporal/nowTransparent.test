@@ -4,10 +4,12 @@
   "backends": {
       "couchbase": "pending",
       "mimir": "pending",
+      "postgres": "pending",
       "spark_local": "pending",
       "spark_hdfs": "pending"
   },
 
+  "NB": "Pending for postgres connector due to unimplemented errors qz-3735",
   "data": "../zips.data",
 
   "query": "select sum(when) from ((select date_part(\"milliseconds\", now()) as when, pop from `../zips` order by pop desc limit 1) union (select -date_part(\"milliseconds\", now()) as when, pop from `../zips` order by pop asc limit 1)) as times",

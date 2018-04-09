@@ -2,8 +2,10 @@
     "name": "convert null to/from strings",
     "backends": {
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":"ignoreFieldOrder"
+        "mimir": "ignoreFieldOrder",
+        "postgres": "pending"
     },
+    "NB": "Pending for postgres connector due to unimplemented errors qz-3735",
     "data": "nulls.data",
     "query": "select null(name) as n, to_string(val) as s from nulls where name = \"null\"",
     "predicate": "exactly",

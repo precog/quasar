@@ -1,7 +1,8 @@
 {
     "name": "unify flattened fields",
     "backends": {
-        "couchbase": "pending"
+        "couchbase": "pending",
+        "postgres":  "pending"
     },
     "data": "zips.data",
     "query": "select loc[*] from zips where loc[*] < 0",

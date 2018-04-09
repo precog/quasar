@@ -53,6 +53,14 @@ configure_metastore() {
 }
 
 ##########################################
+# injects postgres url into
+# it/testing.conf
+#
+configure_postgres() {
+  echo 'postgres'=\"jdbc:postgresql://${DOCKERIP}:35432/postgres?user=postgres\" >> $CONFIGFILE
+}
+
+##########################################
 # injects spark and companion connector
 # URI into it/testing.conf
 #
@@ -93,6 +101,7 @@ container_lookup() {
   if [[ $CONTAINER == "spark_local_test" ]]; then configure_spark;                          fi
   if [[ $CONTAINER == "metastore"        ]]; then configure_metastore;                      fi
   if [[ $CONTAINER == "mimir"            ]]; then configure_mimir;                          fi
+  if [[ $CONTAINER == "postgres"         ]]; then configure_postgres;                       fi
   if [[ $CONTAINER == "spark_cassandra" || $CONTAINER == "spark_elasticsearch" || $CONTAINER == "spark_ftp" || $CONTAINER == "spark_hdfs" || $CONTAINER == "spark_s3" ]]; then configure_spark_connector $CONTAINER; fi
 }
 

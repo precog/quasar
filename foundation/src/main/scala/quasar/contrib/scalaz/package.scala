@@ -52,6 +52,11 @@ package object scalaz {
       OptionT(self.run.run.map(_.join))
   }
 
+  implicit final class Nested3FunctorsOps[F[_], G[_], H[_], A](val self: F[G[H[A]]]) extends AnyVal {
+    def map3[B](f: A => B)(implicit F: Functor[F], G: Functor[G], H: Functor[H]) =
+      self.map(x => x.map(y => y.map(f)))
+  }
+
   implicit final class EitherTOps[F[_], E, A](val self: EitherT[F, E, A]) extends AnyVal {
     def leftMapF[E1](f: E => F[E1])(implicit F: Monad[F]): EitherT[F, E1, A] =
       EitherT(self.run.flatMap {

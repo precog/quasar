@@ -19,6 +19,7 @@ package quasar.fs.mount
 import slamdata.Predef._
 import quasar._
 import quasar.contrib.pathy._
+import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
 import quasar.fp._
@@ -34,6 +35,7 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz.{Failure => _, Node => _, _}, Scalaz._
+import scalaz.syntax.tag._
 import scalaz.concurrent.Task
 
 object view {
@@ -246,7 +248,7 @@ object view {
     val VC = VCacheKVS.Ops[S]
 
     def lift(e: Set[FPath], plan: Fix[LP]) =
-      plan.project.strengthL(e).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
+      WriterT.put(plan.project.strengthL(e).point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]])(Tags.Disjunction(false))
 
     def compiledView(loc: AFile): OptionT[Free[S, ?], FileSystemError \/ (SemanticErrors \/ Fix[LP])] =
       (for {
@@ -272,11 +274,6 @@ object view {
                   _.right[SemanticErrors].right[FileSystemError])).η[Free[S, ?]])
       } yield r
 
-    // NB: simplify incoming queries to the raw, idealized LP which is simpler
-    //     to manage.
-    // JR: Why is this easier to manage exactly? Perhaps we could add a more detailed explanation here
-    val cleaned = plan.cata(optimizer.elideTypeCheckƒ)
-
     // The `Set[FPath]` is to ensure we don't expand the same view within the SAME AST
     // branch as that would be nonsensical and lead to an infinitely large LP
     // Instead, we just ignore it letting the view refer to an underlying file
@@ -285,17 +282,32 @@ object view {
     // but we chose the former approach.
     // Note: This does not prevent a view from being referenced twice in an expression, as
     // those references would appear in separate branches and thus not share the same `Set[FPath]`
-    val newLP: SemanticErrsT[FileSystemErrT[Free[S, ?], ?], Fix[LP]] =
-      (Set[FPath](), cleaned).anaM[Fix[LP]] {
+    val newLP: WriterT[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?], Boolean @@ Tags.Disjunction, Fix[LP]] =
+      (Set[FPath](), plan).anaM[Fix[LP]] {
         case (e, i @ Embed(lp.Read(p))) if !(e contains p) =>
           refineTypeAbs(p).swap.map { absFile =>
-            val inlinedView = vcacheRead(absFile) orElse compiledView(absFile) getOrElse i.right.right
-            EitherT(EitherT(inlinedView)).map(_.project.strengthL(e + absFile))
+            val inlinedView =
+              vcacheRead(absFile).map3(x => (Tags.Disjunction(false), x)) orElse
+              compiledView(absFile).map3(x => (Tags.Disjunction(true),x)) getOrElse
+              (Tags.Disjunction(false),i).right.right
+            WriterT(EitherT(EitherT(inlinedView))).map(_.project.strengthL(e + absFile))
           }.getOrElse(lift(e, i))
 
         case (e, i) => lift(e, i)
-      } flatMap (resolved => EitherT(preparePlan(resolved).run.value.point[FileSystemErrT[Free[S, ?], ?]]))
+      }
 
-    newLP.leftMap(e => planningFailed(plan, Planner.CompilationFailed(e))).flattenLeft
+    // Thx to the `Boolean @@ Tags.Disjunction`, we tracked whether we actually changed the plan in a
+    // meaningful way (a cached view substitution does not count) and if so, we remove typechecks and
+    // "recompile" the new plan, otherwise we just return the new plan without recompiling
+    newLP.run.flatMap { case (changed, newPlan) =>
+      if (changed.unwrap)
+        // NB: We remove the typechecks here because otherwise, we will end up with duplicate typechecks
+        //     after compiling once more
+        EitherT(preparePlan(newPlan.cata(optimizer.elideTypeCheckƒ)).run.value.point[FileSystemErrT[Free[S, ?], ?]])
+      else
+        // It's important to return the `newPlan` here as opposed to `plan` because otherwise we might
+        // discard a view cache read substitution
+        newPlan.point[SemanticErrsT[FileSystemErrT[Free[S, ?], ?], ?]]
+    }.leftMap(e => planningFailed(plan, Planner.CompilationFailed(e))).flattenLeft
   }
 }

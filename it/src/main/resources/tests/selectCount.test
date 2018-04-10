@@ -7,8 +7,10 @@
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",
         "mongodb_3_6":       "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder"
+        "mongodb_read_only": "ignoreFieldOrder",
+        "postgres":          "pending"
     },
+    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "slamengine_commits.data",
     "query": "select committer.login, count(*) from slamengine_commits",
     "predicate": "atLeast",

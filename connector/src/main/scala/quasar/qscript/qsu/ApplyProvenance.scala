@@ -25,7 +25,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.ι
-import quasar.qscript.{construction, ExcludeId, HoleF, IdOnly, IdStatus, OnUndefined}
+import quasar.qscript.{construction, ExcludeId, IdOnly, IdStatus, OnUndefined}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -49,6 +49,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
   val dims = QProv[T]
   val func = construction.Func[T]
+  val recFunc = construction.RecFunc[T]
 
   def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QAuth, A]
@@ -62,7 +63,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case g @ Extractors.Transpose(src, retain, rot) =>
         computeProvenance[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, HoleF, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, func.RightTarget, rot)
+          LeftShift(src.root, recFunc.Hole, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, func.RightTarget, rot)
         }
 
       case other =>

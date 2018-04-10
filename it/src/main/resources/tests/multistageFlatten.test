@@ -5,10 +5,12 @@
         "marklogic_json":      "pending",
         "marklogic_xml":       "pending",
         "mimir":               "pending",
+        "postgres":            "pending",
         "spark_local":         "pending",
         "spark_hdfs":          "pending",
         "spark_cassandra":     "pending"
     },
+    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "nested_foo.data",
     "query": "select * from nested_foo where (
                 foo              LIKE \"%zap%\" OR

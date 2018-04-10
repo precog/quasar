@@ -168,7 +168,7 @@ object QScriptUniform {
             s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
 
           case LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
-            s"LeftShift(${source.shows}, ${struct.shows}, ${idStatus.shows}, ${onUndefined.shows}, ${repair.shows}, ${rot.shows})"
+            s"LeftShift(${source.shows}, ${struct.linearize.shows}, ${idStatus.shows}, ${onUndefined.shows}, ${repair.shows}, ${rot.shows})"
 
           case MultiLeftShift(source, shifts, onUndefined, repair) =>
             s"MultiLeftShift(${source.shows}, ${shifts.shows}, ${onUndefined.shows}, ${repair.shows})"
@@ -412,7 +412,7 @@ object QScriptUniform {
   // QScriptish
   final case class LeftShift[T[_[_]], A](
       source: A,
-      struct: FreeMap[T],
+      struct: RecFreeMap[T],
       idStatus: IdStatus,
       onUndefined: OnUndefined,
       repair: FreeMapA[T, ShiftTarget[T]],
@@ -503,8 +503,8 @@ object QScriptUniform {
         case JoinSideRef(s) => s
       } (JoinSideRef(_))
 
-    def leftShift[A]: Prism[QScriptUniform[A], (A, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)] =
-      Prism.partial[QScriptUniform[A], (A, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)] {
+    def leftShift[A]: Prism[QScriptUniform[A], (A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)] =
+      Prism.partial[QScriptUniform[A], (A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)] {
         case LeftShift(s, fm, ids, ou, jf, rot) => (s, fm, ids, ou, jf, rot)
       } { case (s, fm, ids, ou, jf, rot) => LeftShift(s, fm, ids, ou, jf, rot) }
 
@@ -657,8 +657,8 @@ object QScriptUniform {
       composeLifting[G](O.joinSideRef[A])
     }
 
-    def leftShift: Prism[A, F[(A, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)]] = {
-      composeLifting[(?, FreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)](O.leftShift[A])
+    def leftShift: Prism[A, F[(A, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)]] = {
+      composeLifting[(?, RecFreeMap, IdStatus, OnUndefined, FreeMapA[ShiftTarget[T]], Rotation)](O.leftShift[A])
     }
 
     def multiLeftShift: Prism[A, F[(A, List[(FreeMap, IdStatus, Rotation)], OnUndefined, FreeMapA[QAccess[Hole] \/ Int])]] = {

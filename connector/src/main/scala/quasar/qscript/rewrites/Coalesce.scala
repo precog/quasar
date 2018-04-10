@@ -284,8 +284,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         (implicit QC: QScriptCore :<: OUT)
           : QScriptCore[IT[F]] => Option[QScriptCore[IT[F]]] = {
         case LeftShift(src, struct, id, stpe, undef, repair) =>
-          MapFuncCore.extractFilter(struct)(_.some) ∘ { case (f, m, _) =>
-            LeftShift(FToOut(QC.inj(Filter(src, f))).embed, m, id, stpe, undef, repair)
+          MapFuncCore.extractFilter(struct.linearize)(_.some) ∘ { case (f, m, _) =>
+            LeftShift(FToOut(QC.inj(Filter(src, f))).embed, RecFreeS.fromFree(m), id, stpe, undef, repair)
           }
         case Map(src, mf) =>
           MapFuncCore.extractFilter(mf)(_.some) ∘ { case (f, m, _) =>
@@ -350,7 +350,7 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         case LeftShift(Embed(src), struct, id, stpe, undef, shiftRepair) =>
           FToOut.get(src) >>= QC.prj >>= {
             case LeftShift(innerSrc, innerStruct, innerId, innerStpe, innerUndef, innerRepair)
-                if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct ≠ HoleF =>
+                if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct.linearize ≠ HoleF =>
               LeftShift(
                 FToOut.reverseGet(QC.inj(LeftShift(
                   innerSrc,
@@ -358,8 +358,8 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
                   innerId,
                   innerStpe,
                   innerUndef,
-                  struct >> innerRepair))).embed,
-                HoleF,
+                  struct.linearize >> innerRepair))).embed,
+                RecFreeS.fromFree[MapFunc, Hole](HoleF),
                 id,
                 stpe,
                 OnUndefined.omit,
@@ -367,12 +367,12 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
             // TODO: Should be able to apply this where there _is_ a `LeftSide`
             //       reference, but currently that breaks merging.
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
-              LeftShift(innerSrc, struct >> mf, id, stpe, OnUndefined.omit, shiftRepair).some
+              LeftShift(innerSrc, struct >> RecFreeS.fromFree(mf), id, stpe, OnUndefined.omit, shiftRepair).some
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftArray(elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
+                if nm.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(elem)(shiftRepair) ∘ (Map(srcInner, _))
             case Reduce(srcInner, _, List(ReduceFuncs.UnshiftMap(k, elem)), redRepair)
-                if nm.freeMF(struct >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
+                if nm.freeMF(struct.linearize >> redRepair) ≟ Free.point(ReduceIndex(0.right)) =>
               rightOnly(id match {
                 case ExcludeId => elem
                 case IdOnly    => k
@@ -489,11 +489,11 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
               repair))
 
         case LeftShift(Embed(src), struct, idStatus, shiftType, undef, repair) =>
-          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProjUnary(struct) ⊛ eliminateRightSideProj(repair, LeftSide))(
+          ((FToOut.get(src) >>= SR.prj) ⊛ eliminateRightSideProjUnary(struct.linearize) ⊛ eliminateRightSideProj(repair, LeftSide))(
             (sr, newStruct, newRepair) =>
             LeftShift(
               FToOut.reverseGet(SR.inj(Const[ShiftedRead[A], T[F]](ShiftedRead(sr.getConst.path, ExcludeId)))).embed,
-              newStruct,
+              RecFreeS.fromFree(newStruct),
               idStatus,
               shiftType,
               undef,

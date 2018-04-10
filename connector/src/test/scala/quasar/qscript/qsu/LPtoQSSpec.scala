@@ -47,6 +47,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
 
   val func = defaults.func
   val qs = defaults.fix
+  val recFunc = defaults.recFunc
   val json = Fixed[Fix[EJson]]
 
   val root = Path.rootDir[Sandboxed]
@@ -68,7 +69,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
 
       val expected = qs.LeftShift(
         qs.Read(afoo),
-        HoleF[Fix],
+        recFunc.Hole,
         ExcludeId,
         ShiftType.Map,
         OnUndefined.Omit,
@@ -87,7 +88,7 @@ object LPtoQSSpec extends Qspec with CompilerHelpers with QSUTTypes[Fix] {
       val expected = qs.Reduce(
         qs.LeftShift(
           qs.Read(afoo),
-          HoleF[Fix],
+          recFunc.Hole,
           ExcludeId,
           ShiftType.Map,
           OnUndefined.Omit,

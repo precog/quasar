@@ -16,9 +16,14 @@
 
 package quasar.std
 
+import slamdata.Predef._
 import quasar._
+import quasar.fp.ski._
+import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
-import scalaz._, Validation.success
+import matryoshka._
+import matryoshka.implicits._
+import scalaz._, Scalaz._, Validation.success
 import shapeless.{Data => _, :: => _, _}
 
 trait AggLib extends Library {
@@ -27,12 +32,25 @@ trait AggLib extends Library {
   private val reflexiveUntyper: Func.Untyper[nat._1] =
     untyper[nat._1](t => success(Func.Input1(t)))
 
+  private def simplifiesOnConstants(cont: Data => LP[Nothing]) = new Func.Simplifier {
+    def apply[T]
+      (orig: LP[T])
+      (implicit TR: Recursive.Aux[T, LP], TC: Corecursive.Aux[T, LP]) =
+      orig match {
+        case Invoke(_, Sized(src)) => src.project match {
+          case Constant(d) => cont(d).map(ι).some
+          case _ => None
+        }
+        case _ => None
+      }
+  }
+
   val Count = UnaryFunc(
     Reduction,
     "Counts the values in a set",
     Type.Int,
     Func.Input1(Type.Top),
-    noSimplification,
+    simplifiesOnConstants(_ => Constant(Data.Int(1))),
     basicTyper[nat._1],
     basicUntyper[nat._1])
 
@@ -50,7 +68,7 @@ trait AggLib extends Library {
     "Finds the minimum in a set of values",
     Type.Comparable,
     Func.Input1(Type.Comparable),
-    noSimplification,
+    simplifiesOnConstants(Constant(_)),
     widenConstTyper(_(0)),
     reflexiveUntyper)
 
@@ -59,7 +77,7 @@ trait AggLib extends Library {
     "Finds the maximum in a set of values",
     Type.Comparable,
     Func.Input1(Type.Comparable),
-    noSimplification,
+    simplifiesOnConstants(Constant(_)),
     widenConstTyper(_(0)),
     reflexiveUntyper)
 
@@ -68,7 +86,7 @@ trait AggLib extends Library {
     "Finds the first value in a set.",
     Type.Top,
     Func.Input1(Type.Top),
-    noSimplification,
+    simplifiesOnConstants(Constant(_)),
     widenConstTyper(_(0)),
     reflexiveUntyper)
 
@@ -77,7 +95,7 @@ trait AggLib extends Library {
     "Finds the last value in a set.",
     Type.Top,
     Func.Input1(Type.Top),
-    noSimplification,
+    simplifiesOnConstants(Constant(_)),
     widenConstTyper(_(0)),
     reflexiveUntyper)
 
@@ -86,7 +104,7 @@ trait AggLib extends Library {
     "Finds the average in a set of numeric values",
     Type.Numeric,
     Func.Input1(Type.Numeric),
-    noSimplification,
+    simplifiesOnConstants(Constant(_)),
     partialTyperV[nat._1] {
       case Sized(t) if MathRel.contains(t) =>
         success(t.widenConst)
@@ -98,7 +116,7 @@ trait AggLib extends Library {
     "Returns an arbitrary value from a set",
     Type.Top,
     Func.Input1(Type.Top),
-    noSimplification,
+    simplifiesOnConstants(Constant(_)),
     widenConstTyper(_(0)),
     reflexiveUntyper)
 }

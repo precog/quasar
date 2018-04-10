@@ -34,6 +34,8 @@ trait TTypes[T[_[_]]] {
   type MapFunc[A]        = quasar.qscript.MapFunc[T, A]
   type FreeMapA[A]       = quasar.qscript.FreeMapA[T, A]
   type FreeMap           = quasar.qscript.FreeMap[T]
+  type RecFreeMap        = quasar.qscript.RecFreeMap[T]
+  type RecFreeMapA[A]    = quasar.qscript.RecFreeMapA[T, A]
   type JoinFunc          = quasar.qscript.JoinFunc[T]
   type CoEnvQS[A]        = quasar.qscript.CoEnvQS[T, A]
   type CoEnvMapA[A, B]   = quasar.qscript.CoEnvMapA[T, A, B]

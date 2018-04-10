@@ -4,9 +4,11 @@
     "backends": {
         "couchbase":      "pending",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":          "ignoreFieldOrder"
+        "mimir":          "ignoreFieldOrder",
+        "postgres":       "pending"
     },
 
+    "NB": "Pending for postgres connector due to Cond implementation missing qz-3734",
     "data": "zips.data",
 
     "query": "select distinct

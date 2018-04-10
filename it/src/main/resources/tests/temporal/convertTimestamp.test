@@ -3,11 +3,13 @@
 
     "backends": {
         "couchbase": "ignoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder",
+        "postgres": "pending",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "marklogic_xml": "pending",
         "mimir":"pendingIgnoreFieldOrder"
     },
-
+    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "../days.data",
 
     "query": "select day, ts, to_timestamp(epoch) as converted from `../days` where ts = to_timestamp(1408255200000) or to_timestamp(epoch) = timestamp(\"2014-08-18T07:00:00Z\")",

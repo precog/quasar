@@ -25,7 +25,8 @@ import quasar.qscript.{
   construction,
   Hole,
   OnUndefined,
-  SrcHole
+  SrcHole,
+  RecFreeS
 }
 import quasar.qscript.qsu.{QScriptUniform => QSU}
 import QSU.Rotation
@@ -85,7 +86,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
               "0" -> func.RightTarget
             )
           val firstShiftPat: QScriptUniform[Symbol] =
-            QSU.LeftShift[T, Symbol](source.root, struct, idStatus, OnUndefined.Emit, firstRepair, rotation)
+            QSU.LeftShift[T, Symbol](source.root, RecFreeS.fromFree(struct), idStatus, OnUndefined.Emit, firstRepair, rotation)
           for {
             firstShift <- QSUGraph.withName[T, G](namePrefix)(firstShiftPat)
             _ <- ApplyProvenance.computeProvenance[T, G](firstShift)
@@ -98,7 +99,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
                 val repair = func.ConcatMaps(staticAbove, func.MakeMapS((idx + 1).toString, func.RightTarget))
                 val struct = newStruct >> func.ProjectKeyS(func.Hole, originalKey)
                 val newShiftPat =
-                  QSU.LeftShift[T, Symbol](shiftAbove.root, struct, newIdStatus, OnUndefined.Emit, repair, newRotation)
+                  QSU.LeftShift[T, Symbol](shiftAbove.root, RecFreeS.fromFree(struct), newIdStatus, OnUndefined.Emit, repair, newRotation)
                 for {
                   newShift <- QSUGraph.withName[T, G](namePrefix)(newShiftPat)
                   _ <- ApplyProvenance.computeProvenance[T, G](newShift)

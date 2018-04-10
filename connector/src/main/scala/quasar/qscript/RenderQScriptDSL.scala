@@ -137,12 +137,11 @@ object RenderQScriptDSL {
     case Data.Str(s) => "Data.Str(\"" + s + "\")"
   }
 
-  def mapFuncRenderQScriptDSLDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, MapFunc[T, ?]] =
+  def mapFuncRenderQScriptDSLDelay[T[_[_]]: RecursiveT](prefix: String): Delay[RenderQScriptDSL, MapFunc[T, ?]] =
     new Delay[RenderQScriptDSL, MapFunc[T, ?]] {
       import MapFuncsCore._, MapFuncsDerived._
       def apply[A](fa: RenderQScriptDSL[A]) = {
         (base: String, mf: MapFunc[T, A]) =>
-          val prefix = "func"
           val (label, children) = mf.run.fold({
             case Constant(ejson) => ("Constant", (eJsonRenderQScriptDSL[T].apply(base, ejson).right :: Nil).some)
             case Undefined()     => ("Undefined", none)
@@ -251,7 +250,18 @@ object RenderQScriptDSL {
 
   def freeMapARender[T[_[_]]: RecursiveT, A](A: RenderQScriptDSL[A]): RenderQScriptDSL[FreeMapA[T, A]] = {
     def toDsl(base: String, mf: FreeMapA[T, A]): DSLTree =
-      mf.resume.fold(mapFuncRenderQScriptDSLDelay[T].apply[FreeMapA[T, A]](toDsl)(base, _), A(base, _))
+      mf.resume.fold(mapFuncRenderQScriptDSLDelay[T]("func").apply[FreeMapA[T, A]](toDsl)(base, _), A(base, _))
+
+    toDsl
+  }
+
+  def recFreeMapARender[T[_[_]]: RecursiveT, A](A: RenderQScriptDSL[A]): RenderQScriptDSL[RecFreeMapA[T, A]] = {
+    def lin(d: (String, RecFreeMapA[T, A])): (String, FreeMapA[T, A]) = d.rightMap(_.linearize)
+
+    def toDsl(base: String, mf: RecFreeMapA[T, A]): DSLTree =
+      mf.linearize.resume.fold(mapFuncRenderQScriptDSLDelay[T]("recFunc")
+        .apply[FreeMapA[T, A]] { case (s, f) => toDsl(s, RecFreeS.fromFree(f)) } (base, _), A(base, _))
+
     toDsl
   }
 
@@ -267,6 +277,7 @@ object RenderQScriptDSL {
   }
 
   def freeMapRender[T[_[_]]: RecursiveT] = freeMapARender(holeRender("func"))
+  def recFreeMapRender[T[_[_]]: RecursiveT] = recFreeMapARender(holeRender("recFunc"))
   def joinFuncRender[T[_[_]]: RecursiveT] = freeMapARender(joinSideRender("func"))
   def freeMapReduceIndexRender[T[_[_]]: RecursiveT] = freeMapARender(reduceIndexRender("func"))
 
@@ -315,9 +326,11 @@ object RenderQScriptDSL {
     new Delay[RenderQScriptDSL, QScriptCore[T, ?]] {
       def apply[A](A: RenderQScriptDSL[A]): RenderQScriptDSL[QScriptCore[T, A]] = {
         val freeMap = freeMapRender[T]
+        val recFreeMap = recFreeMapRender[T]
         val joinFunc = joinFuncRender[T]
         val reduceIndex = freeMapReduceIndexRender[T]
         val freeQS = freeQSRender[T]
+
         (base: String, qsc: QScriptCore[T, A]) => qsc match {
           case Map(src, f) =>
             DSLTree(base, "Map", (A(base, src).right :: freeMap(base, f).right :: Nil).some)
@@ -325,7 +338,7 @@ object RenderQScriptDSL {
           case LeftShift(src, struct, idStatus, shiftType, undef, repair) =>
             DSLTree(base, "LeftShift",
               (A(base, src).right ::
-                freeMap(base, struct).right ::
+                recFreeMap(base, struct).right ::
                 idStatus.shows.left ::
                 ("ShiftType." + shiftType.shows).left ::
                 ("OnUndefined." + undef.shows).left ::

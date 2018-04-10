@@ -33,18 +33,6 @@ final case class DocVar(name: DocVar.Name, deref: Option[BsonField]) {
     (this.deref |@| that.deref)(_ startsWith (_)) getOrElse (that.deref.isEmpty)
   }
 
-  // FIXME: This overloading is terrible, but would break many things to change,
-  //        and we need to think about what is the right set of operators.
-  @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
-  def \ (that: DocVar): Option[DocVar] = (this, that) match {
-    case (DocVar(n1, f1), DocVar(n2, f2)) if (n1 == n2) =>
-      val f3 = (f1 |@| f2)(_ \ _) orElse (f1) orElse (f2)
-
-      Some(DocVar(n1, f3))
-
-    case _ => None
-  }
-
   def \\ (that: DocVar): DocVar = (this, that) match {
     case (DocVar(n1, f1), DocVar(_, f2)) =>
       val f3 = (f1 |@| f2)(_ \ _) orElse (f1) orElse (f2)

@@ -3,8 +3,11 @@
     "backends": {
         "marklogic_xml":     "pending",
         "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending"
+        "mongodb_3_4":       "pending",
+        "postgres":          "pending"
     },
+    "NB": "working on mongo_3_4 because it uses version >= 3.4.4. Expected to still fail on version < 3.4.4",
+    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "newTests.data",
     "query": "select distinct backends{_:} from newTests",
     "predicate": "exactly",

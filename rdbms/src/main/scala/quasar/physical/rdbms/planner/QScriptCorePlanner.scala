@@ -167,7 +167,7 @@ F[_]: Monad: NameGenerator: PlannerErrorME](
     case qscript.LeftShift(src, struct, ExcludeId, ShiftType.Array, _, repair) =>
       for {
         structAlias <- genId[T[SqlExpr], F](deriveIndirection(src))
-        structExpr  <- processFreeMap(struct, structAlias)
+        structExpr  <- processFreeMap(struct.linearize, structAlias)
         right = ArrayUnwind(structExpr)
         repaired <- processJoinFunc(mapFuncPlanner)(repair, structAlias, right)
         result = Select[T[SqlExpr]](

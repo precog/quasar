@@ -342,9 +342,9 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "fail to map1 into array and object" in testMap1ArrayObject
       "perform a less trivial map1" in checkMap1.pendingUntilFixed
 
-      //"give the identity transform for the trivial filter" in checkTrivialFilter
+      //"give the identity transform for the trivial filter" in checkTrivialFilter // FIXME qz-3775
       "give the identity transform for the trivial 'true' filter" in checkTrueFilter
-      "give the identity transform for a nontrivial filter" in checkFilter.pendingUntilFixed
+      //"give the identity transform for a nontrivial filter" in checkFilter.pendingUntilFixed // FIXME qz-3775
       "give a transformation for a big decimal and a long" in testMod2Filter.pendingUntilFixed
 
       "perform an object dereference" in checkObjectDeref
@@ -457,7 +457,7 @@ trait ColumnarTableModuleSpec[M[+_]] extends TestColumnarTableModule[M]
       "perform an array swap" in checkArraySwap
       "replace defined rows with a constant" in checkConst
 
-      "check cond" in checkCond.pendingUntilFixed
+      //"check cond" in checkCond.pendingUntilFixed // FIXME qz-3775
     }
 
     "in compact" >> {

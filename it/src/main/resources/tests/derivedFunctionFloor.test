@@ -1,8 +1,10 @@
 {
     "name": "derived function floor",
     "backends": {
-      "couchbase": "ignoreFieldOrder"
+      "couchbase": "ignoreFieldOrder",
+      "postgres":   "pending"
     },
+    "NB": "Pending for postgres connector due to Cond implementation missing qz-3734",
     "data": "divide.data",
     "query": "select nr, floor(val3) as floor1 from divide",
     "predicate": "exactly",

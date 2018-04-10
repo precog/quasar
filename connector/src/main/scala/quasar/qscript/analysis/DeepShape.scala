@@ -151,7 +151,7 @@ sealed abstract class DeepShapeInstances {
         case LeftShift(shape, struct, id, _, _, repair) =>
           repair >>= {
             case LeftSide => shape
-            case RightSide => freeShape[T](Shifting[T](id, struct >> shape))
+            case RightSide => freeShape[T](Shifting[T](id, struct.linearize >> shape))
           }
 
         case Reduce(shape, bucket, reducers, repair) =>

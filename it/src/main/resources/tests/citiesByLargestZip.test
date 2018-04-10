@@ -1,9 +1,11 @@
 {
     "name": "cities with largest individual zip codes",
     "backends": {
-        "couchbase": "pending"
+        "couchbase": "pending",
+        "postgres":   "pending"
     },
 
+    "NB": "Pending for postgres connector due to unimplemented errors qz-3735",
     "data": "zips.data",
 
     "query": "select distinct city from zips order by pop desc limit 5",

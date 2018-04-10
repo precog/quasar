@@ -53,7 +53,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
       }
 
       "LeftShift" >> {
-        val struct: FreeMap = func.ProjectIndexI(func.Hole, 3)
+        val struct = recFunc.ProjectIndexI(recFunc.Hole, 3)
 
         val repair: JoinFunc =
           func.ConcatArrays(
@@ -65,7 +65,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
         val expected: FreeShape[Fix] =
           func.ConcatArrays(
             func.MakeArray(func.Add(shape, IntLit(9))),
-            func.MakeArray(func.Subtract(freeShape(Shifting(IdOnly, struct >> shape)), IntLit(10))))
+            func.MakeArray(func.Subtract(freeShape(Shifting(IdOnly, struct.linearize >> shape)), IntLit(10))))
 
         deepShapeQS(qs) must equal(expected)
       }
@@ -197,13 +197,12 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
     }
 
     "Joins" >> {
-
       val lBranch: FreeQS =
         free.LeftShift(
           free.Map(
             free.Hole,
             func.ProjectKeyS(func.Hole, "foo")),
-          func.Hole,
+          recFunc.Hole,
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -214,7 +213,7 @@ final class DeepShapeSpec extends quasar.Qspec with QScriptHelpers with TTypes[F
           free.Map(
             free.Hole,
             func.ProjectKeyS(func.Hole, "bar")),
-          func.Hole,
+          recFunc.Hole,
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,

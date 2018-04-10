@@ -4,8 +4,10 @@
         "couchbase": "pending",
         "marklogic_json": "ignoreFieldOrder",
         "marklogic_xml":     "skip",
-        "mimir": "ignoreFieldOrder"
+        "mimir": "ignoreFieldOrder",
+        "postgres": "pending"
     },
+    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "zips.data",
     "query": "SELECT `_id` as zip, loc as loc, loc[*] as coord FROM zips",
     "predicate": "atLeast",

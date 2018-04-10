@@ -10,6 +10,7 @@
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending",
         "mongodb_read_only": "pending",
+        "postgres":          "pending",
         "spark_cassandra":   "pending"
     },
     "NB": "Pending for all connectors because of qz-3686",

@@ -103,7 +103,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
     val base: Fix[QS] =
       fix.LeftShift(
         fix.Read[AFile](rootDir </> dir("foo") </> file("bar")),
-        func.Hole,
+        recFunc.Hole,
         ExcludeId,
         ShiftType.Array,
         OnUndefined.Omit,
@@ -115,6 +115,11 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
     def prjFrom[A](src: FreeMapA[A], key: String, keys: String*): FreeMapA[A] =
       MapFuncCore.StaticMap((key :: keys.toList) map { name =>
         json.str(name) -> func.ProjectKeyS(src, name)
+      })
+
+    def recPrjFrom[A](src: RecFreeMapA[A], key: String, keys: String*): RecFreeMapA[A] =
+      MapFuncCore.RecStaticMap((key :: keys.toList) map { name =>
+        json.str(name) -> recFunc.ProjectKeyS(src, name)
       })
 
     "Map" >> {
@@ -135,7 +140,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val q =
         fix.LeftShift(
           base,
-          func.DeleteKeyS(func.Hole, "c"),
+          recFunc.DeleteKeyS(recFunc.Hole, "c"),
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -146,7 +151,7 @@ final class PreferProjectionSpec extends quasar.Qspec with QScriptHelpers {
       val e =
         fix.LeftShift(
           base,
-          prjFrom(func.Hole, "a", "b"),
+          recPrjFrom(recFunc.Hole, "a", "b"),
           IncludeId,
           ShiftType.Array,
           OnUndefined.Omit,

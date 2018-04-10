@@ -24,6 +24,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
+import quasar.physical.mongodb.planner.common._
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql.JoinDir
@@ -264,11 +265,11 @@ class PlannerQScriptSpec extends
           fix.Filter(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
             func.Eq(func.ProjectKeyS(func.Hole, "state"), func.Constant(json.str("CO")))),
-          func.Guard(
-            func.ProjectKeyS(func.Hole, "codes"),
+          recFunc.Guard(
+            recFunc.ProjectKeyS(recFunc.Hole, "codes"),
             Type.FlexArr(0, None, Type.Top),
-            func.ProjectKeyS(func.Hole, "codes"),
-            func.Undefined),
+            recFunc.ProjectKeyS(recFunc.Hole, "codes"),
+            recFunc.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,
@@ -304,11 +305,11 @@ class PlannerQScriptSpec extends
         fix.Filter(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
+            recFunc.Guard(
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
               Type.FlexArr(0, None, Type.Top),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
+              recFunc.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -340,11 +341,11 @@ class PlannerQScriptSpec extends
         fix.Filter(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
+            recFunc.Guard(
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
               Type.FlexArr(0, None, Type.Top),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
+              recFunc.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -353,17 +354,17 @@ class PlannerQScriptSpec extends
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
-            "0" ->
+            Keys.wrap ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
                 $literal(Bson.Undefined)))),
-          $unwind(DocField("0"), None, None),
+          $unwind(DocField(Keys.wrap), None, None),
           $match(Selector.Doc(
-            BsonField.Name("0") -> Selector.Lt(Bson.Int32(-165)))),
-          $project(reshape(sigil.Quasar -> $field("0")))))
+            BsonField.Name(Keys.wrap) -> Selector.Lt(Bson.Int32(-165)))),
+          $project(reshape(sigil.Quasar -> $field(Keys.wrap)))))
     }
 
     "plan double flatten with reference to LeftSide" in {
@@ -371,11 +372,11 @@ class PlannerQScriptSpec extends
         fix.LeftShift(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
+            recFunc.Guard(
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
               Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
+              recFunc.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -388,7 +389,7 @@ class PlannerQScriptSpec extends
                   func.Undefined),
               "original" ->
                 func.LeftSide)),
-          func.ProjectKeyS(func.Hole, "results"),
+          recFunc.ProjectKeyS(recFunc.Hole, "results"),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           OnUndefined.Omit,
@@ -433,11 +434,11 @@ class PlannerQScriptSpec extends
         fix.LeftShift(
           fix.LeftShift(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "loc"),
+            recFunc.Guard(
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
               Type.FlexArr(0, None, Type.FlexArr(0, None, Type.Top)),
-              func.ProjectKeyS(func.Hole, "loc"),
-              func.Undefined),
+              recFunc.ProjectKeyS(recFunc.Hole, "loc"),
+              recFunc.Undefined),
             qscript.ExcludeId,
             qscript.ShiftType.Array,
             OnUndefined.Omit,
@@ -445,7 +446,7 @@ class PlannerQScriptSpec extends
               Type.FlexArr(0, None, Type.Top),
               func.RightSide,
               func.Undefined)),
-          func.Hole,
+          recFunc.Hole,
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           OnUndefined.Omit,
@@ -453,36 +454,36 @@ class PlannerQScriptSpec extends
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
-            "0" ->
+            Keys.wrap ->
               $cond(
                 $and(
                   $lte($literal(Bson.Arr()), $field("loc")),
                   $lt($field("loc"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
                 $field("loc"),
                 $literal(Bson.Undefined)))),
-          $unwind(DocField("0"), None, None),
+          $unwind(DocField(Keys.wrap), None, None),
           $project(reshape(
-            "0" ->
+            Keys.wrap ->
               $cond(
                 $and(
-                  $lte($literal(Bson.Arr()), $field("0")),
-                  $lt($field("0"), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
-                $field("0"),
+                  $lte($literal(Bson.Arr()), $field(Keys.wrap)),
+                  $lt($field(Keys.wrap), $literal(Bson.Binary.fromArray(scala.Array[Byte]())))),
+                $field(Keys.wrap),
                 $literal(Bson.Undefined)))),
-          $unwind(DocField("0"), None, None),
+          $unwind(DocField(Keys.wrap), None, None),
           $project(reshape(
-            sigil.Quasar -> $field("0")))))
+            sigil.Quasar -> $field(Keys.wrap)))))
     }
 
     "plan flatten with reference to LeftSide" in {
       qplan(
         fix.LeftShift(
           fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-          func.Guard(
-            func.ProjectKeyS(func.Hole, "loc"),
+          recFunc.Guard(
+            recFunc.ProjectKeyS(recFunc.Hole, "loc"),
             Type.FlexArr(0, None, Type.Top),
-            func.ProjectKeyS(func.Hole, "loc"),
-            func.Undefined),
+            recFunc.ProjectKeyS(recFunc.Hole, "loc"),
+            recFunc.Undefined),
           qscript.ExcludeId,
           qscript.ShiftType.Array,
           OnUndefined.Omit,
@@ -510,32 +511,33 @@ class PlannerQScriptSpec extends
 
     "plan flatten with Cond in struct and repair" in {
       qplan(
-        fix.LeftShift(fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
-          func.Guard(
-            func.ProjectKeyS(
-              func.Cond(
-                func.And(
-                  func.Eq(
-                    func.ProjectKey(func.Hole, func.Constant(json.str("state"))),
-                    func.Constant(json.str("CO"))),
-                  func.Within(
-                    func.ProjectKey(func.Hole, func.Constant(json.str("city"))),
-                    func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
-                func.Hole,
-                func.Undefined),
+        fix.LeftShift(
+          fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
+          recFunc.Guard(
+            recFunc.ProjectKeyS(
+              recFunc.Cond(
+                recFunc.And(
+                  recFunc.Eq(
+                    recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("state"))),
+                    recFunc.Constant(json.str("CO"))),
+                  recFunc.Within(
+                    recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("city"))),
+                    recFunc.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                recFunc.Hole,
+                recFunc.Undefined),
               "codes"),
             Type.FlexArr(0, None, Type.Top),
-            func.ProjectKeyS(
-              func.Cond(
-                func.And(
-                  func.Eq(
-                    func.ProjectKeyS(func.Hole, "state"),
-                    func.Constant(json.str("CO"))),
-                  func.Within(
-                    func.ProjectKeyS(func.Hole, "city"),
-                    func.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
-                func.Hole, func.Undefined), "codes"),
-            func.Undefined),
+            recFunc.ProjectKeyS(
+              recFunc.Cond(
+                recFunc.And(
+                  recFunc.Eq(
+                    recFunc.ProjectKeyS(recFunc.Hole, "state"),
+                    recFunc.Constant(json.str("CO"))),
+                  recFunc.Within(
+                    recFunc.ProjectKeyS(recFunc.Hole, "city"),
+                    recFunc.Constant(json.arr(List(json.str("BOULDER"), json.str("AURORA")))))),
+                recFunc.Hole, recFunc.Undefined), "codes"),
+            recFunc.Undefined),
           qscript.ExcludeId,
           ShiftType.Array,
           OnUndefined.Omit,

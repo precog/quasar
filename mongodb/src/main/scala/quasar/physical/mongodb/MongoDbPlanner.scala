@@ -638,7 +638,7 @@ object MongoDbPlanner {
                 getJsMerge[T, M](
                   _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
 
-              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val struct0 = struct.linearize.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
               val repair0 = repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
 
               val src0: M[WorkflowBuilder[WF]] =
@@ -651,15 +651,18 @@ object MongoDbPlanner {
                   exprOrJs(_)(exprMerge, jsMerge), cfg.bsonVersion)(
                   FlatteningBuilder(
                     src1,
-                    shiftType match {
-                      case ShiftType.Array => Set(StructureType.Array(DocField(structKey), id))
-                      case ShiftType.Map   => Set(StructureType.Object(DocField(structKey), id))
-                    }, List(rootKey).some), repair0))
-            }
+                    Set(StructureType.mk(shiftType, structKey, id)),
+                    List(rootKey).some),
+                  repair0))
 
-            else {
-              val struct0 = struct.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
-              val repair0 = repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+            } else {
+
+              val struct0 = struct.linearize.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
+              val repair0 =
+                repair.as[Hole](SrcHole).transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole])) >>=
+                  κ(Free.roll(MFC(MapFuncsCore.ProjectKey[T, FreeMap[T]](HoleF[T], MapFuncsCore.StrLit(Keys.wrap)))))
+
+              val wrapKey = BsonField.Name(Keys.wrap)
 
               getBuilder[T, M, WF, EX, Hole](
                 handleFreeMap[T, M, EX](
@@ -669,12 +672,10 @@ object MongoDbPlanner {
                     cfg.funcHandler, cfg.staticHandler, _),
                   cfg.bsonVersion)(
                   FlatteningBuilder(
-                    builder,
-                    shiftType match {
-                      case ShiftType.Array => Set(StructureType.Array(DocVar.ROOT(), id))
-                      case ShiftType.Map => Set(StructureType.Object(DocVar.ROOT(), id))
-                    }, List().some),
-                    repair0))
+                    DocBuilder(builder, ListMap(wrapKey -> docVarToExpr(DocVar.ROOT()))),
+                    Set(StructureType.mk(shiftType, wrapKey, id)),
+                    List().some),
+                  repair0))
             }
 
           }

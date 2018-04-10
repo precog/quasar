@@ -146,14 +146,14 @@ final class CompressionSpec extends quasar.Qspec
     }
 
     "combines multiple instances of a primary SST in unions" >> prop {
-      (sts: NonEmptyList[SimpleType], a1: NonEmptyList[J], a2: NonEmptyList[J]) =>
-      val as1 = SST.fromEJson(Real(1), J.arr(a1.toList))
-      val as2 = SST.fromEJson(Real(1), J.arr(a2.toList))
-      val xs  = sts.list.map(st => envT(cnt1, TypeST(TypeF.simple[J, S](st))).embed)
-      val cnt = TypeStat.count(Real(xs.length + 2))
+      (x: SimpleType, xs: NonEmptyList[SimpleType]) =>
 
-      val union = envT(cnt, TypeST(TypeF.union[J, S](as1, as2, xs))).embed
-      val sum   = NonEmptyList.nel(as1, as2 :: xs).suml1
+      val y   = envT(cnt1, TypeST(TypeF.simple[J, S](x))).embed
+      val ys  = xs.map(st => envT(cnt1, TypeST(TypeF.simple[J, S](st))).embed)
+      val cnt = TypeStat.count(Real(ys.length + 1))
+
+      val union = envT(cnt, TypeST(TypeF.union[J, S](y, ys.head, ys.tail))).embed
+      val sum   = (y <:: ys).suml1
 
       attemptCompression(union, compression.coalescePrimary) must_= sum
     }

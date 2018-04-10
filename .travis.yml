@@ -96,6 +96,8 @@ script:
 
   - set +e
 
+  - ./sbt postBuild
+
 jobs:
   include:
     - stage: clean
@@ -124,11 +126,14 @@ jobs:
       env:
       script:
         - ./sbt preBuild
+
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
             it/sideEffectTestFSConfig \
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
+
+        - ./sbt postBuild
 
     - stage: publish
       env:

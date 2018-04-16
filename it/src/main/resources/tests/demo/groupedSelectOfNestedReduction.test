@@ -2,11 +2,9 @@
     "name": "select unreduced grouped values from nested select with reduction",
     "backends": {
         "couchbase":         "skip",
-        "marklogic_json":    "pending",
-        "postgres":          "pending"
+        "marklogic_json":    "pending"
     },
     "NB": "disabled on couchbase due to lack of general join",
-    "NB2": "pending for Postgres due to unsupported nested MakeMaps",
     "data": "patients.data",
     "query": "select city, cnt as c from (select city, count(*) as cnt from patients where state = \"NY\"
               group by city order by count(*) desc, city limit 10) group by city order by c desc, city",

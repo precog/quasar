@@ -63,15 +63,8 @@ package object main extends Logging {
 
   // all of the backends which are included in the core distribution
   private val CoreFS = IList(
-    // Couchbase.definition translate injectFT[Task, PhysFsEff],
-    // marklogic.MarkLogic.definition translate injectFT[Task, PhysFsEff],
     mimir.Mimir.definition translate injectFT[Task, PhysFsEff],
-    // mongodb.MongoDb.definition translate injectFT[Task, PhysFsEff],
-    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff]// ,
-    // sparkcore.fs.hdfs.SparkHdfsBackendModule.definition translate injectFT[Task, PhysFsEff],
-    // sparkcore.fs.elastic.SparkElasticBackendModule.definition translate injectFT[Task, PhysFsEff],
-    // sparkcore.fs.cassandra.SparkCassandraBackendModule.definition translate injectFT[Task, PhysFsEff],
-    // sparkcore.fs.local.SparkLocalBackendModule.definition translate injectFT[Task, PhysFsEff]
+    skeleton.Skeleton.definition translate injectFT[Task, PhysFsEff]
   ).fold
 
   val QuasarAPI = QuasarAPIImpl[Free[CoreEff, ?]](liftFT)

@@ -3,8 +3,7 @@
     "backends": {
         "couchbase":      "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir":          "ignoreFieldOrder",
-        "postgres":        "pending"
+        "mimir":          "ignoreFieldOrder"
     },
     "data": "smallZips.data",
     "query": "select city, pop, pop between 1000 and 10000 as midsized from smallZips",

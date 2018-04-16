@@ -2,10 +2,8 @@
     "name": "reduced expressions which trigger bad field ordering in MongoDB (#598)",
 
     "backends": {
-        "mimir": "ignoreFieldOrder",
-        "postgres": "pending"
+        "mimir": "ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "zips.data",
 
     "query": "select count(*)/1000, 0 from zips limit 5",

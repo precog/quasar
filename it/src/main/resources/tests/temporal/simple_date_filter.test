@@ -1,9 +1,9 @@
 {
     "name": "simple filter using date literals",
     "backends": {
-        "marklogic_json":    "pending",
-        "marklogic_xml":     "pending",
-        "mimir":             "pending"
+        "marklogic_json": "pending",
+        "marklogic_xml":  "pending",
+        "mimir":          "pending"
     },
     "data":  "../days.data",
     "query": "select ts from `../days` where ts > date(\"2014-08-18\")",

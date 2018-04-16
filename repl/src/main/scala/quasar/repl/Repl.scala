@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
 import quasar.Planner.PlannerError
 import quasar.common.{PhaseResult, PhaseResults}
-import quasar.connector.{BackendModule, CompileM}
+import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
@@ -171,7 +171,7 @@ object Repl {
         LPtoQS[Fix].apply[EitherT[StateT[CompileM, Long, ?], PlannerError, ?]](lp)
           .leftMap(qscriptPlanningFailed(_))
           .mapT(_.eval(0))
-          .flatMap(qs => BackendModule.logPhase[M](PhaseResult.tree("QScript (Educated)", qs)))
+          .flatMap(qs => PhaseResults.logPhase[M](PhaseResult.tree("QScript (Educated)", qs)))
 
       queryPlan(expr, vars, basePath, 0L, None)
         .liftM[FileSystemErrT]

@@ -1,17 +1,14 @@
 {
     "name": "unshift aggregation",
-    "NB": "Couchbase pending due to different ordering of pop array. Enable once group contents ordering is possible.",
-    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "backends": {
         "couchbase":         "pending",
         "marklogic_json":    "ignoreFieldOrder",
         "mimir":             "ignoreFieldOrder",
         "mongodb_3_2":       "ignoreFieldOrder",
         "mongodb_3_4":       "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
-        "postgres":          "pending",
-	    "spark_cassandra":   "pending"
+        "mongodb_read_only": "ignoreFieldOrder"
     },
+    "NB": "Couchbase pending due to different ordering of pop array. Enable once group contents ordering is possible.",
     "data": "zips.data",
     "query": "select state, city, [pop ...] as pop from zips group by state, city",
     "predicate": "atLeast",

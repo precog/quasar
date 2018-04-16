@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Data, Planner, Type}, Planner._, Type.{Coproduct => _, _}
+import quasar.{Data, Planner => QPlanner, Type}, QPlanner._, Type.{Coproduct => _, _}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._

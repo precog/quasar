@@ -4,8 +4,7 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "pending",
-       "postgres":          "ignoreFieldOrder"
+       "mimir":             "pending"
     },
     "NB": "mimir is pending because the results are not properly ordered - it can only be fully ASC or DESC, you can not mix sorting orders",
     "query": "temp0 := SELECT * FROM olympics;

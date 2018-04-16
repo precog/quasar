@@ -47,7 +47,7 @@ import scalaz.concurrent.Task
 
 trait BackendModule {
   import BackendDef.{DefErrT, DefinitionResult}
-  import BackendModule._
+  import PhaseResults._
 
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
@@ -266,9 +266,4 @@ trait BackendModule {
   }
 
   def AnalyzeModule: AnalyzeModule
-}
-
-object BackendModule {
-  final def logPhase[M[_]: Monad: PhaseResultTell](pr: PhaseResult): M[Unit] =
-    PhaseResultTell[M].tell(Vector(pr))
 }

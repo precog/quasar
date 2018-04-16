@@ -19,8 +19,8 @@ package quasar.fp
 import slamdata.Predef._
 
 import java.util.concurrent.atomic.AtomicReference
+
 import scalaz.syntax.id._
-import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
 /** A thread-safe, atomically updatable mutable reference.
@@ -34,6 +34,7 @@ sealed abstract class TaskRef[A] {
   def write(a: A): Task[Unit]
   def compareAndSet(oldA: A, newA: A): Task[Boolean]
   def modifyS[B](f: A => (A, B)): Task[B]
+  def modifyT[B](f: A => Task[(A, B)]): Task[B]
   def modify(f: A => A): Task[A] =
     modifyS(a => f(a).squared)
 }
@@ -42,16 +43,31 @@ object TaskRef {
   def apply[A](initial: A): Task[TaskRef[A]] = Task delay {
     new TaskRef[A] {
       val ref = new AtomicReference(initial)
+
       def read = Task.delay(ref.get)
       def write(a: A) = Task.delay(ref.set(a))
+
       def compareAndSet(oldA: A, newA: A) =
         Task.delay(ref.compareAndSet(oldA, newA))
+
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def modifyS[B](f: A => (A, B)) =
-        read >>= (a0 => {
-          val (a1, b) = f(a0)
-          compareAndSet(a0, a1) >>= (if (_) Task.now(b) else modifyS(f))
-        })
+      def modifyS[B](f: A => (A, B)): Task[B] =
+        for {
+          a0 <- read
+          (a1, b) = f(a0)
+          bool <- compareAndSet(a0, a1)
+          back <- if (bool) Task.now(b) else modifyS[B](f)
+        } yield back
+
+      @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+      def modifyT[B](f: A => Task[(A, B)]): Task[B] =
+        for {
+          a0 <- read
+          tup <- f(a0)
+          (a1, b) = tup
+          bool <- compareAndSet(a0, a1)
+          back <- if (bool) Task.now(b) else modifyT[B](f)
+        } yield back
     }
   }
 }

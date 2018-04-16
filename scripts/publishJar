@@ -19,9 +19,6 @@ if [[ "$TRAVIS" == "true"                                              &&
       ("$TRAVIS_BRANCH" == "master" || "$TRAVIS_BRANCH" == backport/*) &&
       "$TRAVIS_REPO_SLUG" == "quasar-analytics/quasar" ]] ; then
 
-    # 'set every sparkDependencyProvided := true' \
-    # sparkcore/githubRelease \
-
   "$SBT" \
     repl/githubRelease \
     web/githubRelease \

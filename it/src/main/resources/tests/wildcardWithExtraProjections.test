@@ -1,9 +1,7 @@
 {
   "name": "wildcard with additional projections and filtering",
   "backends": {
-    "postgres": "pending"
   },
-  "NB": "Pending for postgres connector due to boxed result errors qz-3739",
   "data": "zips.data",
   "query": "select *, concat(city, concat(\", \", state)) as city_state, city = \"BOULDER\" as boulderish from zips where city like \"BOULDER%\"",
   "predicate": "exactly",

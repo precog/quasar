@@ -9,12 +9,7 @@
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending",
-        "postgres":          "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_elastic":     "pending",
-        "spark_cassandra":   "pending"
+        "mongodb_read_only": "pending"
     },
     "data": "slamengine_commits.data",
     "query": "select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)",

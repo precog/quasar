@@ -4,8 +4,7 @@
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "pendingIgnoreFieldOrder",
         "marklogic_xml": "pending",
-        "mimir":"pendingIgnoreFieldOrder",
-        "postgres": "ignoreFieldOrder"
+        "mimir":"pendingIgnoreFieldOrder"
     },
     "data": "smalltimeseries.data",
     "query": "

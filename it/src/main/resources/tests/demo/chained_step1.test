@@ -4,10 +4,8 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder",
-       "postgres":          "pending"
+       "mimir":             "ignoreFieldOrder"
     },
-    "NB": "Pending for Postgres due to qz-3626 (Superfluous synthetic sort key created when sorting on aliased field)",
     "query": "SELECT DISTINCT (state) as State FROM patients ORDER BY state ASC LIMIT 5",
     "predicate": "exactly",
     "expected": [

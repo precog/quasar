@@ -10,10 +10,8 @@
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
         "mongodb_3_6":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder",
-        "postgres":          "pending"
+        "mongodb_read_only": "pendingIgnoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to unimplemented errors qz-3735",
     "data": "../days.data",
 
     "query": "select day, time_of_day(ts) as tod, time_of_day(day) as notadate, time_of_day(missing) as missing from `../days`

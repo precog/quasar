@@ -64,8 +64,6 @@ quasar_metastore
 quasar_marklogic_xml
 quasar_marklogic_json
 quasar_couchbase
-quasar_spark_hdfs
-quasar_spark_cluster
 ```
 
 Knowing which backend datastores are supported you can create and configure docker containers using `setupContainers`. For example
@@ -133,8 +131,6 @@ The `<mountPath>` specifies the path of your mount point and the remaining param
 | `marklogic`     | `xcc://`         | [MarkLogic](#marklogic)      |
 | `mimir`         | `mimir=`         | "\<path-to-directory\>"      |
 | `mongodb`       | `mongodb://`     | [MongoDB](#database-mounts)  |
-| `spark-hdfs`    | `spark://`       | [Spark HDFS](#apache-spark)  |
-| `spark-local`   | `spark_local=`   | [Spark](#apache-spark)       |
 
 
 See [here](#get-mountfspath) for more details on the mount web api service.
@@ -181,7 +177,7 @@ Now run the `assembly` task for the relevant backend:
 $ ./sbt mongodb/assembly
 ```
 
-The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `sparkcore/assembly` will produce a very different JAR from `mongodb/assembly`).
+The path to the JAR will be something like `./.targets/mongodb/scala-2.11/quasar-mongodb-internal-assembly-23.1.5.jar`, though the exact name of the JAR (and the directory path in question) will of course depend on the backend built (for example, `marklogic/assembly` will produce a very different JAR from `mongodb/assembly`).
 
 For each backend that you wish to support, run that backend's `assembly` and copy the JAR file into your new `plugins/` directory.  Once this is done, you can launch the web assembly using the following sort of command:
 
@@ -212,10 +208,6 @@ What follows is a list of class names for each supported backend:
 | `couchbase`       | `quasar.physical.couchbase.Couchbase$`                   |
 | `marklogic`       | `quasar.physical.marklogic.MarkLogic$`                   |
 | `mongodb`         | `quasar.physical.mongodb.MongoDb$`                       |
-| `spark-cassandra` | `quasar.physical.sparkcore.fs.cassandra.SparkCassandra$` |
-| `spark-elastic`   | `quasar.physical.sparkcore.fs.elastic.SparkElastic$`     |
-| `spark-hdfs`      | `quasar.physical.sparkcore.fs.hdfs.SparkHdfs$`           |
-| `spark-local`     | `quasar.physical.sparkcore.fs.local.SparkLocal$`         |
 
 Mimir is not included in the above, since it is already built into the core of quasar.
 
@@ -320,20 +312,6 @@ Known Limitations
 - Join unimplemented — future support planned
 - [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
-#### Apache Spark
-
-To connect to Apache Spark and use either local files or HDFS to query data use the following `connectionUri`:
-
-with local files:
-
-`spark_local=\"/path/to/data/my.data\"`
-
-with HDFS:
-
-`spark://<host>:<port>?rootPath=<rootPath>&hdfsUri=<hdfsUri>[&spark_configuration=spark_configuration_value]`
-
-For example: "spark://10.0.0.4:7077?hdfsUri=hdfs%3A%2F%2F10.0.0.3%3A9000&rootPath=/data&spark.executor.memory=4g&spark.eventLog.enabled=true"
-
 #### MarkLogic
 
 To connect to MarkLogic, specify an [XCC URL](https://docs.marklogic.com/guide/xcc/concepts#id_55196) with a `format` query parameter and an optional root directory as the `connectionUri`:
@@ -403,15 +381,6 @@ To create a new module one would send a json blob similar to this one to the mou
 See [SQL² reference](http://quasar-analytics.org/docs/sqlreference/) for more info on SQL².
 
 Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
-
-#### Build Quasar for Apache Spark
-
-In order for Quasar to work with Apache Spark based connectors (like `spark-hdfs` or `spark-local`) you need to build `sparkcore.jar` and move it to same location where your `quasar-web.jar` is placed.
-To build sparkcore.jar:
-
-```
-./sbt 'set every sparkDependencyProvided := true' sparkcore/assembly
-```
 
 ## REPL Usage
 

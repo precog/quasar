@@ -1,10 +1,8 @@
 {
     "name": "derived function ceil",
     "backends": {
-      "couchbase": "ignoreFieldOrder",
-      "postgres":  "pending"
+      "couchbase": "ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to Cond implementation missing qz-3734",
     "data": "divide.data",
     "query": "select nr, ceil(val3) as ceil1 from divide",
     "predicate": "exactly",

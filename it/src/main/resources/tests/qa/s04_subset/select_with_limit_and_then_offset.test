@@ -10,9 +10,7 @@
        "mongodb_3_4":       "pending",
        "mongodb_3_4_13":    "pending",
        "mongodb_3_6":       "pending",
-       "mongodb_read_only": "pending",
-       "spark_hdfs":        "pending",
-       "spark_local":       "pending"
+       "mongodb_read_only": "pending"
     },
 
     "NB": "Pending for majority of connectors, because QScript understands order (first Limit and then Offset) and connectors follow that order. This query should either ignore order (change limit->offset to offset->limit during compilation) or not compile at all (requires change in qscript)",

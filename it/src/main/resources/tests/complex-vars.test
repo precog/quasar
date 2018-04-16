@@ -2,12 +2,10 @@
     "name": "variable with a non-trivial value",
 
     "backends": {
-        "postgres":"pending",
         "marklogic_json": "pending",
         "marklogic_xml": "pending",
         "mimir":"pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "days.data",
 
     "variables": {

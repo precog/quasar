@@ -3,11 +3,9 @@
     "backends": {
         "couchbase":  "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder",
-        "postgres": "pending",
         "couchbase": "ignoreFieldOrder",
         "mimir": "ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "usa_factbook.data",
     "query": "select geo{*} from usa_factbook",
     "predicate": "exactly",

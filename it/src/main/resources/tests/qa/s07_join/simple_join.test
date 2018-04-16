@@ -10,11 +10,9 @@
         "mongodb_3_4_13":    "ignoreFieldOrder",
         "mongodb_3_6":       "ignoreFieldOrder",
         "mongodb_read_only": "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder",
-	    "postgres":          "pending"
+        "mimir":             "ignoreFieldOrder"
     },
 
-    "NB": "Pending for Postgres until there's support for DeleteKey",
     "data": ["leftData2.data", "rightData.data"],
 
     "ignoredFields": ["_id"],

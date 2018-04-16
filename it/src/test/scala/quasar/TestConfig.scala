@@ -57,18 +57,12 @@ object TestConfig {
   val MONGO_3_4_13    = ExternalBackendRef(BackendRef(BackendName("mongodb_3_4_13")   , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_3_6       = ExternalBackendRef(BackendRef(BackendName("mongodb_3_6")      , BackendCapability.All), FileSystemType("mongodb"))
   val MONGO_READ_ONLY = ExternalBackendRef(BackendRef(BackendName("mongodb_read_only"), ISet singleton BackendCapability.query()), FileSystemType("mongodb"))
-  val SPARK_HDFS      = ExternalBackendRef(BackendRef(BackendName("spark_hdfs")       , BackendCapability.All), FileSystemType("spark-hdfs"))
-  val SPARK_LOCAL     = ExternalBackendRef(BackendRef(BackendName("spark_local")      , BackendCapability.All), FileSystemType("spark-local"))
-  val SPARK_ELASTIC   = ExternalBackendRef(BackendRef(BackendName("spark_elastic")    , BackendCapability.All), FileSystemType("spark-elastic"))
-  val SPARK_CASSANDRA = ExternalBackendRef(BackendRef(BackendName("spark_cassandra")  , BackendCapability.All), FileSystemType("spark-cassandra"))
-  val POSTGRES        = ExternalBackendRef(BackendRef(BackendName("postgres")         , BackendCapability.All), FileSystemType("postgres"))
 
   lazy val backendRefs: List[ExternalBackendRef] = List(
     COUCHBASE,
     MARKLOGIC_JSON, MARKLOGIC_XML,
     MIMIR,
-    MONGO_3_2, MONGO_3_4, MONGO_3_4_13, MONGO_3_6, MONGO_READ_ONLY,
-    SPARK_HDFS, SPARK_LOCAL, SPARK_ELASTIC, SPARK_CASSANDRA, POSTGRES)
+    MONGO_3_2, MONGO_3_4, MONGO_3_4_13, MONGO_3_6, MONGO_READ_ONLY)
 
   final case class UnsupportedFileSystemConfig(c: MountConfig)
     extends RuntimeException(s"Unsupported filesystem config: $c")

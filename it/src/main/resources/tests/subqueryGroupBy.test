@@ -9,12 +9,10 @@
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending",
-        "postgres":          "pending"
+        "mongodb_read_only": "pending"
     },
     "NB": "pending on mongo due to sorting issues",
     "NB": "skipped on couchbase due to a lack of general join",
-    "NB": "Pending for postgres connector due to Cond implementation missing qz-3734",
     "data": "zips.data",
     "query": "SELECT round_scale(100 * SUM(pop) / (SELECT SUM(pop) FROM zips), 2), state FROM zips GROUP BY state ORDER BY state LIMIT 5",
     "predicate": "exactly",

@@ -9,8 +9,7 @@
     "mongodb_3_4":       "pending",
     "mongodb_3_4_13":    "pending",
     "mongodb_3_6":       "pending",
-    "mongodb_read_only": "pending",
-    "postgres":          "pending"
+    "mongodb_read_only": "pending"
   },
   "NB": "skipped on couchbase due to lack of general join",
   "NB": "skipped on marklogic due to timeout",

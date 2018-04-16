@@ -143,7 +143,7 @@ useGpg in Global := {
 }
 
 lazy val publishSettings = commonPublishSettings ++ Seq(
-  performSonatypeSync := false,   // basically just ignores all the sonatype sync parts of things
+  performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
   organizationName := "SlamData Inc.",
   organizationHomepage := Some(url("http://quasar-analytics.org")),
   homepage := Some(url("https://github.com/quasar-analytics/quasar")),
@@ -167,11 +167,6 @@ lazy val assemblySettings = Seq(
   assemblyMergeStrategy in assembly := {
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
     case PathList("org", "apache", "hadoop", "yarn", xs @ _*) => MergeStrategy.last
-    case PathList("org", "objectweb", "asm", xs @ _*)         => MergeStrategy.last // TODO remove this
-    case PathList("javax", "ws", "rs", xs @ _*)               => MergeStrategy.last // and this
-    case PathList("javax", "servlet", xs @ _*)                => MergeStrategy.last // and this
-    case PathList("com", "sun", "research", "ws", xs @ _*)    => MergeStrategy.last // and this
-    case PathList("mime.types", xs @ _*)                      => MergeStrategy.last // and this once each spark based connector has its own subproject
     case PathList("com", "google", "common", "base", xs @ _*) => MergeStrategy.last
     case "log4j.properties"                                   => MergeStrategy.discard
     // After recent library version upgrades there seems to be a library pulling
@@ -236,7 +231,6 @@ def isolatedBackendSettings(classnames: String*) = Seq(
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
-lazy val sparkDependencyProvided = settingKey[Boolean]("Whether or not the spark dependency should be marked as provided. If building for use in a Spark cluster, one would set this to true otherwise setting it to false will allow you to run the assembly jar on it's own")
 
 lazy val isolatedBackends =
   taskKey[Seq[(String, Seq[File])]]("Global-only setting which contains all of the classpath-isolated backends")
@@ -275,22 +269,22 @@ lazy val root = project.in(file("."))
                       niflheim,
 //   |         |         |
     sql, connector,   yggdrasil,
-//   |   /  | | \ \______|____________________________________________
-//   |  /   | |  \      /     \         \         \         \         \
-    core, skeleton, mimir, marklogic, mongodb, couchbase, /*sparkcore,*/ rdbms,
-//      \     |     /         |          |         |         |         |
-          interface,   //     |          |         |         |         |
-//          /  \              |          |         |         |         |
-         repl, web,   //      |          |         |         |         |
-//              |             |          |         |         |         |
-                it,   //      |          |         |         |         |
-//   ___________|_____________/          |         |         |         |
-//  /           |      __________________/         |         |         |
-//  |          /|\    /          __________________/         |         |
-//  |         / | \  /          /             _______________/         /
-//  |        /  |  \/__________/______       /            ____________/
-//  |       /   |  /    \     /        \    /            /
-  marklogicIt, mongoIt, couchbaseIt, /*sparkcoreIt,*/ rdbmsIt
+//   |   /  | | \ \______|________________________
+//   |  /   | |  \      /     \         \         \
+    core, skeleton, mimir, marklogic, mongodb, couchbase,
+//      \     |     /         |          |         |
+          interface,   //     |          |         |
+//          /  \              |          |         |
+         repl, web,   //      |          |         |
+//              |             |          |         |
+                it,   //      |          |         |
+//   ___________|_____________/          |         |
+//  /           |      __________________/         |
+//  |          /|\    /          __________________/
+//  |         / | \  /          /
+//  |        /  |  \/__________/
+//  |       /   |  /    \     /
+  marklogicIt, mongoIt, couchbaseIt
 //
 // NB: the *It projects are temporary until we polyrepo
   ).enablePlugins(AutomateHeaderPlugin)
@@ -494,45 +488,6 @@ lazy val skeleton = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val rdbms = project
-  .settings(name := "quasar-rdbms-internal")
-  .dependsOn(connector % BothScopes,
-             core      % "test->compile")
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(githubReleaseSettings)
-  .settings(libraryDependencies ++= Dependencies.rdbmscore)
-  .settings(isolatedBackendSettings("quasar.physical.rdbms.fs.postgres.Postgres$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** Implementation of the Spark connector.
-  */
-/*lazy val sparkcore = project
-  .settings(name := "quasar-sparkcore-internal")
-  .dependsOn(
-    connector % BothScopes
-    )
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(githubReleaseSettings)
-  // re-add the sparkcore.jar that we hopefully generated
-  // se really should generate this more explicitly, rather than relying on the CI script
-  // it's hard though because generating it requires setting and then un-setting some keys
-  .settings(GithubKeys.assets += crossTarget.value / "sparkcore.jar")
-  .settings(parallelExecution in Test := false)
-  .settings(
-    sparkDependencyProvided := false,
-    libraryDependencies ++= Dependencies.sparkcore(sparkDependencyProvided.value))
-  .settings(
-    isolatedBackendSettings(
-      "quasar.physical.sparkcore.fs.cassandra.SparkCassandra$",
-      "quasar.physical.sparkcore.fs.elastic.SparkElastic$",
-      "quasar.physical.sparkcore.fs.hdfs.SparkHdfs$",
-      "quasar.physical.sparkcore.fs.local.SparkLocal$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)*/
-
 // interfaces
 
 /** Types and operations needed by applications that embed Quasar.
@@ -654,32 +609,6 @@ lazy val mongoIt = project
 lazy val couchbaseIt = project
   .configs(ExclusiveTests)
   .dependsOn(it % BothScopes, couchbase)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/*lazy val sparkcoreIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, sparkcore)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)*/
-
-lazy val rdbmsIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, rdbms)
   .settings(commonSettings)
   .settings(noPublishSettings)
   .settings(targetSettings)

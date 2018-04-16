@@ -75,7 +75,7 @@ object FsPath {
       (v, p, ev) => sandbox(dir, p) map (p1 => InVolume(v, dir </> p1)(ev))
     )
 
-  private def winVolAndPath(s: String): (String, String) = {
+  def winVolAndPath(s: String): (String, String) = {
     val (prefix, s1): (String, String) = if (s.startsWith("\\\\")) ("\\\\", s.drop(2)) else ("", s)
     val (vol, rest) = s1.splitAt(s1.indexOf('\\'))
     (prefix + vol.toString, rest.toString)

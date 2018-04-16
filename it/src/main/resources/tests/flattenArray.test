@@ -1,10 +1,8 @@
 {
     "name": "flatten array",
     "backends": {
-        "marklogic_xml":     "skip",
-        "postgres":          "pending"
+        "marklogic_xml":     "skip"
     },
-    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "zips.data",
     "query": "SELECT loc[*] AS loc FROM zips",
     "predicate": "atLeast",

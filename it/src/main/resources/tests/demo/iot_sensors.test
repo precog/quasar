@@ -4,8 +4,7 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder",
-       "postgres":          "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder"
 
     },
     "query": "temp0 := SELECT * FROM timeseries WHERE sensor IN (\"S0\", \"S1\", \"S2\", \"S3\", \"S4\");

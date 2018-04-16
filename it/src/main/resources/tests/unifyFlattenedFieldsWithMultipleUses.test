@@ -9,13 +9,8 @@
         "mongodb_3_4":       "pending",
         "mongodb_3_4_13":    "pending",
         "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending",
-        "postgres":          "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "mongodb_read_only": "pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips where loc[*] > 68 order by loc[*]",
     "predicate": "exactly",

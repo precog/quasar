@@ -1,9 +1,7 @@
 {
     "name": "skip and count",
     "backends": {
-        "postgres": "pending"
     },
-    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "../zips.data",
 
     "query": "select count(*) from (select * from `../zips` offset 10) as x",

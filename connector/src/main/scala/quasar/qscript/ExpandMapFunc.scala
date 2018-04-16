@@ -99,6 +99,9 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
       def floorR[A](a: Free[OUT, A]): Free[OUT, A] =
         Free.roll(floor(a))
 
+      def undefinedR[A]: Free[OUT, A] =
+        Free.roll(MFC(Undefined()))
+
       // CREATE FUNCTION ROUND(:a) BEGIN
       //   CASE
       //     WHEN :a % 1 = 0 THEN :a
@@ -214,6 +217,9 @@ sealed abstract class ExpandMapFuncInstances extends ExpandMapFuncInstancesʹ {
                   a.point[Free[OUT, ?]],
                   powerR(intR(10), b.point[Free[OUT, ?]]))),
               powerR(intR(10), b.point[Free[OUT, ?]])))
+
+          case D.Typecheck(a, typ) =>
+            MFC(Guard(a.point[Free[OUT, ?]], typ, a.point[Free[OUT, ?]], undefinedR))
         }
     }
 

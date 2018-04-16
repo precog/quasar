@@ -4,11 +4,7 @@
         "couchbase":              "skip",
         "marklogic_json":         "skip",
         "marklogic_xml":          "skip",
-        "mimir":                  "skip",
-        "spark_hdfs":             "skip",
-        "spark_local":            "skip",
-        "spark_cassandra":        "skip",
-        "postgres":               "skip"
+        "mimir":                  "skip"
     },
     "data": "../objectids.data",
     "query": "select oid(bar), oid(\"5a01ee026546432336042587\") from `../objectids`",

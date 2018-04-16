@@ -2,10 +2,8 @@
     "name": "unify flattened fields with unflattened field",
     "backends": {
         "couchbase": "pending",
-        "mimir": "ignoreFieldOrder",
-        "postgres": "pending"
+        "mimir": "ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "zips.data",
     "query": "select `_id` as zip, loc[*] from zips order by loc[*] limit 10",
     "predicate": "exactly",

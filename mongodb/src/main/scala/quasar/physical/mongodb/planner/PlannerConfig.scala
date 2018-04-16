@@ -18,12 +18,14 @@ package quasar.physical.mongodb.planner
 
 import quasar.qscript.MapFunc
 import quasar.physical.mongodb.{BsonVersion, MongoQueryModel}
+import quasar.physical.mongodb.planner.common.WBM
 
-import scalaz._
+import matryoshka._
+import matryoshka.data._
 
-final case class PlannerConfig[T[_[_]], EX[_], WF[_]](
+final case class PlannerConfig[T[_[_]], EX[_], WF[_], M[_]](
   joinHandler: JoinHandler[WF, WBM],
-  funcHandler: MapFunc[T, ?] ~> OptionFree[EX, ?],
+  funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]],
   staticHandler: StaticHandler[T, EX],
   queryModel: MongoQueryModel,
   bsonVersion: BsonVersion)

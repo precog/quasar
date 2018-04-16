@@ -22,14 +22,18 @@ import quasar.ejson.implicits._
 import quasar.fp.coproductEqual
 import quasar.qscript.{
   ExtractFunc,
+  ExtractFuncDerived,
   FreeMapA,
   MFC,
+  MFD,
   MapFuncCore,
   MapFuncsCore,
+  MapFuncsDerived,
   TTypes
 }
 import MapFuncCore.{rollMF, CoMapFuncR}
 import MapFuncsCore.{Guard, Undefined}
+import MapFuncsDerived.Typecheck
 
 import matryoshka._
 import matryoshka.data.free._
@@ -57,6 +61,7 @@ final class DedupeGuards[T[_[_]]: BirecursiveT: EqualT] private () extends TType
       : Option[FreeMapA[A]] =
     some(fm) collect {
       case ExtractFunc(Guard(c, t, e, ExtractFunc(Undefined()))) if preds.element((c, t)) => e
+      case ExtractFuncDerived(Typecheck(c, t)) if preds.element((c, t)) => c
     }
 
   private def substituteGuardedExpression[A: Equal](
@@ -78,6 +83,12 @@ object DedupeGuards {
 
         case MFC(Guard(c, t, e, ExtractFunc(Undefined()))) =>
           (NonEmptyList((c, t)), e)
+
+        case MFD(Typecheck(c @ Embed(Guarded(conds, _)), t)) =>
+          ((c, t) <:: conds, c)
+
+        case MFD(Typecheck(c, t)) =>
+          (NonEmptyList((c, t)), c)
       }
   }
 }

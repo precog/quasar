@@ -40,6 +40,10 @@ package object expression {
   val fixExprOp =
     new ExprOpCoreF.fixpoint[Fix[ExprOp], ExprOp](_.embed)
 
+  def fixExprOpCore[EX[_]: Functor]
+    (implicit I: ExprOpCoreF :<: EX) =
+    new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)
+
   val DocField = Prism.partial[DocVar, BsonField] {
     case DocVar.ROOT(Some(tail)) => tail
   } (DocVar.ROOT(_))

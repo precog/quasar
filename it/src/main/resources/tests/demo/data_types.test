@@ -7,7 +7,6 @@
        "mimir":             "pending"
     },
     "NB": "mimir and couchbase are failing with missing implementation for typeof",
-    "NB2": "Postgres connector coerces mixed number and booleans into strings, to facilitate possible debugging (a string of \"true\" is more telling than a number of 1)",
     "query": "temp0 := SELECT `_id` AS id, TYPE_OF(`_id`) AS id_Description, field1 AS F1, TYPE_OF(field1) AS F1_Description, field2 AS F2, TYPE_OF(field2) AS F2_Description, field3 AS F3, TYPE_OF(field3) AS F3_Description FROM types;
              SELECT COUNT(*) AS count FROM (temp0) AS temp1
      ",

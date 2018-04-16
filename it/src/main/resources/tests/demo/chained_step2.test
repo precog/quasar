@@ -4,10 +4,8 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder",
-       "postgres":          "pending"
+       "mimir":             "ignoreFieldOrder"
     },
-     "NB": "Pending on Postgres due to problems with handling for IncludeId (actually a QS bug qz-3618)",
      "query": "SELECT DISTINCT (city) FROM patients WHERE state = \"CO\" ORDER BY city ASC LIMIT 5",
     "predicate": "exactly",
     "expected": [

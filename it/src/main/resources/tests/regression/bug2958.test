@@ -3,11 +3,9 @@
   "data": "bug2958.data",
   "backends": {
     "couchbase":         "pending",
-    "marklogic_xml":     "pending",
-    "postgres":          "pending"
+    "marklogic_xml":     "pending"
   },
   "NB": "couchbase is pending becasue the value c contains null.  marklogic_xml  is pending because the valeu c is {}. Both issues seem connector specific and are not related to bug2958",
-  "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
   "query": "SELECT MAP_CONCAT(DELETE_KEY(t0, \"b\"), {\"c\": MAP_CONCAT(t0.c, t0.b) ?? t0.b}) FROM bug2958 AS t0",
   "predicate": "exactly",
   "ignoreResultOrder": true,

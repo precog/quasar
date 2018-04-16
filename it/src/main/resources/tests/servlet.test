@@ -9,11 +9,7 @@
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
         "mongodb_3_6":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder",
-        "postgres":          "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "mongodb_read_only": "pendingIgnoreFieldOrder"
     },
     "data": "webapp.data",
     "query": "select \"servlet-name\", \"init-param\" is not null from webapp where \"init-param\" is null or \"init-param\".\"betaServer\"",

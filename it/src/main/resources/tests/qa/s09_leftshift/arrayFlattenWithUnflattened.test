@@ -2,7 +2,6 @@
   "name": "[qa_s09] array flatten with unflattened side-by-side",
 
   "backends": {
-    "postgres":       "ignoreResultOrder",
     "marklogic_json": "skip",
     "marklogic_xml":  "skip",
     "mimir":          "skip"

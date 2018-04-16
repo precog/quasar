@@ -9,13 +9,11 @@
     "mongodb_3_4":       "pending",
     "mongodb_3_4_13":    "pending",
     "mongodb_3_6":       "pending",
-    "mongodb_read_only": "pending",
-    "postgres":          "pending"
+    "mongodb_read_only": "pending"
   },
   "NB": "skipped on couchbase due to lack of general join",
   "NB": "skipped on marklogic due to timeout",
   "NB": "pending for mongodb due to MongoDB Error: Command failed with error 13070: 'value too large to reduce'",
-  "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
   "data": ["demo/patients.data", "extraSmallZips.data"],
   "query": "SELECT first_name, last_name FROM `demo/patients` AS p where state in (SELECT state FROM extraSmallZips) ORDER BY last_name, first_name",
   "predicate": "initial",

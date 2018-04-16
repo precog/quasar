@@ -1,10 +1,8 @@
 {
     "name": "project unrelated field with object flatten",
     "backends": {
-        "couchbase": "pending",
-        "postgres":   "pending"
+        "couchbase": "pending"
     },
-    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "usa_factbook.data",
     "query": "select intro from usa_factbook where geo{*}.text = \"19,924 km\"",
     "predicate": "exactly",

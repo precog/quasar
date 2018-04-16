@@ -1,10 +1,8 @@
 {
     "name": "filter on contains",
     "backends": {
-        "mimir":"ignoreFieldOrder",
-        "postgres": "pending"
+        "mimir":"ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "zips.data",
     "query": "select * from zips where 43.058514 in loc[_]",
     "predicate": "exactly",

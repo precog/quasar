@@ -275,7 +275,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
 
         target = precog.Table.constString(Set(posixCodec.printPath(file)))
 
-        // apparently read on a non-existent file is equivalent to reading the empty file??!!
+        // FIXME apparently read on a non-existent file is equivalent to reading the empty file??!!
         eitherTable <- precog.Table.load(target, JType.JUniverseT).mapT(_.toTask).run.liftM[MT].liftB
         table = eitherTable.fold(_ => precog.Table.empty, table => table)
 

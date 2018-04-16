@@ -2,11 +2,9 @@
     "name": "select reduction from nested select",
     "backends": {
         "couchbase":         "skip",
-        "marklogic_json":    "ignoreFieldOrder",
-        "postgres":          "pending"
+        "marklogic_json":    "ignoreFieldOrder"
     },
     "NB": "disabled on couchbase due to lack of general join",
-    "NB2": "pending on Postgres due to unsupported unwind for arrays of objects",
     "data": "otherpatients.data",
     "query": "SELECT AVG(cnt) as measure, state as category FROM
                 (SELECT COUNT(*) as cnt, state, gender FROM otherpatients

@@ -2,8 +2,7 @@
   "name": "[qa_s01] select with string escapes",
 
   "backends": {
-    "mimir": "ignoreFieldOrder",
-    "postgres": "ignoreFieldOrder"
+    "mimir": "ignoreFieldOrder"
   },
 
   "data": "escapy_strings.data",

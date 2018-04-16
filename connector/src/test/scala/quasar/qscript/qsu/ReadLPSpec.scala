@@ -29,6 +29,7 @@ import quasar.qscript.{
   LeftSide,
   LeftSide3,
   MapFuncsCore,
+  MapFuncsDerived,
   ReduceFuncs,
   RightSide,
   RightSide3,
@@ -65,6 +66,7 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QS
   val root = Path.rootDir[Sandboxed]
 
   val IC = Inject[MapFuncCore, MapFunc]
+  val ID = Inject[MapFuncDerived, MapFunc]
 
   "reading lp into qsu" should {
     "convert Read nodes" in {
@@ -336,45 +338,30 @@ object ReadLPSpec extends Qspec with CompilerHelpers with DataGenerators with QS
           DimEdit(
             AutoJoin2C(
               LPFilter(
-                AutoJoin3C(   // '__tmp0
+                Unary(   // '__tmp0
                   Transpose(    // '__tmp1
                     Read(_),
                     QSU.Retain.Values,
                     QSU.Rotation.ShiftMap),
-                  Transpose(
-                    Read(_),
-                    QSU.Retain.Values,
-                    QSU.Rotation.ShiftMap),
-                  _,
-                  MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)),
+                  ID(MapFuncsDerived.Typecheck(SrcHole, Type.AnyObject))),
                 AutoJoin3C(
                   AutoJoin2C(   // '__tmp2
-                    AutoJoin3C(   // '__tmp0
+                    Unary(   // '__tmp0
                       Transpose(    // '__tmp1
                         Read(_),
                         QSU.Retain.Values,
                         QSU.Rotation.ShiftMap),
-                      Transpose(
-                        Read(_),
-                        QSU.Retain.Values,
-                        QSU.Rotation.ShiftMap),
-                      _,
-                      MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)),
+                      ID(MapFuncsDerived.Typecheck(SrcHole, Type.AnyObject))),
                     DataConstant(Data.Str("city")),
                     MapFuncsCore.ProjectKey(LeftSide, RightSide)),
                   AutoJoin3C(
                     AutoJoin2C(   // '__tmp2
-                      AutoJoin3C(   // '__tmp0
+                      Unary(   // '__tmp0
                         Transpose(    // '__tmp1
                           Read(_),
                           QSU.Retain.Values,
                           QSU.Rotation.ShiftMap),
-                        Transpose(
-                          Read(_),
-                          QSU.Retain.Values,
-                          QSU.Rotation.ShiftMap),
-                        _,
-                        MapFuncsCore.Guard(LeftSide3, Type.AnyObject, Center, RightSide3)),
+                        ID(MapFuncsDerived.Typecheck(SrcHole, Type.AnyObject))),
                       DataConstant(Data.Str("city")),
                       MapFuncsCore.ProjectKey(LeftSide, RightSide)),
                     DataConstant(Data.Str("OULD.{0,2} CIT")),

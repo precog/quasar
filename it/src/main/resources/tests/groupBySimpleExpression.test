@@ -8,10 +8,8 @@
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",
         "mongodb_3_6":       "ignoreFieldOrder",
-        "mongodb_read_only": "pending",
-        "postgres":          "pending"
+        "mongodb_read_only": "pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "extraSmallZips.data",
     "query": "select city, sum(pop) from extraSmallZips group by lower(city)",
     "predicate": "exactly",

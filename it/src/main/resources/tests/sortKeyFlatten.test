@@ -4,10 +4,8 @@
     "backends": {
         "couchbase": "ignoreFieldOrder",
         "marklogic_json": "ignoreFieldOrder",
-        "mimir": "ignoreFieldOrder",
-        "postgres": "pending"
+        "mimir": "ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "zips.data",
 
     "query": "select city, state, loc from zips order by loc[*] desc",

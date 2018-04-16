@@ -2,7 +2,6 @@
   "name": "[qa_s02] coercions",
 
   "backends": {
-    "spark_local":       "skip",
     "couchbase":         "skip",
     "marklogic_json":    "skip",
     "marklogic_xml":     "skip",
@@ -11,8 +10,7 @@
     "mongodb_3_4":       "skip",
     "mongodb_3_4_13":    "skip",
     "mongodb_3_6":       "skip",
-    "mongodb_read_only": "skip",
-    "spark_hdfs":        "skip"
+    "mongodb_read_only": "skip"
   },
 
   "data": "coercions.data",

@@ -17,13 +17,13 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef.{Map => _, _}
-import quasar._, Planner._, Type.{Const => _, _}
+import quasar._, Type.{Const => _, _}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{FileSystemError, MonadFsErr}, FileSystemError.qscriptPlanningFailed
+import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript._
 import quasar.qscript.analysis.ShapePreserving
@@ -71,21 +71,28 @@ object assumeReadType {
   def elideMoreGeneralGuards[T[_[_]], M[_]: Applicative: MonadFsErr, A: Eq]
     (hole: A, subType: Type)
       : CoEnvMapA[T, A, FreeMapA[T, A]] => M[CoEnvMapA[T, A, FreeMapA[T, A]]] = {
-    def f: CoEnvMapA[T, A, FreeMapA[T, A]] => M[CoEnvMapA[T, A, FreeMapA[T, A]]] = {
-      case free @ CoEnv(\/-(MFC(MapFuncsCore.Guard(Embed(CoEnv(-\/(h))), typ, cont, fb)))) if (h ≟ hole) =>
-        if (typ.contains(subType)) cont.project.point[M]
-        // TODO: Error if there is no overlap between the types.
-        else {
-          val union = subType ⨯ typ
-          if (union ≟ Type.Bottom)
-            raiseErr(qscriptPlanningFailed(InternalError.fromMsg(s"can only contain ${subType.shows}, but a(n) ${typ.shows} is expected")))
-          else {
-            CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]](MFC(MapFuncsCore.Guard[T, FreeMapA[T, A]](Free.point[MapFunc[T, ?], A](h), union, cont, fb)).right).point[M]
-          }
-        }
+
+    def elide(e: FreeMapA[T,A], typ: Type, cont: FreeMapA[T,A], u: Type => MapFunc[T, FreeMapA[T, A]])
+        : M[CoEnvMapA[T, A, FreeMapA[T, A]]] =
+      if (typ.contains(subType)) cont.project.point[M]
+      // TODO: Error if there is no overlap between the types.
+      else {
+        val union = subType ⨯ typ
+        if (union ≟ Type.Bottom)
+          raiseInternalError(s"can only contain ${subType.shows}, but ${typ.shows} is expected")
+        else
+          CoEnv[A, MapFunc[T, ?], FreeMapA[T, A]](u(union).right).point[M]
+      }
+
+    {
+      case CoEnv(\/-(MFC(MapFuncsCore.Guard(e @ Embed(CoEnv(-\/(h))), typ, cont, fb)))) if (h ≟ hole) =>
+        elide(e, typ, cont,
+          t => MFC(MapFuncsCore.Guard[T, FreeMapA[T, A]](e, t, cont, fb)))
+      case CoEnv(\/-(MFD(MapFuncsDerived.Typecheck(e @ Embed(CoEnv(-\/(h))), typ)))) if (h ≟ hole) =>
+        elide(e, typ, e,
+          t => MFD(MapFuncsDerived.Typecheck[T, FreeMapA[T, A]](e, t)))
       case x => x.point[M]
     }
-    f
   }
 
 def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]

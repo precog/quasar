@@ -18,6 +18,7 @@ package quasar.mimir
 
 import quasar.fp.ski._
 import quasar.qscript.{ExpandMapFunc, MapFuncCore, MapFuncDerived, MapFuncsDerived}
+import quasar.yggdrasil.bytecode.JType
 
 import matryoshka.{AlgebraM, BirecursiveT}
 
@@ -43,6 +44,8 @@ final class MapFuncDerivedPlanner[T[_[_]]: BirecursiveT, F[_]: Monad]
       case MapFuncsDerived.Abs(src) => Unary.Abs.spec(src).point[F]
       case MapFuncsDerived.Trunc(src) => Unary.Trunc.spec(src).point[F]
       case MapFuncsDerived.Round(src) => Unary.Round.spec(src).point[F]
+      case MapFuncsDerived.Typecheck(src, tpe) =>
+        (Typed(src, JType.fromType(tpe)): TransSpec[A]).point[F]
       case x => ExpandMapFunc.expand[T, F, TransSpec[A]](core.plan(cake)(id), κ(None)).apply(x)
     }
   }

@@ -5,9 +5,7 @@
         "mimir":"ignoreFieldOrder",
         "mongodb_3_2": "ignoreFieldOrder",
         "mongodb_3_4": "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
-        "spark_hdfs": "ignoreFieldOrder",
-        "spark_local": "ignoreFieldOrder"
+        "mongodb_read_only": "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, sum(pop) as totalPop from largeZips group by city",

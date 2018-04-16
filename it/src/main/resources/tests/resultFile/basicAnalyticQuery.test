@@ -8,8 +8,7 @@
         "mongodb_3_4":       "skip",
         "mongodb_3_4_13":    "skip",
         "mongodb_3_6":       "skip",
-        "mongodb_read_only": "skip",
-        "spark_cassandra":   "pending"
+        "mongodb_read_only": "skip"
     },
     "NB": "Pending on mongo due to #3176",
     "NB": "Pending on couchbase due to #3158",

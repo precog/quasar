@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner, Type}, Planner._, Type._
+import quasar.{Planner => QPlanner, Type}, QPlanner._, Type._
 import quasar.contrib.scalaz._
 import quasar.fp.ski._
 import quasar.fs._, FileSystemError._
@@ -32,6 +32,13 @@ import scalaz._, Scalaz._
 
 object common {
   type ExecTimeR[F[_]] = MonadReader_[F, Instant]
+
+  // TODO: Remove this type.
+  type WBM[X] = PlannerError \/ X
+
+  /** Brings a [[WBM]] into our `M`. */
+  def liftM[M[_]: Monad: MonadFsErr, A](meh: WBM[A]): M[A] =
+    meh.fold(raisePlannerError[M, A], _.point[M])
 
   def raiseErr[M[_], A](err: FileSystemError)(
     implicit ev: MonadFsErr[M]
@@ -71,6 +78,8 @@ object common {
             (a, b) => ((expr: In) => or(a(expr), b(expr))))
         case _ => None
       })(Some(_))
+
+  def createFieldName(prefix: String, i: Int): String = prefix + i.toString
 
   object Keys {
     val wrap = "wrap"

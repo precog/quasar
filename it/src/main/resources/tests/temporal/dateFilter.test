@@ -2,11 +2,9 @@
     "name": "filter on date part",
 
     "backends": {
-        "postgres": "pending",
         "marklogic_json": "pending",
         "mimir": "pending"
     },
-    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "../days.data",
 
     "query": "select distinct `day` from `../days` where date_part(\"dow\", ts) >= 3",

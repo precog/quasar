@@ -4,7 +4,6 @@
         "mimir": "ignoreFieldOrder",
         "couchbase": "ignoreFieldOrder"
     },
-    "NB": "Skipping for postgres: incorrenctly rendered 'where' clause ('could not determine polymorphic type...')",
     "data": "otherpatients.data",
     "query": "SELECT
                 COUNT(*) as cnt,

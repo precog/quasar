@@ -17,351 +17,396 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.physical.mongodb.{Bson, BsonCodec, BsonVersion}
+import quasar.Type
+import quasar.fp._
+import quasar.fp.ski._
+import quasar.fs.MonadFsErr
+import quasar.physical.mongodb.{Bson, BsonCodec, BsonField, BsonVersion}
 import quasar.physical.mongodb.expression._
-import quasar.qscript.{MapFuncsDerived => D,  _}, MapFuncsCore._
+import quasar.physical.mongodb.planner.common._
+import quasar.qscript.{MapFuncsDerived => D, _}, MapFuncsCore._
 import quasar.qscript.rewrites.{Coalesce => _}
 
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns._
 import scalaz.{Divide => _, Split => _, _}, Scalaz._
 import simulacrum.typeclass
 
 @typeclass trait FuncHandler[IN[_]] {
 
-  def handleOpsCore[EX[_]: Functor](v: BsonVersion)
+  def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
     (implicit e32: ExprOpCoreF :<: EX)
-      : IN ~> OptionFree[EX, ?]
+      : AlgebraM[M, IN, Fix[EX]]
 
-  def handleOps3_4[EX[_]: Functor](v: BsonVersion)
+  def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-      : IN ~> OptionFree[EX, ?]
+      : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
 
-  def handleOps3_4_4[EX[_]: Functor](v: BsonVersion)
+  def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-      : IN ~> OptionFree[EX, ?]
+      : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
 
-  def handle3_2(v: BsonVersion)
-     : IN ~> OptionFree[Expr3_2, ?] =
-    λ[IN ~> OptionFree[Expr3_2, ?]]{f =>
-      val h = handleOpsCore[Expr3_2](v)
-      h(f)
-    }
+  def handle3_2[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX)
+      : AlgebraM[M, IN, Fix[EX]] =
+    handleOpsCore[EX, M](v)
 
-  def handle3_4(v: BsonVersion)
-     : IN ~> OptionFree[Expr3_4, ?] =
-    λ[IN ~> OptionFree[Expr3_4, ?]]{f =>
-      val h34 = handleOps3_4[Expr3_4](v)
-      val h = handleOpsCore[Expr3_4](v)
-      h34(f) orElse h(f)
-    }
+  def handle3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
+      : AlgebraM[M, IN, Fix[EX]] = f => {
+    val h34 = handleOps3_4[EX, M](v)
+    val h = handleOpsCore[EX, M](v)
+    h34(f) getOrElse h(f)
+  }
 
-  def handle3_4_4(v: BsonVersion)
-     : IN ~> OptionFree[Expr3_4_4, ?] =
-    λ[IN ~> OptionFree[Expr3_4_4, ?]]{f =>
-      val h344 = handleOps3_4_4[Expr3_4_4](v)
-      val h34 = handleOps3_4[Expr3_4_4](v)
-      val h = handleOpsCore[Expr3_4_4](v)
-      h344(f) orElse h34(f) orElse h(f)
-    }
+  def handle3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
+     : AlgebraM[M, IN, Fix[EX]] = f => {
+    val h344 = handleOps3_4_4[EX, M](v)
+    val h34 = handleOps3_4[EX, M](v)
+    val h = handleOpsCore[EX, M](v)
+    h344(f) getOrElse (h34(f) getOrElse h(f))
+  }
 }
 
 object FuncHandler {
 
-  implicit def mapFuncCore[T[_[_]]: BirecursiveT]: FuncHandler[MapFuncCore[T, ?]] =
+  implicit def mapFuncCore[T[_[_]]: BirecursiveT: ShowT]: FuncHandler[MapFuncCore[T, ?]] =
     new FuncHandler[MapFuncCore[T, ?]] {
 
-      def handleOpsCore[EX[_]: Functor]
+      def execTime[M[_]: Monad: MonadFsErr](implicit MR: ExecTimeR[M]): M[Bson.Date] =
+        OptionT[M, Bson.Date](MR.ask.map(Bson.Date.fromInstant(_)))
+          .getOrElseF(raiseInternalError("Could not get the current timestamp"))
+
+      def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX)
-          : MapFuncCore[T, ?] ~> OptionFree[EX, ?] =
-        new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]) {
+          : AlgebraM[M, MapFuncCore[T, ?], Fix[EX]] = {
 
-          implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
+        val fp = new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)
+        import fp._
+        import FormatSpecifier._
 
-          def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
+        val check = new Check[Fix[EX], EX]
 
-            val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
-            import fp._
-            import FormatSpecifier._
+        {
+          case Undefined()           => $literal(Bson.Undefined).point[M]
+          case Add(a1, a2)           => $add(a1, a2).point[M]
+          case Multiply(a1, a2)      => $multiply(a1, a2).point[M]
+          case Subtract(a1, a2)      => $subtract(a1, a2).point[M]
+          case Divide(a1, a2)        =>
+            // NB: It’s apparently intentional that division by zero crashes
+            //     the query in MongoDB. See
+            //     https://jira.mongodb.org/browse/SERVER-29410
+            // TODO: It would be nice if we would be able to generate simply
+            //       $divide(a1, a2) for $literal denominators, but the type
+            //       of a2 is generic so we can't check it here.
+            $cond($eq(a2, $literal(Bson.Int32(0))),
+              $cond($eq(a1, $literal(Bson.Int32(0))),
+                $literal(Bson.Dec(Double.NaN)),
+                $cond($gt(a1, $literal(Bson.Int32(0))),
+                  $literal(Bson.Dec(Double.PositiveInfinity)),
+                  $literal(Bson.Dec(Double.NegativeInfinity)))),
+              $divide(a1, a2)).point[M]
+          case Modulo(a1, a2)        => $mod(a1, a2).point[M]
+          case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1).point[M]
+          case MapFuncsCore.Eq(a1, a2) => $eq(a1, a2).point[M]
+          case Neq(a1, a2)           => $neq(a1, a2).point[M]
+          case Lt(a1, a2)            => $lt(a1, a2).point[M]
+          case Lte(a1, a2)           => $lte(a1, a2).point[M]
+          case Gt(a1, a2)            => $gt(a1, a2).point[M]
+          case Gte(a1, a2)           => $gte(a1, a2).point[M]
 
-            def partial(mfc: MapFuncCore[T, A]): OptionFree[EX, A] = mfc.some collect {
-              case Undefined()           => $literal(Bson.Undefined)
-              case Add(a1, a2)           => $add(a1, a2)
-              case Multiply(a1, a2)      => $multiply(a1, a2)
-              case Subtract(a1, a2)      => $subtract(a1, a2)
-              case Divide(a1, a2)        =>
-                // NB: It’s apparently intentional that division by zero crashes
-                //     the query in MongoDB. See
-                //     https://jira.mongodb.org/browse/SERVER-29410
-                // TODO: It would be nice if we would be able to generate simply
-                //       $divide(a1, a2) for $literal denominators, but the type
-                //       of a2 is generic so we can't check it here.
-                $cond($eq(a2, $literal(Bson.Int32(0))),
-                  $cond($eq(a1, $literal(Bson.Int32(0))),
-                    $literal(Bson.Dec(Double.NaN)),
-                    $cond($gt(a1, $literal(Bson.Int32(0))),
-                      $literal(Bson.Dec(Double.PositiveInfinity)),
-                      $literal(Bson.Dec(Double.NegativeInfinity)))),
-                  $divide(a1, a2))
-              case Modulo(a1, a2)        => $mod(a1, a2)
-              case Negate(a1)            => $multiply($literal(Bson.Int32(-1)), a1)
-              case MapFuncsCore.Eq(a1, a2) => $eq(a1, a2)
-              case Neq(a1, a2)           => $neq(a1, a2)
-              case Lt(a1, a2)            => $lt(a1, a2)
-              case Lte(a1, a2)           => $lte(a1, a2)
-              case Gt(a1, a2)            => $gt(a1, a2)
-              case Gte(a1, a2)           => $gte(a1, a2)
+          // FIXME: this is valid for strings only
 
-              // FIXME: this is valid for strings only
+          case Lower(a1)             => $toLower(a1).point[M]
+          case Upper(a1)             => $toUpper(a1).point[M]
+          case Substring(a1, a2, a3) => $substr(a1, a2, a3).point[M]
+          case Cond(a1, a2, a3)      => $cond(a1, a2, a3).point[M]
 
-              case Lower(a1)             => $toLower(a1)
-              case Upper(a1)             => $toUpper(a1)
-              case Substring(a1, a2, a3) => $substr(a1, a2, a3)
-              case Cond(a1, a2, a3)      => $cond(a1, a2, a3)
+          case Or(a1, a2)            => $or(a1, a2).point[M]
+          case And(a1, a2)           => $and(a1, a2).point[M]
+          case Not(a1)               => $not(a1).point[M]
 
-              case Or(a1, a2)            => $or(a1, a2)
-              case And(a1, a2)           => $and(a1, a2)
-              case Not(a1)               => $not(a1)
+          case Null(a1) =>
+            $cond($eq(a1, $literal(Bson.Text("null"))),
+              $literal(Bson.Null),
+              $literal(Bson.Undefined)).point[M]
 
-              case Null(a1) =>
-                $cond($eq(a1, $literal(Bson.Text("null"))),
-                  $literal(Bson.Null),
-                  $literal(Bson.Undefined))
+          case Bool(a1) =>
+            $cond($eq(a1, $literal(Bson.Text("true"))),
+              $literal(Bson.Bool(true)),
+              $cond($eq(a1, $literal(Bson.Text("false"))),
+                $literal(Bson.Bool(false)),
+                $literal(Bson.Undefined))).point[M]
 
-              case Bool(a1) =>
-                $cond($eq(a1, $literal(Bson.Text("true"))),
-                  $literal(Bson.Bool(true)),
-                  $cond($eq(a1, $literal(Bson.Text("false"))),
-                    $literal(Bson.Bool(false)),
-                    $literal(Bson.Undefined)))
-
-              case ExtractCentury(a1) =>
-                $trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
-              case ExtractDayOfMonth(a1) => $dayOfMonth(a1)
-              case ExtractDecade(a1) => $trunc($divide($year(a1), $literal(Bson.Int32(10))))
-              case ExtractDayOfWeek(a1) => $subtract($dayOfWeek(a1), $literal(Bson.Int32(1)))
-              case ExtractDayOfYear(a1) => $dayOfYear(a1)
-              case ExtractEpoch(a1) =>
+          case ExtractCentury(a1) =>
+            $trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100)))).point[M]
+          case ExtractDayOfMonth(a1) => $dayOfMonth(a1).point[M]
+          case ExtractDecade(a1) => $trunc($divide($year(a1), $literal(Bson.Int32(10)))).point[M]
+          case ExtractDayOfWeek(a1) => $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))).point[M]
+          case ExtractDayOfYear(a1) => $dayOfYear(a1).point[M]
+          case ExtractEpoch(a1) =>
+            $divide(
+              $subtract(a1, $literal(Bson.Date(0))),
+              $literal(Bson.Int32(1000))).point[M]
+          case ExtractHour(a1) => $hour(a1).point[M]
+          case ExtractIsoDayOfWeek(a1) =>
+            $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
+              $literal(Bson.Int32(7)),
+              $subtract($dayOfWeek(a1), $literal(Bson.Int32(1)))).point[M]
+          case ExtractMicrosecond(a1) =>
+            $multiply(
+              $add(
+                $multiply($second(a1), $literal(Bson.Int32(1000))),
+                $millisecond(a1)),
+              $literal(Bson.Int32(1000))).point[M]
+          case ExtractMillennium(a1) =>
+            $trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000)))).point[M]
+          case ExtractMillisecond(a1) =>
+            $add(
+              $multiply($second(a1), $literal(Bson.Int32(1000))),
+              $millisecond(a1)).point[M]
+          case ExtractMinute(a1) => $minute(a1).point[M]
+          case ExtractMonth(a1) => $month(a1).point[M]
+          case ExtractQuarter(a1) =>
+            $trunc(
+              $add(
                 $divide(
-                  $subtract(a1, $literal(Bson.Date(0))),
-                  $literal(Bson.Int32(1000)))
-              case ExtractHour(a1) => $hour(a1)
-              case ExtractIsoDayOfWeek(a1) =>
-                $cond($eq($dayOfWeek(a1), $literal(Bson.Int32(1))),
-                  $literal(Bson.Int32(7)),
-                  $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))))
-              case ExtractMicrosecond(a1) =>
-                $multiply(
-                  $add(
-                    $multiply($second(a1), $literal(Bson.Int32(1000))),
-                    $millisecond(a1)),
-                  $literal(Bson.Int32(1000)))
-              case ExtractMillennium(a1) =>
-                $trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000))))
-              case ExtractMillisecond(a1) =>
-                $add(
-                  $multiply($second(a1), $literal(Bson.Int32(1000))),
-                  $millisecond(a1))
-              case ExtractMinute(a1) => $minute(a1)
-              case ExtractMonth(a1) => $month(a1)
-              case ExtractQuarter(a1) =>
-                $trunc(
-                  $add(
-                    $divide(
-                      $subtract($month(a1), $literal(Bson.Int32(1))),
-                      $literal(Bson.Int32(3))),
-                    $literal(Bson.Int32(1))))
-              case ExtractSecond(a1) =>
-                $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000))))
-              case ExtractWeek(a1) => $week(a1)
-              case ExtractYear(a1) => $year(a1)
+                  $subtract($month(a1), $literal(Bson.Int32(1))),
+                  $literal(Bson.Int32(3))),
+                $literal(Bson.Int32(1)))).point[M]
+          case ExtractSecond(a1) =>
+            $add($second(a1), $divide($millisecond(a1), $literal(Bson.Int32(1000)))).point[M]
+          case ExtractWeek(a1) => $week(a1).point[M]
+          case ExtractYear(a1) => $year(a1).point[M]
 
-              case ToTimestamp(a1) =>
-               $add($literal(Bson.Date(0)), a1)
+          case ToTimestamp(a1) =>
+           $add($literal(Bson.Date(0)), a1).point[M]
 
-              case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3))
-              case TimeOfDay(a1) =>
-                $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, a1)
-              case Power(a1, a2) => $pow(a1, a2)
-              case ProjectIndex(a1, a2) => $arrayElemAt(a1, a2)
-              case MakeArray(a1) => $arrayLit(List(a1))
-              case ConcatArrays(a1, a2) =>
-                $let(ListMap(DocVar.Name("a1") -> a1, DocVar.Name("a2") -> a2),
-                  $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
-                    $concatArrays(List($field("$a1"), $field("$a2"))),
-                    $concat($field("$a1"), $field("$a2"))))
-              case TypeOf(a1) => mkTypeOf(a1, $isArray)
-            }
+          case Between(a1, a2, a3)   => $and($lte(a2, a1), $lte(a1, a3)).point[M]
+          case TimeOfDay(a1) =>
+            $dateToString(Hour :: ":" :: Minute :: ":" :: Second :: "." :: Millisecond :: FormatString.empty, a1).point[M]
+          case Power(a1, a2) => $pow(a1, a2).point[M]
+          case ProjectIndex(a1, a2) => $arrayElemAt(a1, a2).point[M]
+          case MakeArray(a1) => $arrayLit(List(a1)).point[M]
+          case ConcatArrays(a1, a2) =>
+            $let(ListMap(DocVar.Name("a1") -> a1, DocVar.Name("a2") -> a2),
+              $cond($and($isArray($field("$a1")), $isArray($field("$a2"))),
+                $concatArrays(List($field("$a1"), $field("$a2"))),
+                $concat($field("$a1"), $field("$a2")))).point[M]
+          case TypeOf(a1) => mkTypeOf(a1, $isArray).point[M]
 
-            partial(mfc) orElse (mfc match {
-              case Constant(v1)  => v1.cataM(BsonCodec.fromEJson(v)).toOption.map($literal(_))
-              case _             => None
-            })
-          }
+          case Constant(v1)  =>
+            v1.cataM(BsonCodec.fromEJson(v)).fold(
+              raisePlannerError(_),
+              $literal(_).point[M])
+          case Now() => execTime[M] map ($literal(_))
+          // NB: The aggregation implementation of `ToString` does not handle ObjectId
+          //     Here we force this case to be planned using JS
+          case ToString($var(DocVar(_, Some(BsonField.Name("_id"))))) =>
+            unimplemented[M, Fix[EX]]("ToString _id expression")
+          // FIXME: $substr is deprecated in Mongo 3.4. This implementation should be
+          //        versioned along with the other functions in FuncHandler, taking into
+          //        account the special case for ObjectId above. Mongo 3.4 should
+          //        use $substrBytes instead of $substr
+          case ToString(a1) => mkToString(a1, $substr).point[M]
+
+          case ProjectKey($var(dv), $literal(Bson.Text(key))) =>
+            $var(dv \ BsonField.Name(key)).point[M]
+          case ProjectKey(el @ $arrayElemAt($var(dv), _), $literal(Bson.Text(key))) =>
+            $let(ListMap(DocVar.Name("el") -> el),
+              $var(DocVar.ROOT(BsonField.Name("$el")) \ BsonField.Name(key))).point[M]
+
+          // NB: This is maybe a NOP for Fix[ExprOp]s, as they (all?) safely
+          //     short-circuit when given the wrong type. However, our guards may be
+          //     more restrictive than the operation, in which case we still want to
+          //     short-circuit, so …
+          case Guard(expr, typ, cont, fallback) =>
+            import Type._
+
+            // NB: Even if certain checks aren’t needed by ExprOps, we have to
+            //     maintain them because we may convert ExprOps to JS.
+            //     Hopefully BlackShield will eliminate the need for this.
+            @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+            def exprCheck: Type => Option[Fix[EX] => Fix[EX]] =
+              generateTypeCheck[Fix[EX], Fix[EX]]($or(_, _)) {
+                case Type.Null => check.isNull
+                case Type.Int
+                   | Type.Dec
+                   | Type.Int ⨿ Type.Dec
+                   | Type.Int ⨿ Type.Dec ⨿ Type.Interval => check.isNumber // for now intervals check as numbers
+                case Type.Str => check.isString
+                case Type.Obj(map, _) =>
+                  ((expr: Fix[EX]) => {
+                    val basic = check.isObject(expr)
+                    expr match {
+                      case $var(dv) =>
+                        map.foldLeft(
+                          basic)(
+                          (acc, pair) =>
+                          exprCheck(pair._2).fold(
+                            acc)(
+                            e => $and(acc, e($var(dv \ BsonField.Name(pair._1))))))
+                      case _ => basic // FIXME: Check fields
+                    }
+                  })
+                case Type.FlexArr(_, _, _) => check.isArray
+                case Type.Binary => check.isBinary
+                case Type.Id => check.isId
+                case Type.Bool => check.isBoolean
+                case Type.OffsetDateTime | Type.OffsetDate | Type.OffsetTime |
+                    Type.LocalDateTime | Type.LocalDate | Type.LocalTime => check.isDate
+                // NB: Some explicit coproducts for adjacent types.
+                case Type.Int ⨿ Type.Dec ⨿ Type.Str => check.isNumberOrString
+                case Type.Int ⨿ Type.Dec ⨿ Type.Interval ⨿ Type.Str => check.isNumberOrString // for now intervals check as numbers
+                case Type.LocalDate ⨿ Type.Bool => check.isDateTimestampOrBoolean
+                case Type.Syntaxed => check.isSyntaxed
+              }
+            exprCheck(typ).fold(cont)(f => $cond(f(expr), cont, fallback)).point[M]
+
+          // NB: catch all added because scala cannot check exhaustiveness here.
+          // It's also not trivial to manually make sure that all cases are covered,
+          // so without getting triggered by the compiler when this needs to be
+          // updated, this will be hard to keep in sync.
+          case x =>
+            val mf: MapFuncCore[T,quasar.qscript.Hole] = x.as(SrcHole)
+            unimplemented[M, Fix[EX]](s"expression ${mf.shows}")
         }
+      }
 
-      def handleOps3_4[EX[_]: Functor](v: BsonVersion)
+      def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : MapFuncCore[T, ?] ~> OptionFree[EX, ?] =
-        new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]){
-          implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncCore[T, ?], Fix[EX]] = { mfc =>
 
-          def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = {
-            val fp32  = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
-            val fp34  = new ExprOp3_4F.fixpoint[Free[EX, A], EX](Free.roll)
+        val fp32  = new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)
+        val fp34  = new ExprOp3_4F.fixpoint[Fix[EX], EX](_.embed)
 
-            import fp32._, fp34._
+        import fp32._, fp34._
 
-            mfc.some collect {
-              case Split(a1, a2) => $split(a1, a2)
-              case Substring(a1, a2, a3) =>
-                $cond($or(
-                    $lt(a2, $literal(Bson.Int32(0))),
-                    $gt(a2, $strLenCP(a1))),
-                  $literal(Bson.Text("")),
-                  $cond(
-                    $lt(a3, $literal(Bson.Int32(0))),
-                    $substrCP(a1, a2, $strLenCP(a1)),
-                    $substrCP(a1, a2, a3)))
-              case Length(a1) => $strLenCP(a1)
-            }
-          }
+        val check = new Check[Fix[EX], EX]
+
+        mfc.some collect {
+          case Split(a1, a2) => $split(a1, a2).point[M]
+          case Substring(a1, a2, a3) =>
+            $cond($or(
+                $lt(a2, $literal(Bson.Int32(0))),
+                $gt(a2, $strLenCP(a1))),
+              $literal(Bson.Text("")),
+              $cond(
+                $lt(a3, $literal(Bson.Int32(0))),
+                $substrCP(a1, a2, $strLenCP(a1)),
+                $substrCP(a1, a2, a3))).point[M]
+
+          // NB: Quasar strings are arrays of characters. However, MongoDB
+          //     represent strings and arrays as distinct types. Moreoever, SQL^2
+          //     exposes two functions: `array_length` to obtain the length of an
+          //     array and `length` to obtain the length of a string. This
+          //     distinction, however, is lost when LP is translated into
+          //     QScript. There's only one `Length` MapFunc. The workaround here
+          //     detects calls to array_length or length indirectly through the
+          //     typechecks inserted around calls to `Length` or `ArrayLength` in
+          //     LP typechecks.
+          case Length(a1) => $strLenCP(a1).point[M]
+          case Guard(expr, Type.Str, cont @ $strLenCP(_), fallback) =>
+            $cond(check.isString(expr), cont, fallback).point[M]
+          case Guard(expr, Type.FlexArr(_, _, _), $strLenCP(str), fallback) =>
+            $cond(check.isArray(expr), $size(str), fallback).point[M]
         }
+      }
 
-      def handleOps3_4_4[EX[_]: Functor](v: BsonVersion)
+      def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : MapFuncCore[T, ?] ~> OptionFree[EX, ?] =
-        new (MapFuncCore[T, ?] ~> OptionFree[EX, ?]){
-
-          def apply[A](mfc: MapFuncCore[T, A]): OptionFree[EX, A] = None
-        }
+          : AlgebraM[(Option ∘ M)#λ, MapFuncCore[T, ?], Fix[EX]] = κ(None)
 
     }
 
-  def mapFuncDerived[T[_[_]]: CorecursiveT]
-      : FuncHandler[MapFuncDerived[T, ?]] =
-    new FuncHandler[MapFuncDerived[T, ?]] {
-      def emptyDerived[T[_[_]], F[_]]: MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
-         λ[MapFuncDerived[T, ?] ~> OptionFree[F, ?]] { _ => None }
-
-      def handleOpsCore[EX[_]: Functor](v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX)
-          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
-        new (MapFuncDerived[T, ?] ~> OptionFree[EX, ?]){
-          implicit def hole[D](d: D): Free[EX, D] = Free.pure(d)
-
-          def apply[A](fa: MapFuncDerived[T, A]): OptionFree[EX, A] = {
-            val fp = new ExprOpCoreF.fixpoint[Free[EX, A], EX](Free.roll)
-            import fp._
-
-            fa.some collect {
-              case D.Abs(a1)       => $abs(a1)
-              case D.Ceil(a1)      => $ceil(a1)
-              case D.Floor(a1)     => $floor(a1)
-              case D.Trunc(a1)     => $trunc(a1)
-            }
-          }
-        }
-
-      def handleOps3_4[EX[_]: Functor](v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
-        emptyDerived
-
-      def handleOps3_4_4[EX[_]: Functor](v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
-        emptyDerived
-    }
-
-  implicit def mapFuncDerivedUnhandled[T[_[_]]: CorecursiveT]
+  implicit def mapFuncDerived[T[_[_]]: CorecursiveT]
     (implicit core: FuncHandler[MapFuncCore[T, ?]])
       : FuncHandler[MapFuncDerived[T, ?]] =
     new FuncHandler[MapFuncDerived[T, ?]] {
-      val derived = mapFuncDerived
-
-      private def handleUnhandled[F[_]]
-        (derived: MapFuncDerived[T, ?] ~> OptionFree[F, ?], core: MapFuncCore[T, ?] ~> OptionFree[F, ?])
-          : MapFuncDerived[T, ?] ~> OptionFree[F, ?] =
-            new (MapFuncDerived[T, ?] ~> OptionFree[F, ?]) {
-              def apply[A](f: MapFuncDerived[T, A]): OptionFree[F, A] = {
-                val alg: AlgebraM[Option, CoEnv[A, MapFuncCore[T,?], ?], Free[F,A]] =
-                  _.run.fold[OptionFree[F, A]](x => Free.point(x).some, core(_).map(_.join))
-                derived(f)
-                  .orElse(Free.roll(ExpandMapFunc.mapFuncDerived[T, MapFuncCore[T, ?]].expand(f)).cataM(alg))
-            }
-          }
-
-      def handleOpsCore[EX[_]: Functor](v: BsonVersion)
+      def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX)
-          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] =
-        handleUnhandled(derived.handleOpsCore(v), core.handleOpsCore(v))
+          : AlgebraM[M, MapFuncDerived[T, ?], Fix[EX]] = {
 
-      def handleOps3_4[EX[_]: Functor](v: BsonVersion)
+        val fp = new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)
+        import fp._
+
+        val derived: AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = {
+          _.some.collect {
+            case D.Abs(a1)       => $abs(a1).point[M]
+            case D.Ceil(a1)      => $ceil(a1).point[M]
+            case D.Floor(a1)     => $floor(a1).point[M]
+            case D.Trunc(a1)     => $trunc(a1).point[M]
+          }
+        }
+
+        ExpandMapFunc.expand(core.handle3_2(v), derived)
+      }
+
+      def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] = {
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
 
-        val hCore = λ[MapFuncCore[T, ?] ~> OptionFree[EX, ?]]{f =>
-          val h34 = core.handleOps3_4[EX](v)
-          val h = core.handleOpsCore[EX](v)
-          h34(f) orElse h(f)
-        }
-        handleUnhandled(derived.handleOps3_4(v), hCore)
-      }
-
-      def handleOps3_4_4[EX[_]: Functor](v: BsonVersion)
+      def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : MapFuncDerived[T, ?] ~> OptionFree[EX, ?] = {
-
-        val hCore = λ[MapFuncCore[T, ?] ~> OptionFree[EX, ?]]{f =>
-          val h344 = core.handleOps3_4_4[EX](v)
-          val h34 = core.handleOps3_4[EX](v)
-          val h = core.handleOpsCore[EX](v)
-          h344(f) orElse h34(f) orElse h(f)
-        }
-        handleUnhandled(derived.handleOps3_4_4(v), hCore)
-      }
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
       (implicit F: FuncHandler[F], G: FuncHandler[G])
       : FuncHandler[Coproduct[F, G, ?]] =
     new FuncHandler[Coproduct[F, G, ?]] {
-      def handleOpsCore[EX[_]: Functor](v: BsonVersion)
+      def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX)
-          : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
-        λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
-          F.handleOpsCore[EX](v).apply _,
-          G.handleOpsCore[EX](v).apply _
-        ))
+          : AlgebraM[M, Coproduct[F, G, ?], Fix[EX]] =
+        _.run.fold(
+          F.handleOpsCore[EX, M](v).apply _,
+          G.handleOpsCore[EX, M](v).apply _)
 
-      def handleOps3_4[EX[_]: Functor](v: BsonVersion)
+      def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
-        λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
-          F.handleOps3_4[EX](v).apply _,
-          G.handleOps3_4[EX](v).apply _
-        ))
+          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
+        _.run.fold(
+          F.handleOps3_4[EX, M](v).apply _,
+          G.handleOps3_4[EX, M](v).apply _)
 
-      def handleOps3_4_4[EX[_]: Functor](v: BsonVersion)
+      def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : Coproduct[F, G, ?] ~> OptionFree[EX, ?] =
-        λ[Coproduct[F, G, ?] ~> OptionFree[EX, ?]](_.run.fold(
-          F.handleOps3_4_4[EX](v).apply _,
-          G.handleOps3_4_4[EX](v).apply _
-        ))
+          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
+        _.run.fold(
+          F.handleOps3_4_4[EX, M](v).apply _,
+          G.handleOps3_4_4[EX, M](v).apply _)
 
     }
 
-  def handle3_2[F[_]: FuncHandler](v: BsonVersion): F ~> OptionFree[Expr3_2, ?] =
-    FuncHandler[F].handle3_2(v)
+  def handle3_2[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+      : AlgebraM[M, F, Fix[Expr3_2]] =
+    FuncHandler[F].handle3_2[Expr3_2, M](v)
 
-  def handle3_4[F[_]: FuncHandler](v: BsonVersion): F ~> OptionFree[Expr3_4, ?] =
-    FuncHandler[F].handle3_4(v)
+  def handle3_4[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+      : AlgebraM[M, F, Fix[Expr3_4]] =
+    FuncHandler[F].handle3_4[Expr3_4, M](v)
 
-  def handle3_4_4[F[_]: FuncHandler](v: BsonVersion): F ~> OptionFree[Expr3_4_4, ?] =
-    FuncHandler[F].handle3_4_4(v)
+  def handle3_4_4[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+      : AlgebraM[M, F, Fix[Expr3_4_4]] =
+    FuncHandler[F].handle3_4_4[Expr3_4_4, M](v)
 }

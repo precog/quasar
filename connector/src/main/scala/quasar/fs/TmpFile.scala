@@ -23,11 +23,11 @@ import scalaz._, Scalaz._
 
 object TmpFile {
 
-  def tmpFilename[A: Show](prefix: TempFilePrefix, a: A): FileName =
+  def tmpFileName[A: Show](prefix: TempFilePrefix, a: A): FileName =
     FileName(prefix.s + a.shows)
 
   def tmpFile[A: Show](dir: ADir, prefix: TempFilePrefix, a: A): AFile =
-    dir </> file1(tmpFilename(prefix, a))
+    dir </> file1(tmpFileName(prefix, a))
 
   def tmpFile0[A: Show](near: APath, prefix: TempFilePrefix, a: A): AFile =
     tmpFile(nearDir(near), prefix, a)

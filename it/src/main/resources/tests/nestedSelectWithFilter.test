@@ -2,8 +2,7 @@
     "name": "nested select with filter",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "pending",
-        "spark_cassandra":   "pending"
+        "mimir":             "pending"
     },
     "data": "olympics.data",
     "query": "select * from

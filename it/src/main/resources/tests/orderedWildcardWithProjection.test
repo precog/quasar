@@ -1,9 +1,7 @@
 {
     "name": "wildcard with projection and synthetic field",
     "backends": {
-        "postgres": "pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "largeZips.data",
     "query": "select *, pop * 10 as dpop from largeZips order by pop / 10 desc",
     "predicate": "initial",

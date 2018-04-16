@@ -4,10 +4,8 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder",
-       "postgres":          "pending"
+       "mimir":             "ignoreFieldOrder"
     },
-    "NB": "Pending on Postgres due to problems with handling for IncludeId (actually a QS bug qz-3618)",
     "query": "temp0 := SELECT A_Name AS Game, B_Released AS ReleaseDate, C_Recommendations AS Reviews, D_Metacritic AS Score, PriceInitial AS Price FROM steamgames WHERE (IsAction = \"TRUE\") AND (A_Name <> \"\") AND (D_Metacritic >= 0) AND (C_Recommendations >= 0) ORDER BY D_Metacritic DESC, PriceInitial DESC, A_Name ASC;
      SELECT Game AS dimension, SUM(Score) AS measure1, null AS size, SUM(Price) AS measure2, null AS series FROM (temp0) AS temp1 GROUP BY Game ORDER BY measure1 desc, measure2 asc LIMIT 5
     ",

@@ -30,21 +30,26 @@ env:
     - CONNECTOR=mongodb_3_4_13
     - CONNECTOR=mongodb_3_6
     - CONNECTOR=mongodb_read_only
-    - CONNECTOR=postgres
-    # - CONNECTOR=spark_local_test # no spark for 2.12
-    # - CONNECTOR=spark_hdfs # no spark for 2.12
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
+    - BUILD_HACK_TIMEOUT=60
     # DISCORD_WEBHOOK_TOKENS
     - secure: "copZbrzCXeRfTx2ZRM6nsM07A4rfQAZ0mqk4R+z6USJhjLHv+KXAN30QN2nIAi9FmLoEX8BZRRpbX36nkc81jverhbS6POaci5UcQLpo8HOX4yR3b/pWqIBlno55K5hC6UCEXAneI/ZThFKwotpME9dw7ww+S+gIyaoDvZc4OUI="
+    # ENCRYPTION_PASSWORD
+    - secure: "YIfY4y2fR4jMOim40r7m4zIHDXI6sXIk+J8qaPJyfPx/cmDRKs5DfbHddb0Rp7Ny0tnRiwRZDt+pEZvfSiuxCIeQQ6/2vi76Jg1iK2ZMO7ZP2wFg5m2t3T+vRIx9WVBr3JVmI4lPuP9FCNTUmxHIzYgozgZM+KdhticW5k3BABY="
+    # GITHUB_ACCESS_TOKEN
+    - secure: "Cuba400Wq7DxPe/1fXWlgI/aS3oXTj64jQJY588dQZ84wLDnTNbdP4SgZMcGJgzVs4f14PTIGTkK5xJ6WjNLIrUVxBhsB5sRRlX/oMkTVo3ALl/+/q6XXzG6JFuzc2lOHAiryuqQ4ndVNbwSmm5u9u/Krgl2lUlrDqKhhq6LdJI="
+    # GITHUB_TOKEN
+    - secure: "lH3uaFqFM+4fXAQiF+cQ6eo89HI4Vc7QuIaVUuA7xcVTkPy52cWg6ivrX1ZIG1HQXo5UOFEJDxPmGyeobF/8BrcgacigvEbiHkVhiXzRnWtpZYEPFac3cUmnKd8VRgYA68gXX3pBuF29v+v91MmznDiuBkfKn8r7z/sTykUdHV4="
+
 
 # this is also the test stage :eyeroll:
 script:
   - set -e
 
   # travis installs postgres by default this will stop and free up the psql port
-  # needed by the  postgreql container
+  # needed by the postgresql container
   - sudo /etc/init.d/postgresql stop
   - sudo /etc/init.d/mysql stop
   - sudo service memcached stop
@@ -67,26 +72,11 @@ script:
       couchbase) SPECIFIC_DELEGATE="couchbaseIt/testOnly -- xonly failtrace" ;;
       marklogic_*) SPECIFIC_DELEGATE="marklogicIt/testOnly -- xonly failtrace" ;;
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
-
-      spark_hdfs)
-
-        ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-          'set every assemblyJarName in assembly := "sparkcore.jar"' \
-          'set every sparkDependencyProvided := true' \
-          sparkcore/assembly
-
-        cp ./.targets/sparkcore/scala-2.11/sparkcore.jar $TRAVIS_BUILD_DIR
-
-        export SPARKCORE_JAR_PATH="$TRAVIS_BUILD_DIR/sparkcore.jar"
-
-        ;;
-
-      *) ;;
     esac
 
   # workaround for the fact that travis caching isn't working. when it starts working again, remove this
   - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-  - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+  - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
@@ -142,7 +132,7 @@ jobs:
 
         # workaround for the fact that travis caching isn't working. when it starts working again, remove this
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-        - travis_wait 40 ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
+        - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
         - travis_wait 40 './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
 
@@ -160,14 +150,6 @@ jobs:
 
         # release to sonatype
         - scripts/quasarPublishAndTag
-
-        # recreate sparkcore.jar, which is just going to hang out
-        # sparkcore currently disabled
-        # - |-
-        #   ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-        #     'set every assemblyJarName in assembly := "sparkcore.jar"' \
-        #     'set every sparkDependencyProvided := true' \
-        #     sparkcore/assembly
 
         # release to github
         - scripts/publishJar

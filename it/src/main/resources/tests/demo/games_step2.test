@@ -4,10 +4,8 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "pending",
-       "mimir":             "ignoreFieldOrder",
-       "postgres":          "pending"
+       "mimir":             "ignoreFieldOrder"
     },
-    "NB": "Pending on Postgres due to problems with handling for IncludeId (actually a QS bug qz-3618)",
   "query": "SELECT A_Name AS Game, B_Released AS ReleaseDate, C_Recommendations AS Reviews, D_Metacritic AS Score, PriceInitial AS Price FROM steamgames WHERE (IsAction = \"TRUE\") AND (LIKE(UPPER(A_Name), \"%\" || UPPER(\"Half-Life\") || \"%\", \"\\\\\")) AND (D_Metacritic >= 94) AND (C_Recommendations >= 12486) ORDER BY D_Metacritic DESC, PriceInitial DESC, A_Name ASC LIMIT 10",
     "predicate": "exactly",
     "expected": [

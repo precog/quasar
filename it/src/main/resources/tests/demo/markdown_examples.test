@@ -1,9 +1,7 @@
 {
     "name": "markdown_examples",
     "backends": {
-        "postgres":     "pending"
     },
-    "NB": "Pending on Postgres due to problems with handling for IncludeId (actually a QS bug qz-3618)",
     "data": "patients.data",
     "query": "SELECT DISTINCT (city) as city FROM patients WHERE state = \"TX\" ORDER BY city ASC LIMIT 6",
     "predicate": "exactly",

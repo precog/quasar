@@ -1,8 +1,7 @@
 {
     "name": "shortest city names",
     "backends": {
-        "couchbase": "pending",
-        "postgres":   "pending"
+        "couchbase": "pending"
     },
     "data": "largeZips.data",
     "query": "select distinct city from largeZips order by length(city), city limit 5",

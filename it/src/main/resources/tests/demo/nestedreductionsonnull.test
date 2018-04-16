@@ -4,12 +4,12 @@
   "backends": {
     "marklogic_json":    "skip",
     "marklogic_xml":     "skip",
-    "mimir":             "ignoreFieldOrder",
-    "mongodb_3_2":       "ignoreFieldOrder",
-    "mongodb_3_4":       "ignoreFieldOrder",
-    "mongodb_3_4_13":    "ignoreFieldOrder",
-    "mongodb_3_6":       "ignoreFieldOrder",
-    "mongodb_read_only": "ignoreFieldOrder"
+    "mimir":             "pending",
+    "mongodb_3_2":       "pending",
+    "mongodb_3_4":       "pending",
+    "mongodb_3_4_13":    "pending",
+    "mongodb_3_6":       "pending",
+    "mongodb_read_only": "pending"
   },
   "query": "SELECT AVG(weight) AS measure, city AS category, gender AS stack, null AS parallel FROM patients AS card468278e5ec90410e8d702ed8f6967066_ WHERE true GROUP BY null, gender, city ORDER BY null ASC, gender ASC, city ASC",
   "predicate": "exactly",

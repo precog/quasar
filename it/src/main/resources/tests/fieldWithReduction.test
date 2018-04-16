@@ -7,10 +7,8 @@
         "mongodb_3_4":       "ignoreFieldOrder",
         "mongodb_3_4_13":    "ignoreFieldOrder",
         "mongodb_3_6":       "ignoreFieldOrder",
-        "mongodb_read_only": "ignoreFieldOrder",
-        "postgres":          "pending"
+        "mongodb_read_only": "ignoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to boxed result errors qz-3739",
     "data": "extraSmallZips.data",
 
     "query": "select state, sum(pop) from extraSmallZips",

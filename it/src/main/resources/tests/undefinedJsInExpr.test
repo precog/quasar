@@ -2,10 +2,8 @@
     "name": "propagate undefined and null in JS",
     "backends": {
         "couchbase":         "pending",
-        "mimir":             "pending",
-        "postgres":          "pending"
+        "mimir":             "pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "zips.data",
     "query": "select distinct length(meh) as meh_len, meh.mep, length(meh.mep) as mep_len from zips",
     "predicate": "exactly",

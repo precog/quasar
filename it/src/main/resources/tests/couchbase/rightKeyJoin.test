@@ -9,11 +9,7 @@
         "mongodb_3_4":       "skip",
         "mongodb_3_4_13":    "skip",
         "mongodb_3_6":       "skip",
-        "mongodb_read_only": "skip",
-        "postgres":          "skip",
-        "spark_hdfs":        "skip",
-        "spark_local":       "skip",
-        "spark_cassandra":   "skip"
+        "mongodb_read_only": "skip"
     },
     "NB": "Pending on couchbase due to #3158",
     "data": [],

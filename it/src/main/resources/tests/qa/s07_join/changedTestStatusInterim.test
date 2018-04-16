@@ -9,11 +9,7 @@
         "marklogic_xml":     "pending",
         "mimir":             "skip",
         "mongodb_3_2":       "pendingIgnoreFieldOrder",
-        "mongodb_3_4":       "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending",
-        "postgres":          "pending"
+        "mongodb_3_4":       "pending"
     },
     "data": ["../../oldTests.data", "../../newTests.data"],
     "query": "select old.name ?? new.name as name,

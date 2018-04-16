@@ -4,16 +4,6 @@ set -euo pipefail # STRICT MODE
 IFS=$'\n\t'
 
 ##########################################
-# injects spark_local path into
-# it/testing.conf
-# need to call it like this if running locally
-# buildtestingconfig.sh spark
-#
-configure_spark() {
-  echo "spark_local=\"${HOME}/spark_local_test/\"" >> $CONFIGFILE
-}
-
-##########################################
 # injects mimir path into
 # it/testing.conf
 #
@@ -53,32 +43,6 @@ configure_metastore() {
 }
 
 ##########################################
-# injects postgres url into
-# it/testing.conf
-#
-configure_postgres() {
-  echo 'postgres'=\"jdbc:postgresql://${DOCKERIP}:35432/postgres?user=postgres\" >> $CONFIGFILE
-}
-
-##########################################
-# injects spark and companion connector
-# URI into it/testing.conf
-#
-configure_spark_connector() {
-  CONTAINERNAME=$1
-  if [[ $CONTAINERNAME != "spark_s3" ]]
-  then
-    CONNECTORIPADDR=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' quasar_$1)
-  fi
-  SPARKCLUSTERIPADDR=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' quasar_spark_cluster)
-  if [[ $CONTAINERNAME == "spark_cassandra"     ]]; then echo "spark_cassandra=\"spark://${SPARKCLUSTERIPADDR}:7077?cassandraHost=${CONNECTORIPADDR}&cassandraPort=9042&rootPath=/\""  >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "spark_elasticsearch" ]]; then echo "spark_elastic=\"spark://${SPARKCLUSTERIPADDR}:7077?elasticHost=${CONNECTORIPADDR}&elasticPort=9200\""        >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "spark_ftp"           ]]; then echo "spark_hdfs=\"spark://${SPARKCLUSTERIPADDR}:7077?hdfsUrl=ftp://${CONNECTORIPADDR}:21&rootPath=/\""            >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "spark_hdfs"          ]]; then echo "spark_hdfs=\"spark://${SPARKCLUSTERIPADDR}:7077?hdfsUrl=hdfs://${CONNECTORIPADDR}:9000&rootPath=/\""         >> $CONFIGFILE; fi
-  if [[ $CONTAINERNAME == "spark_s3"            ]]; then echo "spark_hdfs=\"spark://${SPARKCLUSTERIPADDR}:7077?hdfsUrl=s3://<s3url>:<port>&rootPath=/\""                    >> $CONFIGFILE; fi
-}
-
-##########################################
 # injects various mongodb urls into
 # it/testing.conf depending on argument
 #
@@ -98,11 +62,8 @@ container_lookup() {
   if [[ $CONTAINER == "marklogic_xml"    ]]; then configure_marklogic_xml  $CONTAINER 8001; fi
   if [[ $CONTAINER == "marklogic_json"   ]]; then configure_marklogic_json $CONTAINER 9001; fi
   if [[ $CONTAINER == "couchbase"        ]]; then configure_couchbase      $CONTAINER;      fi
-  if [[ $CONTAINER == "spark_local_test" ]]; then configure_spark;                          fi
   if [[ $CONTAINER == "metastore"        ]]; then configure_metastore;                      fi
   if [[ $CONTAINER == "mimir"            ]]; then configure_mimir;                          fi
-  if [[ $CONTAINER == "postgres"         ]]; then configure_postgres;                       fi
-  if [[ $CONTAINER == "spark_cassandra" || $CONTAINER == "spark_elasticsearch" || $CONTAINER == "spark_ftp" || $CONTAINER == "spark_hdfs" || $CONTAINER == "spark_s3" ]]; then configure_spark_connector $CONTAINER; fi
 }
 
 
@@ -136,7 +97,6 @@ continers. Works for local development and within travis-ci.
   -a                   cleans existing testing.conf and adds testing.conf entries for all currently running quasar test containers
   -i CONTAINER-NAME    add CONTAINER-NAME entry to existing testing.conf file
   -c CONTAINER-NAME    cleans exisitng testing.conf and adds a entry for CONTAINER-NAME
-  -t                   add spark local entry to testing.conf
 EOF
 }
 
@@ -166,10 +126,6 @@ while getopts ":hastpc:i:" opt; do
       echo "cleaning exisitng testing.conf and adding a entry for $OPTARG..." >&2
       cleanup_testing_conf_file
       container_lookup $OPTARG
-      ;;
-    t)
-      echo "adding spark local entry to testing.conf..." >&2
-      ./$0 -i quasar_spark_local_test
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2

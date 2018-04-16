@@ -5,8 +5,7 @@
         "couchbase":      "timeout",
         "marklogic_json": "timeout",
         "marklogic_xml":  "timeout",
-        "mimir":          "ignoreFieldOrder",
-        "postgres":       "ignoreFieldOrder"
+        "mimir":          "ignoreFieldOrder"
     },
 
     "data": ["leftData.data", "rightData.data"],

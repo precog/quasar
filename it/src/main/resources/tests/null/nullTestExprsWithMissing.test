@@ -9,13 +9,8 @@
         "mongodb_3_4":       "pendingIgnoreFieldOrder",
         "mongodb_3_4_13":    "pendingIgnoreFieldOrder",
         "mongodb_3_6":       "pendingIgnoreFieldOrder",
-        "mongodb_read_only": "pendingIgnoreFieldOrder",
-        "postgres":          "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "mongodb_read_only": "pendingIgnoreFieldOrder"
     },
-    "NB": "Pending for postgres connector due to unmatched and unexpected value errors qz-3738",
     "data": "nullsWithMissing.data",
     "query": "select name,
                      val, val = null, val is null, val is not null,

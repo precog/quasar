@@ -50,7 +50,7 @@ object InMemory {
   type QueryResponses = Map[Fix[LogicalPlan], Vector[Data]]
   type ResultMap = Map[ResultHandle, Vector[Data]]
 
-  type InMemoryFs[A]  = State[InMemState, A]
+  type InMemoryFs[A] = State[InMemState, A]
 
   final case class Reading(f: AFile, start: Natural, lim: Option[Positive], pos: Int)
 

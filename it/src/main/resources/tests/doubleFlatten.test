@@ -1,9 +1,7 @@
 {
     "name": "flatten a flattened field",
     "backends": {
-        "postgres": "pending"
     },
-    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "slamengine_commits.data",
     "query": "select parents[*]{*} from slamengine_commits",
     "predicate": "atLeast",

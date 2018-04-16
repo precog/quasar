@@ -18,6 +18,7 @@ package quasar.fs
 
 import slamdata.Predef._
 import quasar.{BackendCapability, BackendName, BackendRef, Data, TestConfig}
+import quasar.config.FsPath
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.fp._
@@ -100,7 +101,7 @@ abstract class FileSystemTest[S[_]](
     * superset of the key -> value associations.
     *
     * This exists to allow data stores having synthetic primary keys
-    * (MongoDB, RDBMS, etc.) to still pass the tests even though
+    * (MongoDB, etc.) to still pass the tests even though
     * their results may contain extra identity keys.
     */
   def subsume(superType: Data): Matcher[Data] =
@@ -157,9 +158,9 @@ abstract class FileSystemTest[S[_]](
     def delete(dir: ADir): Free[S, FileSystemError \/ Unit] = for {
       d <- M.delete(dir).run
       r <- d match {
-             case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
-             case x => Free.point[S, FileSystemError \/ Unit](x)
-           }
+        case -\/(UnsupportedOperation(_)) => deletePerFile(dir)
+        case x => Free.point[S, FileSystemError \/ Unit](x)
+      }
     } yield r
 
     runT(run)(EitherT(delete(dir)))
@@ -230,12 +231,12 @@ object FileSystemTest {
   }
 
   def localFsUT(mounts: BackendDef[PhysFsEffM]): Task[IList[SupportedFs[BackendEffect]]] =
-    (inMemUT |@| hierarchicalUT |@| nullViewUT(mounts)) { (mem, hier, nullUT) =>
+    (inMemUT |@| localUT |@| hierarchicalUT |@| nullViewUT(mounts)) { (mem, local, hier, nullUT) =>
       IList(
         SupportedFs(mem.ref, mem.some),
+        SupportedFs(local.ref, local.some),
         SupportedFs(hier.ref, hier.some),
-        SupportedFs(nullUT.ref, nullUT.some)
-      )
+        SupportedFs(nullUT.ref, nullUT.some))
     }
 
   def nullViewUT(mounts: BackendDef[PhysFsEffM]): Task[FileSystemUT[BackendEffect]] =
@@ -300,9 +301,27 @@ object FileSystemTest {
   def inMemUT: Task[FileSystemUT[BackendEffect]] = {
     val ref = BackendRef(BackendName("in-memory"), ISet singleton BackendCapability.write())
 
-    InMemory.runStatefully(InMemory.InMemState.empty)
-      .map(_ compose InMemory.fileSystem)
+    InMemory.runFs(InMemory.InMemState.empty)
       .map(f => Empty.analyze[Task] :+: f)
       .map(f => FileSystemUT(ref, f, f, rootDir, ().point[Task]))
+  }
+
+  def localUT: Task[FileSystemUT[BackendEffect]] = {
+    val ref = BackendRef(BackendName("local"), ISet singleton BackendCapability.write())
+
+    val local: java.io.File = java.nio.file.Files.createTempDirectory("localfs").toFile
+
+    // this is literally only going to work if the tempdir is at C:\
+    val testDir: ADir =
+      if (java.lang.System.getProperty("os.name").contains("Windows"))
+        windowsCodec.parseAbsDir(FsPath.winVolAndPath(local.getAbsolutePath)._2 + "\\").map(unsafeSandboxAbs)
+          .getOrElse(scala.sys.error("Failed to generate a temp path on windows."))
+      else
+        posixCodec.parseAbsDir(local.getAbsolutePath + "/").map(unsafeSandboxAbs)
+          .getOrElse(scala.sys.error("Failed to generate a temp path on a non-windows fs (assumed posix compliance)."))
+
+    Local(local).runFs
+      .map(f => Empty.analyze[Task] :+: f)
+      .map(f => FileSystemUT(ref, f, f, testDir, ().point[Task]))
   }
 }

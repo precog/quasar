@@ -4,8 +4,7 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "pending",
-       "mimir":             "pending",
-       "postgres":          "ignoreFieldOrder"
+       "mimir":             "pending"
     },
     "NB": "mimir handles order incorrectly, marklogic_json blows up with 'arg1 is not of type xs:string? on line 117'",
     "query": "temp0 := SELECT * FROM olympics;

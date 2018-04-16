@@ -115,66 +115,6 @@ object Dependencies {
     )
   }
 
-  def rdbmscore = {
-    Seq(
-      "org.tpolecat" %% "doobie-core"       % doobieVersion,
-      "org.tpolecat" %% "doobie-postgres"   % doobieVersion,
-      "org.tpolecat" %% "doobie-hikari"     % doobieVersion,
-      "org.tpolecat" %% "doobie-h2"         % doobieVersion,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.13" % "1.1.6" % Test,
-      "org.tpolecat" %% "doobie-specs2"     % doobieVersion % Test
-    )
-  }
-
-  def sparkcore(sparkProvided: Boolean) = Seq(
-    ("org.apache.spark" %% "spark-core" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
-      .exclude("aopalliance", "aopalliance")                  // It seems crazy that we need to do this,
-      .exclude("javax.inject", "javax.inject")                // but it looks like Spark had some dependency conflicts
-      .exclude("commons-collections", "commons-collections")  // among its transitive dependencies which means
-      .exclude("commons-beanutils", "commons-beanutils-core") // we need to exclude this stuff so that we can
-      .exclude("commons-logging", "commons-logging")          // create an assembly jar without conflicts
-      .exclude("commons-logging", "commons-logging")          // It would seem though that things work without them...
-      .exclude("com.esotericsoftware.minlog", "minlog")       // It's likely this list will need to be updated
-      .exclude("org.spark-project.spark", "unused")           // anytime the Spark dependency itselft is updated
-      .excludeAll(ExclusionRule(organization = "io.netty")),
-    ("org.apache.spark" %% "spark-sql" % "2.2.0" % (if(sparkProvided) "provided" else "compile"))
-      .exclude("aopalliance", "aopalliance")                  // Same limitation
-      .exclude("javax.inject", "javax.inject")                // as above for
-      .exclude("commons-collections", "commons-collections")  // spark-sql dependency.
-      .exclude("commons-beanutils", "commons-beanutils-core") // This hopefully will go away
-      .exclude("commons-logging", "commons-logging")          // in near future with
-      .exclude("commons-logging", "commons-logging")          // classloaders magic
-      .exclude("com.esotericsoftware.minlog", "minlog")       // Keep calm and
-      .exclude("org.spark-project.spark", "unused")           // ignore Spark.
-      .excludeAll(ExclusionRule(organization = "io.netty")),
-    "io.netty" % "netty-all" % "4.0.43.Final",    // we need THIS version
-    ("org.apache.hadoop" % "hadoop-aws" % "2.7.3")
-      .exclude("com.esotericsoftware.minlog", "minlog")
-      .exclude("commons-collections", "commons-collections")
-      .exclude("commons-beanutils", "commons-beanutils-core")
-      .exclude("commons-logging", "commons-logging"),
-    "org.apache.parquet"     % "parquet-format"          % "2.3.1",
-    "org.apache.parquet"     % "parquet-hadoop"          % "1.9.0",
-    ("com.datastax.spark" %% "spark-cassandra-connector" % "2.0.3")
-      .excludeAll(ExclusionRule(organization = "io.netty")),
-    "org.http4s"             %% "http4s-core"            % http4sVersion,
-    "org.http4s"             %% "http4s-blaze-client"    % http4sVersion,
-    "org.elasticsearch"      %% "elasticsearch-spark-20" % "5.4.1",
-    ("com.sksamuel.elastic4s" %% "elastic4s-http"         % "5.4.6")
-      .exclude("commons-logging", "commons-logging"),
-    "io.verizon.delorean" %% "core" % deloreanVersion,
-    // Please note that elastic4s-jackson and elastic4s-testkit DON'T contain
-    // dependency to io.netty:netty-all in the elastic4s build.sbt. For the
-    // unknown reasons however netty-all is a deriviative dependency (@daniel suspects
-    // bug in ivy) thus we must exclude netty-all here since it is a conflicting version 4.1.x
-    ("com.sksamuel.elastic4s" %% "elastic4s-jackson"      % "5.4.6")
-      .exclude("io.netty", "netty-all"),
-    ("com.sksamuel.elastic4s" %% "elastic4s-testkit"      % "5.4.6" % Test)
-      .exclude("org.scalatest", "scalatest_2.11")
-      .exclude("io.netty", "netty-all"),
-    "org.apache.logging.log4j"              % "log4j-core"                % "2.6.2"
-  )
-
   def marklogic = Seq(
     "com.fasterxml.jackson.core" %  "jackson-core"         % jacksonVersion,
     "com.fasterxml.jackson.core" %  "jackson-databind"     % jacksonVersion,

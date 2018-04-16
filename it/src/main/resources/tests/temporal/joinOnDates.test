@@ -2,10 +2,8 @@
     "name": "join on dates",
 
     "backends": {
-        "mimir": "pending",
-        "postgres": "pending"
+        "mimir": "pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data":  ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
 
     "query": "select a.commit.committer.name as name, b.commit.committer.name as namedup

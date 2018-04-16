@@ -4,13 +4,8 @@
         "couchbase":         "pending",
         "marklogic_json":    "pending",
         "marklogic_xml":     "pending",
-        "mimir":             "pending",
-        "postgres":          "pending",
-        "spark_hdfs":        "pending",
-        "spark_local":       "pending",
-        "spark_cassandra":   "pending"
+        "mimir":             "pending"
     },
-    "NB": "Pending for postgres connector due to PSQLException errors qz-3737",
     "data": "flattenable.data",
     "query": "select t0.b[*] ?? t0.b from flattenable as t0",
     "predicate": "exactly",

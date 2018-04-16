@@ -5,12 +5,10 @@
         "marklogic_json": "pending",
         "mongodb_3_2": "pending",
         "mongodb_3_4": "pending",
-        "mongodb_read_only": "skip",
-        "postgres": "pending"
+        "mongodb_read_only": "skip"
     },
     "NB": "disabled on couchbase due to lack of general join",
     "NB": "skipped on mongodb_read_only because of 👻",
-    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "newTests.data",
     "query": "select name from newTests where count(backends{_}) = 12 order by name limit 5",
     "predicate": "exactly",

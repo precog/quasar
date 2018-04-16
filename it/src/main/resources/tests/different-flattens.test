@@ -7,11 +7,7 @@
         "mimir":             "skip",
         "mongodb_3_2":       "skip",
         "mongodb_3_4":       "skip",
-        "mongodb_read_only": "skip",
-        "spark_hdfs":        "skip",
-        "spark_local":       "skip",
-        "spark_cassandra":   "skip",
-        "postgres":          "skip"
+        "mongodb_read_only": "skip"
     },
     "data": "user_comments.data",
     "query": "select profile from user_comments where (

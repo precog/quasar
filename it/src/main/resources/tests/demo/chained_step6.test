@@ -4,10 +4,8 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "pending",
-       "postgres":          "pending"
+       "mimir":             "pending"
     },
-    "NB": "Pending for Postgres. Correct result, but arrays are unordered.",
     "query": "temp0 := SELECT * FROM patients WHERE state = \"CO\" AND city = \"DENVER\" ORDER BY last_name ASC;
     SELECT DISTINCT row.city AS city, row.gender AS gender, [row.last_name...] AS last_name, [row.first_name...] AS first_name, [row.height...] AS height, [row.age...] AS age FROM (temp0) AS row GROUP BY row.city, row.gender ORDER BY row.city ASC, row.gender ASC LIMIT 5
     ",

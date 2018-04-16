@@ -5,14 +5,9 @@
         "marklogic_json":    "skip",
         "marklogic_xml":     "skip",
         "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "postgres":          "pending",
-        "spark_hdfs":        "skip",
-        "spark_local":       "skip",
-        "spark_cassandra":   "skip"
+        "mongodb_3_4":       "pending"
     },
     "NB": "Skipped for now because this is now intermitently working on some backends, but not consistently",
-    "NB": "Pending for postgres connector due to LeftShift error qz-3733",
     "data": "newTests.data",
     "query": "select backends{_:} as backend, backends{:_} as status, name from newTests",
     "predicate": "atLeast",

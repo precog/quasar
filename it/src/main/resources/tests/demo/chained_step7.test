@@ -4,8 +4,7 @@
     "backends": {
        "couchbase":         "ignoreFieldOrder",
        "marklogic_json":    "ignoreFieldOrder",
-       "mimir":             "ignoreFieldOrder",
-       "postgres":          "ignoreFieldOrder"
+       "mimir":             "ignoreFieldOrder"
     },
     "query": "temp0 := SELECT COUNT(*) AS cnt, gender FROM patients WHERE state = \"CO\" AND city = \"DENVER\" GROUP BY gender;
     SELECT gender AS category, SUM(cnt) AS measure, null AS donut, null AS parallel FROM (temp0) AS temp1 GROUP BY gender ORDER BY gender ASC

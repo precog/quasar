@@ -51,9 +51,8 @@ env:
 script:
   - set -e
   
-  - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER target --recursive
-  - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .targets --recursive
-  - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .hoarder-cache --recursive
+  - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER target --recursive
+  - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .hoarder-cache --recursive
 
   # travis installs postgres by default this will stop and free up the psql port
   # needed by the postgresql container
@@ -99,6 +98,8 @@ jobs:
     - stage: clean
       env:
       script:
+        - echo "cleaning s3 $TRAVIS_BUILD_NUMBER"
+        - aws s3 --quiet rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
@@ -107,10 +108,6 @@ jobs:
         - set -e
 
         - pip install --user awscli
-        # this is just for testing if we fail here something is wrong
-        - aws s3 cp version.sbt s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER
-        - aws s3 ls s3://quasar-build-cache/
-        - aws s3 ls s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER
 
         - ./sbt preBuild
 
@@ -121,9 +118,9 @@ jobs:
 
         - ./sbt postBuild
 
-        - aws s3 cp target s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
-        - aws s3 cp .targets s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
-        - aws s3 cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
+        - echo "uploading target and .hoarder-cache to s3 $TRAVIS_BUILD_NUMBER"
+        - aws s3 --quiet cp target s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
+        - aws s3 --quiet cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 
         - set +e
 
@@ -131,9 +128,9 @@ jobs:
     - stage: unit test
       env:
       script:
-        - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER target --recursive
-        - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .targets --recursive
-        - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .hoarder-cache --recursive
+        - echo "downloading target and .hoarder-cache from s3 $TRAVIS_BUILD_NUMBER"
+        - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER target --recursive
+        - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .hoarder-cache --recursive
         - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
@@ -146,9 +143,9 @@ jobs:
       script:
         - set -e
 
-        - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER target --recursive
-        - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .targets --recursive
-        - aws s3 cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .hoarder-cache --recursive
+        - echo "downloading target and .hoarder-cache from s3 $TRAVIS_BUILD_NUMBER"
+        - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER target --recursive
+        - aws s3 --queit cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER .hoarder-cache --recursive
         - ./sbt preBuild
 
         # workaround for the fact that travis caching isn't working. when it starts working again, remove this

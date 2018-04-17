@@ -52,7 +52,6 @@ script:
   - set -e
   
   - pip install --user awscli
-  - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/target target --recursive
   - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
 
   # travis installs postgres by default this will stop and free up the psql port
@@ -120,8 +119,6 @@ jobs:
 
         - ./sbt postBuild
 
-        - echo "uploading target and .hoarder-cache to s3 $TRAVIS_BUILD_NUMBER"
-        - aws s3 --quiet cp target s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/target --recursive
         - aws s3 --quiet cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache --recursive
 
         - set +e
@@ -131,8 +128,6 @@ jobs:
       env:
       script:
         - pip install --user awscli
-        - echo "downloading target and .hoarder-cache from s3 $TRAVIS_BUILD_NUMBER"
-        - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/target target --recursive
         - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
         - ./sbt preBuild
         - |-
@@ -147,8 +142,6 @@ jobs:
         - set -e
 
         - pip install --user awscli
-        - echo "downloading target and .hoarder-cache from s3 $TRAVIS_BUILD_NUMBER"
-        - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/target target --recursive
         - aws s3 --queit cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
         - ./sbt preBuild
 

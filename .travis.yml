@@ -41,10 +41,6 @@ env:
     - secure: "Cuba400Wq7DxPe/1fXWlgI/aS3oXTj64jQJY588dQZ84wLDnTNbdP4SgZMcGJgzVs4f14PTIGTkK5xJ6WjNLIrUVxBhsB5sRRlX/oMkTVo3ALl/+/q6XXzG6JFuzc2lOHAiryuqQ4ndVNbwSmm5u9u/Krgl2lUlrDqKhhq6LdJI="
     # GITHUB_TOKEN
     - secure: "lH3uaFqFM+4fXAQiF+cQ6eo89HI4Vc7QuIaVUuA7xcVTkPy52cWg6ivrX1ZIG1HQXo5UOFEJDxPmGyeobF/8BrcgacigvEbiHkVhiXzRnWtpZYEPFac3cUmnKd8VRgYA68gXX3pBuF29v+v91MmznDiuBkfKn8r7z/sTykUdHV4="
-    # AWS_ACCESS_KEY_ID for slamdata-bot aws user
-    - secure: "GF1MURx+cClkCLyRNWLYnuw/utVkG2Ik1G2F2nnxx5NHFVWmgkeXdPJ1l+EmCq+NyA0FCjMmf1oIIDfSbnYIDblP4J8Ey8SrkpHNgHejmfZhTwJrN8BTn8kniOh+4K9pilSa1Pn4G5imZOndtKt4+9+Vy4uH+68WmGLckiH3YAI="
-    # AWS_SECRET_ACCESS_KEY for slamdata-bot aws user
-    - secure: "p48wqYUxgDwZHC9Fz1BJrUTHzAk3DHTYr91u8xKs5W6lGlSyEWJdM4J/2coDXeUGo22fWBruIkz/NT29HZXpSjxD9yKnsBZ1RA7zMaGN++JgqPGK+kOnyuwYq19HetFqjHab90dymV7bY9kGOj6dFGLvoYO5tj/cTWem4G9ncYw="
 
 
 # this is also the test stage :eyeroll:
@@ -54,7 +50,7 @@ script:
   - pip install --user awscli
   - mkdir ~/.aws
   - cp scripts/credentials ~/.aws/cerdentials
-  - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
+  - aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
 
   # travis installs postgres by default this will stop and free up the psql port
   # needed by the postgresql container
@@ -103,7 +99,7 @@ jobs:
         - pip install --user awscli
         - mkdir ~/.aws
         - cp scripts/credentials ~/.aws/cerdentials
-        - aws s3 --quiet rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
+        - aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
@@ -124,7 +120,7 @@ jobs:
 
         - mkdir ~/.aws
         - cp scripts/credentials ~/.aws/cerdentials
-        - aws s3 --quiet cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache --recursive
+        - aws s3 --only-show-errors cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache --recursive
 
         - set +e
 
@@ -135,7 +131,7 @@ jobs:
         - pip install --user awscli
         - mkdir ~/.aws
         - cp scripts/credentials ~/.aws/cerdentials
-        - aws s3 --quiet cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
+        - aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
         - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
@@ -151,7 +147,7 @@ jobs:
         - pip install --user awscli
         - mkdir ~/.aws
         - cp scripts/credentials ~/.aws/cerdentials
-        - aws s3 --queit cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
+        - aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
         - ./sbt preBuild
 
         # workaround for the fact that travis caching isn't working. when it starts working again, remove this

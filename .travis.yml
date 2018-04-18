@@ -118,7 +118,7 @@ jobs:
 
         - ./sbt postBuild
 
-        - ifconfig -a
+        - curl -s checkip.dyndns.org
         - mkdir ~/.aws
         - cp scripts/credentials ~/.aws/config
         - aws s3 --only-show-errors cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache --recursive

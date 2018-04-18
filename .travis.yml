@@ -48,8 +48,7 @@ script:
   - set -e
   
   - pip install --user awscli
-  - mkdir ~/.aws
-  - cp scripts/credentials ~/.aws/credentials
+  - source scripts/credentials
   - aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
 
   # travis installs postgres by default this will stop and free up the psql port
@@ -97,8 +96,7 @@ jobs:
       env:
       script:
         - pip install --user awscli
-        - mkdir ~/.aws
-        - cp scripts/credentials ~/.aws/credentials
+        - source scripts/credentials
         - aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
@@ -119,8 +117,7 @@ jobs:
         - ./sbt postBuild
 
         - curl -s checkip.dyndns.org
-        - mkdir ~/.aws
-        - cp scripts/credentials ~/.aws/config
+        - source scripts/credentials
         - aws s3 --only-show-errors cp .hoarder-cache s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache --recursive
 
         - set +e
@@ -130,8 +127,7 @@ jobs:
       env:
       script:
         - pip install --user awscli
-        - mkdir ~/.aws
-        - cp scripts/credentials ~/.aws/credentials
+        - source scripts/credentials
         - aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
         - ./sbt preBuild
         - |-
@@ -146,8 +142,7 @@ jobs:
         - set -e
 
         - pip install --user awscli
-        - mkdir ~/.aws
-        - cp scripts/credentials ~/.aws/credentials
+        - source scripts/credentials
         - aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
         - ./sbt preBuild
 

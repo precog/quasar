@@ -17,8 +17,9 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.{Data => QData, NameGenerator}
-import quasar.Planner.{PlannerErrorME, InternalError}
+import quasar.{Data => QData}
+import quasar.fs.Planner.{PlannerErrorME, InternalError}
+import quasar.effect.NameGenerator
 import quasar.ejson
 import quasar.fp._
 import quasar.fp.ski.κ
@@ -67,7 +68,7 @@ final class QScriptCorePlanner[
     case qscript.Map(src, f) =>
       for {
         id1 <- genId[T[N1QL], F]
-        ff  <- processFreeMap(f, id1)
+        ff  <- processFreeMap(f.linearize, id1)
       } yield Select(
         Value(true),
         ResultExpr(ff, none).wrapNel,

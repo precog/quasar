@@ -34,6 +34,7 @@ import quasar.time.TemporalPart
 import scala.sys
 
 import java.time.{Instant, OffsetDateTime => JOffsetDateTime, ZoneOffset}
+import java.time.temporal.ChronoUnit
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data.Fix
@@ -84,7 +85,10 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
         Data.Str(time.toString)
       case Data.LocalDateTime(time) =>
         Data.OffsetDateTime(JOffsetDateTime.of(
-          time.withNano(scala.math.round(time.getNano.toDouble / 1000000).toInt * 1000000), // round to millis
+          // NB withNano(scala.math.round(...)) fails for a corner case:
+          // Invalid value for NanoOfSecond (valid values 0 - 999999999): 1000000000
+          time.truncatedTo(ChronoUnit.SECONDS)
+            .plusNanos(scala.math.round(time.getNano.toDouble / 1000000).toLong * 1000000), // round to millis
           ZoneOffset.UTC))
       case _ => expected
     }
@@ -108,7 +112,7 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
       for {
         exc <- WorkflowExecutor.mongoDb.run.unattemptRuntime
-        v   <- exc.evaluate(wf, None).run.run(tmp.collection).eval(0).unattemptRuntime
+        v   <- exc.evaluate(wf).run.run(tmp.collection).eval(0).unattemptRuntime
         rez <- v.fold(
                 _.map(BsonCodec.toData(_)).point[MongoDbIO],
                 c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))

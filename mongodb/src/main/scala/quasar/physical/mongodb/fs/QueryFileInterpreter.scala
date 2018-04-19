@@ -22,6 +22,7 @@ import quasar.common.{PhaseResult, PhaseResults, PhaseResultT}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
+import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{constant, LogicalPlan}
@@ -57,14 +58,14 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
     } yield ()).run.run
 
 
-  def evalPlan(wf: Crystallized[WorkflowF], dbName: Option[DatabaseName]): MQPhErr[ResultHandle] =
+  def evalPlan(wf: Crystallized[WorkflowF]): MQPhErr[ResultHandle] =
     (for {
-      rcursor <- handlePlan(wf, execJs.evaluate(_, dbName), evalWorkflow(_, dbName, _))
+      rcursor <- handlePlan(wf, execJs.evaluate(_), evalWorkflow(_, _))
       handle <- liftMQ(recordCursor(rcursor))
     } yield handle).run.run
 
-  def explain(wf: Crystallized[WorkflowF], dbName: Option[DatabaseName]): MQPhErr[String] = {
-    val (stmts, r) = execJs.evaluate(wf, dbName)
+  def explain(wf: Crystallized[WorkflowF]): MQPhErr[String] = {
+    val (stmts, r) = execJs.evaluate(wf)
                        .leftMap(wfErrToFsErr(wf))
                        .run.run(CollectionName("tmp.gen_"))
                        .eval(0).run
@@ -111,12 +112,12 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
     WorkflowExecErrT[ReaderT[StateT[JavaScriptLog, Long, ?], CollectionName, ?], A]
 
   private val queryR =
-    MonadReader[MQ, (Option[DefaultDb], TaskRef[EvalState[C]])]
+    MonadReader[MQ, TaskRef[EvalState[C]]]
 
   // FIXME: Not sure how to distinguish these.
   @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
   private def MongoQuery[A](f: TaskRef[EvalState[C]] => Task[A]): MQ[A] =
-    queryR.ask flatMapK { case (_, ref) => MongoDbIO.liftTask(f(ref)) }
+    queryR.ask flatMapK (ref => MongoDbIO.liftTask(f(ref)))
 
   private def MongoQuery[A](s: State[EvalState[C], A]): MQ[A] =
     MongoQuery(_ modifyS s.run)
@@ -138,9 +139,6 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
 
   private def lookupCursor(h: ResultHandle): OptionT[MQ, ResultCursor[C]] =
     OptionT(MongoQuery(resultsL(h).st))
-
-  private def defaultDbName: MQ[Option[DatabaseName]] =
-    queryR.asks(_._1.map(_.run))
 
   private def genPrefix: MQ[CollectionName] =
     MongoDbIO.liftTask(NameGenerator.salt)
@@ -183,11 +181,10 @@ final class QueryFileInterpreter(execMongo: WorkflowExecutor[MongoDbIO, BsonCurs
 
   def evalWorkflow(
     wf: Crystallized[WorkflowF],
-    defDb: Option[DatabaseName],
     tmpPrefix: CollectionName
   ): WorkflowExecErrT[MQ, ResultCursor[C]] =
     EitherT[MQ, WorkflowExecutionError, ResultCursor[C]](
-      execMongo.evaluate(wf, defDb).run.run(tmpPrefix).eval(0).liftM[QRT])
+      execMongo.evaluate(wf).run.run(tmpPrefix).eval(0).liftM[QRT])
 
   private def writeJsLog(wf: Crystallized[WorkflowF], jsr: JsR[_], tmpPrefix: CollectionName): MongoLogWFR[C, Unit] = {
     val (stmts, r) = jsr.run.run(tmpPrefix).eval(0).run

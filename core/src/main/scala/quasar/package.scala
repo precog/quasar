@@ -16,7 +16,7 @@
 
 import slamdata.Predef._
 import quasar.common.{PhaseResult, PhaseResultW}
-import quasar.connector.CompileM
+import quasar.fs.CompileM
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.Failure

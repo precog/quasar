@@ -19,7 +19,7 @@ package quasar.connector
 import slamdata.Predef._
 
 import quasar.{RenderTree, RenderTreeT}
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.Data
 import quasar.common._
 import quasar.concurrent.Pools._
@@ -35,9 +35,9 @@ import quasar.fs._
 import quasar.fs.FileSystemError.qscriptPlanningFailed
 import quasar.fs.mount._
 import quasar.qscript._
-import quasar.qscript.qsu.LPtoQS
 import quasar.qscript.rewrites.{Rewrite, Unicoalesce, Unirewrite}
 import quasar.qscript.RenderQScriptDSL._
+import quasar.qsu.LPtoQS
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -47,7 +47,7 @@ import scalaz.concurrent.Task
 
 trait BackendModule {
   import BackendDef.{DefErrT, DefinitionResult}
-  import BackendModule._
+  import PhaseResults._
 
   type QSM[T[_[_]], A] = QS[T]#M[A]
 
@@ -266,9 +266,4 @@ trait BackendModule {
   }
 
   def AnalyzeModule: AnalyzeModule
-}
-
-object BackendModule {
-  final def logPhase[M[_]: Monad: PhaseResultTell](pr: PhaseResult): M[Unit] =
-    PhaseResultTell[M].tell(Vector(pr))
 }

@@ -16,18 +16,18 @@
 
 package quasar.physical.mongodb.planner
 
-import quasar.{Qspec, TreeMatchers, Type}
 import quasar.common.SortDir
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.physical.mongodb._
 import quasar.qscript._
+import quasar.{Qspec, TreeMatchers, Type}
 import slamdata.Predef._
 
 import eu.timepit.refined.auto._
-import matryoshka.{Hole => _, _}
 import matryoshka.data._
+import matryoshka.{Hole => _, _}
 import org.scalacheck._
 import pathy.Path._
 import scalaz._
@@ -51,12 +51,12 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   val noRewriteSrcFix0 = fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), IncludeId)
 
   def nextFix(s: Free[fs.MongoQScript[Fix, ?], Hole]) = Gen.const(
-    fix.Subset(fix.Unreferenced, s, Take, free.Map(free.Unreferenced, func.Constant(json.int(1)))))
+    fix.Subset(fix.Unreferenced, s, Take, free.Map(free.Unreferenced, recFunc.Constant(json.int(1)))))
 
   def nextFree(s: Free[fs.MongoQScript[Fix, ?], Hole]) = Gen.oneOf(
     free.Sort(s, Nil, NonEmptyList((func.Hole, SortDir.Ascending))),
-    free.Subset(free.Unreferenced, s, Take, free.Map(free.Unreferenced, func.Constant(json.int(1)))),
-    free.Subset(s, free.Hole, Take, free.Map(free.Unreferenced, func.Constant(json.int(1)))))
+    free.Subset(free.Unreferenced, s, Take, free.Map(free.Unreferenced, recFunc.Constant(json.int(1)))),
+    free.Subset(s, free.Hole, Take, free.Map(free.Unreferenced, recFunc.Constant(json.int(1)))))
 
   def genRewriteSrcFree(maxDepth: Int = MAX_DEPTH): Gen[Free[fs.MongoQScript[Fix, ?], Hole]] =
     if (maxDepth <= 0)
@@ -79,15 +79,16 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   def genNoRewriteSrcFix(maxDepth: Int = MAX_DEPTH): Gen[Fix[fs.MongoQScript[Fix, ?]]] =
     Gen.const(noRewriteSrcFix0)
 
-  def guard(mf: FreeMap) = func.Guard(func.Hole, Type.AnyObject, mf, func.Undefined)
-  val fun = func.ProjectKeyS(func.Hole, "_id")
+  def guard(mf: RecFreeMap) = recFunc.Guard(recFunc.Hole, Type.AnyObject, mf, recFunc.Undefined)
 
-  def assertElide(qs: FreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
+  val fun = recFunc.ProjectKeyS(recFunc.Hole, "_id")
+
+  def assertElide(qs: RecFreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
     assumeReadTp(qs(guard(fun))) must beRight(beTreeEqual(qs(fun)))
-  def assertNoElide(qs: FreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
+  def assertNoElide(qs: RecFreeMap => Fix[fs.MongoQScript[Fix, ?]]) =
     assumeReadTp(qs(guard(fun))) must beRight(beTreeEqual(qs(guard(fun))))
 
-  def elideProps(qs: Fix[fs.MongoQScript[Fix, ?]] => FreeMap => Fix[fs.MongoQScript[Fix, ?]]) = {
+  def elideProps(qs: Fix[fs.MongoQScript[Fix, ?]] => RecFreeMap => Fix[fs.MongoQScript[Fix, ?]]) = {
     "elide" >> Prop.forAll(genRewriteSrcFix()) { src =>
       assertElide(qs(src))
     }
@@ -97,8 +98,8 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   }
 
   "assumeReadType" >> {
-    "Filter condition" >> elideProps(src => fm => fix.Filter(src, fm))
-    "Leftshift struct" >> elideProps(src => fm => fix.LeftShift(src, RecFreeS.fromFree(fm), IncludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide))
+    "Filter condition" >> elideProps(src => fm => fix.Filter(src, fm.linearize))
+    "Leftshift struct" >> elideProps(src => fm => fix.LeftShift(src, fm, IncludeId, ShiftType.Array, OnUndefined.Omit, func.LeftSide))
     "Subset from" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm), Take, free.Hole))
     "Subset count" >> elideProps(src => fm => fix.Subset(src, free.Hole, Take, free.Map(free.Hole, fm)))
     "Subset both" >> elideProps(src => fm => fix.Subset(src, free.Map(free.Hole, fm), Take, free.Map(free.Hole, fm)))

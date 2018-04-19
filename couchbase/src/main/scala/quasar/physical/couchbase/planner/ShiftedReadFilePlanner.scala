@@ -17,7 +17,8 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.{Data => QData, NameGenerator}
+import quasar.{Data => QData}
+import quasar.effect.NameGenerator
 import quasar.contrib.pathy.AFile
 import quasar.physical.couchbase._,
   common.ContextReader,

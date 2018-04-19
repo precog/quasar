@@ -55,7 +55,7 @@ private[qscript] final class QScriptCorePlanner[
       for {
         src <- elimSearch[Q](src0)
         x   <- freshName[F]
-        g   <- mapFuncXQuery[T, F, FMT](f, ~x)
+        g   <- mapFuncXQuery[T, F, FMT](f.linearize, ~x)
       } yield (src match {
         case IterativeFlwor(bindings, filter, order, isStable, result) =>
           XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)), filter, order, isStable, g)

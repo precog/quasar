@@ -170,18 +170,10 @@ object MongoDb
       mkInterp[Backend] >>= (i => toBackendP(i.execPlan(repr, out)))
 
     def evaluatePlan(repr: Repr): Backend[ResultHandle] =
-      for {
-        dbName <- config[Backend].map(_.defaultDb.map(_.run))
-        i <- mkInterp[Backend]
-        handle <- toBackendP(i.evalPlan(repr, dbName))
-      } yield handle
+      mkInterp[Backend] >>= (i => toBackendP(i.evalPlan(repr)))
 
     def explain(repr: Repr): Backend[String] =
-      for {
-        dbName <- config[Backend].map(_.defaultDb.map(_.run))
-        i <- mkInterp[Backend]
-        s <- toBackendP(i.explain(repr, dbName))
-      } yield s
+      mkInterp[Backend] >>= (i => toBackendP(i.explain(repr)))
 
     def more(h: ResultHandle): Backend[Vector[Data]] =
       mkInterp[Backend] >>= (i => toBackend(i.more(h)))

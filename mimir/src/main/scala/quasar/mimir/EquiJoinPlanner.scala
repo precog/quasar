@@ -28,7 +28,7 @@ import quasar.yggdrasil.TableModule.SortAscending
 
 import fs2.interop.scalaz._
 
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
 import matryoshka.patterns._
@@ -62,8 +62,11 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
       val (lkeys, rkeys) = keys.unfzip
 
       for {
-        leftRepr <- lbranch.cataM(interpretM(κ(src.point[F]), planQST))
-        rightRepr <- rbranch.cataM(interpretM(κ(src.point[F]), planQST))
+        leftRepr <- lbranch.cataM[F, MimirRepr](
+          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
+
+        rightRepr <- rbranch.cataM[F, MimirRepr](
+          interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
 
         lmerged = src.unsafeMerge(leftRepr)
         ltable = lmerged.table
@@ -77,7 +80,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
         transRKey = combineTransSpecs(src.P)(transRKeys)
 
         transMiddle <- combine.cataM[F, TransSpec2](
-          interpretM(
+          interpretM[F, MapFunc[T, ?], JoinSide, TransSpec2](
             {
               case qscript.LeftSide => TransSpec2.LeftId.point[F]
               case qscript.RightSide => TransSpec2.RightId.point[F]
@@ -96,15 +99,18 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
             log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
             for {
-              lsorted <- liftF(sortT[leftRepr.P.type](MimirRepr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey)))
+              lsorted <- liftF[MimirRepr.Aux[leftRepr.P.type]](
+                sortT[leftRepr.P.type](MimirRepr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey)))
                 .map(r => src.unsafeMergeTable(r.table))
-              rsorted <- liftF(sortT[rightRepr.P.type](MimirRepr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey)))
+
+              rsorted <- liftF[MimirRepr.Aux[rightRepr.P.type]](
+                sortT[rightRepr.P.type](MimirRepr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey)))
                 .map(r => src.unsafeMergeTable(r.table))
 
               transLeft <- tpe match {
                 case JoinType.LeftOuter | JoinType.FullOuter =>
                   combine.cataM[F, TransSpec1](
-                    interpretM(
+                    interpretM[F, MapFunc[T, ?], JoinSide, TransSpec1](
                       {
                         case qscript.LeftSide => TransSpec1.Id.point[F]
                         case qscript.RightSide => TransSpec1.Undef.point[F]
@@ -120,7 +126,7 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
               transRight <- tpe match {
                 case JoinType.RightOuter | JoinType.FullOuter =>
                   combine.cataM[F, TransSpec1](
-                    interpretM(
+                    interpretM[F, MapFunc[T, ?], JoinSide, TransSpec1](
                       {
                         case qscript.LeftSide => TransSpec1.Undef.point[F]
                         case qscript.RightSide => TransSpec1.Id.point[F]

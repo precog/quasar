@@ -17,12 +17,11 @@
 package quasar.physical.marklogic.fs
 
 import slamdata.Predef._
-import quasar.{Planner => QPlanner}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.effect.uuid._
 import quasar.fp.numeric._
-import quasar.fs.{FileSystemError, MonadFsErr}
+import quasar.fs.{FileSystemError, MonadFsErr, Planner => QPlanner}
 import quasar.physical.marklogic.ErrorMessages
 import quasar.physical.marklogic.qscript._
 import quasar.physical.marklogic.xquery._

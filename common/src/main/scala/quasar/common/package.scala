@@ -23,6 +23,15 @@ import scalaz._
 
 package object common {
   type PhaseResults = Vector[PhaseResult]
+
+  object PhaseResults {
+    final def logPhase[M[_]: Monad]
+      (pr: PhaseResult)
+      (implicit MT: PhaseResultTell[M])
+        : M[Unit] =
+      MT.tell(Vector(pr))
+}
+
   type PhaseResultW[A] = Writer[PhaseResults, A]
   type PhaseResultT[F[_], A] = WriterT[F, PhaseResults, A]
 

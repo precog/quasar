@@ -18,6 +18,7 @@ package quasar.physical.mongodb.planner
 
 import quasar.qscript.MapFunc
 import quasar.physical.mongodb.{BsonVersion, MongoQueryModel}
+import quasar.physical.mongodb.planner.common.WBM
 
 import matryoshka._
 import matryoshka.data._

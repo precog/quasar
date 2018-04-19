@@ -32,7 +32,7 @@ import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import delorean._
 import fs2.interop.scalaz._
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
 import matryoshka.patterns._
@@ -54,7 +54,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
     case qscript.Map(src, f) =>
       import src.P.trans._
       for {
-        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f)
+        trans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(f.linearize)
         newSort = for {
           lastSort <- src.lastSort
           newBucket = lastSort.bucket.flatMap(TransSpec.rephrase(_, Source, trans))
@@ -83,7 +83,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
         distincted = src.unsafeMerge(distinctedUnforced)
 
         repairTrans <- repair.cataM[F, TransSpec1](
-          interpretM(
+          interpretM[F, MapFunc[T, ?], ReduceIndex, TransSpec1](
             {
               case ReduceIndex(-\/(0) | \/-(0)) => bucketTrans.point[F]
               case _ => sys.error("should be impossible")
@@ -172,7 +172,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                 // and .1 is the value (if bucketed)
                 // if we aren't bucketed, everything is unwrapped
                 // these are effectively implementation details of partitionMerge
-                interpretM(
+                interpretM[Future, MapFunc[T, ?], ReduceIndex, TransSpec1](
                   {
                     case ReduceIndex(\/-(idx)) =>
                       // we don't add First if we aren't bucketed
@@ -223,7 +223,7 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
         wrappedStructTrans = InnerArrayConcat(WrapArray(TransSpec1.Id), WrapArray(structTrans))
 
         repairTrans <- repair.cataM[F, TransSpec1](
-          interpretM(
+          interpretM[F, MapFunc[T, ?], JoinSide, TransSpec1](
             {
               case qscript.LeftSide =>
                 (DerefArrayStatic(TransSpec1.Id, CPathIndex(0)): TransSpec1).point[F]
@@ -329,15 +329,17 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
 
     case qscript.Union(src, lBranch, rBranch) =>
       for {
-       leftRepr <- lBranch.cataM(interpretM(κ(src.point[F]), planQST))
-       rightRepr <- rBranch.cataM(interpretM(κ(src.point[F]), planQST))
+       leftRepr <- interpretBranch(planQST)(src, lBranch)
+       rightRepr <- interpretBranch(planQST)(src, rBranch)
+
        rightCoerced = leftRepr.unsafeMerge(rightRepr)
       } yield MimirRepr(leftRepr.P)(leftRepr.table.concat(rightCoerced.table))
 
     case qscript.Subset(src, from, op, count) =>
       for {
-        fromRepr <- from.cataM(interpretM(κ(src.point[F]), planQST))
-        countRepr <- count.cataM(interpretM(κ(src.point[F]), planQST))
+        fromRepr <- interpretBranch(planQST)(src, from)
+        countRepr <- interpretBranch(planQST)(src, count)
+
         back <- {
           def result = for {
             vals <- countRepr.table.toJson
@@ -372,4 +374,13 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
           P.Table.constLong(Set(0)).point[CakeM]
       }))
   }
+
+  ////////
+
+  private def interpretBranch(
+    planQST: AlgebraM[F, QScriptTotal[T, ?], MimirRepr])(
+    src: MimirRepr, qs: FreeQS[T])
+      : F[MimirRepr] =
+    qs.cataM[F, MimirRepr](
+      interpretM[F, QScriptTotal[T, ?], Hole, MimirRepr](κ(src.point[F]), planQST))
 }

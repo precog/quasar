@@ -21,6 +21,7 @@ import quasar.contrib.pathy.AFile
 import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.mongodb.{sigil, Collection}
 import quasar.qscript._
+import quasar.qscript.RecFreeS._
 
 import matryoshka._
 import matryoshka.implicits._
@@ -49,7 +50,7 @@ object elideQuasarSigil {
     case sr @ SR(Const(ShiftedRead(f, idStatus))) =>
       (collection[M](f).liftM[OptionT] >>= anyDoc).run
         .map(_.flatMap(getValue[T]).fold(sr) { fm =>
-          QC(Map(sr.embed, elideSigil[T](idStatus, fm)))
+          QC(Map(sr.embed, elideSigil[T](idStatus, fm).asRec))
         })
 
     case other => other.point[M]

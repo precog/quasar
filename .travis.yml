@@ -49,6 +49,7 @@ script:
   
   - pip install --user awscli
   - source scripts/credentials
+  - curl -s checkip.dyndns.org
   - travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.tragets .tragets --recursive
   - travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/.hoarder-cache .hoarder-cache --recursive
 

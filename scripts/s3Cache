@@ -28,7 +28,6 @@ uploadToS3() {
 }
 
 cleanUpS3() {
-  echo "removing directory s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER"
   $TRAVIS_RETRY aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 }
 

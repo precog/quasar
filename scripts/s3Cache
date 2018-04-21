@@ -8,7 +8,7 @@ TARGETS=".targets"
 HOARDER=".hoarder-cache"
 TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
 
-echo "Trivs public IP is: $TRAVISIP"
+echo "Travis public IP is: $TRAVISIP"
 
 export AWS_ACCESS_KEY_ID=$(openssl rsautl -inkey ./scripts/key.txt -decrypt < ./scripts/aws-access-key-id.bin)
 export AWS_SECRET_ACCESS_KEY=$(openssl rsautl -inkey ./scripts/key.txt -decrypt < ./scripts/aws-secret-access-key.bin)

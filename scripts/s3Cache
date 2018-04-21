@@ -12,13 +12,13 @@ echo "Trivs public IP is: $TRAVISIP"
 ./scripts/credentials
 
 if [[ "$1" = "upload" ]]; then
-  travis_retry aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS --recursive
-  travis_retry aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$HOARDER --recursive
+  aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS --recursive
+  aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$HOARDER --recursive
 elif [[ "$1" = "download" ]]; then
-  travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS $TARGETS --recursive
-  travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$HOARDER $HOARDER --recursive
+  aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS $TARGETS --recursive
+  aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$HOARDER $HOARDER --recursive
 elif [[ "$1" = "cleanup" ]]; then
-  travis_retry aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
+  aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 else
   echo "Usage: ./scripts/s3Cache upload | download | cleanup"
 fi

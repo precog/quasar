@@ -1,58 +1,24 @@
 #!/usr/bin/env bash
 
-TRAVIS_RETRY=$(command -v travis_retry)
-
-deployCredentials() {
-  ./scripts/credentials
-}
-
 if [[ $(command -v aws) = "1" ]]; then
-  pip install --user awscli
+  pip install awscli --user
 fi
 
-AWS=$(command -v aws)
+TARGETS=".targets"
+HOARDER=".hoarder-cache"
+TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
 
-checkTravisIP() {
-  curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'
-}
-
-downloadFromS3() {
-  $TRAVIS_RETRY $AWS s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 $1 --recursive
-}
-
-uploadToS3() {
-  $TRAVIS_RETRY $AWS s3 --only-show-errors cp $1 s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 --recursive
-}
-
-cleanUpS3() {
-  $TRAVIS_RETRY $AWS s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
-}
-
-usage() {
-  echo "Usage: ./scripts/s3Cache upload | download | cleanup"
-}
-
-if [[ $# -eq 0 ]]; then
-  usage
-  exit 1
-fi
-
-deployCredentials
-echo "Trivs public IP is: $(checkTravisIP)"
+echo "Trivs public IP is: $TRAVISIP"
+./scripts/credentials
 
 if [[ "$1" = "upload" ]]; then
-  uploadToS3 .targets
-  uploadToS3 .hoarder-cache
-  exit 0
+  travis_retry aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS --recursive
+  travis_retry aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$HOARDER --recursive
 elif [[ "$1" = "download" ]]; then
-  downloadFromS3 .targets
-  downloadFromS3 .hoarder-cache
-  exit 0
+  travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS $TARGETS --recursive
+  travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$HOARDER $HOARDER --recursive
 elif [[ "$1" = "cleanup" ]]; then
-  echo "cleaning up..."
-  cleanUpS3
-  exit 0
+  travis_retry aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 else
-  usage
-  exit 1
+  echo "Usage: ./scripts/s3Cache upload | download | cleanup"
 fi

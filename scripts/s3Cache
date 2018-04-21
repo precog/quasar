@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [[ $(command -v aws) = "1" ]]; then
+if ! type "aws" > /dev/null; then
   pip install awscli --user
 fi
 

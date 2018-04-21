@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 
-set -euo pipefail # STRICT MODE
-IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
-
 TRAVIS_RETRY=$(command -v travis_retry)
 
 deployCredentials() {
-  source scripts/credentials
+  ./scripts/credentials
 }
 
 installAwsCli() {
@@ -31,8 +28,12 @@ cleanUpS3() {
   $TRAVIS_RETRY aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 }
 
-if [[ $# -eq 0 ]]; then
+usage() {
   echo "Usage: ./scripts/s3Cache upload | download | cleanup"
+}
+
+if [[ $# -eq 0 ]]; then
+  usage
   exit 1
 fi
 
@@ -40,16 +41,19 @@ deployCredentials
 installAwsCli
 echo "Trivs public IP is: $(checkTravisIP)"
 
-if [[ $1 = "upload" ]]; then
+if [[ "$1" = "upload" ]]; then
   uploadToS3 .targets
   uploadToS3 .hoarder-cache
   exit 0
-elif [[ $1 = "download" ]]; then
+elif [[ "$1" = "download" ]]; then
   downloadFromS3 .targets
   downloadFromS3 .hoarder-cache
   exit 0
-elif [[ $1 = "cleanup" ]]; then
+elif [[ "$1" = "cleanup" ]]; then
   echo "cleaning up..."
   cleanUpS3
   exit 0
+else
+  usage
+  exit 1
 fi

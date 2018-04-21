@@ -9,7 +9,7 @@ HOARDER=".hoarder-cache"
 TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
 
 echo "Trivs public IP is: $TRAVISIP"
-./scripts/credentials
+source scripts/credentials
 
 if [[ "$1" = "upload" ]]; then
   aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$TARGETS --recursive

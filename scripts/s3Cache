@@ -6,26 +6,26 @@ deployCredentials() {
   ./scripts/credentials
 }
 
-installAwsCli() {
-  if [[ $(command -v aws) = "1" ]]; then
-    pip install --user awscli
-  fi
-}
+if [[ $(command -v aws) = "1" ]]; then
+  pip install --user awscli
+fi
+
+AWS=$(command -v aws)
 
 checkTravisIP() {
   curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'
 }
 
 downloadFromS3() {
-  $TRAVIS_RETRY aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 $1 --recursive
+  $TRAVIS_RETRY $AWS s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 $1 --recursive
 }
 
 uploadToS3() {
-  $TRAVIS_RETRY aws s3 --only-show-errors cp $1 s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 --recursive
+  $TRAVIS_RETRY $AWS s3 --only-show-errors cp $1 s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 --recursive
 }
 
 cleanUpS3() {
-  $TRAVIS_RETRY aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
+  $TRAVIS_RETRY $AWS s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 }
 
 usage() {
@@ -38,7 +38,6 @@ if [[ $# -eq 0 ]]; then
 fi
 
 deployCredentials
-installAwsCli
 echo "Trivs public IP is: $(checkTravisIP)"
 
 if [[ "$1" = "upload" ]]; then

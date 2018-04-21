@@ -6,7 +6,6 @@ IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 TRAVIS_RETRY=$(command -v travis_retry)
 
 deployCredentials() {
-  pwd
   source scripts/credentials
 }
 
@@ -20,15 +19,16 @@ checkTravisIP() {
   curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//'
 }
 
-cpFromS3() {
+downloadFromS3() {
   $TRAVIS_RETRY aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 $1 --recursive
 }
 
-cpToS3() {
+uploadToS3() {
   $TRAVIS_RETRY aws s3 --only-show-errors cp $1 s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 --recursive
 }
 
-rmFromS3() {
+cleanUpS3() {
+  echo "removing directory s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER"
   $TRAVIS_RETRY aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 }
 
@@ -42,14 +42,15 @@ installAwsCli
 echo "Trivs public IP is: $(checkTravisIP)"
 
 if [[ $1 = "upload" ]]; then
-  cpToS3 .targets
-  cpToS3 .hoarder-cache
+  uploadToS3 .targets
+  uploadToS3 .hoarder-cache
   exit 0
 elif [[ $1 = "download" ]]; then
-  cpFromS3 .targets
-  cpFromS3 .hoarder-cache
+  downloadFromS3 .targets
+  downloadFromS3 .hoarder-cache
   exit 0
 elif [[ $1 = "cleanup" ]]; then
-  rmFromS3
+  echo "cleaning up..."
+  cleanUpS3
   exit 0
 fi

@@ -90,7 +90,7 @@ jobs:
     - stage: clean
       env:
       script:
-        - scripts/s3Cache cleanup
+        - ./scripts/s3Cache cleanup
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
@@ -148,9 +148,7 @@ jobs:
     - stage: cache cleanup
       env:
       script:
-        - set -e
         - scripts/s3Cache cleanup
-        - set +e
 
 notifications:
   irc:

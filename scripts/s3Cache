@@ -3,7 +3,7 @@
 set -euo pipefail # STRICT MODE
 IFS=$'\n\t'       # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 
-dir=$(dirname $0)
+TRAVIS_RETRY=$(command -v travis_retry)
 
 deployCredentials() {
   pwd
@@ -21,15 +21,15 @@ checkTravisIP() {
 }
 
 cpFromS3() {
-  travis_retry aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 $1 --recursive
+  $TRAVIS_RETRY aws s3 --only-show-errors cp s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 $1 --recursive
 }
 
 cpToS3() {
-  travis_retry aws s3 --only-show-errors cp $1 s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 --recursive
+  $TRAVIS_RETRY aws s3 --only-show-errors cp $1 s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER/$1 --recursive
 }
 
 rmFromS3() {
-  travis_retry aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
+  $TRAVIS_RETRY aws s3 --only-show-errors rm s3://quasar-build-cache/$TRAVIS_BUILD_NUMBER --recursive
 }
 
 if [[ $# -eq 0 ]]; then

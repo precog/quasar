@@ -16,6 +16,7 @@ stages:
   - name: publish
     # weirdly, we have to add the extra PR check
     if: NOT type = pull_request
+  - name: cache cleanup
 
 # this all goes in the test stage
 env:
@@ -46,6 +47,8 @@ env:
 # this is also the test stage :eyeroll:
 script:
   - set -e
+  
+  - scripts/s3Cache download
 
   # travis installs postgres by default this will stop and free up the psql port
   # needed by the postgresql container
@@ -87,12 +90,15 @@ jobs:
     - stage: clean
       env:
       script:
+        - ./scripts/s3Cache cleanup
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
       env:
       script:
         - set -e
+
+        - scripts/s3Cache cleanup
 
         - ./sbt preBuild
 
@@ -103,12 +109,15 @@ jobs:
 
         - ./sbt postBuild
 
+        - scripts/s3Cache upload
+
         - set +e
 
     # note that the "test" stage has special significance to Travis (it's the only matrix-able stage)
     - stage: unit test
       env:
       script:
+        - scripts/s3Cache download
         - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
@@ -121,6 +130,7 @@ jobs:
       script:
         - set -e
 
+        - scripts/s3Cache download
         - ./sbt preBuild
 
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
@@ -134,6 +144,11 @@ jobs:
         - scripts/publishJar
 
         - set +e
+
+    - stage: cache cleanup
+      env:
+      script:
+        - scripts/s3Cache cleanup
 
 notifications:
   irc:

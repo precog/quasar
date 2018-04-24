@@ -17,9 +17,9 @@
 package quasar.physical.couchbase
 
 import slamdata.Predef._
-import quasar.NameGenerator
-import quasar.Planner.InternalError
-import quasar.Planner.PlannerErrorME
+import quasar.effect.NameGenerator
+import quasar.fs.Planner.InternalError
+import quasar.fs.Planner.PlannerErrorME
 
 import matryoshka._
 import matryoshka.implicits._

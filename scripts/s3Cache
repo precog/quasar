@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+if ! type "aws" > /dev/null; then
+  pip install awscli --user
+fi
+
+TARGETS=".targets"
+HOARDER=".hoarder-cache"
+PRNUM=$TRAVIS_PULL_REQUEST
+TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
+
+export AWS_ACCESS_KEY_ID=$(openssl rsautl -inkey ./scripts/key.txt -decrypt < ./scripts/aws-access-key-id.bin)
+export AWS_SECRET_ACCESS_KEY=$(openssl rsautl -inkey ./scripts/key.txt -decrypt < ./scripts/aws-secret-access-key.bin)
+
+echo "Travis public IP is: $TRAVISIP"
+
+if [[ "$1" = "upload" ]]; then
+  echo "uploading $TARGETS and $HOARDER to s3://quasar-build-cache/$PRNUM ..."
+  aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$PRNUM/$TARGETS --recursive
+  aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$PRNUM/$HOARDER --recursive
+  echo "done uploading!"
+elif [[ "$1" = "download" ]]; then
+  echo "downloading $TARGETS and $HOARDER from s3://quasar-build-cache/$PRNUM ..."
+  aws s3 --only-show-errors cp s3://quasar-build-cache/$PRNUM/$TARGETS $TARGETS --recursive
+  aws s3 --only-show-errors cp s3://quasar-build-cache/$PRNUM/$HOARDER $HOARDER --recursive
+  echo "done downloading!"
+elif [[ "$1" = "cleanup" ]]; then
+  echo "cleaning up s3://quasar-build-cache/$PRNUM ..."
+  aws s3 --only-show-errors rm s3://quasar-build-cache/$PRNUM --recursive
+  echo "done cleaning up!"
+else
+  echo "Usage: ./scripts/s3Cache upload | download | cleanup"
+fi

@@ -159,10 +159,7 @@ abstract class QueryRegressionTest[S[_]](
             execute.Skipped("(skipped because it times out)"),
             runTest)
         case TestDirective.Pending | TestDirective.PendingIgnoreFieldOrder =>
-          if (BuildInfo.coverageEnabled)
-            execute.Skipped("(pending example skipped during coverage run)")
-          else
-            runTest.pendingUntilFixed
+          runTest.pendingUntilFixed
       } getOrElse runTest
     }
   }

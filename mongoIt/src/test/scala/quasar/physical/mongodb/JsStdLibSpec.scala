@@ -76,12 +76,12 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     // we Success these so the property tests don't abort early
     case (date.LocalDate, Data.Str(date) :: Nil)
         if JLocalDate.parse(date).getYear < 100 &&
-          (is3_2(backend) || is3_4(backend)) || is3_4_13(backend) =>
+          (advertisedVersion(backend) lt MongoQueryModel.`3.6`.some) =>
       Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
 
     case (date.LocalDateTime, Data.Str(date) :: Nil)
         if JLocalDateTime.parse(date).getYear < 100 &&
-          (is3_2(backend) || is3_4(backend)) || is3_4_13(backend) =>
+          (advertisedVersion(backend) lt MongoQueryModel.`3.6`.some) =>
       Success().updateExpected("Actually skipped due to mongo bug SERVER-8164 (Fixed in 3.5.13).").left
 
     case (date.Interval, _) => Pending("TODO").left
@@ -131,15 +131,11 @@ class MongoDbJsStdLibSpec extends MongoDbStdLibSpec {
     case _ => ().right
   }
 
-  // These error when mongo tries to extract date components from a time.
-  def skipTemporalTrunc(part: TemporalPart): Boolean = part match {
-    case TemporalPart.Hour => true
-    case TemporalPart.Microsecond => true
-    case TemporalPart.Millisecond => true
-    case TemporalPart.Minute => true
-    case TemporalPart.Second => true
-    case _ => false
-  }
+  def temporalTruncSupported(backend: BackendName, part: TemporalPart): Boolean =
+    part match {
+      case TemporalPart.Microsecond => false
+      case _ => true
+    }
 
   def compile(queryModel: MongoQueryModel, coll: Collection, mf: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name) = {

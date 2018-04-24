@@ -16,12 +16,14 @@
 
 package quasar
 
-import scala._
+import quasar.build.BuildInfo._
+
 import java.lang.String
-import scalaz._
+import scala._
+
 import org.specs2.main.ArgProperty
 import org.specs2.execute._
-import quasar.build.BuildInfo._
+import scalaz._
 
 /** Use Qspec if you can, QuasarSpecification only if you must.
  *  An abstract class allows the many trait forwarders to be reused
@@ -71,13 +73,14 @@ trait QuasarSpecification extends AnyRef
   implicit class QuasarOpsForAsResultable[T: AsResult](t: => T) {
     /** Steps in front of the standard specs2 implicit. */
     def pendingUntilFixed: Result = pendingUntilFixed("")
-    def pendingUntilFixed(m: String): Result =
-      if (coverageEnabled)
-        Skipped(m + " (pending example skipped during coverage run)")
-      else outer.toPendingUntilFixed(t).pendingUntilFixed(m)
 
-    def skippedOnUserEnv: Result            = skippedOnUserEnv("")
-    def skippedOnUserEnv(m: String): Result = if (isIsolatedEnv) AsResult(t) else Skipped(m)
+    def pendingUntilFixed(m: String): Result =
+      outer.toPendingUntilFixed(t).pendingUntilFixed(m)
+
+    def skippedOnUserEnv: Result= skippedOnUserEnv("")
+
+    def skippedOnUserEnv(m: String): Result =
+      if (isIsolatedEnv) AsResult(t) else Skipped(m)
   }
 }
 

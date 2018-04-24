@@ -171,7 +171,7 @@ object Mimir extends BackendModule with Logging with DefaultAnalyzeModule {
         equiJoinPlanner.plan(planQST),
 	shiftedReadPlanner.plan))
 
-    cp.cataM(planQSM _)
+    cp.cataM[Backend, Repr](planQSM _)
   }
 
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))

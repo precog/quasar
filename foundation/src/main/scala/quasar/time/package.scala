@@ -182,11 +182,12 @@ package object time {
       }
 
   def truncDateTime(part: TemporalPart, i: LocalDateTime): LocalDateTime =
-    if (part === TemporalPart.Day) {
+    if (part === TemporalPart.Day)
       LocalDateTime.of(i.toLocalDate, LocalTime.MIN)
-    } else {
-      LocalDateTime.of(truncDate(part, i.toLocalDate), truncTime(part, i.toLocalTime))
-    }
+    else if (part gt TemporalPart.Day)
+      LocalDateTime.of(truncDate(part, i.toLocalDate), LocalTime.MIN)
+    else
+      LocalDateTime.of(i.toLocalDate, truncTime(part, i.toLocalTime))
 
   def truncDate(part: TemporalPart, date: LocalDate): LocalDate =
     part match {

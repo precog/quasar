@@ -17,9 +17,10 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner => QPlanner, _}, QPlanner._
+import quasar.RenderTree
 import quasar.contrib.pathy.AFile
 import quasar.fs.MonadFsErr
+import quasar.fs.{Planner => QPlanner, _}, QPlanner._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._

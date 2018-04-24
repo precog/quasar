@@ -17,11 +17,12 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Data, Planner => QPlanner, Type}, QPlanner._, Type.{Coproduct => _, _}
+import quasar.{Data, Type}, Type.{Coproduct => _, _}
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
+import quasar.fs.{Planner => QPlanner}, QPlanner._
 import quasar.javascript.Js
 import quasar.jscore, jscore.{JsCore, Name}
 import quasar.physical.mongodb.planner.common._

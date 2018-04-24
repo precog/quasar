@@ -22,7 +22,7 @@ import quasar.qscript._
 import quasar.yggdrasil.TableModule.{DesiredSortOrder, SortAscending}
 
 import delorean._
-import matryoshka._
+import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
 import matryoshka.patterns._
@@ -59,7 +59,7 @@ object MimirCake {
     (fm: FreeMap[T])
       : F[P.trans.TransSpec1] =
     fm.cataM[F, P.trans.TransSpec1](
-      interpretM(
+      interpretM[F, MapFunc[T, ?], Hole, P.trans.TransSpec1](
         κ(P.trans.TransSpec1.Id.point[F]),
         planner.plan(P)[P.trans.Source1](P.trans.TransSpec1.Id)))
 

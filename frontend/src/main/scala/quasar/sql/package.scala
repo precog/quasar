@@ -33,6 +33,17 @@ import scalaz._, Scalaz._
 import scalaz.Liskov._
 
 package object sql {
+
+  type CIName = quasar.CIString
+
+  object CIName {
+    def apply(value: String): CIName =
+      CIString(value)
+
+    def unapply(name: CIName): Option[String] =
+      CIString.unapply(name)
+  }
+
   def select[A] = Prism.partial[Sql[A], (IsDistinct, List[Proj[A]], Option[SqlRelation[A]], Option[A], Option[GroupBy[A]], Option[OrderBy[A]])] {
     case Select(d, p, r, f, g, o) => (d, p, r, f, g, o)
   } ((Select[A] _).tupled)

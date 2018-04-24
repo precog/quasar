@@ -16,11 +16,11 @@
 
 package quasar.physical.mongodb
 
-import quasar.{Planner => _, _}
+import quasar._
 import quasar.common.{PhaseResult, PhaseResults, PhaseResultT, PhaseResultTell}
 import quasar.contrib.scalaz._, eitherT._
 import quasar.fp._
-import quasar.fs.{FileSystemError, MonadFsErr}
+import quasar.fs.{FileSystemError, MonadFsErr, Planner => _}
 import quasar.physical.mongodb.WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => _, _}
@@ -225,6 +225,15 @@ object MongoDbPlanner {
         JoinHandler.mapReduce[WBM, WF](queryModel))
 
     queryModel match {
+      case `3.6` =>
+        val cfg = PlannerConfig[T, Expr3_6, Workflow3_4F, M](
+          joinHandler[Workflow3_4F],
+          FuncHandler.handle3_6[MapFunc[T, ?], M](bsonVersion),
+          StaticHandler.handle,
+          queryModel,
+          bsonVersion)
+        plan0[T, M, Workflow3_4F, Expr3_6](anyDoc, cfg)(qs)
+
       case `3.4.4` =>
         val cfg = PlannerConfig[T, Expr3_4_4, Workflow3_4F, M](
           joinHandler[Workflow3_4F],

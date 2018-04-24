@@ -1,5 +1,3 @@
-libraryDependencies += "org.kohsuke" % "github-api" % "1.59" exclude("org.jenkins-ci", "annotation-indexer")
-
 disablePlugins(TravisCiPlugin)
 
 scalacOptions ++= scalacOptions_2_12

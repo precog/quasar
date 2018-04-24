@@ -29,7 +29,7 @@ import quasar.fs._, QueryFile.ResultHandle, ReadFile.ReadHandle, WriteFile.Write
 import quasar.fs.mount._, BackendDef.DefErrT
 import quasar.physical.couchbase.common._
 import quasar.physical.couchbase.planner.Planner
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.qscript.{Map => _, _}
 import quasar.qscript.analysis._
 import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}

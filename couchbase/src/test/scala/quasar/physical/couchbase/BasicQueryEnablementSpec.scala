@@ -17,14 +17,14 @@
 package quasar.physical.couchbase
 
 import slamdata.Predef._
-import quasar.{Planner => _, _}
+import quasar._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fp._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.qscript.{Map => _, Read => _, _}
 import quasar.sql._
 
@@ -142,9 +142,9 @@ class BasicQueryEnablementSpec
       val qs =
         fix.Map(
           fix.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
-          func.Add(
-            func.ProjectKeyS(func.Hole, "a"),
-            func.ProjectKeyS(func.Hole, "b")))
+          recFunc.Add(
+            recFunc.ProjectKeyS(recFunc.Hole, "a"),
+            recFunc.ProjectKeyS(recFunc.Hole, "b")))
 
       val n1ql = n1qlFromQS(qs)
 

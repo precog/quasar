@@ -17,10 +17,10 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner => QPlanner}, QPlanner._
 import quasar.contrib.matryoshka._
 import quasar.fp._
 import quasar.fp.ski._
+import quasar.fs.{Planner => QPlanner}, QPlanner._
 import quasar.physical.mongodb.{BsonVersion, Selector, WorkflowBuilder}, WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}

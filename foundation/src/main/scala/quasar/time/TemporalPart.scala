@@ -18,7 +18,8 @@ package quasar.time
 
 import slamdata.Predef._
 
-import scalaz.{Equal, Show}
+import scalaz.{Order, Ordering, Show}
+import scalaz.std.anyVal._
 
 sealed abstract class TemporalPart extends Serializable
 
@@ -37,6 +38,25 @@ object TemporalPart {
   final case object Week        extends TemporalPart
   final case object Year        extends TemporalPart
 
-  implicit val equal: Equal[TemporalPart] = Equal.equalRef
+  private def toInt(t: TemporalPart) = t match {
+    case Microsecond => 0
+    case Millisecond => 1
+    case Second => 2
+    case Minute => 3
+    case Hour => 4
+    case Day => 5
+    case Week => 6
+    case Month => 7
+    case Quarter => 8
+    case Year => 9
+    case Decade => 10
+    case Century => 11
+    case Millennium => 12
+  }
+
+  implicit val order: Order[TemporalPart] = new Order[TemporalPart] {
+    def order(x: TemporalPart, y: TemporalPart): Ordering =
+      Order[Int].order(toInt(x), toInt(y))
+  }
   implicit val show: Show[TemporalPart] = Show.showFromToString
 }

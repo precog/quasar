@@ -19,6 +19,7 @@ package quasar.physical.mongodb.fs
 import slamdata.Predef._
 import quasar._
 import quasar.contrib.pathy.ADir
+import quasar.effect.NameGenerator
 import quasar.fs.FileSystemType
 import quasar.fs.mount.ConnectionUri
 import quasar.physical.mongodb.Collection

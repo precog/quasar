@@ -43,6 +43,7 @@ import java.time.{
   Period,
   ZoneOffset
 }
+import java.time.temporal.ChronoUnit
 import scala.collection.Traversable
 import scala.math.abs
 import scala.util.matching.Regex
@@ -1531,8 +1532,21 @@ abstract class StdLibSpec extends Qspec {
         }
       }
 
-      "LocalDateTime" >> prop { (v: JLocalDateTime) =>
-        unary(LocalDateTime(_).embed, Data.Str(v.toString), Data.LocalDateTime(v))
+      "LocalDateTime" >> {
+        def test(x: JLocalDateTime) = unary(
+          LocalDateTime(_).embed,
+          Data.Str(x.toString),
+          Data.LocalDateTime(x))
+
+        "precision minutes" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MINUTES)) }
+
+        "precision seconds" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.SECONDS)) }
+
+        "precision millis" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MILLIS)) }
+
+        "precision micros" >> prop { (v: JLocalDateTime) => test(v.truncatedTo(ChronoUnit.MICROS)) }
+
+        "full precision" >> prop (test(_: JLocalDateTime))
       }
 
       "LocalTime" >> {
@@ -1561,56 +1575,114 @@ abstract class StdLibSpec extends Qspec {
             TemporalPart.Century,
             JOffsetDateTime.parse("2000-03-01T06:15:45.204Z"))
 
-        "datetime Century" >> prop { x: JOffsetDateTime =>
+        "offset datetime Century" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Century, x)
         }
 
-        "datetime Day" >> prop { x: JOffsetDateTime =>
+        "offset datetime Day" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Day, x)
         }
 
-        "datetime Decade" >> prop { x: JOffsetDateTime =>
+        "offset datetime Decade" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Decade, x)
         }
 
-        "datetime Hour" >> prop { x: JOffsetDateTime =>
+        "offset datetime Hour" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Hour, x)
         }
 
-        "datetime Microsecond" >> prop { x: JOffsetDateTime =>
+        "offset datetime Microsecond" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Microsecond, x)
         }
 
-        "datetime Millennium" >> prop { x: JOffsetDateTime =>
+        "offset datetime Millennium" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Millennium, x)
         }
 
-        "datetime Millisecond" >> prop { x: JOffsetDateTime =>
+        "offset datetime Millisecond" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Millisecond, x)
         }
 
-        "datetime Minute" >> prop { x: JOffsetDateTime =>
+        "offset datetime Minute" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Minute, x)
         }
 
-        "datetime Month" >> prop { x: JOffsetDateTime =>
+        "offset datetime Month" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Month, x)
         }
 
-        "datetime Quarter" >> prop { x: JOffsetDateTime =>
+        "offset datetime Quarter" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Quarter, x)
         }
 
-        "datetime Second" >> prop { x: JOffsetDateTime =>
+        "offset datetime Second" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Second, x)
         }
 
-        "datetime Week" >> prop { x: JOffsetDateTime =>
+        "offset datetime Week" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Week, x)
         }
 
-        "datetime Year" >> prop { x: JOffsetDateTime =>
+        "offset datetime Year" >> prop { x: JOffsetDateTime =>
           truncOffsetDateTime(TemporalPart.Year, x)
+        }
+
+        def truncLocalDateTime(p: TemporalPart, i: JLocalDateTime): Result =
+          unary(
+            TemporalTrunc(p, _).embed,
+            Data.LocalDateTime(i),
+            Data.LocalDateTime(truncDateTime(p, i)))
+
+        "datetime Century" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Century, x)
+        }
+
+        "datetime Day" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Day, x)
+        }
+
+        "datetime Decade" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Decade, x)
+        }
+
+        "datetime Hour" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Hour, x)
+        }
+
+        "datetime Microsecond" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Microsecond, x)
+        }
+
+        "datetime Millennium" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Millennium, x)
+        }
+
+        "datetime Millisecond" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Millisecond, x)
+        }
+
+        "datetime Minute" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Minute, x)
+        }
+
+        "datetime Month" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Month, x)
+        }
+
+        "datetime Quarter" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Quarter, x)
+        }
+
+        "datetime Second" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Second, x)
+        }
+
+        "datetime Week" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Week, x)
+        }
+
+        "datetime Year" >> prop { x: JLocalDateTime =>
+          truncLocalDateTime(TemporalPart.Year, x)
         }
 
         def truncDateʹ(p: TemporalPart, d: JLocalDate): Result =

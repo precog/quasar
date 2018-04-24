@@ -22,6 +22,7 @@ import quasar.common._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.foldable._
 import quasar.contrib.scalaz.writerT._
+import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.ski._

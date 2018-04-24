@@ -81,6 +81,10 @@ object ArbitraryExprOp {
     genExpr3_4.map(inj3_4)
   }
 
+  lazy val genExpr3_6: Gen[Fix[Expr3_6]] = {
+    def inj3_4_4(expr: Fix[Expr3_4_4]) = expr.transCata[Fix[Expr3_6]](Inject[Expr3_4_4, Expr3_6])
+    genExpr3_4_4.map(inj3_4_4)
+  }
 }
 
 class ExpressionSpec extends quasar.Qspec {

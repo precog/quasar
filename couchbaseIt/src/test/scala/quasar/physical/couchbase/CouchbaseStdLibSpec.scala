@@ -26,7 +26,7 @@ import quasar.physical.couchbase.common.CBDataCodec
 import quasar.physical.couchbase.fs.{parseConfig, FsType}
 import quasar.physical.couchbase.Couchbase._, QueryFileModule.n1qlResults
 import quasar.physical.couchbase.planner.Planner.mapFuncPlanner
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.qscript._
 import quasar.std.StdLibSpec
 import quasar.time.{DateGenerators, DateTimeInterval}
@@ -105,7 +105,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
     val r: FileSystemError \/ (String, Vector[QData]) = (
       for {
         q  <- ME.unattempt(
-                fm.cataM(interpretM(a =>
+                fm.cataM[M, Fix[N1QL]](interpretM(a =>
                     argN1ql(args(a)), mapFuncPlanner[Fix, EitherT[F, PlannerError, ?]].plan))
                   .leftMap(FileSystemError.qscriptPlanningFailed(_)).run.liftB)
         s  =  Select(

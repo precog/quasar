@@ -18,7 +18,7 @@ package quasar.physical.couchbase.planner
 
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._
-import quasar.Planner.{PlannerErrorME, InternalError}
+import quasar.fs.Planner.{PlannerErrorME, InternalError}
 
 import matryoshka._
 

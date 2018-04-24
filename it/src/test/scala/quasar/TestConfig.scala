@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.contrib.scalaz._
 import quasar.contrib.pathy._
+import quasar.effect.NameGenerator
 import quasar.fs._
 import quasar.fs.mount.{BackendDef, ConnectionUri, MountConfig}
 import quasar.main.BackendConfig

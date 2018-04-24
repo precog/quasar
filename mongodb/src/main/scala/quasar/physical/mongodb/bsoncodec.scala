@@ -17,11 +17,12 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
+import quasar._
+import quasar.Data.DateTimeConstants
 import quasar.ejson.{EJson, TypeTag}
 import quasar.fp._
 import quasar.fp.ski._
-import quasar._, Planner._
-import quasar.Data.DateTimeConstants
+import quasar.fs.Planner, Planner._
 
 import java.time.{
   Instant,

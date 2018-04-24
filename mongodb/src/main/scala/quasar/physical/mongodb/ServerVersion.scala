@@ -25,6 +25,7 @@ object ServerVersion {
   val MongoDb3_2 = ServerVersion(3, 2, None, "")
   val MongoDb3_4 = ServerVersion(3, 4, None, "")
   val MongoDb3_4_4 = ServerVersion(3, 4, Some(4), "")
+  val MongoDb3_6 = ServerVersion(3, 6, None, "")
 
   private val Pattern = """(?s)(\d+)\.(\d+)(?:\.(\d+))?[-. _]?(.*)""".r
 

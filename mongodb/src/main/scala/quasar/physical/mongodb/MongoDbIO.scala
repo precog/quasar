@@ -18,7 +18,6 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar.concurrent.Pools._
-import quasar.contrib.scalaz.optionT._
 import quasar.contrib.scalaz.concurrent._
 import quasar.effect.Failure
 import quasar.fp._
@@ -143,28 +142,6 @@ object MongoDbIO {
   /** Returns the first document in the collection. */
   def first(coll: Collection): OptionT[MongoDbIO, BsonDocument] =
     OptionT(find(coll) >>= (c => async(c.limit(1).first) map (Option(_))))
-
-  /** Returns the name of the first database where an insert to the collection
-    * having the given name succeeds.
-    */
-  def firstWritableDb(collName: CollectionName): OptionT[MongoDbIO, DatabaseName] = {
-    type M[A] = OptionT[MongoDbIO, A]
-
-    val testDoc = Bson.Doc(ListMap("a" -> Bson.Int32(1)))
-
-    def canWriteToCol(coll: Collection): M[DatabaseName] =
-      insertAny[Id](coll, testDoc.repr)
-        .filter(_ == 1)
-        .as(coll.database)
-        .attempt
-        .flatMap(r => OptionT(r.toOption.point[MongoDbIO]))
-
-    databaseNames
-      .translate[M](liftMT[MongoDbIO, OptionT])
-      .evalMap(n => canWriteToCol(Collection(n, collName)))
-      .take(1).runLast
-      .flatMap(n => OptionT(n.point[MongoDbIO]))
-  }
 
   /** Inserts the given documents into the collection. */
   def insert[F[_]: Foldable](coll: Collection, docs: F[BsonDocument]): MongoDbIO[Unit] = {

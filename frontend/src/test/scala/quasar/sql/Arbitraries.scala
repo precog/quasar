@@ -16,10 +16,12 @@
 
 package quasar.sql
 
+import quasar.CIStringArbitrary
+
 trait Arbitraries extends
   ExprArbitrary with
   ScopedExprArbitrary with
   StatementArbitrary with
-  CINameArbitrary
+  CIStringArbitrary
 
 object Arbitraries extends Arbitraries

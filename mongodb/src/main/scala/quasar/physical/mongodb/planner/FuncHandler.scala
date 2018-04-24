@@ -26,6 +26,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.common._
 import quasar.qscript.{MapFuncsDerived => D, _}, MapFuncsCore._
 import quasar.qscript.rewrites.{Coalesce => _}
+import quasar.time.TemporalPart
 
 import matryoshka._
 import matryoshka.data._
@@ -50,6 +51,11 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
       : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
 
+  def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+      : AlgebraM[(Option ∘ M)#λ, IN, Fix[EX]]
+
   def handle3_2[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)
     (implicit e32: ExprOpCoreF :<: EX)
@@ -61,7 +67,7 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
       : AlgebraM[M, IN, Fix[EX]] = f => {
     val h34 = handleOps3_4[EX, M](v)
-    val h = handleOpsCore[EX, M](v)
+    val h = handle3_2[EX, M](v)
     h34(f) getOrElse h(f)
   }
 
@@ -70,9 +76,17 @@ import simulacrum.typeclass
     (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
      : AlgebraM[M, IN, Fix[EX]] = f => {
     val h344 = handleOps3_4_4[EX, M](v)
-    val h34 = handleOps3_4[EX, M](v)
-    val h = handleOpsCore[EX, M](v)
-    h344(f) getOrElse (h34(f) getOrElse h(f))
+    val h34 = handle3_4[EX, M](v)
+    h344(f) getOrElse h34(f)
+  }
+
+  def handle3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+    (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+     : AlgebraM[M, IN, Fix[EX]] = f => {
+    val h36 = handleOps3_6[EX, M](v)
+    val h344 = handle3_4_4[EX, M](v)
+    h36(f) getOrElse h344(f)
   }
 }
 
@@ -147,10 +161,9 @@ object FuncHandler {
                 $literal(Bson.Bool(false)),
                 $literal(Bson.Undefined))).point[M]
 
-          case ExtractCentury(a1) =>
-            $trunc($divide($add($year(a1), $literal(Bson.Int32(99))), $literal(Bson.Int32(100)))).point[M]
+          case ExtractCentury(a1) => mkYearToCentury($year(a1)).point[M]
           case ExtractDayOfMonth(a1) => $dayOfMonth(a1).point[M]
-          case ExtractDecade(a1) => $trunc($divide($year(a1), $literal(Bson.Int32(10)))).point[M]
+          case ExtractDecade(a1) => mkYearToDecade($year(a1)).point[M]
           case ExtractDayOfWeek(a1) => $subtract($dayOfWeek(a1), $literal(Bson.Int32(1))).point[M]
           case ExtractDayOfYear(a1) => $dayOfYear(a1).point[M]
           case ExtractEpoch(a1) =>
@@ -168,8 +181,7 @@ object FuncHandler {
                 $multiply($second(a1), $literal(Bson.Int32(1000))),
                 $millisecond(a1)),
               $literal(Bson.Int32(1000))).point[M]
-          case ExtractMillennium(a1) =>
-            $trunc($divide($add($year(a1), $literal(Bson.Int32(999))), $literal(Bson.Int32(1000)))).point[M]
+          case ExtractMillennium(a1) => mkYearToMillenium($year(a1)).point[M]
           case ExtractMillisecond(a1) =>
             $add(
               $multiply($second(a1), $literal(Bson.Int32(1000))),
@@ -328,6 +340,123 @@ object FuncHandler {
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
           : AlgebraM[(Option ∘ M)#λ, MapFuncCore[T, ?], Fix[EX]] = κ(None)
 
+      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
+        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncCore[T, ?], Fix[EX]] = { mfc =>
+
+        val fp32  = new ExprOpCoreF.fixpoint[Fix[EX], EX](_.embed)
+        val fp36  = new ExprOp3_6F.fixpoint[Fix[EX], EX](_.embed)
+
+        import fp32._, fp36._
+        import ExprOp3_6F.DateParts
+
+        def extractDateFieldIso(date: Fix[EX], fieldName: BsonField.Name): Fix[EX] =
+          $let(
+            ListMap(DocVar.Name("parts") -> $dateToParts(date, None, true.some)),
+            $var(DocVar.ROOT(BsonField.Name("$parts")) \ fieldName))
+
+        val selectPartsField: String => Fix[EX] =
+          f => $var(DocVar.ROOT(BsonField.Name("$parts")) \ BsonField.Name(f))
+
+        val selectPartsFieldIf: Boolean => String => Option[Fix[EX]] =
+          cond => f =>
+            if (cond) selectPartsField(f).some else none
+
+        // i is number of $dateFromParts args to keep apart from year
+        // (which is always kept) and timezone (which is never kept)
+        def tempTrunc(date: Fix[EX], i: Int): Fix[EX] =
+          $let(
+            ListMap(
+              DocVar.Name("parts") -> $dateToParts(date, None, false.some)),
+            $dateFromParts(
+              y  = selectPartsField(DateParts.year),
+              m  = selectPartsFieldIf(i >= 1)(DateParts.month),
+              d  = selectPartsFieldIf(i >= 2)(DateParts.day),
+              h  = selectPartsFieldIf(i >= 3)(DateParts.hour),
+              mi = selectPartsFieldIf(i >= 4)(DateParts.minute),
+              s  = selectPartsFieldIf(i >= 5)(DateParts.second),
+              ms = selectPartsFieldIf(i >= 6)(DateParts.millisecond),
+              tz = none))
+
+        def dateWith(
+          date: Fix[EX],
+          year: Option[Fix[EX]],
+          month: Option[Option[Fix[EX]]]): Fix[EX] =
+          $let(
+            ListMap(
+              DocVar.Name("parts") -> $dateToParts(date, None, false.some)),
+            $dateFromParts(
+              y  = year.getOrElse(selectPartsField(DateParts.year)),
+              m  = month.getOrElse(selectPartsField(DateParts.month).some),
+              d  = none,
+              h  = none,
+              mi = none,
+              s  = none,
+              ms = none,
+              tz = none))
+
+        mfc.some collect {
+          case ExtractIsoDayOfWeek(a1) =>
+            extractDateFieldIso(a1, BsonField.Name(DateParts.isoDayOfWeek)).point[M]
+          case ExtractIsoYear(a1) =>
+            extractDateFieldIso(a1, BsonField.Name(DateParts.isoWeekYear)).point[M]
+          case ExtractWeek(a1) =>
+            extractDateFieldIso(a1, BsonField.Name(DateParts.isoWeek)).point[M]
+          case LocalDate(a1) => $dateFromString(a1, None).point[M]
+          case LocalDateTime(a1) => $dateFromString(a1, None).point[M]
+          case StartOfDay(a1) => tempTrunc(a1, 2).point[M]
+          case tt @ TemporalTrunc(part, a1) =>
+            ExprOp3_6F.dateFromPartsArgIndex(part) match {
+              case Some(i) => tempTrunc(a1, i).point[M]
+              case None =>
+                part match {
+                  case TemporalPart.Millennium =>
+                    dateWith(
+                      date = a1,
+                      year = mkTruncBy(1000, selectPartsField(DateParts.year)).some,
+                      month = Some(None)).point[M]
+                  case TemporalPart.Century =>
+                    dateWith(
+                      date = a1,
+                      year = mkTruncBy(100, selectPartsField(DateParts.year)).some,
+                      month = Some(None)).point[M]
+                  case TemporalPart.Decade =>
+                    dateWith(
+                      date = a1,
+                      year = mkTruncBy(10, selectPartsField(DateParts.year)).some,
+                      month = Some(None)).point[M]
+                  case TemporalPart.Quarter =>
+                    dateWith(
+                      date = a1,
+                      year = none,
+                      month = Some(Some(
+                        $add(
+                          $literal(Bson.Int32(1)),
+                          mkTruncBy(3, $subtract(
+                            selectPartsField(DateParts.month),
+                            $literal(Bson.Int32(1)))))))).point[M]
+                  case TemporalPart.Week =>
+                    $let(
+                      ListMap(
+                        DocVar.Name("parts") -> $dateToParts(a1, None, true.some)),
+                      $dateFromPartsIso(
+                        y  = selectPartsField(DateParts.isoWeekYear),
+                        w  = selectPartsField(DateParts.isoWeek).some,
+                        d  = none,
+                        h  = none,
+                        mi = none,
+                        s  = none,
+                        ms = none,
+                        tz = none)).point[M]
+                  case _ =>
+                    val mf: MapFuncCore[T,quasar.qscript.Hole] =
+                      (tt : MapFuncCore[T, Fix[EX]]).as(SrcHole)
+                    unimplemented[M, Fix[EX]](s"expression ${mf.shows}")
+                }
+            }
+        }
+      }
     }
 
   implicit def mapFuncDerived[T[_[_]]: CorecursiveT]
@@ -363,6 +492,11 @@ object FuncHandler {
         (v: BsonVersion)
         (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
           : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
+
+      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
+        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
   implicit def mapFuncCoproduct[F[_], G[_]]
@@ -393,6 +527,14 @@ object FuncHandler {
           F.handleOps3_4_4[EX, M](v).apply _,
           G.handleOps3_4_4[EX, M](v).apply _)
 
+      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+        (v: BsonVersion)
+        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
+        _.run.fold(
+          F.handleOps3_6[EX, M](v).apply _,
+          G.handleOps3_6[EX, M](v).apply _)
+
     }
 
   def handle3_2[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
@@ -409,4 +551,9 @@ object FuncHandler {
     (v: BsonVersion)
       : AlgebraM[M, F, Fix[Expr3_4_4]] =
     FuncHandler[F].handle3_4_4[Expr3_4_4, M](v)
+
+  def handle3_6[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
+    (v: BsonVersion)
+      : AlgebraM[M, F, Fix[Expr3_6]] =
+    FuncHandler[F].handle3_6[Expr3_6, M](v)
 }

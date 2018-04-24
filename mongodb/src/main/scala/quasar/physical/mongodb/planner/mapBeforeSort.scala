@@ -18,7 +18,9 @@ package quasar.physical.mongodb.planner
 
 import slamdata.Predef.{Map => _, _}
 import quasar.fp._
-import quasar.qscript.{MapFuncsCore => MF, _}
+import quasar.qscript._
+import quasar.qscript.construction
+import quasar.qscript.RecFreeS._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
@@ -26,10 +28,12 @@ import scalaz._, Scalaz._
 
 object mapBeforeSort {
 
-  def apply[T[_[_]]: CorecursiveT, M[_]: Applicative]: Trans[QScriptCore[T, ?], M] =
+  def apply[T[_[_]]: BirecursiveT, M[_]: Applicative]: Trans[QScriptCore[T, ?], M] =
     new Trans[QScriptCore[T, ?], M] {
 
-      private def projectIndex(i: Int): FreeMap[T] = Free.roll(MFC(MF.ProjectIndex(HoleF[T], MF.IntLit(i))))
+      private val func = construction.Func[T]
+      private val recFunc = construction.RecFunc[T]
+      private def projectIndex(i: Int): FreeMap[T] = func.ProjectIndexI(func.Hole, i)
 
       def trans[A, G[_]: Functor]
         (GtoF: PrismNT[G, QScriptCore[T, ?]])
@@ -46,7 +50,7 @@ object mapBeforeSort {
               val innerMap =
                 GtoF.reverseGet(Map(
                   innerSrc,
-                  MapFuncCore.StaticArray(List(fm, HoleF[T])))).embed
+                  MapFuncCore.RecStaticArray(List(fm, recFunc.Hole)))).embed
               val m = Map(
                 GtoF.reverseGet(Sort(innerMap,
                   bucket.map(_ >> projectIndex(1)),
@@ -54,7 +58,7 @@ object mapBeforeSort {
                     case (fm, dir) =>
                       (fm >> projectIndex(1), dir)
                   })).embed,
-                projectIndex(0))
+                projectIndex(0).asRec)
               GtoF.reverseGet(m)
             case _ => GtoF.reverseGet(qs)
           }

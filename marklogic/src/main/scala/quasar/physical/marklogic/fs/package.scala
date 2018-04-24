@@ -17,15 +17,14 @@
 package quasar.physical.marklogic
 
 import slamdata.Predef.{uuid => _, _}
-import quasar.{Data, Planner => QPlanner}
-import quasar.connector.EnvironmentError
+import quasar.Data
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.catchable._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect._
 import quasar.fp._, free._
 import quasar.frontend.logicalplan
-import quasar.fs._
+import quasar.fs.{Planner => QPlanner, _}
 import quasar.fs.impl.DataStream
 import quasar.fs.mount._, BackendDef.{DefinitionError, DefErrT}
 import quasar.physical.marklogic.qscript._

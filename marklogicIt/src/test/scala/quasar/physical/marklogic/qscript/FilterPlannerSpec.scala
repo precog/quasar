@@ -30,7 +30,6 @@ import quasar.physical.marklogic.fs._
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript.{Read => _, _}
-import quasar.qscript.{MapFuncsCore => MFCore}
 
 import com.marklogic.xcc.{ContentSource, Session}
 import matryoshka._
@@ -52,6 +51,9 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
 
   type M[A] = MarkLogicPlanErrT[PrologT[StateT[Free[XccEvalEff, ?], Long, ?], ?], A]
   type G[A] = WriterT[Id, Prologs, A]
+
+  private val recFunc = quasar.qscript.construction.RecFunc[Fix]
+  private val json = quasar.ejson.Fixed[Fix[EJson]]
 
   xccSpec[DocType.Json](bn => s"Filter Planner for ${bn.name}") { (evalPlan, evalXQuery) =>
     "uses a path range index when it exists" >> {
@@ -92,16 +94,16 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
   }
 
   private def filterExpr(idxName: String): Fix[QSR] = {
-    def eq(lhs: FreeMap[Fix], rhs: String): FreeMap[Fix] =
-      Free.roll(MFC(MFCore.Eq(lhs, MFCore.StrLit(rhs))))
+    def eq(lhs: RecFreeMap[Fix], rhs: String): RecFreeMap[Fix] =
+      recFunc.Eq(lhs, recFunc.Constant(json.str(rhs)))
 
-    def projectField(str: String): FreeMap[Fix] =
-      Free.roll(MFC(MFCore.ProjectKey(HoleF, MFCore.StrLit(str))))
+    def projectField(str: String): RecFreeMap[Fix] =
+      recFunc.ProjectKeyS(recFunc.Hole, str)
 
     def shiftedRead(path: ADir): Fix[QSR] =
       Fix(Inject[SR, QSR].inj(Const(ShiftedRead(path, IncludeId))))
 
-    def filter(src: Fix[QSR], f: FreeMap[Fix]): Fix[QSR] =
+    def filter(src: Fix[QSR], f: RecFreeMap[Fix]): Fix[QSR] =
       Fix(Inject[QScriptCore[Fix, ?], QSR].inj(Filter(src, f)))
 
     filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))

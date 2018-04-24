@@ -19,9 +19,7 @@ package quasar.repl
 import slamdata.Predef._
 
 import quasar.{Data, DataCodec, Variables, resolveImports, queryPlan}
-import quasar.Planner.PlannerError
 import quasar.common.{PhaseResult, PhaseResults}
-import quasar.connector.CompileM
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
 import quasar.csv.CsvWriter
@@ -33,8 +31,9 @@ import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fp._, ski._, numeric.widenPositive
 import quasar.fs._
 import quasar.fs.mount._
+import quasar.fs.Planner.PlannerError
 import quasar.main.{analysis, FilesystemQueries, Prettify}
-import quasar.qscript.qsu.LPtoQS
+import quasar.qsu.LPtoQS
 import quasar.sql.Sql
 import quasar.sql
 

@@ -18,7 +18,6 @@ package quasar.fs.mount
 
 import slamdata.Predef._
 import quasar.QuasarError
-import quasar.connector.EnvironmentError
 import quasar.fs._
 
 import monocle.Prism

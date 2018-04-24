@@ -26,10 +26,11 @@ import quasar.DataCodec, DataCodec.PreciseKeys.{
   OffsetDateTimeKey,
   OffsetTimeKey
 }
-import quasar.{Data => QData, Type => QType, NameGenerator}
+import quasar.{Data => QData, Type => QType}
+import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
-import quasar.Planner.PlannerErrorME
+import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript, qscript.{MapFuncCore, MapFuncsCore => MF}
 import quasar.std.StdLib.string.{dateRegex, timeRegex}
 import quasar.time.TemporalPart, TemporalPart._

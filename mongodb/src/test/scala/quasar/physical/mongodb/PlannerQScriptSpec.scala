@@ -60,11 +60,11 @@ class PlannerQScriptSpec extends
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("smallZips"), qscript.ExcludeId),
           free.Filter(
             free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKey(func.Hole, func.Constant(json.str("_id"))),
+            recFunc.Guard(
+              recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("_id"))),
               Type.Str,
-              func.Constant(json.bool(true)),
-              func.Constant(json.bool(false)))),
+              recFunc.Constant(json.bool(true)),
+              recFunc.Constant(json.bool(false)))),
           List(
             (func.ProjectKey(func.Hole, func.Constant(json.str("_id"))),
               func.Lower(func.ProjectKey(func.Hole, func.Constant(json.str("_id")))))),
@@ -108,12 +108,12 @@ class PlannerQScriptSpec extends
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("foo"), qscript.ExcludeId),
           free.Filter(
             free.ShiftedRead[AFile](rootDir </> dir("db") </> file("bar"), qscript.ExcludeId),
-            func.Guard(
-              func.ProjectKey(func.Hole, func.Constant(json.str("rating"))),
+            recFunc.Guard(
+              recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("rating"))),
               Type.Comparable,
-              func.Gte(func.ProjectKey(func.Hole, func.Constant(json.str("rating"))),
-                func.Constant(json.int(4))),
-              func.Undefined)),
+              recFunc.Gte(recFunc.ProjectKey(recFunc.Hole, recFunc.Constant(json.str("rating"))),
+                recFunc.Constant(json.int(4))),
+              recFunc.Undefined)),
           List(
             (func.ProjectKey(func.Hole, func.Constant(json.str("id"))),
               func.ProjectKey(func.Hole, func.Constant(json.str("foo_id"))))),
@@ -170,11 +170,11 @@ class PlannerQScriptSpec extends
                   func.LeftSide,
                 "right" ->
                   func.RightSide)),
-            func.Guard(
-              func.ProjectKeyS(func.Hole, "right"),
+            recFunc.Guard(
+              recFunc.ProjectKeyS(recFunc.Hole, "right"),
               Type.Obj(Map(), Some(Type.Top)),
-              func.Constant(json.bool(true)),
-              func.Constant(json.bool(false)))),
+              recFunc.Constant(json.bool(true)),
+              recFunc.Constant(json.bool(false)))),
           free.ShiftedRead[AFile](rootDir </> dir("db") </> file("baz"), qscript.ExcludeId),
           List(
             (func.ProjectKeyS(
@@ -264,7 +264,7 @@ class PlannerQScriptSpec extends
         fix.LeftShift(
           fix.Filter(
             fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("patients"), qscript.ExcludeId),
-            func.Eq(func.ProjectKeyS(func.Hole, "state"), func.Constant(json.str("CO")))),
+            recFunc.Eq(recFunc.ProjectKeyS(recFunc.Hole, "state"), recFunc.Constant(json.str("CO")))),
           recFunc.Guard(
             recFunc.ProjectKeyS(recFunc.Hole, "codes"),
             Type.FlexArr(0, None, Type.Top),
@@ -317,7 +317,7 @@ class PlannerQScriptSpec extends
               "city" ->
                 func.ProjectKeyS(func.LeftSide, "city"),
               "loc" -> func.RightSide)),
-          func.Lt(func.ProjectKeyS(func.Hole, "loc"), func.Constant(json.int(-165))))) must beWorkflow0(
+          recFunc.Lt(recFunc.ProjectKeyS(recFunc.Hole, "loc"), recFunc.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
@@ -350,7 +350,7 @@ class PlannerQScriptSpec extends
             qscript.ShiftType.Array,
             OnUndefined.Omit,
             func.RightSide),
-          func.Lt(func.Hole, func.Constant(json.int(-165))))) must beWorkflow0(
+          recFunc.Lt(recFunc.Hole, recFunc.Constant(json.int(-165))))) must beWorkflow0(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape(
@@ -617,11 +617,11 @@ class PlannerQScriptSpec extends
       qplan(
         fix.Filter(
           fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), qscript.IncludeId),
-          func.Guard(
-            func.DeleteKey(func.Constant(json.str("a")), func.Constant(json.str("b"))),
+          recFunc.Guard(
+            recFunc.DeleteKey(recFunc.Constant(json.str("a")), recFunc.Constant(json.str("b"))),
             Type.Str,
-            func.Constant(json.bool(false)),
-            func.Constant(json.bool(true))))) must beWorkflow(
+            recFunc.Constant(json.bool(false)),
+            recFunc.Constant(json.bool(true))))) must beWorkflow(
         chain[Workflow](
           $read(collection("db", "zips")),
           $project(reshape("0" -> $arrayLit(List($field("_id"), $$ROOT)))),

@@ -17,14 +17,15 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner => QPlanner, _}, QPlanner._
+import quasar.{RenderTree, Type}
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.MonadFsErr
+import quasar.fs.{Planner => QPlanner, _}, QPlanner._
+import quasar.jscore
 import quasar.jscore.JsFn
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.WorkflowBuilder.{Subset => _, _}
@@ -65,8 +66,8 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
       WB: WorkflowBuilder.Ops[WF],
       ev3: ExprOpCoreF :<: EX,
       ev4: EX :<: ExprOp) = {
-    case qscript.Map(src, f) =>
-      getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, f)
+    case quasar.qscript.Map(src, f) =>
+      getExprBuilder[T, M, WF, EX](cfg.funcHandler, cfg.staticHandler, cfg.bsonVersion)(src, f.linearize)
     case LeftShift(src, struct, id, shiftType, onUndef, repair) => {
       def rewriteUndefined[A]: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
         case CoEnv(\/-(MFC(Guard(exp, tpe @ Type.FlexArr(_, _, _), exp0, Embed(CoEnv(\/-(MFC(Undefined()))))))))
@@ -157,15 +158,15 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
         .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
     case Filter(src0, cond) => {
       val selectors = getSelector[T, M, EX, Hole](
-        cond, defaultSelector[T].right, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
+        cond.linearize, defaultSelector[T].right, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
       val typeSelectors = getSelector[T, M, EX, Hole](
-        cond, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
+        cond.linearize, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
 
       def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
           M[WorkflowBuilder[WF]] = {
         val (sel, inputs) = partialSel
 
-        inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond)))
+        inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond.linearize)))
           .map(WB.filter(src, _, sel))
       }
 
@@ -174,7 +175,7 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
         case (Some(sel), None) => filterBuilder(src0, sel)
         case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
         case _ =>
-          handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond).map {
+          handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond.linearize).map {
             // TODO: Postpone decision until we know whether we are going to
             //       need mapReduce anyway.
             case cond @ HasThat(_) => WB.filter(src0, List(cond), {

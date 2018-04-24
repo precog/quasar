@@ -16,6 +16,7 @@ stages:
   - name: publish
     # weirdly, we have to add the extra PR check
     if: NOT type = pull_request
+  - name: cache cleanup
 
 # this all goes in the test stage
 env:
@@ -46,6 +47,8 @@ env:
 # this is also the test stage :eyeroll:
 script:
   - set -e
+  
+  - scripts/s3Cache download
 
   # travis installs postgres by default this will stop and free up the psql port
   # needed by the postgresql container
@@ -73,10 +76,6 @@ script:
       mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- xonly failtrace" ;;
     esac
 
-  # workaround for the fact that travis caching isn't working. when it starts working again, remove this
-  - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-  - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
-
   # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
@@ -91,12 +90,15 @@ jobs:
     - stage: clean
       env:
       script:
+        - ./scripts/s3Cache cacheCleanUp
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
 
     - stage: compile
       env:
       script:
         - set -e
+
+        - scripts/s3Cache cleanup
 
         - ./sbt preBuild
 
@@ -107,12 +109,15 @@ jobs:
 
         - ./sbt postBuild
 
+        - scripts/s3Cache upload
+
         - set +e
 
     # note that the "test" stage has special significance to Travis (it's the only matrix-able stage)
     - stage: unit test
       env:
       script:
+        - scripts/s3Cache download
         - ./sbt preBuild
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
@@ -125,11 +130,8 @@ jobs:
       script:
         - set -e
 
+        - scripts/s3Cache download
         - ./sbt preBuild
-
-        # workaround for the fact that travis caching isn't working. when it starts working again, remove this
-        - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION foundation/test:compile
-        - travis_wait $BUILD_HACK_TIMEOUT ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION connector/test:compile
 
         - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
 
@@ -138,10 +140,12 @@ jobs:
         # release to sonatype
         - scripts/quasarPublishAndTag
 
-        # release to github
-        - scripts/publishJar
-
         - set +e
+
+    - stage: cache cleanup
+      env:
+      script:
+        - scripts/s3Cache cleanup
 
 notifications:
   irc:

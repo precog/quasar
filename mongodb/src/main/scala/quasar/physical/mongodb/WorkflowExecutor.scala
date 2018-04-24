@@ -17,10 +17,10 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.{NameGenerator => QNameGenerator}
-import quasar.connector.{EnvironmentError, EnvErrT}
+import quasar.connector.EnvErrT
 import quasar.contrib.scalaz.eitherT._
 import quasar.contrib.scalaz.kleisli._
+import quasar.effect.{NameGenerator => QNameGenerator}
 import quasar.fs._
 import quasar.javascript._
 import quasar.physical.mongodb.execution._
@@ -98,13 +98,9 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     * workflow.
     *
     * @param workflow the crystallized `Workflow` to evaluate
-    * @param defaultDb the database to use for temp collections when one is
-    *                  required and unable to be determined from the workflow.
-    *                  If not provided, a `NoDatabase` error is returned instead.
     */
   def evaluate(
-    workflow: Crystallized[WorkflowF],
-    defaultDb: Option[DatabaseName]
+    workflow: Crystallized[WorkflowF]
   ): M[List[Bson] \/ WorkflowCursor[C]] =
     task(workflow) match {
       case PureTask(Bson.Arr(bsons)) =>
@@ -124,13 +120,13 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
         asWorkflowCursor(mapReduceCursor(coll, mr))
 
       case PipelineTask(src, pipeline) =>
-        executeToCursor(defaultDb, src, evalPipeline(_, pipeline))
+        executeToCursor(src, evalPipeline(_, pipeline))
 
       case MapReduceTask(src, mr, _) =>
-        executeToCursor(defaultDb, src, c => mapReduceCursor(c, mr) map (_.right))
+        executeToCursor(src, c => mapReduceCursor(c, mr) map (_.right))
 
       case foldl @ FoldLeftTask(_, _) =>
-        executeToCursor(defaultDb, foldl, c => findAll(c) map (_.right))
+        executeToCursor(foldl, c => findAll(c) map (_.right))
     }
 
   /** Execute the given (crystallized) `Workflow` and
@@ -178,14 +174,13 @@ private[mongodb] abstract class WorkflowExecutor[F[_]: Monad, C] {
     asM(c) map (WorkflowCursor(_, none)) map (_.right[List[Bson]])
 
   private def executeToCursor(
-    defDb: Option[DatabaseName],
     src: WorkflowTask,
     f: Collection => F[Bson \/ C]
   ): M[List[Bson] \/ WorkflowCursor[C]] = {
     val tempDbName = src.foldMap {
       case Fix(ReadTaskF(Collection(dbName, _))) => List(dbName)
       case _ => Nil
-    }.headOption orElse defDb
+    }.headOption
 
     val tempDst: N[Collection] =
       tempDbName cata (
@@ -403,7 +398,7 @@ object WorkflowExecutor {
 
   /** Interpret a `Workflow` into an equivalent JavaScript program. */
   def toJS(workflow: Crystallized[WorkflowF]): WorkflowExecutionError \/ String =
-    javaScript.evaluate(workflow, none).run.run(CollectionName("tmp.gen_")).eval(0).run match {
+    javaScript.evaluate(workflow).run.run(CollectionName("tmp.gen_")).eval(0).run match {
       case (log, r) if log.isEmpty => r as ""
       case (log, r)                => r as Js.Stmts(log.toList).pprint(0)
     }

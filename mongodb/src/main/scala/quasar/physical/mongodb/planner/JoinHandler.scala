@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.Planner.PlannerError
+import quasar.fs.Planner.PlannerError
 import quasar.RenderTree
 import quasar.common.JoinType
 import quasar.contrib.scalaz._

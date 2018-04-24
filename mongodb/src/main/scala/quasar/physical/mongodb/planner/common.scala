@@ -17,10 +17,11 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{Planner => QPlanner, Type}, QPlanner._, Type._
+import quasar.Type, Type._
 import quasar.contrib.scalaz._
 import quasar.fp.ski._
 import quasar.fs._, FileSystemError._
+import quasar.fs.Planner.{InternalError, PlannerError}
 
 import java.time.Instant
 

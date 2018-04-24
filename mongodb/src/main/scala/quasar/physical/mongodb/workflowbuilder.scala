@@ -17,12 +17,13 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.{NonTerminal, RenderTree, Terminal}, RenderTree.ops._
+import quasar._
+import quasar.RenderTree.ops._
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.fp._
-import quasar._, Planner._
+import quasar.fs.Planner, Planner._
 import quasar.javascript._
 import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.accumulator._
@@ -502,8 +503,9 @@ object WorkflowBuilder {
           flattenFieldArrayUnwindProject(base.toDocVar, field, idStatus, r, acc)
         case (StructureType.Array(field, idStatus), _, _) =>
           flattenFieldMapReduce(base.toDocVar \ field, idStatus).apply(acc)
-        case (StructureType.Object(field, idStatus), Some(r), MongoQueryModel.`3.4.4`) =>
-          flattenFieldObject344(base.toDocVar, field, idStatus, r, acc)
+        case (StructureType.Object(field, idStatus), Some(r), m)
+          if m gte MongoQueryModel.`3.4.4` =>
+            flattenFieldObject344(base.toDocVar, field, idStatus, r, acc)
         case (StructureType.Object(field, idStatus), _, _) =>
           flattenFieldMapReduce(base.toDocVar \ field, idStatus).apply(acc)
       }

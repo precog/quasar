@@ -55,22 +55,24 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
 
   val runAt = Instant.parse("2015-01-26T00:00:00Z")
 
-  val noTimeZoneSupport = Skipped("Mongo does not support time zones.")
+  val noTimeZoneSupport = Pending("Mongo does not support time zones.")
 
   args.report(showtimes = ArgProperty(true))
 
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit
 
-  def skipTemporalTrunc(part: TemporalPart): Boolean
+  def temporalTruncSupported(backend: BackendName, part: TemporalPart): Boolean
 
   def compile(queryModel: MongoQueryModel, coll: Collection, lp: FreeMap[Fix])
       : FileSystemError \/ (Crystallized[WorkflowF], BsonField.Name)
 
-  def is3_2(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_2.name
-  def is3_4(backend: BackendName): Boolean =
-    (backend ≟ TestConfig.MONGO_3_4.name) || (backend ≟ TestConfig.MONGO_READ_ONLY.name)
-  def is3_4_13(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_4_13.name
-  def is3_6(backend: BackendName): Boolean = backend ≟ TestConfig.MONGO_3_6.name
+  def advertisedVersion(backend: BackendName): Option[MongoQueryModel] =
+    if (backend ≟ TestConfig.MONGO_3_2.name) MongoQueryModel.`3.2`.some
+    else if (backend ≟ TestConfig.MONGO_3_4.name) MongoQueryModel.`3.4`.some
+    else if ((backend ≟ TestConfig.MONGO_3_4_13.name) || (backend ≟ TestConfig.MONGO_READ_ONLY.name))
+      MongoQueryModel.`3.4.4`.some
+    else if (backend ≟ TestConfig.MONGO_3_6.name) MongoQueryModel.`3.6`.some
+    else None
 
   MongoDbSpec.clientShould(MongoDb.Type) { (backend, prefix, setupClient, testClient) =>
     import MongoDbIO._
@@ -103,16 +105,19 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     def shortCircuitLP(args: List[Data]): AlgebraM[Result \/ ?, LP, Unit] = {
       case lp.Invoke(_, _) if containsOffset(args) => noTimeZoneSupport.left
       case lp.Invoke(func, _) => shortCircuit(backend, func, args)
-      case lp.TemporalTrunc(part, _) if skipTemporalTrunc(part) =>
-        Pending(s"TemporalTrunc for $part not implemented.").left
       case lp.TemporalTrunc(_, _) if containsOffset(args) => noTimeZoneSupport.left
+      case lp.TemporalTrunc(_, _)
+        if args.exists(Data._localTime.getOption(_).isDefined) =>
+          Pending(s"TemporalTrunc for LocalTime not implemented.").left
+      case lp.TemporalTrunc(part, _) if !temporalTruncSupported(backend, part) =>
+        Pending(s"TemporalTrunc for $part not implemented.").left
       case _ => ().right
     }
 
     def evaluate(wf: Crystallized[WorkflowF], tmp: Collection): MongoDbIO[List[Data]] =
       for {
         exc <- WorkflowExecutor.mongoDb.run.unattemptRuntime
-        v   <- exc.evaluate(wf, None).run.run(tmp.collection).eval(0).unattemptRuntime
+        v   <- exc.evaluate(wf).run.run(tmp.collection).eval(0).unattemptRuntime
         rez <- v.fold(
                 _.map(BsonCodec.toData(_)).point[MongoDbIO],
                 c => DataCursor[MongoDbIO, WorkflowCursor[BsonCursor]].process(c).runLog.map(_.toList))
@@ -207,5 +212,12 @@ abstract class MongoDbStdLibSpec extends StdLibSpec {
     }
 
     backend.name should tests(runner)
+
+    s"advertised version of ${backend.name}" should {
+      "match with real version" in {
+        advertisedVersion(BackendName(backend.name)) must_===
+          MongoDbIO.serverVersion.run(testClient).map(MongoQueryModel(_).some).unsafePerformSync
+      }
+    }
   }
 }

@@ -17,8 +17,8 @@
 package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
-import quasar.NameGenerator
-import quasar.Planner.{PlannerErrorME}
+import quasar.effect.NameGenerator
+import quasar.fs.Planner.{PlannerErrorME}
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski.κ
@@ -51,8 +51,8 @@ final class EquiJoinPlanner[
   }
 
   object MetaGuard {
-    def unapply[A](mf: FreeMapA[T, A]): Boolean = (
-      mf.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
+    def unapply[A](mf: RecFreeMapA[T, A]): Boolean = (
+      mf.linearize.resume.swap.toOption >>= { case MFC(mfs.Guard(Meta(), _, _, _)) => ().some; case _ => none }
     ).isDefined
 
     object Meta {

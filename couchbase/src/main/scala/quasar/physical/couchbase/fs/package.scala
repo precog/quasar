@@ -17,7 +17,7 @@
 package quasar.physical.couchbase
 
 import slamdata.Predef._
-import quasar.connector.EnvironmentError, EnvironmentError.{invalidCredentials}
+import quasar.fs.EnvironmentError, EnvironmentError.{invalidCredentials}
 import quasar.effect.{KeyValueStore, MonotonicSeq}
 import quasar.effect.uuid.GenUUID
 import quasar.fp._, free._, ski.κ

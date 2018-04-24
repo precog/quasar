@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.fs
 
 import slamdata.Predef._
-import quasar.NameGenerator
+import quasar.effect.NameGenerator
 import quasar.contrib.pathy._
 import quasar.fp.TaskRef
 import quasar.fs._

@@ -55,7 +55,7 @@ private[qscript] final class QScriptCorePlanner[
       for {
         src <- elimSearch[Q](src0)
         x   <- freshName[F]
-        g   <- mapFuncXQuery[T, F, FMT](f, ~x)
+        g   <- mapFuncXQuery[T, F, FMT](f.linearize, ~x)
       } yield (src match {
         case IterativeFlwor(bindings, filter, order, isStable, result) =>
           XQuery.Flwor(bindings :::> IList(BindingClause.let_(x := result)), filter, order, isStable, g)
@@ -147,7 +147,7 @@ private[qscript] final class QScriptCorePlanner[
         r   <- elimSearch[Q](r0)
       } yield (mkSeq_(l) union mkSeq_(r)).right
 
-    case Filter(src, f) => FilterPlanner.plan[T, F, FMT, Q](src, f)
+    case Filter(src, f) => FilterPlanner.plan[T, F, FMT, Q](src, f.linearize)
 
     // TODO: detect when from and count don't reference `src` and avoid the let.
     // NB: XQuery sequences use 1-based indexing.

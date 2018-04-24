@@ -26,11 +26,13 @@ object MongoQueryModel {
   case object `3.2` extends MongoQueryModel("3.2")
   case object `3.4` extends MongoQueryModel("3.4")
   case object `3.4.4` extends MongoQueryModel("3.4.4")
+  case object `3.6` extends MongoQueryModel("3.6")
 
   def apply(version: ServerVersion): MongoQueryModel =
-    if (version >= ServerVersion.MongoDb3_4_4)    MongoQueryModel.`3.4.4`
-    else if (version >= ServerVersion.MongoDb3_4) MongoQueryModel.`3.4`
-    else                                          MongoQueryModel.`3.2`
+    if (version >= ServerVersion.MongoDb3_6)        MongoQueryModel.`3.6`
+    else if (version >= ServerVersion.MongoDb3_4_4) MongoQueryModel.`3.4.4`
+    else if (version >= ServerVersion.MongoDb3_4)   MongoQueryModel.`3.4`
+    else                                            MongoQueryModel.`3.2`
 
   def toBsonVersion(v: MongoQueryModel): BsonVersion =
     if (v lt `3.4`) BsonVersion.`1.0`
@@ -44,6 +46,7 @@ object MongoQueryModel {
     case `3.2` => 0
     case `3.4` => 1
     case `3.4.4` => 2
+    case `3.6` => 3
   }
 
   implicit val orderMongoQueryModel: Order[MongoQueryModel] = new Order[MongoQueryModel] {

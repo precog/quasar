@@ -17,10 +17,11 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.connector.{EnvErr, EnvironmentError}
+import quasar.connector.EnvErr
 import quasar.config._
 import quasar.effect.Failure
 import quasar.fp.free
+import quasar.fs.EnvironmentError
 import quasar.fs.mount.ConnectionUri
 
 import java.util.concurrent.TimeoutException

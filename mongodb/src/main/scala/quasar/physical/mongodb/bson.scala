@@ -138,6 +138,11 @@ object Bson {
 
   object Doc {
     def apply(pairs: (String, Bson)*): Bson.Doc = Doc(ListMap(pairs: _*))
+
+    def opt(value: ListMap[String, Option[Bson]]): Doc =
+      Doc(value.foldLeft(ListMap[String, Bson]()){ case (acc, (k, v)) =>
+        acc ++ v.map(x => ListMap(k -> x)).getOrElse(ListMap())
+      })
   }
 
   final case class Arr(value: List[Bson]) extends Bson {

@@ -17,9 +17,10 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar._, Planner.PlannerError
+import quasar._
 import quasar.contrib.scalaz._
 import quasar.fs.FileSystemError, FileSystemError.qscriptPlanningFailed
+import quasar.fs.Planner.PlannerError
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.workflow._
@@ -29,7 +30,9 @@ import quasar.qscript.rewrites.{Coalesce => _}
 import quasar.std.StdLib._
 import quasar.time.TemporalPart
 
-import java.time.Instant
+import java.time.{Instant, LocalDateTime => JLocalDateTime}
+import java.time.temporal.ChronoUnit
+
 import matryoshka._
 import matryoshka.data.Fix
 import org.specs2.execute._
@@ -40,13 +43,24 @@ import shapeless.Nat
   * pipeline (aka ExprOp).
   */
 class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
+  import MongoQueryModel._
+
   val notHandled = Skipped("Not implemented in aggregation.")
+  def notImplBefore(v: MongoQueryModel) = Pending(s"not implemented in aggregation on MongoDB < ${v.shows}")
+  def notImplBeforeSkipped(v: MongoQueryModel) = Skipped(s"not implemented in aggregation on MongoDB < ${v.shows}")
 
   /** Identify constructs that are expected not to be implemented in the pipeline. */
   def shortCircuit[N <: Nat](backend: BackendName, func: GenericFunc[N], args: List[Data]): Result \/ Unit = (func, args) match {
     /* DATE */
-    case (date.ExtractIsoYear, _) => Pending("TODO").left
-    case (date.ExtractWeek, _) => Pending("TODO").left
+    case (date.ExtractIsoYear, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
+    // Not working for year < 1 for any date-like types, but we just have tests for LocalDate
+    case (date.ExtractIsoYear, List(Data.LocalDate(d)))
+      if d.getYear < 1 && advertisedVersion(backend) === `3.6`.some =>
+        Pending("TODO").left
+
+    case (date.ExtractWeek, _) if advertisedVersion(backend) lt `3.6`.some  =>
+      notImplBefore(`3.6`).left
 
     case (date.ExtractHour, Data.LocalTime(_) :: Nil) => Pending("TODO").left
     case (date.ExtractMicrosecond, Data.LocalTime(_) :: Nil) => Pending("TODO").left
@@ -59,7 +73,8 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.ExtractDecade, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
     case (date.ExtractMillennium, List(Data.LocalDate(d))) if d.getYear < 1 => Pending("TODO").left
 
-    case (date.StartOfDay, Data.LocalLike(_) :: Nil) => notHandled.left
+    case (date.StartOfDay, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
 
     case (date.Now, _) => Pending("Returns correct result, but wrapped into Data.Dec instead of Data.Interval").left
     case (date.NowDate, _) => Pending("TODO").left
@@ -74,8 +89,13 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (date.OffsetDateTime, _) => noTimeZoneSupport.left
     case (date.OffsetTime, _) => noTimeZoneSupport.left
 
-    case (date.LocalDate, _) => notHandled.left
-    case (date.LocalDateTime, _) => notHandled.left
+    case (date.LocalDate, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
+    case (date.LocalDateTime, _) if advertisedVersion(backend) lt `3.6`.some =>
+      notImplBefore(`3.6`).left
+    case (date.LocalDateTime, List(Data.Str(s)))
+      if JLocalDateTime.parse(s) != JLocalDateTime.parse(s).truncatedTo(ChronoUnit.MILLIS) =>
+        Pending("LocalDateTime(s) does not support precision beyond millis in MongoDb 3.6").left
     case (date.LocalTime, _) => notHandled.left
 
     case (date.Interval, _) => notHandled.left
@@ -112,17 +132,20 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case (quasar.std.SetLib.Within, _) => notHandled.left
 
     /* STRING */
-    case (string.Length, _) if !is3_4(backend) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
+    case (string.Length, _) if advertisedVersion(backend) lt `3.4`.some =>
+      notImplBeforeSkipped(`3.4`).left
     case (string.Integer, _) => notHandled.left
     case (string.Decimal, _) => notHandled.left
 
     case (string.ToString, List(Data.DateTimeLike(_))) =>
-      Pending("Works but isn't formatted as expected.").left
+      Pending("implemented but isn't formatted as specified").left
 
     case (string.Search, _) => notHandled.left
-    case (string.Split, _) if (!is3_4(backend)) => Skipped("not implemented in aggregation on MongoDB < 3.4").left
-    case (string.Substring, List(Data.Str(s), _, _)) if (!is3_4(backend) && !isPrintableAscii(s)) =>
-      Skipped("only printable ascii supported on MongoDB < 3.4").left
+    case (string.Split, _) if advertisedVersion(backend) lt `3.4`.some =>
+      notImplBeforeSkipped(`3.4`).left
+    case (string.Substring, List(Data.Str(s), _, _)) if
+      ((advertisedVersion(backend) lt `3.4`.some) && !isPrintableAscii(s)) =>
+        Skipped("only printable ascii supported on MongoDB < 3.4").left
 
     /* STRUCTURAL */
     case (structural.ConcatOp, _) => notHandled.left
@@ -132,7 +155,13 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     case _ => ().right
   }
 
-  def skipTemporalTrunc(part: TemporalPart): Boolean = true
+  def temporalTruncSupported(backend: BackendName, part: TemporalPart): Boolean =
+    if (advertisedVersion(backend) lt MongoQueryModel.`3.6`.some) false
+    else
+      part match {
+        case TemporalPart.Microsecond => false
+        case _ => true
+      }
 
   def build[WF[_]: Coalesce: Inject[WorkflowOpCoreF, ?[_]]](
       expr: Fix[ExprOp], queryModel: MongoQueryModel, coll: Collection)(
@@ -148,6 +177,11 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
 
     val bsonVersion = MongoQueryModel.toBsonVersion(queryModel)
     queryModel match {
+      case MongoQueryModel.`3.6` =>
+        (exprOp.getExpr[Fix, PlanStdT, Expr3_6](
+          FuncHandler.handle3_6(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
+
       case MongoQueryModel.`3.4.4` =>
         (exprOp.getExpr[Fix, PlanStdT, Expr3_4_4](
           FuncHandler.handle3_4_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))

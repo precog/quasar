@@ -45,10 +45,10 @@ class PipelineSpec extends quasar.Qspec with ArbBsonField {
 
       field = c.toString + cs
 
-      value <- if (size <= 0) genExpr3_4_4.map(\/-(_))
+      value <- if (size <= 0) genExpr3_6.map(\/-(_))
       else Gen.oneOf(
         genProject(size - 1).map(p => -\/(p.shape)),
-        genExpr3_4_4.map(\/-(_)))
+        genExpr3_6.map(\/-(_)))
     } yield BsonField.Name(field) -> value)
     id <- Gen.oneOf(ExcludeId, IncludeId)
   } yield $ProjectF((), Reshape[ExprOp](ListMap(fields: _*)), id)

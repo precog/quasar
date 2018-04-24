@@ -16,9 +16,13 @@
 
 package quasar.fs.mount
 
-import quasar.connector.{EnvironmentError, EnvironmentErrorArbitrary}
-import quasar.fs.{PathError, PathErrorArbitrary}
 import slamdata.Predef._
+import quasar.fs.{
+  EnvironmentError,
+  EnvironmentErrorArbitrary,
+  PathError,
+  PathErrorArbitrary
+}
 
 import org.scalacheck.Arbitrary.{arbitrary => arb}
 import org.scalacheck._

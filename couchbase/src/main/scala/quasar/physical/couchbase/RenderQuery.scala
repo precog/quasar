@@ -19,7 +19,7 @@ package quasar.physical.couchbase
 import slamdata.Predef._
 import quasar.{Data => QData, DataCodec}
 import quasar.fp.ski.κ
-import quasar.Planner.{NonRepresentableData, PlannerError}
+import quasar.fs.Planner.{NonRepresentableData, PlannerError}
 import quasar.common.SortDir, SortDir.{Ascending, Descending}
 import quasar.DataCodec.PreciseKeys.{LocalDateKey, LocalTimeKey}
 

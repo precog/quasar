@@ -32,7 +32,7 @@ object queryfileTypes {
   type ResultCursor[C]     = List[Bson] \/ WorkflowCursor[C]
   type ResultMap[C]        = Map[ResultHandle, ResultCursor[C]]
   type EvalState[C]        = (Long, ResultMap[C])
-  type QueryRT[F[_], C, A] = ReaderT[F, (Option[DefaultDb], TaskRef[EvalState[C]]), A]
+  type QueryRT[F[_], C, A] = ReaderT[F, TaskRef[EvalState[C]], A]
   type MongoQuery[C, A]    = QueryRT[MongoDbIO, C, A]
 
   type QRT[F[_], A]        = QueryRT[F, BsonCursor, A]
@@ -46,7 +46,6 @@ object queryfile {
 
   def run[C, S[_]](
     client: MongoClient,
-    defDb: Option[DefaultDb]
   )(implicit
     S0: Task :<: S,
     S1: PhysErr :<: S
@@ -57,7 +56,7 @@ object queryfile {
     def runMQ(ref: TaskRef[EvalState[C]]): MQ ~> F =
       new (MQ ~> F) {
         def apply[A](mq: MQ[A]) =
-          mq.run((defDb, ref)).runF(client)
+          mq.run(ref).runF(client)
       }
 
     TaskRef((0L, Map.empty: ResultMap[C])) map runMQ

@@ -17,7 +17,7 @@
 package quasar.physical
 
 import slamdata.Predef._
-import quasar.connector.{EnvironmentError, EnvErr}
+import quasar.connector.EnvErr
 import quasar.config.{CfgErr, ConfigError}
 import quasar.effect.Failure
 import quasar.fp._

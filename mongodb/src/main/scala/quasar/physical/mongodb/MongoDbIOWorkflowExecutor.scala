@@ -17,7 +17,7 @@
 package quasar.physical.mongodb
 
 import slamdata.Predef._
-import quasar.connector.{EnvironmentError, EnvErrT}
+import quasar.connector.EnvErrT
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.physical.mongodb.MapReduce._

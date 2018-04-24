@@ -40,9 +40,6 @@ trait RelationsLib extends Library {
         }
     },
     partialTyper[nat._2] {
-      case Sized(Type.Const(data1), Type.Const(data2)) =>
-        Type.Const(Data.Bool(data1 == data2))
-
       case Sized(type1, type2)
         if Type.lub(type1, type2) == Type.Top && type1 != Type.Top && type2 != Type.Top =>
           Type.Const(Data.Bool(false))

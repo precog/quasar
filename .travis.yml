@@ -14,6 +14,7 @@ stages:
   - name: unit test
   - name: test
   - name: testPublish
+    if: type = pull_request
   - name: publish
     # weirdly, we have to add the extra PR check
     if: NOT type = pull_request
@@ -145,19 +146,19 @@ jobs:
     - stage: publish
       env:
       script:
-        # Uncomment this if uncommenting Spark block below
-        # - set -e
+        - set -e
 
+        - travis_wait 30 scripts/s3Cache download
         - ./sbt preBuild
+
+        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
+
+        - scripts/testJar
 
         # release to sonatype
         - scripts/quasarPublishAndTag
 
-        # release to github
-        - scripts/publishJar
-
-        # Uncomment this if uncommenting Spark block above
-        # - set +e
+        - set +e
 
     - stage: cache cleanup
       env:

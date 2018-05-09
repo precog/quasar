@@ -3,10 +3,8 @@ Chain
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("identities" -> {
-│  │  │  │       "rlp1": { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] }
-│  │  │  │     })
-│  │  │  ├─ Name("value" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
+│  │  │  ├─ Name("identities" -> { "rlp1": "$_id" })
+│  │  │  ├─ Name("value" -> "$$ROOT")
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
@@ -25,22 +23,32 @@ Chain
 │     │  ├─ Chain
 │     │  │  ├─ $ReadF(db; zips)
 │     │  │  ├─ $ProjectF
-│     │  │  │  ├─ Name("identities" -> {
-│     │  │  │  │       "rlp1": { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("0") }] }
-│     │  │  │  │     })
-│     │  │  │  ├─ Name("value" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
+│     │  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
 │     │  │  │  ╰─ ExcludeId
 │     │  │  ├─ $ProjectF
-│     │  │  │  ├─ Name("identities" -> "$identities")
+│     │  │  │  ├─ Name("identities" -> { "rlp1": { "$arrayElemAt": ["$0", { "$literal": NumberInt("0") }] } })
 │     │  │  │  ├─ Name("value" -> {
 │     │  │  │  │       "pop": {
 │     │  │  │  │         "$cond": [
 │     │  │  │  │           {
 │     │  │  │  │             "$and": [
-│     │  │  │  │               { "$lte": [{ "$literal": {  } }, "$value"] },
-│     │  │  │  │               { "$lt": ["$value", { "$literal": [] }] }]
+│     │  │  │  │               {
+│     │  │  │  │                 "$lte": [
+│     │  │  │  │                   { "$literal": {  } },
+│     │  │  │  │                   { "$arrayElemAt": ["$0", { "$literal": NumberInt("1") }] }]
+│     │  │  │  │               },
+│     │  │  │  │               {
+│     │  │  │  │                 "$lt": [
+│     │  │  │  │                   { "$arrayElemAt": ["$0", { "$literal": NumberInt("1") }] },
+│     │  │  │  │                   { "$literal": [] }]
+│     │  │  │  │               }]
 │     │  │  │  │           },
-│     │  │  │  │           "$value.pop",
+│     │  │  │  │           {
+│     │  │  │  │             "$let": {
+│     │  │  │  │               "vars": { "el": { "$arrayElemAt": ["$0", { "$literal": NumberInt("1") }] } },
+│     │  │  │  │               "in": "$$el.pop"
+│     │  │  │  │             }
+│     │  │  │  │           },
 │     │  │  │  │           { "$literal": undefined }]
 │     │  │  │  │       }
 │     │  │  │  │     })
@@ -58,9 +66,6 @@ Chain
 │     │  │     ╰─ IncludeId
 │     │  ╰─ Chain
 │     │     ├─ $ReadF(db; zips)
-│     │     ├─ $ProjectF
-│     │     │  ├─ Name("value" -> { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] })
-│     │     │  ╰─ ExcludeId
 │     │     ├─ $GroupF
 │     │     │  ├─ Grouped
 │     │     │  │  ╰─ Name("f0" -> {
@@ -68,45 +73,10 @@ Chain
 │     │     │  │            "$cond": [
 │     │     │  │              {
 │     │     │  │                "$and": [
-│     │     │  │                  {
-│     │     │  │                    "$lt": [
-│     │     │  │                      { "$literal": null },
-│     │     │  │                      {
-│     │     │  │                        "$cond": [
-│     │     │  │                          {
-│     │     │  │                            "$and": [
-│     │     │  │                              { "$lte": [{ "$literal": {  } }, "$value"] },
-│     │     │  │                              { "$lt": ["$value", { "$literal": [] }] }]
-│     │     │  │                          },
-│     │     │  │                          "$value.pop",
-│     │     │  │                          { "$literal": undefined }]
-│     │     │  │                      }]
-│     │     │  │                  },
-│     │     │  │                  {
-│     │     │  │                    "$lt": [
-│     │     │  │                      {
-│     │     │  │                        "$cond": [
-│     │     │  │                          {
-│     │     │  │                            "$and": [
-│     │     │  │                              { "$lte": [{ "$literal": {  } }, "$value"] },
-│     │     │  │                              { "$lt": ["$value", { "$literal": [] }] }]
-│     │     │  │                          },
-│     │     │  │                          "$value.pop",
-│     │     │  │                          { "$literal": undefined }]
-│     │     │  │                      },
-│     │     │  │                      { "$literal": "" }]
-│     │     │  │                  }]
+│     │     │  │                  { "$lt": [{ "$literal": null }, "$pop"] },
+│     │     │  │                  { "$lt": ["$pop", { "$literal": "" }] }]
 │     │     │  │              },
-│     │     │  │              {
-│     │     │  │                "$cond": [
-│     │     │  │                  {
-│     │     │  │                    "$and": [
-│     │     │  │                      { "$lte": [{ "$literal": {  } }, "$value"] },
-│     │     │  │                      { "$lt": ["$value", { "$literal": [] }] }]
-│     │     │  │                  },
-│     │     │  │                  "$value.pop",
-│     │     │  │                  { "$literal": undefined }]
-│     │     │  │              },
+│     │     │  │              "$pop",
 │     │     │  │              { "$literal": undefined }]
 │     │     │  │          }
 │     │     │  │        })
@@ -178,6 +148,6 @@ Chain
    │           ├─ JsCore(_.left.left.value)
    │           ├─ JsCore(_.left.right)
    │           ╰─ Obj
-   │              ╰─ Key(2: ((isNumber(
-   │                     (isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) || ((((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberInt) || (((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberLong))) && (isObject(_.right.value) && (! Array.isArray(_.right.value)))) ? _.right.value.pop / 1000 : undefined)
+   │              ╰─ Key(2: (isNumber(
+   │                     (isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) || ((((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberInt) || (((isObject(_.right.value) && (! Array.isArray(_.right.value))) ? _.right.value.pop : undefined) instanceof NumberLong))) ? _.right.value.pop / 1000 : undefined)
    ╰─ Scope(ListMap())

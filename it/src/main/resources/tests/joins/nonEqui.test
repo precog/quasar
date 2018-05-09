@@ -1,0 +1,25 @@
+{
+    "name": "join with non-equi condition",
+
+    "backends": {
+        "couchbase": "skip"
+    },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
+    "data": ["../cars.data", "../cars2.data"],
+
+    "query": "select c1.name from `../cars` as c1 join `../cars2` as c2 on c1.year[0] < c2.year[0]",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        "RangeRover-Evoque",
+        "RangeRover-Evoque",
+        "Honda-civic",
+        "Honda-civic",
+        "BMW-X5",
+        "BMW-X5",
+        "BMW-X5"]
+}

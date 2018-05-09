@@ -22,14 +22,26 @@ Chain
 │  │  │  │         {
 │  │  │  │           "$or": [
 │  │  │  │             {
-│  │  │  │               "$and": [
-│  │  │  │                 { "$lt": [{ "$literal": null }, "$pop"] },
-│  │  │  │                 { "$lt": ["$pop", { "$literal": {  } }] }]
+│  │  │  │               "$or": [
+│  │  │  │                 {
+│  │  │  │                   "$and": [
+│  │  │  │                     { "$lt": [{ "$literal": null }, "$pop"] },
+│  │  │  │                     { "$lt": ["$pop", { "$literal": {  } }] }]
+│  │  │  │                 },
+│  │  │  │                 {
+│  │  │  │                   "$and": [
+│  │  │  │                     {
+│  │  │  │                       "$lte": [
+│  │  │  │                         { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
+│  │  │  │                         "$pop"]
+│  │  │  │                     },
+│  │  │  │                     { "$lt": ["$pop", { "$literal": Timestamp(-2147483648, 0) }] }]
+│  │  │  │                 }]
 │  │  │  │             },
 │  │  │  │             {
 │  │  │  │               "$and": [
 │  │  │  │                 { "$lte": [{ "$literal": false }, "$pop"] },
-│  │  │  │                 { "$lt": ["$pop", { "$literal": new RegExp("", "") }] }]
+│  │  │  │                 { "$lte": ["$pop", { "$literal": true }] }]
 │  │  │  │             }]
 │  │  │  │         },
 │  │  │  │         { "$literal": true },
@@ -73,14 +85,26 @@ Chain
 │     │  │         {
 │     │  │           "$or": [
 │     │  │             {
-│     │  │               "$and": [
-│     │  │                 { "$lt": [{ "$literal": null }, "$pop"] },
-│     │  │                 { "$lt": ["$pop", { "$literal": {  } }] }]
+│     │  │               "$or": [
+│     │  │                 {
+│     │  │                   "$and": [
+│     │  │                     { "$lt": [{ "$literal": null }, "$pop"] },
+│     │  │                     { "$lt": ["$pop", { "$literal": {  } }] }]
+│     │  │                 },
+│     │  │                 {
+│     │  │                   "$and": [
+│     │  │                     {
+│     │  │                       "$lte": [
+│     │  │                         { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
+│     │  │                         "$pop"]
+│     │  │                     },
+│     │  │                     { "$lt": ["$pop", { "$literal": Timestamp(-2147483648, 0) }] }]
+│     │  │                 }]
 │     │  │             },
 │     │  │             {
 │     │  │               "$and": [
 │     │  │                 { "$lte": [{ "$literal": false }, "$pop"] },
-│     │  │                 { "$lt": ["$pop", { "$literal": new RegExp("", "") }] }]
+│     │  │                 { "$lte": ["$pop", { "$literal": true }] }]
 │     │  │             }]
 │     │  │         },
 │     │  │         { "$literal": true },

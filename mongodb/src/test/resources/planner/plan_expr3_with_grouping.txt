@@ -357,7 +357,7 @@ Chain
 │  │  │  │           │  ╰─ SpliceObjects
 │  │  │  │           │     ├─ JsCore(_.right.left.identities)
 │  │  │  │           │     ╰─ JsCore(_.right.right.identities)
-│  │  │  │           ╰─ Key(value: "leftAccess29"[_.right.left.value] ? "centerAccess30"[_.right.left.value] : _.right.right.value)
+│  │  │  │           ╰─ Key(value: _.right.left.value.leftAccess29 ? _.right.left.value.centerAccess30 : _.right.right.value)
 │  │  │  ╰─ Scope(ListMap())
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> { "$eq": ["$left.identities.rlp8_k0", "$right.identities.rlp17_b0"] })
@@ -382,62 +382,7 @@ Chain
 │  │  │  │     │     ╰─ JsCore(_.src.right.identities)
 │  │  │  │     ╰─ Key(value)
 │  │  │  │        ╰─ Obj
-│  │  │  │           ╰─ Key(0)
-│  │  │  │              ╰─ If
-│  │  │  │                 ├─ BinOp(||)
-│  │  │  │                 │  ├─ BinOp(||)
-│  │  │  │                 │  │  ├─ BinOp(||)
-│  │  │  │                 │  │  │  ├─ Call
-│  │  │  │                 │  │  │  │  ├─ Ident(isNumber)
-│  │  │  │                 │  │  │  │  ╰─ Access
-│  │  │  │                 │  │  │  │     ├─ Literal("leftAccess32")
-│  │  │  │                 │  │  │  │     ╰─ Obj
-│  │  │  │                 │  │  │  │        ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │  │  │  │        ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 │  │  │  ╰─ BinOp(||)
-│  │  │  │                 │  │  │     ├─ BinOp(instanceof)
-│  │  │  │                 │  │  │     │  ├─ Access
-│  │  │  │                 │  │  │     │  │  ├─ Literal("leftAccess32")
-│  │  │  │                 │  │  │     │  │  ╰─ Obj
-│  │  │  │                 │  │  │     │  │     ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │  │  │     │  │     ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 │  │  │     │  ╰─ Ident(NumberInt)
-│  │  │  │                 │  │  │     ╰─ BinOp(instanceof)
-│  │  │  │                 │  │  │        ├─ Access
-│  │  │  │                 │  │  │        │  ├─ Literal("leftAccess32")
-│  │  │  │                 │  │  │        │  ╰─ Obj
-│  │  │  │                 │  │  │        │     ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │  │  │        │     ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 │  │  │        ╰─ Ident(NumberLong)
-│  │  │  │                 │  │  ╰─ Call
-│  │  │  │                 │  │     ├─ Ident(isString)
-│  │  │  │                 │  │     ╰─ Access
-│  │  │  │                 │  │        ├─ Literal("leftAccess32")
-│  │  │  │                 │  │        ╰─ Obj
-│  │  │  │                 │  │           ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │  │           ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 │  ╰─ BinOp(||)
-│  │  │  │                 │     ├─ BinOp(instanceof)
-│  │  │  │                 │     │  ├─ Access
-│  │  │  │                 │     │  │  ├─ Literal("leftAccess32")
-│  │  │  │                 │     │  │  ╰─ Obj
-│  │  │  │                 │     │  │     ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │     │  │     ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 │     │  ╰─ Ident(Date)
-│  │  │  │                 │     ╰─ BinOp(===)
-│  │  │  │                 │        ├─ UnOp(typeof)
-│  │  │  │                 │        │  ╰─ Access
-│  │  │  │                 │        │     ├─ Literal("leftAccess32")
-│  │  │  │                 │        │     ╰─ Obj
-│  │  │  │                 │        │        ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │        │        ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 │        ╰─ Literal("boolean")
-│  │  │  │                 ├─ Access
-│  │  │  │                 │  ├─ Literal("centerAccess33")
-│  │  │  │                 │  ╰─ Obj
-│  │  │  │                 │     ├─ Key(leftAccess32: _.src.left.value)
-│  │  │  │                 │     ╰─ Key(centerAccess33: _.src.right.value)
-│  │  │  │                 ╰─ Ident(undefined)
+│  │  │  │           ╰─ Key(0: ((((isNumber(_.src.left.value) || ((_.src.left.value instanceof NumberInt) || (_.src.left.value instanceof NumberLong))) || isString(_.src.left.value)) || (_.src.left.value instanceof Date)) || ((typeof _.src.left.value) === "boolean")) ? _.src.right.value : undefined)
 │  │  │  ╰─ Scope(ListMap())
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
@@ -457,22 +402,10 @@ Chain
 │     │  │       "$cond": [
 │     │  │         {
 │     │  │           "$and": [
-│     │  │             {
-│     │  │               "$lte": [
-│     │  │                 { "$literal": {  } },
-│     │  │                 {
-│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│     │  │                 }]
-│     │  │             },
-│     │  │             {
-│     │  │               "$lt": [
-│     │  │                 {
-│     │  │                   "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }]
-│     │  │                 },
-│     │  │                 { "$literal": [] }]
-│     │  │             }]
+│     │  │             { "$lte": [{ "$literal": {  } }, "$$ROOT"] },
+│     │  │             { "$lt": ["$$ROOT", { "$literal": [] }] }]
 │     │  │         },
-│     │  │         { "$arrayElemAt": [["$_id", "$$ROOT"], { "$literal": NumberInt("1") }] },
+│     │  │         "$$ROOT",
 │     │  │         { "$literal": undefined }]
 │     │  │     })
 │     │  ╰─ ExcludeId

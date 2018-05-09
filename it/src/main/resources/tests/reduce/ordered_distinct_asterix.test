@@ -1,0 +1,25 @@
+{
+    "name": "[qa_s08] distinct *",
+
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder",
+       "mongodb_3_2":       "pending",
+       "mongodb_3_4":       "pending",
+       "mongodb_3_4_13":    "pending",
+       "mongodb_3_6":       "pending",
+       "mongodb_read_only": "pending"
+    },
+    "NB": "Mongo pending because values are correct but there are some issues with equal on BigDecimal",
+    "data": "../zips.data",
+    "query": "select distinct(*) from `../zips` order by pop desc limit 5",
+    "predicate": "exactly",
+    "expected": [
+         { "_id": "60623", "city":  "CHICAGO"      , "loc": [   -87.7157,  41.849015] , "pop":  112047, "state": "IL" },
+         { "_id": "11226", "city":  "BROOKLYN"     , "loc": [ -73.956985,  40.646694] , "pop":  111396, "state": "NY" },
+         { "_id": "10021", "city":  "NEW YORK"     , "loc": [ -73.958805,  40.768476] , "pop":  106564, "state": "NY" },
+         { "_id": "10025", "city":  "NEW YORK"     , "loc": [ -73.968312,  40.797466] , "pop":  100027, "state": "NY" },
+         { "_id": "90201", "city":  "BELL GARDENS" , "loc": [ -118.17205,  33.969177] , "pop":   99568, "state": "CA" }
+    ]
+}

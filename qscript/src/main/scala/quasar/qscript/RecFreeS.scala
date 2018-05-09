@@ -24,7 +24,7 @@ import quasar.fp.ski.κ
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
-import matryoshka.patterns.interpretM
+import matryoshka.patterns.{interpretM, interpret, CoEnv}
 import scalaz._, Scalaz._
 
 sealed trait RecFreeS[F[_], A] extends Product with Serializable {
@@ -32,6 +32,8 @@ sealed trait RecFreeS[F[_], A] extends Product with Serializable {
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion")) // this is like a very strange foldMap...
   def linearize: Free[F, A] = this match {
+    case Leaf(a) =>
+      Free.point(a)
     case Suspend(fa) =>
       Free.liftF(fa)
     case Fix(form, rec) =>
@@ -40,12 +42,14 @@ sealed trait RecFreeS[F[_], A] extends Product with Serializable {
 }
 
 object RecFreeS {
+  final case class Leaf[F[_], A](a: A) extends RecFreeS[F, A]
   final case class Suspend[F[_], A](fa: F[A]) extends RecFreeS[F, A]
   final case class Fix[F[_], A](form: RecFreeS[F, A], rec: Free[RecFreeS[F, ?], Hole]) extends RecFreeS[F, A]
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def recInterpretM[M[_]: Monad, F[_]: Traverse, A](susint: AlgebraM[M, F, A], fixint: A => M[(A, A => M[A])]): AlgebraM[M, RecFreeS[F, ?], A] =
     fm => fm match {
+      case Leaf(a) => a.point[M]
       case Suspend(fa) => susint(fa)
       case Fix(form, rec) =>
         recInterpretM[M, F, A](susint, fixint).apply(form) >>= (fixint(_)) >>= {
@@ -63,14 +67,19 @@ object RecFreeS {
   def fromFree[F[_], A](f: Free[F, A]): Free[RecFreeS[F, ?], A] =
     f.mapSuspension(λ[F ~> RecFreeS[F, ?]](Suspend(_)))
 
-  def letIn[F[_], A](form: Free[RecFreeS[F, ?], A], body: Free[RecFreeS[F, ?], Hole]): Free[RecFreeS[F, ?], A] =
-    form.mapSuspension(λ[RecFreeS[F, ?] ~> RecFreeS[F, ?]](f => Fix(f, body)))
+  def letIn[F[_]: Traverse, A](form: Free[RecFreeS[F, ?], A], body: Free[RecFreeS[F, ?], Hole]): Free[RecFreeS[F, ?], A] =
+    form.resume match {
+      case \/-(leaf) => Free.roll(Fix(Leaf(leaf.point[Free[RecFreeS[F, ?], ?]]), body))
+      case -\/(step) => Free.roll(Fix(step, body))
+    }
 
   def linearize[F[_], A](f: Free[RecFreeS[F, ?], A]): Free[F, A] =
     f.flatMapSuspension(λ[RecFreeS[F, ?] ~> Free[F, ?]](_.linearize))
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def mapS[F[_], S[_], A](rc: RecFreeS[F, A])(t: F ~> S): RecFreeS[S, A] = rc match {
+    case Leaf(a) =>
+      Leaf(a)
     case Suspend(fa) =>
       Suspend(t(fa))
     case Fix(form, rec) =>
@@ -85,6 +94,7 @@ object RecFreeS {
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   implicit def traverse[F[_]: Traverse]: Traverse[RecFreeS[F, ?]] = new Traverse[RecFreeS[F, ?]] {
     def traverseImpl[G[_]: Applicative, A, B](fa: RecFreeS[F, A])(f: A => G[B]): G[RecFreeS[F, B]] = fa match {
+      case Leaf(a) => f(a) map (Leaf(_))
       case Suspend(fa0) => Traverse[F].traverseImpl[G, A, B](fa0)(f) map (Suspend(_))
       case Fix(form, rec) => traverseImpl[G, A, B](form)(f) map (Fix(_, rec))
     }
@@ -94,6 +104,7 @@ object RecFreeS {
   implicit def recRenderTree[F[_]: Traverse](implicit FR: Delay[RenderTree, F]): Delay[RenderTree, RecFreeS[F, ?]] =
     Delay.fromNT(λ[RenderTree ~> (RenderTree ∘ RecFreeS[F, ?])#λ](rt =>
       RenderTree.make {
+        case Leaf(a) => rt.render(a)
         case Suspend(fa) => FR.apply(rt).render(fa)
         case Fix(form, body) =>
           NonTerminal(
@@ -104,8 +115,22 @@ object RecFreeS {
               RenderTree.free[RecFreeS[F, ?]].apply(RenderTree[Hole]).render(body)))
       }))
 
-  implicit def show[F[_], A](implicit SF: Show[Free[F, A]]): Show[Free[RecFreeS[F, ?], A]] =
-    Show.show(_.linearize.show)
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+  implicit def show[F[_]: Traverse](implicit S: Delay[Show, F]): Delay[Show, RecFreeS[F, ?]] =
+    Delay.fromNT(λ[Show ~> (Show ∘ RecFreeS[F, ?])#λ](sh =>
+      Show.show {
+        case Leaf(a) => sh.show(a)
+        case Suspend(fa) => S.apply(sh).show(fa)
+        case Fix(form, body) => {
+          def mkLet(f: Cord, b: Cord): Cord =
+            Cord("Let(") ++ f ++ Cord(" = ") ++ b ++ Cord(")")
+
+          val alg: Algebra[CoEnv[Hole, RecFreeS[F, ?], ?], Cord] =
+            interpret[RecFreeS[F, ?], Hole, Cord](_.show, RecFreeS.recInterpret(_.show, frm => (Cord("SrcHole"), c => mkLet(frm, c))))
+
+          mkLet(RecFreeS.show[F].apply(sh).show(form), body.cata(alg))
+        }
+      }))
 
   implicit def equal[F[_], A](implicit SF: Equal[Free[F, A]]): Equal[Free[RecFreeS[F, ?], A]] =
     Equal.equalBy(_.linearize)

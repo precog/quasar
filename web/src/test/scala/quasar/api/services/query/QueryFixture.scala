@@ -29,6 +29,7 @@ import quasar.api.services.Fixture
 import quasar.sql._
 import quasar.sql.fixpoint._
 
+import eu.timepit.refined.scalaz._
 import org.http4s._
 import org.http4s.syntax.service._
 import org.specs2.matcher._, MustMatchers._

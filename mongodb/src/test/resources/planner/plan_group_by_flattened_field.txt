@@ -96,68 +96,11 @@ Chain
 │     │  │     })
 │     │  ╰─ ExcludeId
 │     ├─ $UnwindF
-│     │  ╰─ Path(DocField(BsonField.Name("f")))
-│     ├─ $ProjectF
-│     │  ├─ Name("s")
-│     │  │  ├─ Name("1" -> { "1": "$f", "0": "$s" })
-│     │  │  ╰─ Name("0" -> "$s")
-│     │  ├─ Name("f" -> {
-│     │  │       "$cond": [
-│     │  │         {
-│     │  │           "$and": [
-│     │  │             {
-│     │  │               "$lte": [
-│     │  │                 { "$literal": [] },
-│     │  │                 {
-│     │  │                   "$cond": [
-│     │  │                     {
-│     │  │                       "$and": [
-│     │  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
-│     │  │                         { "$lt": ["$s", { "$literal": [] }] }]
-│     │  │                     },
-│     │  │                     "$s.parents",
-│     │  │                     { "$literal": undefined }]
-│     │  │                 }]
-│     │  │             },
-│     │  │             {
-│     │  │               "$lt": [
-│     │  │                 {
-│     │  │                   "$cond": [
-│     │  │                     {
-│     │  │                       "$and": [
-│     │  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
-│     │  │                         { "$lt": ["$s", { "$literal": [] }] }]
-│     │  │                     },
-│     │  │                     "$s.parents",
-│     │  │                     { "$literal": undefined }]
-│     │  │                 },
-│     │  │                 { "$literal": BinData(0, "") }]
-│     │  │             }]
-│     │  │         },
-│     │  │         {
-│     │  │           "$cond": [
-│     │  │             {
-│     │  │               "$and": [
-│     │  │                 { "$lte": [{ "$literal": {  } }, "$s"] },
-│     │  │                 { "$lt": ["$s", { "$literal": [] }] }]
-│     │  │             },
-│     │  │             "$s.parents",
-│     │  │             { "$literal": undefined }]
-│     │  │         },
-│     │  │         [{ "$literal": undefined }]]
-│     │  │     })
-│     │  ╰─ ExcludeId
-│     ├─ $UnwindF
 │     │  ├─ Path(DocField(BsonField.Name("f")))
 │     │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 │     ├─ $ProjectF
-│     │  ├─ Name("identities" -> {
-│     │  │       "esh56": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
-│     │  │     })
-│     │  ├─ Name("value" -> {
-│     │  │       "original": "$s",
-│     │  │       "0": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }
-│     │  │     })
+│     │  ├─ Name("identities" -> { "esh55": "$ix" })
+│     │  ├─ Name("value" -> { "original": "$s", "0": "$f" })
 │     │  ╰─ ExcludeId
 │     ├─ $ProjectF
 │     │  ├─ Name("s" -> "$$ROOT")
@@ -172,10 +115,10 @@ Chain
 │     │  │                   "$cond": [
 │     │  │                     {
 │     │  │                       "$and": [
-│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.original.1.0"] },
-│     │  │                         { "$lt": ["$value.original.1.0", { "$literal": [] }] }]
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│     │  │                         { "$lt": ["$value.original", { "$literal": [] }] }]
 │     │  │                     },
-│     │  │                     "$value.original.1.0.parents",
+│     │  │                     "$value.original.parents",
 │     │  │                     { "$literal": undefined }]
 │     │  │                 }]
 │     │  │             },
@@ -185,25 +128,16 @@ Chain
 │     │  │                   "$cond": [
 │     │  │                     {
 │     │  │                       "$and": [
-│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.original.1.0"] },
-│     │  │                         { "$lt": ["$value.original.1.0", { "$literal": [] }] }]
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│     │  │                         { "$lt": ["$value.original", { "$literal": [] }] }]
 │     │  │                     },
-│     │  │                     "$value.original.1.0.parents",
+│     │  │                     "$value.original.parents",
 │     │  │                     { "$literal": undefined }]
 │     │  │                 },
 │     │  │                 { "$literal": BinData(0, "") }]
 │     │  │             }]
 │     │  │         },
-│     │  │         {
-│     │  │           "$cond": [
-│     │  │             {
-│     │  │               "$and": [
-│     │  │                 { "$lte": [{ "$literal": {  } }, "$value.original.1.0"] },
-│     │  │                 { "$lt": ["$value.original.1.0", { "$literal": [] }] }]
-│     │  │             },
-│     │  │             "$value.original.1.0.parents",
-│     │  │             { "$literal": undefined }]
-│     │  │         },
+│     │  │         "$value.original.parents",
 │     │  │         [{ "$literal": undefined }]]
 │     │  │     })
 │     │  ╰─ ExcludeId
@@ -211,21 +145,10 @@ Chain
 │     │  ├─ Path(DocField(BsonField.Name("f")))
 │     │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> {
-│     │  │       "$eq": [
-│     │  │         "$s.identities.esh56",
-│     │  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│     │  │     })
-│     │  ├─ Name("1" -> {
-│     │  │       "$eq": [
-│     │  │         "$s.identities.esh56",
-│     │  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│     │  │     })
-│     │  ├─ Name("2" -> {
-│     │  │       "$eq": [
-│     │  │         "$s.identities.esh56",
-│     │  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│     │  │     })
+│     │  ├─ Name("0" -> { "$eq": ["$s.identities.esh55", "$ix"] })
+│     │  ├─ Name("1" -> { "$eq": ["$s.identities.esh55", "$ix"] })
+│     │  ├─ Name("2" -> { "$eq": ["$s.identities.esh55", "$ix"] })
+│     │  ├─ Name("3" -> { "$eq": ["$s.identities.esh55", "$ix"] })
 │     │  ├─ Name("src")
 │     │  │  ├─ Name("s" -> "$s")
 │     │  │  ╰─ Name("f" -> ["$ix", "$f"])
@@ -236,8 +159,68 @@ Chain
 │     │     │  ╰─ Expr($0 -> Eq(Bool(true)))
 │     │     ├─ Doc
 │     │     │  ╰─ Expr($1 -> Eq(Bool(true)))
+│     │     ├─ Doc
+│     │     │  ╰─ Expr($2 -> Eq(Bool(true)))
 │     │     ╰─ Doc
-│     │        ╰─ Expr($2 -> Eq(Bool(true)))
+│     │        ╰─ Expr($3 -> Eq(Bool(true)))
+│     ├─ $SimpleMapF
+│     │  ├─ Map
+│     │  │  ╰─ Obj
+│     │  │     ├─ Key(identities: _.src.s.identities)
+│     │  │     ╰─ Key(value)
+│     │  │        ╰─ Obj
+│     │  │           ├─ Key(left)
+│     │  │           │  ╰─ Obj
+│     │  │           │     ╰─ Key(0)
+│     │  │           │        ╰─ Obj
+│     │  │           │           ├─ Key(1: _.src.s.value["0"])
+│     │  │           │           ╰─ Key(0: _.src.s.value.original)
+│     │  │           ╰─ Key(right)
+│     │  │              ╰─ Obj
+│     │  │                 ├─ Key(1: _.src.f[1])
+│     │  │                 ╰─ Key(0: _.src.s.value.original)
+│     │  ╰─ Scope(ListMap())
+│     ├─ $ProjectF
+│     │  ├─ Name("s" -> "$$ROOT")
+│     │  ├─ Name("f" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             {
+│     │  │               "$lte": [
+│     │  │                 { "$literal": [] },
+│     │  │                 {
+│     │  │                   "$cond": [
+│     │  │                     {
+│     │  │                       "$and": [
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.right.0"] },
+│     │  │                         { "$lt": ["$value.right.0", { "$literal": [] }] }]
+│     │  │                     },
+│     │  │                     "$value.right.0.parents",
+│     │  │                     { "$literal": undefined }]
+│     │  │                 }]
+│     │  │             },
+│     │  │             {
+│     │  │               "$lt": [
+│     │  │                 {
+│     │  │                   "$cond": [
+│     │  │                     {
+│     │  │                       "$and": [
+│     │  │                         { "$lte": [{ "$literal": {  } }, "$value.right.0"] },
+│     │  │                         { "$lt": ["$value.right.0", { "$literal": [] }] }]
+│     │  │                     },
+│     │  │                     "$value.right.0.parents",
+│     │  │                     { "$literal": undefined }]
+│     │  │                 },
+│     │  │                 { "$literal": BinData(0, "") }]
+│     │  │             }]
+│     │  │         },
+│     │  │         "$value.right.0.parents",
+│     │  │         [{ "$literal": undefined }]]
+│     │  │     })
+│     │  ╰─ ExcludeId
+│     ├─ $UnwindF
+│     │  ╰─ Path(DocField(BsonField.Name("f")))
 │     ├─ $SimpleMapF
 │     │  ├─ Map
 │     │  │  ╰─ Obj
@@ -245,8 +228,8 @@ Chain
 │     │  │        ╰─ Obj
 │     │  │           ├─ Key(grouped)
 │     │  │           │  ╰─ Obj
-│     │  │           │     ╰─ Key(group_key_0: _.src.s.value["0"])
-│     │  │           ╰─ Key(reduce_expr_0: _.src.f[1])
+│     │  │           │     ╰─ Key(group_key_0: _.s.value.left["0"]["1"])
+│     │  │           ╰─ Key(reduce_expr_0: _.f)
 │     │  ╰─ Scope(ListMap())
 │     ├─ $GroupF
 │     │  ├─ Grouped

@@ -45,6 +45,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.{NonNegative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.scalaz._
 import matryoshka.data.Fix
 import org.http4s
 import org.http4s._

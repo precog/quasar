@@ -27,6 +27,7 @@ import scala.Console, Console.{RED, RESET}
 import scala.Predef.implicitly
 
 import fs2.util.Suspendable
+import eu.timepit.refined.scalaz._
 import monocle.macros.Lenses
 import monocle.syntax.fields._
 import scalaz.{Equal, Foldable, Show}

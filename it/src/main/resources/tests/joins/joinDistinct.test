@@ -1,0 +1,29 @@
+{
+    "name": "[qa_s07] join distinct",
+
+    "backends": {
+        "couchbase": "skip",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
+    "data": ["../demo/patients.data", "../extraSmallZips.data"],
+
+    "query": "select p.ssn, p.state, z.State from `../demo/patients` as p join (select distinct state as State from `../extraSmallZips`) as z on p.state = z.State",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
+    "expected": [
+      { "ssn": "239-07-6887", "state": "MA", "State": "MA" },
+      { "ssn": "347-10-6821", "state": "MA", "State": "MA" },
+      { "ssn": "804-48-2462", "state": "MA", "State": "MA" },
+      { "ssn": "873-86-4154", "state": "MA", "State": "MA" },
+      { "ssn": "868-85-8071", "state": "MA", "State": "MA" },
+      { "ssn": "209-20-4809", "state": "MA", "State": "MA" },
+      { "ssn": "142-38-8545", "state": "MA", "State": "MA" },
+      { "ssn": "921-71-1506", "state": "MA", "State": "MA" },
+      { "ssn": "107-77-1278", "state": "MA", "State": "MA" },
+      { "ssn": "608-66-6452", "state": "MA", "State": "MA" }
+    ]
+}

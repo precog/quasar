@@ -17,13 +17,8 @@ Chain
 │  ├─ Path(DocField(BsonField.Name("f")))
 │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 ├─ $ProjectF
-│  ├─ Name("identities" -> {
-│  │       "esh20": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
-│  │     })
-│  ├─ Name("value" -> {
-│  │       "original": "$s",
-│  │       "0": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }
-│  │     })
+│  ├─ Name("identities" -> { "esh20": "$ix" })
+│  ├─ Name("value" -> { "original": "$s", "0": "$f" })
 │  ╰─ ExcludeId
 ├─ $ProjectF
 │  ├─ Name("s" -> "$$ROOT")
@@ -60,16 +55,7 @@ Chain
 │  │                 { "$literal": BinData(0, "") }]
 │  │             }]
 │  │         },
-│  │         {
-│  │           "$cond": [
-│  │             {
-│  │               "$and": [
-│  │                 { "$lte": [{ "$literal": {  } }, "$value.original"] },
-│  │                 { "$lt": ["$value.original", { "$literal": [] }] }]
-│  │             },
-│  │             "$value.original.c",
-│  │             { "$literal": undefined }]
-│  │         },
+│  │         "$value.original.c",
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
@@ -77,11 +63,7 @@ Chain
 │  ├─ Path(DocField(BsonField.Name("f")))
 │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 ├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$eq": [
-│  │         "$s.identities.esh20",
-│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│  │     })
+│  ├─ Name("0" -> { "$eq": ["$s.identities.esh20", "$ix"] })
 │  ├─ Name("src")
 │  │  ├─ Name("s" -> "$s")
 │  │  ╰─ Name("f" -> ["$ix", "$f"])

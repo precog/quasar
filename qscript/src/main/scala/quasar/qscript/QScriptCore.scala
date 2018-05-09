@@ -164,7 +164,7 @@ object QScriptCore {
         Equal.equal {
           case (Map(a1, f1), Map(a2, f2)) => f1 ≟ f2 && eq.equal(a1, a2)
           case (LeftShift(a1, s1, i1, t1, u1, r1), LeftShift(a2, s2, i2, t2, u2, r2)) =>
-            eq.equal(a1, a2) && s1.linearize ≟ s2.linearize && i1 ≟ i2 && t1 ≟ t2 && u1 ≟ u2 && r1 ≟ r2
+            eq.equal(a1, a2) && s1 ≟ s2 && i1 ≟ i2 && t1 ≟ t2 && u1 ≟ u2 && r1 ≟ r2
           case (Reduce(a1, b1, f1, r1), Reduce(a2, b2, f2, r2)) =>
             b1 ≟ b2 && f1 ≟ f2 && r1 ≟ r2 && eq.equal(a1, a2)
           case (Sort(a1, b1, o1), Sort(a2, b2, o2)) =>
@@ -205,7 +205,7 @@ object QScriptCore {
             mf.show ++ Cord(")")
           case LeftShift(src, struct, id, stpe, undef, repair) => Cord("LeftShift(") ++
             s.show(src) ++ Cord(", ") ++
-            struct.linearize.show ++ Cord(", ") ++
+            struct.show ++ Cord(", ") ++
             id.show ++ Cord(", ") ++
             stpe.show ++ Cord(", ") ++
             undef.show ++ Cord(", ") ++
@@ -250,7 +250,7 @@ object QScriptCore {
             v match {
               case Map(src, f) =>
                 NonTerminal("Map" :: nt, None,
-                  RA.render(src) :: f.linearize.render :: Nil)
+                  RA.render(src) :: f.render :: Nil)
               case LeftShift(src, struct, id, stpe, undef, repair) =>
                 NonTerminal("LeftShift" :: nt, None,
                   RA.render(src) ::

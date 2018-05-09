@@ -2,61 +2,40 @@ Chain
 ├─ $FoldLeftF
 │  ├─ Chain
 │  │  ├─ $ReadF(db; zips)
+│  │  ├─ $MatchF
+│  │  │  ╰─ Doc
+│  │  │     ╰─ Expr($loc -> ElemMatch(\/-(Exists(true))))
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│  │  │  ├─ Name("0" -> {
+│  │  │  │       "$cond": [
+│  │  │  │         {
+│  │  │  │           "$and": [
+│  │  │  │             { "$lte": [{ "$literal": [] }, "$loc"] },
+│  │  │  │             { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
+│  │  │  │         },
+│  │  │  │         { "$literal": true },
+│  │  │  │         { "$literal": false }]
+│  │  │  │     })
+│  │  │  ├─ Name("src" -> "$$ROOT")
 │  │  │  ╰─ ExcludeId
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Obj
-│  │  │  │     ├─ Key(0: Array.isArray(
-│  │  │  │     │      (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].loc : undefined) ? true : false)
-│  │  │  │     ╰─ Key(src: _["0"])
-│  │  │  ╰─ Scope(Map())
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
 │  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
-│  │  ├─ $SimpleMapF
-│  │  │  ├─ Map
-│  │  │  │  ╰─ Let(__val)
-│  │  │  │     ├─ JsCore([
-│  │  │  │     │         _.src[0],
-│  │  │  │     │         (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1] : undefined,
-│  │  │  │     │         Array.isArray(
-│  │  │  │     │           (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].loc : undefined) ? true : false])
-│  │  │  │     ╰─ Obj
-│  │  │  │        ├─ Key(s: __val)
-│  │  │  │        ╰─ Key(f: __val[1].loc)
-│  │  │  ├─ SubMap
-│  │  │  │  ├─ JsCore(_.f)
-│  │  │  │  ╰─ Let(m)
-│  │  │  │     ├─ JsCore(_.f)
-│  │  │  │     ╰─ Call
-│  │  │  │        ├─ JsCore(Object.keys(m).map)
-│  │  │  │        ╰─ Fun(Name(k))
-│  │  │  │           ╰─ JsCore([k, m[k]])
-│  │  │  ├─ Flatten
-│  │  │  │  ╰─ JsCore(_.f)
-│  │  │  ├─ Map
-│  │  │  │  ╰─ JsCore([_.s, [_.s, _.f]])
-│  │  │  ╰─ Scope(Map())
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("s" -> "$src")
+│  │  │  ├─ Name("f" -> "$src.loc")
+│  │  │  ╰─ ExcludeId
+│  │  ├─ $UnwindF
+│  │  │  ╰─ Path(DocField(BsonField.Name("f")))
+│  │  ├─ $ProjectF
+│  │  │  ├─ Name("left_source" -> "$s")
+│  │  │  ├─ Name("left_target_0" -> "$f")
+│  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$$ROOT" })
 │  │  │  ╰─ By
-│  │  │     ├─ Name("0" -> {
-│  │  │     │       "$arrayElemAt": [
-│  │  │     │         { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │  │     │         { "$literal": NumberInt("0") }]
-│  │  │     │     })
-│  │  │     ╰─ Name("1" -> {
-│  │  │             "$arrayElemAt": [
-│  │  │               {
-│  │  │                 "$arrayElemAt": [
-│  │  │                   { "$arrayElemAt": ["$$ROOT", { "$literal": NumberInt("1") }] },
-│  │  │                   { "$literal": NumberInt("1") }]
-│  │  │               },
-│  │  │               { "$literal": NumberInt("1") }]
-│  │  │           })
+│  │  │     ╰─ Name("0" -> "$left_target_0")
 │  │  ╰─ $ProjectF
 │  │     ├─ Name("_id" -> "$_id")
 │  │     ├─ Name("value")
@@ -66,50 +45,38 @@ Chain
 │  │     ╰─ IncludeId
 │  ╰─ Chain
 │     ├─ $ReadF(db; zips)
+│     ├─ $MatchF
+│     │  ╰─ Doc
+│     │     ╰─ Expr($loc -> ElemMatch(\/-(Exists(true))))
 │     ├─ $ProjectF
-│     │  ├─ Name("0" -> ["$_id", "$$ROOT"])
+│     │  ├─ Name("0" -> {
+│     │  │       "$cond": [
+│     │  │         {
+│     │  │           "$and": [
+│     │  │             { "$lte": [{ "$literal": [] }, "$loc"] },
+│     │  │             { "$lt": ["$loc", { "$literal": BinData(0, "") }] }]
+│     │  │         },
+│     │  │         { "$literal": true },
+│     │  │         { "$literal": false }]
+│     │  │     })
+│     │  ├─ Name("src" -> "$$ROOT")
 │     │  ╰─ ExcludeId
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Obj
-│     │  │     ├─ Key(0: Array.isArray(
-│     │  │     │      (isObject(_["0"][1]) && (! Array.isArray(_["0"][1]))) ? _["0"][1].loc : undefined) ? true : false)
-│     │  │     ╰─ Key(src: _["0"])
-│     │  ╰─ Scope(Map())
 │     ├─ $MatchF
 │     │  ╰─ Doc
 │     │     ╰─ Expr($0 -> Eq(Bool(true)))
-│     ├─ $SimpleMapF
-│     │  ├─ Map
-│     │  │  ╰─ Let(__val)
-│     │  │     ├─ JsCore([
-│     │  │     │         _.src[0],
-│     │  │     │         (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1] : undefined,
-│     │  │     │         Array.isArray(
-│     │  │     │           (isObject(_.src[1]) && (! Array.isArray(_.src[1]))) ? _.src[1].loc : undefined) ? true : false])
-│     │  │     ╰─ Obj
-│     │  │        ├─ Key(s: __val)
-│     │  │        ╰─ Key(f: __val[1].loc)
-│     │  ├─ SubMap
-│     │  │  ├─ JsCore(_.f)
-│     │  │  ╰─ Let(m)
-│     │  │     ├─ JsCore(_.f)
-│     │  │     ╰─ Call
-│     │  │        ├─ JsCore(Object.keys(m).map)
-│     │  │        ╰─ Fun(Name(k))
-│     │  │           ╰─ JsCore([k, m[k]])
-│     │  ├─ Flatten
-│     │  │  ╰─ JsCore(_.f)
-│     │  ├─ Map
-│     │  │  ╰─ JsCore([_.s, [_.s, _.f]])
-│     │  ╰─ Scope(Map())
+│     ├─ $ProjectF
+│     │  ├─ Name("s" -> "$src")
+│     │  ├─ Name("f" -> "$src.loc")
+│     │  ╰─ ExcludeId
+│     ├─ $UnwindF
+│     │  ╰─ Path(DocField(BsonField.Name("f")))
+│     ├─ $ProjectF
+│     │  ├─ Name("right_source" -> "$s")
+│     │  ├─ Name("right_target_0" -> "$f")
+│     │  ╰─ ExcludeId
 │     ├─ $MapF
-│     │  ├─ JavaScript(function (key, value) {
-│     │  │               return [
-│     │  │                 { "0": value[1][0], "1": value[1][1][1] },
-│     │  │                 { "left": [], "right": [value] }]
-│     │  │             })
-│     │  ╰─ Scope(Map())
+│     │  ├─ JavaScript(function (key, value) { return [{ "0": value.right_target_0 }, { "left": [], "right": [value] }] })
+│     │  ╰─ Scope(ListMap())
 │     ╰─ $ReduceF
 │        ├─ JavaScript(function (key, values) {
 │        │               var result = { "left": [], "right": [] };
@@ -120,24 +87,54 @@ Chain
 │        │                 });
 │        │               return result
 │        │             })
-│        ╰─ Scope(Map())
+│        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
 │     ├─ NotExpr($left -> Size(0))
 │     ╰─ NotExpr($right -> Size(0))
-├─ $UnwindF(DocField(BsonField.Name("right")))
-├─ $UnwindF(DocField(BsonField.Name("left")))
-├─ $SimpleMapF
-│  ├─ Map
-│  │  ╰─ Obj
-│  │     ├─ Key(city1: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].city : undefined)
-│  │     ├─ Key(loc: (isObject(_.left[0][1]) && (! Array.isArray(_.left[0][1]))) ? _.left[0][1].loc : undefined)
-│  │     ├─ Key(city2: (isObject(_.right[0][1]) && (! Array.isArray(_.right[0][1]))) ? _.right[0][1].city : undefined)
-│  │     ╰─ Key(pop: (isObject(_.right[0][1]) && (! Array.isArray(_.right[0][1]))) ? _.right[0][1].pop : undefined)
-│  ╰─ Scope(Map())
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("right")))
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("left")))
 ╰─ $ProjectF
-   ├─ Name("city1" -> true)
-   ├─ Name("loc" -> true)
-   ├─ Name("city2" -> true)
-   ├─ Name("pop" -> true)
+   ├─ Name("city1" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lte": [{ "$literal": {  } }, "$left.left_source"] },
+   │             { "$lt": ["$left.left_source", { "$literal": [] }] }]
+   │         },
+   │         "$left.left_source.city",
+   │         { "$literal": undefined }]
+   │     })
+   ├─ Name("loc" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lte": [{ "$literal": {  } }, "$left.left_source"] },
+   │             { "$lt": ["$left.left_source", { "$literal": [] }] }]
+   │         },
+   │         "$left.left_source.loc",
+   │         { "$literal": undefined }]
+   │     })
+   ├─ Name("city2" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lte": [{ "$literal": {  } }, "$right.right_source"] },
+   │             { "$lt": ["$right.right_source", { "$literal": [] }] }]
+   │         },
+   │         "$right.right_source.city",
+   │         { "$literal": undefined }]
+   │     })
+   ├─ Name("pop" -> {
+   │       "$cond": [
+   │         {
+   │           "$and": [
+   │             { "$lte": [{ "$literal": {  } }, "$right.right_source"] },
+   │             { "$lt": ["$right.right_source", { "$literal": [] }] }]
+   │         },
+   │         "$right.right_source.pop",
+   │         { "$literal": undefined }]
+   │     })
    ╰─ ExcludeId

@@ -18,24 +18,7 @@ Chain
 │  │  │  │        })
 │  │  │  ╰─ By({ "$literal": null })
 │  │  ├─ $ProjectF
-│  │  │  ├─ Name("0" -> {
-│  │  │  │       "$cond": [
-│  │  │  │         {
-│  │  │  │           "$eq": [{ "$literal": NumberInt("1000") }, { "$literal": NumberInt("0") }]
-│  │  │  │         },
-│  │  │  │         {
-│  │  │  │           "$cond": [
-│  │  │  │             { "$eq": ["$f0", { "$literal": NumberInt("0") }] },
-│  │  │  │             { "$literal": NaN },
-│  │  │  │             {
-│  │  │  │               "$cond": [
-│  │  │  │                 { "$gt": ["$f0", { "$literal": NumberInt("0") }] },
-│  │  │  │                 { "$literal": Infinity },
-│  │  │  │                 { "$literal": -Infinity }]
-│  │  │  │             }]
-│  │  │  │         },
-│  │  │  │         { "$divide": ["$f0", { "$literal": NumberInt("1000") }] }]
-│  │  │  │     })
+│  │  │  ├─ Name("0" -> { "$divide": ["$f0", { "$literal": NumberInt("1000") }] })
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped

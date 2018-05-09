@@ -1,0 +1,23 @@
+{
+    "name": "[qa_s07] simple join written in 'cross join' form (must be optimized to an inner join or else the join explodes, taking several minutes to complete)",
+
+    "backends": {
+        "couchbase": "skip",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
+    "data": ["../smallZips.data", "../zips.data"],
+
+    "query": "select smallZips.city, zips.state
+              from `../smallZips`, `../zips`
+              where smallZips.`_id` = zips.`_id`",
+
+    "predicate": "atLeast",
+    "ignoreResultOrder": true,
+
+    "expected": [{ "city": "AGAWAM",  "state": "MA" },
+                 { "city": "CUSHMAN", "state": "MA" }]
+}

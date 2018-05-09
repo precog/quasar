@@ -52,6 +52,8 @@ object ExprOpOps {
 
   implicit def apply[F[_]](implicit ops: ExprOpOps.Aux[F, F]): ExprOpOps.Uni[F] = ops
 
+  def simplifyAlg[F[_]](implicit ev: Uni[F]): Algebra[F, Fix[F]] = in => apply[F].simplify(in).getOrElse(Fix(in))
+
   implicit def coproduct[F[_], G[_], H[_]](implicit
       F: ExprOpOps.Aux[F, H],
       G: ExprOpOps.Aux[G, H])

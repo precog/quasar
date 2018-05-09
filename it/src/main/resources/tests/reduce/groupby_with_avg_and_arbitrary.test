@@ -1,0 +1,23 @@
+{
+    "name": "[qa_s08] groupby with avg and arbitrary",
+
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+
+    "data": "../zips.data",
+
+    "query": "select avg(pop) as pop, city from `../zips` group by city order by pop desc limit 5",
+
+    "predicate": "exactly",
+    
+    "expected": [
+        { "pop": 99568, "city": "BELL GARDENS" },
+        { "pop": 88114, "city": "ARLETA"       },
+        { "pop": 87026, "city": "SOUTH GATE"   },
+        { "pop": 84712, "city": "WESTLAND"     },
+        { "pop": 78511, "city": "HOLLY PARK"   }
+    ]
+}

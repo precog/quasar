@@ -266,13 +266,15 @@ object ExprOpCoreF {
     val fp = fixpoint[Fix[F], F](Fix(_))
 
     def simplify: AlgebraM[Option, ExprOpCoreF, Fix[F]] = {
-      case $condF(Fix($literalF(Bson.Bool(true))),  c, _) => c.some
-      case $condF(Fix($literalF(Bson.Bool(false))), _, a) => a.some
-      case $condF(Fix($literalF(_)),                _, _) => fp.$literal(Bson.Null).some
-      case $ifNullF(Fix($literalF(Bson.Null)), r)         => r.some
-      case $ifNullF(Fix($literalF(e)),         _)         => fp.$literal(e).some
-      case $notF(Fix($literalF(Bson.Bool(b))))            => fp.$literal(Bson.Bool(!b)).some
-      case $notF(Fix($literalF(_)))                       => fp.$literal(Bson.Null).some
+      case $condF($literal(Bson.Bool(true)),  c, _) => c.some
+      case $condF($literal(Bson.Bool(false)), _, a) => a.some
+      case $condF($literal(_),                _, _) => fp.$literal(Bson.Null).some
+      case $ifNullF($literal(Bson.Null), r)         => r.some
+      case $ifNullF($literal(e),         _)         => fp.$literal(e).some
+      case $notF($literal(Bson.Bool(b)))            => fp.$literal(Bson.Bool(!b)).some
+      case $notF($literal(_))                       => fp.$literal(Bson.Null).some
+      case $arrayElemAtF($arrayLit(x), $literal(Bson.Int32(i))) =>
+        x.lift(i).getOrElse(fp.$literal(Bson.Null)).some
       case _ => None
     }
 
@@ -503,7 +505,13 @@ object ExprOpCoreF {
                         $cond($lt(a1, $literal(Check.minRegex)),   $literal(Bson.Text("_bson.timestamp")),
                           $literal(Bson.Text("_bson.regularexpression"))))))))))))
 
-
+    def mkDivideBy0(a1: T): T =
+      $cond($eq(a1, $literal(Bson.Int32(0))),
+        $literal(Bson.Dec(Double.NaN)),
+        $cond($gt(a1, $literal(Bson.Int32(0))),
+          $literal(Bson.Dec(Double.PositiveInfinity)),
+          $literal(Bson.Dec(Double.NegativeInfinity))))
+      
     def mkYearToCentury(year: T): T =
       $trunc($divide($add(year, $literal(Bson.Int32(99))), $literal(Bson.Int32(100))))
 
@@ -884,6 +892,11 @@ object $arrayLitF {
     I.prj(expr) collect {
       case ExprOpCoreF.$arrayLitF(value) => value
     }
+}
+
+object $arrayLit {
+  def unapply[T, EX[_]](expr: T)(implicit T: Recursive.Aux[T, EX], EX: Functor[EX], I: ExprOpCoreF :<: EX): Option[List[T]] =
+    $arrayLitF.unapply(T.project(expr))
 }
 
 object $arrayElemAtF {

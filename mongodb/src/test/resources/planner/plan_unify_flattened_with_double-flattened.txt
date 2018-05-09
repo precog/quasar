@@ -14,11 +14,14 @@ Chain
 │  │     })
 │  ╰─ ExcludeId
 ├─ $UnwindF
-│  ╰─ Path(DocField(BsonField.Name("f")))
+│  ├─ Path(DocField(BsonField.Name("f")))
+│  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 ├─ $ProjectF
-│  ├─ Name("s")
-│  │  ├─ Name("1" -> "$f")
-│  │  ╰─ Name("0" -> "$s")
+│  ├─ Name("identities" -> { "esh39": "$ix" })
+│  ├─ Name("value" -> { "original": "$s", "0": "$f" })
+│  ╰─ ExcludeId
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
 │  ├─ Name("f" -> {
 │  │       "$cond": [
 │  │         {
@@ -30,10 +33,10 @@ Chain
 │  │                   "$cond": [
 │  │                     {
 │  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │                         { "$lt": ["$s", { "$literal": [] }] }]
+│  │                         { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│  │                         { "$lt": ["$value.original", { "$literal": [] }] }]
 │  │                     },
-│  │                     "$s.comments",
+│  │                     "$value.original.comments",
 │  │                     { "$literal": undefined }]
 │  │                 }]
 │  │             },
@@ -43,25 +46,16 @@ Chain
 │  │                   "$cond": [
 │  │                     {
 │  │                       "$and": [
-│  │                         { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │                         { "$lt": ["$s", { "$literal": [] }] }]
+│  │                         { "$lte": [{ "$literal": {  } }, "$value.original"] },
+│  │                         { "$lt": ["$value.original", { "$literal": [] }] }]
 │  │                     },
-│  │                     "$s.comments",
+│  │                     "$value.original.comments",
 │  │                     { "$literal": undefined }]
 │  │                 },
 │  │                 { "$literal": BinData(0, "") }]
 │  │             }]
 │  │         },
-│  │         {
-│  │           "$cond": [
-│  │             {
-│  │               "$and": [
-│  │                 { "$lte": [{ "$literal": {  } }, "$s"] },
-│  │                 { "$lt": ["$s", { "$literal": [] }] }]
-│  │             },
-│  │             "$s.comments",
-│  │             { "$literal": undefined }]
-│  │         },
+│  │         "$value.original.comments",
 │  │         [{ "$literal": undefined }]]
 │  │     })
 │  ╰─ ExcludeId
@@ -69,48 +63,9 @@ Chain
 │  ├─ Path(DocField(BsonField.Name("f")))
 │  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
 ├─ $ProjectF
-│  ├─ Name("identities" -> {
-│  │       "esh40": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }
-│  │     })
-│  ├─ Name("value" -> {
-│  │       "original": "$s",
-│  │       "0": { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("1") }] }
-│  │     })
-│  ╰─ ExcludeId
-├─ $ProjectF
-│  ├─ Name("s" -> "$$ROOT")
-│  ├─ Name("f" -> {
-│  │       "$cond": [
-│  │         {
-│  │           "$and": [
-│  │             { "$lte": [{ "$literal": [] }, "$value.original.1.replyTo"] },
-│  │             {
-│  │               "$lt": ["$value.original.1.replyTo", { "$literal": BinData(0, "") }]
-│  │             }]
-│  │         },
-│  │         "$value.original.1.replyTo",
-│  │         [{ "$literal": undefined }]]
-│  │     })
-│  ╰─ ExcludeId
-├─ $UnwindF
-│  ├─ Path(DocField(BsonField.Name("f")))
-│  ╰─ IncludeArrayIndex(BsonField.Name("ix"))
-├─ $ProjectF
-│  ├─ Name("0" -> {
-│  │       "$eq": [
-│  │         "$s.identities.esh40",
-│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│  │     })
-│  ├─ Name("1" -> {
-│  │       "$eq": [
-│  │         "$s.identities.esh40",
-│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│  │     })
-│  ├─ Name("2" -> {
-│  │       "$eq": [
-│  │         "$s.identities.esh40",
-│  │         { "$arrayElemAt": [["$ix", "$f"], { "$literal": NumberInt("0") }] }]
-│  │     })
+│  ├─ Name("0" -> { "$eq": ["$s.identities.esh39", "$ix"] })
+│  ├─ Name("1" -> { "$eq": ["$s.identities.esh39", "$ix"] })
+│  ├─ Name("2" -> { "$eq": ["$s.identities.esh39", "$ix"] })
 │  ├─ Name("src")
 │  │  ├─ Name("s" -> "$s")
 │  │  ╰─ Name("f" -> ["$ix", "$f"])
@@ -123,20 +78,49 @@ Chain
 │     │  ╰─ Expr($1 -> Eq(Bool(true)))
 │     ╰─ Doc
 │        ╰─ Expr($2 -> Eq(Bool(true)))
+├─ $SimpleMapF
+│  ├─ Map
+│  │  ╰─ Obj
+│  │     ├─ Key(identities: _.src.s.identities)
+│  │     ╰─ Key(value)
+│  │        ╰─ Obj
+│  │           ├─ Key(left)
+│  │           │  ╰─ Obj
+│  │           │     ╰─ Key(0)
+│  │           │        ╰─ Obj
+│  │           │           ├─ Key(1: _.src.s.value["0"])
+│  │           │           ╰─ Key(0: _.src.s.value.original)
+│  │           ╰─ Key(right: _.src.f[1])
+│  ╰─ Scope(ListMap())
+├─ $ProjectF
+│  ├─ Name("s" -> "$$ROOT")
+│  ├─ Name("f" -> {
+│  │       "$cond": [
+│  │         {
+│  │           "$and": [
+│  │             { "$lte": [{ "$literal": [] }, "$value.right.replyTo"] },
+│  │             { "$lt": ["$value.right.replyTo", { "$literal": BinData(0, "") }] }]
+│  │         },
+│  │         "$value.right.replyTo",
+│  │         [{ "$literal": undefined }]]
+│  │     })
+│  ╰─ ExcludeId
+├─ $UnwindF
+│  ╰─ Path(DocField(BsonField.Name("f")))
 ├─ $ProjectF
 │  ├─ Name("value" -> {
 │  │       "filter_source": {
 │  │         "$cond": [
 │  │           {
 │  │             "$and": [
-│  │               { "$lte": [{ "$literal": {  } }, "$src.s.value.original.0"] },
-│  │               { "$lt": ["$src.s.value.original.0", { "$literal": [] }] }]
+│  │               { "$lte": [{ "$literal": {  } }, "$s.value.left.0.0"] },
+│  │               { "$lt": ["$s.value.left.0.0", { "$literal": [] }] }]
 │  │           },
-│  │           "$src.s.value.original.0",
+│  │           "$s.value.left.0.0",
 │  │           { "$literal": undefined }]
 │  │       },
-│  │       "filter_predicate_0": "$src.s.value.0",
-│  │       "filter_predicate_1": { "$arrayElemAt": ["$src.f", { "$literal": NumberInt("1") }] }
+│  │       "filter_predicate_0": "$s.value.left.0.1",
+│  │       "filter_predicate_1": "$f"
 │  │     })
 │  ╰─ ExcludeId
 ├─ $MatchF

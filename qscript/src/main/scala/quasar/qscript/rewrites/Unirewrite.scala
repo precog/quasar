@@ -18,7 +18,7 @@ package quasar.qscript.rewrites
 
 import quasar.contrib.pathy._
 import quasar.fp._
-import quasar.fs._
+import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 
 import matryoshka._
@@ -27,7 +27,7 @@ import scalaz._
 import scalaz.syntax.all._
 
 sealed trait Unirewrite[T[_[_]], C <: CoM] {
-  def apply[F[_]: Monad: MonadFsErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[C#M]]
+  def apply[F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[C#M]]
 }
 
 private[qscript] trait UnirewriteLowPriorityImplicits {
@@ -42,7 +42,7 @@ private[qscript] trait UnirewriteLowPriorityImplicits {
       N: Normalizable[QScriptShiftRead[T, ?]],
       E: ExpandDirs.Aux[T, C0[C, ?], C#M]): Unirewrite[T, C] = new Unirewrite[T, C] {
 
-    def apply[F[_]: Monad: MonadFsErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F])
+    def apply[F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F])
         : T[QScriptRead[T, ?]] => F[T[C#M]] = { qs =>
       r.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], C0[C, ?]]
         .apply(qs)
@@ -64,10 +64,10 @@ object Unirewrite extends UnirewriteLowPriorityImplicits {
       C: Coalesce.Aux[T, C#M, C#M],
       N: Normalizable[C#M]): Unirewrite[T, C] = new Unirewrite[T, C] {
 
-    def apply[F[_]: Monad: MonadFsErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[C#M]] =
+    def apply[F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[C#M]] =
       r.shiftReadDir[QScriptRead[T, ?], C#M] andThen (_.point[F])
   }
 
-  def apply[T[_[_]], C <: CoM, F[_]: Monad: MonadFsErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F])(implicit U: Unirewrite[T, C]) =
+  def apply[T[_[_]], C <: CoM, F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F])(implicit U: Unirewrite[T, C]) =
     U(r, lc)
 }

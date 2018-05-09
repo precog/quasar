@@ -1,0 +1,24 @@
+{
+    "name": "perform left-outer equi-join",
+
+    "backends": {
+        "couchbase": "skip",
+        "marklogic_json": "pending",
+        "marklogic_xml": "pending",
+        "mimir": "ignoreFieldOrder"
+    },
+
+    "data": ["../cars.data", "../cars2.data"],
+
+    "query": "select cars.name as c1, cars2.name as c2
+              from `../cars2` left outer join `../cars`
+              on cars.`_id` = cars2.`_id`",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [{ "c1": "RangeRover-Evoque", "c2": "Dodge-Caravan" },
+                 { "c1": "BMW-X5",            "c2": "Jeep-Liberty" },
+                 {                            "c2": "Chrysler-Sebring" },
+                 {                            "c2": "Toyota-Prius" }]
+}

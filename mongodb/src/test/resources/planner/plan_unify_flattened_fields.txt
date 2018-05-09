@@ -19,7 +19,7 @@ Chain
 │  ╰─ Doc
 │     ╰─ Expr($f -> Lt(Int32(0)))
 ├─ $ProjectF
-│  ├─ Name("0" -> {
+│  ├─ Name("wrap" -> {
 │  │       "$cond": [
 │  │         {
 │  │           "$and": [
@@ -31,7 +31,7 @@ Chain
 │  │     })
 │  ╰─ ExcludeId
 ├─ $UnwindF
-│  ╰─ Path(DocField(BsonField.Name("0")))
+│  ╰─ Path(DocField(BsonField.Name("wrap")))
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$wrap")
    ╰─ ExcludeId

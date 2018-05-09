@@ -1120,7 +1120,7 @@ class PlannerSql2ExactSpec extends
                   $and(
                     $lt($literal(Bson.Null), $field("bar")),
                     $lt($field("bar"), $literal(Bson.Text("")))),
-                  divide($field("bar"), $literal(Bson.Int32(10))),
+                  $divide($field("bar"), $literal(Bson.Int32(10))),
                   $literal(Bson.Undefined)),
               "src"    -> $$ROOT),
             ExcludeId),

@@ -50,6 +50,9 @@ class ConstantPlanStdLibSpec extends StdLibSpec {
     case (date.NowDate, _) => notHandled
     case (date.CurrentTimeZone, _) => notHandled
 
+    case (math.Divide, List(_, Data.Number(n)))
+      if (n === BigDecimal(0)) => notHandled
+
     case (structural.MapProject, List(Data.Obj(fields), Data.Str(field))) if !fields.contains(field) => notHandled
 
     case (StdLib.set.Range, List(Data.Int(a), Data.Int(b))) if a > b =>

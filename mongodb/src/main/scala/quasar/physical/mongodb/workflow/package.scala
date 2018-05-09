@@ -639,9 +639,9 @@ package object workflow {
 
   // NB: no need for a typeclass if implementing this way, but it will be needed
   // as soon as we need to match on anything here that isn't in core.
-  implicit def crystallizeWorkflowF[F[_]: Functor: Classify: Coalesce: Refs](
-    implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF, ev2: ExprOpOps.Uni[ExprOp]):
-      Crystallize[F] =
+  implicit def crystallizeWorkflowF[F[_]: Traverse: Classify: Coalesce: Refs: ExprOpTraversal](
+    implicit I: WorkflowOpCoreF :<: F, ev1: F :<: WorkflowF)
+      : Crystallize[F] =
     new Crystallize[F] {
       // probable conversions
       // to $MapF:          $ProjectF
@@ -654,7 +654,9 @@ package object workflow {
       def crystallize(op: Fix[F]) = {
 
         val finished =
-          deleteUnusedFields(reorderOps(simplifyGroup[F](op)))
+          deleteUnusedFields(reorderOps(op.transCata[Fix[F]](
+            orOriginal(simplifyGroupƒ[F]) <<<
+            simplifyExprOpsƒ[F])))
 
         def fixShape(wf: Fix[F]) =
           simpleShape(wf).fold(finished) { n =>

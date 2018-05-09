@@ -229,12 +229,12 @@ lazy val root = project.in(file("."))
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 
-       foundation,
-//     /     \    \
-    effect, ejson, js, // <- _______
-//    |        \   /                \
-              common,
-//    |       /      \                \
+       foundation, //___
+//    /    \      \     \
+    api, effect, ejson, js, //______
+//       /     \   /                \
+               common,
+//     /      /      \                \
         frontend,    precog,
 //    |/    /    \       |             |
      fs, sql, datagen, blueeyes,
@@ -284,6 +284,16 @@ lazy val foundation = project
     libraryDependencies ++= Dependencies.foundation)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+/** Types and interfaces describing Quasar's functionality. */
+lazy val api = project
+  .settings(name := "quasar-api-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(libraryDependencies ++= Dependencies.api)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /** A fixed-point implementation of the EJson spec. This should probably become
   * a standalone library.
@@ -373,6 +383,7 @@ lazy val fs = project
     frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
+  .settings(publishTestsSettings)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -397,12 +408,15 @@ lazy val qsu = project
 lazy val connector = project
   .settings(name := "quasar-connector-internal")
   .dependsOn(
+    api,
     sql % "test->test",
     qsu)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
+  .settings(
+    libraryDependencies ++= Dependencies.connector)
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project

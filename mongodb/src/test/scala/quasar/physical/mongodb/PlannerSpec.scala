@@ -18,7 +18,7 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar.contrib.specs2._
-import quasar.fs._, FileSystemError._
+import quasar.fs._
 import quasar.physical.mongodb.workflow._
 import quasar.sql._
 
@@ -416,15 +416,12 @@ class PlannerSpec extends
       // should use less pipeline ops
       projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftJoinSubTree(simpleMapOp.node(readOp.leaf), readOp.leaf))))))
 
-    trackPendingTemplate(
+    trackPendingTree(
       "join with non-JS-able condition",
       plan(sqlE"select z1.city as city1, z1.loc, z2.city as city2, z2.pop from zips as z1 join zips as z2 on z1.loc[*] = z2.loc[*]"),
-      beRight.which(cwf => notBrokenWithOpsTree(cwf.op,
-        projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftOp.node(
-          projectOp.node(groupOp.node(unwindOp.node(projectOp.node(readOp.leaf)))),
-          reduceOp.node(projectOp.node(groupOp.node(unwindOp.node(projectOp.node(readOp.leaf)))))
-        ))))))),
-      beLeft(beLike({ case QScriptPlanningFailed(_) => ok }: PartialFunction[FileSystemError, MatchResult[_]])))
+      projectOp.node(unwindOp.node(unwindOp.node(matchOp.node(foldLeftOp.node(
+        projectOp.node(groupOp.node(unwindOp.node(projectOp.node(readOp.leaf)))),
+        reduceOp.node(projectOp.node(groupOp.node(unwindOp.node(projectOp.node(readOp.leaf)))))))))))
 
     trackPendingTree(
       "simple cross",

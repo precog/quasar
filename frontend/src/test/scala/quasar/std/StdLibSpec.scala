@@ -2019,6 +2019,10 @@ abstract class StdLibSpec extends Qspec {
             binary(Divide(_, _).embed, Data.Int(x), Data.Int(y), Data.Dec(x.toDouble / y.toDouble))
         }
 
+        "any int by 0" >> prop { (x: Int) =>
+            binary(Divide(_, _).embed, Data.Int(x), Data.Int(0), Data.NA)
+        }
+
         // TODO: figure out what domain can be tested here
         // "any doubles" >> prop { (x: Double, y: Double) =>
         //   binary(Divide(_, _).embed, Data.Dec(x), Data.Dec(y), Data.Dec(x / y))

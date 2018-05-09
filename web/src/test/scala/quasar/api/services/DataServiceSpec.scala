@@ -43,9 +43,10 @@ import java.time.{Duration, Instant}
 import argonaut.{Json, EncodeJson}
 import argonaut.Argonaut._
 import argonaut.ArgonautScalaz._
-import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.{NonNegative, Negative, Positive => RPositive}
 import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.scalaz._
 import org.http4s._
 import org.http4s.argonaut._
 import org.http4s.headers._

@@ -1,0 +1,33 @@
+{
+    "name": "[qa_s07] join with complex conditions",
+
+    "backends": {
+        "couchbase": "skip",
+        "marklogic_json": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+
+    "NB": "#1587: Disabled in couchbase due to lack of general join.",
+
+    "data": ["../slamengine_commits.data", "../slamengine_commits_dup.data"],
+
+    "query": "select l.sha as child, l.author.login as c_auth, r.sha as parent, r.author.login as p_auth
+              from `../slamengine_commits` as l join `../slamengine_commits_dup` as r
+              on r.sha = l.parents[0].sha and l.author.login = r.author.login
+              where r.author.login || \",\" || l.author.login = \"jdegoes,jdegoes\"",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        { "child": "56d1caf5d082d1a6840090986e277d36d03f1859", "c_auth": "jdegoes",
+          "parent": "472dd80e8bdffae0c1bded28a91139941433550d", "p_auth": "jdegoes" },
+        { "child": "85c3368890be18a77c1bbfd645228de9f43acd43", "c_auth": "jdegoes",
+          "parent": "292c4259f72adffe922a99f97f7b15e5330bc77a", "p_auth": "jdegoes" },
+        { "child": "292c4259f72adffe922a99f97f7b15e5330bc77a", "c_auth": "jdegoes",
+          "parent": "82e67fef1aae1d283bff90d1d27efd4266d26d49", "p_auth": "jdegoes" },
+        { "child": "472dd80e8bdffae0c1bded28a91139941433550d", "c_auth": "jdegoes",
+          "parent": "85c3368890be18a77c1bbfd645228de9f43acd43", "p_auth": "jdegoes" },
+        { "child": "82e67fef1aae1d283bff90d1d27efd4266d26d49", "c_auth": "jdegoes",
+          "parent": "5b54522e340244d618645ace4bd0cbb7edf8bd5b", "p_auth": "jdegoes" }]
+}

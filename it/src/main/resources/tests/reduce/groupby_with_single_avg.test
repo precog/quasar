@@ -1,0 +1,23 @@
+{
+    "name": "[qa_s08] groupby with single avg",
+
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+
+    "data": "../zips.data",
+
+    "query": "select avg(pop) as pop from `../zips` group by city order by pop desc limit 5",
+
+    "predicate": "exactly",
+    
+    "expected": [
+       { "pop": 99568 },
+       { "pop": 88114 },
+       { "pop": 87026 },
+       { "pop": 84712 },
+       { "pop": 78511 }
+    ]
+}

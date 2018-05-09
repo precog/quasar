@@ -1,0 +1,26 @@
+{
+    "name": "flatten one side of a join condition",
+
+    "backends": {
+        "couchbase":       "pending",
+        "marklogic_json":  "timeout",
+        "marklogic_xml":   "timeout",
+        "mimir":           "ignoreFieldOrder"
+    },
+
+    "data": "../zips.data",
+
+    "query": "select z1.city as city1, z1.loc, z2.city as city2, z2.pop from `../zips` as z1 join `../zips` as z2 on z1.loc[*] = z2.pop",
+
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+
+    "expected": [
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "VAN HORNESVILLE", "pop": 40 },
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "SELBYVILLE",      "pop": 40 },
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "STAR PRAIRIE",    "pop": 40 },
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "MERIDEN",         "pop": 40 },
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "FELT",            "pop": 40 },
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "NEWKIRK",         "pop": 40 },
+        { "city1": "WYNNEWOOD", "loc": [-75.275984, 40], "city2": "VIDAL",           "pop": 40 }]
+}

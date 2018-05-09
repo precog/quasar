@@ -70,8 +70,6 @@ object Build {
       serialTests scalacPlugins (kindProjector) scalacArgs (defaultArgSet: _*) also(
         organization := "org.quasar-analytics",
         scalaVersion := "2.12.4",
-        logBuffered in Test := false,
-        // fork in Test := true,
-        unmanagedJars in Compile += (baseDirectory in ThisBuild).value / "lib" / "jdbm-3.0-SNAPSHOT.jar"))
+        logBuffered in Test := false))
   }
 }

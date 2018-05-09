@@ -283,6 +283,13 @@ object Bson {
   implicit val equal: Equal[Bson] = Equal.equalA
 
   implicit val show: Show[Bson] = Show.showFromToString
+
+  def isInt(bson: Bson, i: Int): Boolean =
+    List(
+      Bson.Int32(i),
+      Bson.Int64(i.toLong),
+      Bson.Dec(i.toDouble),
+      Bson.Dec128(i)).contains(bson)
 }
 
 sealed abstract class BsonType(val ordinal: Int)

@@ -1,7 +1,7 @@
 Chain
 ├─ $ReadF(db; usa_factbook)
 ├─ $ProjectF
-│  ├─ Name("0" -> {
+│  ├─ Name("wrap" -> {
 │  │       "$cond": [
 │  │         {
 │  │           "$and": [
@@ -14,8 +14,8 @@ Chain
 │  ╰─ ExcludeId
 ├─ $SimpleMapF
 │  ├─ Flatten
-│  │  ╰─ JsCore(_["0"])
+│  │  ╰─ JsCore(_.wrap)
 │  ╰─ Scope(ListMap())
 ╰─ $ProjectF
-   ├─ Name("__quasar_mongodb_sigil" -> "$0")
+   ├─ Name("__quasar_mongodb_sigil" -> "$wrap")
    ╰─ ExcludeId

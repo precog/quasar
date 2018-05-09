@@ -1,0 +1,20 @@
+{
+  "name": "extract date parts",
+
+  "backends": {
+    "marklogic_json": "ignoreFieldOrder",
+    "mimir": "skip"
+  },
+  "data": "../dates.data",
+
+  "query": "select a, to_string(date_part(\"year\", timestamp(d))) as year, to_string(date_part(\"second\", timestamp(d))) as seconds from `../dates`",
+
+  "predicate": "exactly",
+
+  "ignoredFields": ["_id"],
+
+  "expected": [
+    {"a": 2016, "year": "2016", "seconds": "0"},
+    {"a": 2017, "year": "2017", "seconds": "12"}
+  ]
+}

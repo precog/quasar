@@ -1,0 +1,24 @@
+{
+    "name": "[qa_s08] groupBy with avg, max, min, count, sum, and arbitrary",
+
+    "backends": {
+       "couchbase":         "ignoreFieldOrder",
+       "marklogic_json":    "ignoreFieldOrder",
+       "mimir":             "ignoreFieldOrder"
+    },
+
+    "data": "../zips.data",
+
+    "query": "select avg(pop) as aPop, max(pop) as maxPop, min(pop) as minPop, count(pop) as cPop,
+              sum(pop) as sPop, city from `../zips` group by city order by aPop desc limit 5",
+
+    "predicate": "exactly",
+    
+    "expected": [
+        { "aPop": 99568, "maxPop": 99568, "minPop": 99568, "cPop": 1, "sPop": 99568, "city": "BELL GARDENS" },
+        { "aPop": 88114, "maxPop": 88114, "minPop": 88114, "cPop": 1, "sPop": 88114, "city": "ARLETA"       },
+        { "aPop": 87026, "maxPop": 87026, "minPop": 87026, "cPop": 1, "sPop": 87026, "city": "SOUTH GATE"   },
+        { "aPop": 84712, "maxPop": 84712, "minPop": 84712, "cPop": 1, "sPop": 84712, "city": "WESTLAND"     },
+        { "aPop": 78511, "maxPop": 78511, "minPop": 78511, "cPop": 1, "sPop": 78511, "city": "HOLLY PARK"   }
+     ]
+}

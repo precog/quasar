@@ -46,14 +46,28 @@ Chain
 │     │  │              {
 │     │  │                "$or": [
 │     │  │                  {
-│     │  │                    "$and": [
-│     │  │                      { "$lt": [{ "$literal": null }, "$city"] },
-│     │  │                      { "$lt": ["$city", { "$literal": {  } }] }]
+│     │  │                    "$or": [
+│     │  │                      {
+│     │  │                        "$and": [
+│     │  │                          { "$lt": [{ "$literal": null }, "$city"] },
+│     │  │                          { "$lt": ["$city", { "$literal": {  } }] }]
+│     │  │                      },
+│     │  │                      {
+│     │  │                        "$and": [
+│     │  │                          {
+│     │  │                            "$lte": [
+│     │  │                              { "$literal": ISODate("-292275055-05-16T16:47:04.192Z") },
+│     │  │                              "$city"]
+│     │  │                          },
+│     │  │                          {
+│     │  │                            "$lt": ["$city", { "$literal": Timestamp(-2147483648, 0) }]
+│     │  │                          }]
+│     │  │                      }]
 │     │  │                  },
 │     │  │                  {
 │     │  │                    "$and": [
 │     │  │                      { "$lte": [{ "$literal": false }, "$city"] },
-│     │  │                      { "$lt": ["$city", { "$literal": new RegExp("", "") }] }]
+│     │  │                      { "$lte": ["$city", { "$literal": true }] }]
 │     │  │                  }]
 │     │  │              },
 │     │  │              "$city",

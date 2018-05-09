@@ -25,7 +25,7 @@ import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.workflow._
 
 import matryoshka._
-import matryoshka.data.Fix
+import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 
@@ -87,7 +87,7 @@ package object optimize {
       * without those fields followed by a \$project that projects those fields
       * from the key.
       */
-    private def simplifyGroupƒ[F[_]: Coalesce: Functor](implicit ev: WorkflowOpCoreF :<: F):
+    def simplifyGroupƒ[F[_]: Coalesce: Functor](implicit ev: WorkflowOpCoreF :<: F):
         F[Fix[F]] => Option[F[Fix[F]]] = {
       case ev($GroupF(src, Grouped(cont), id)) =>
         val (newCont, proj) =
@@ -125,6 +125,10 @@ package object optimize {
 
     def simplifyGroup[F[_]: Coalesce: Functor](op: Fix[F])(implicit ev: WorkflowOpCoreF :<: F): Fix[F] =
       op.transCata[Fix[F]](orOriginal(simplifyGroupƒ[F]))
+
+    def simplifyExprOpsƒ[F[_]: ExprOpTraversal]: F[Fix[F]] => F[Fix[F]] =
+      ExprOpTraversal[F].exprOps.modify(
+        _.cata[Fix[ExprOp]](ExprOpOps.simplifyAlg[ExprOp]))
 
     private def reorderOpsƒ[F[_]: Coalesce: Functor](implicit I: WorkflowOpCoreF :<: F)
         : F[Fix[F]] => Option[F[Fix[F]]] = {

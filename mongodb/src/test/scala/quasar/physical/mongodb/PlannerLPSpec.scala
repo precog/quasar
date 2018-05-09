@@ -83,7 +83,7 @@ class PlannerLPSpec extends
         $read(collection("db", "foo")),
         $project(
           reshape(
-            "0" -> divide($field("bar"), $literal(Bson.Dec(10.0))),
+            "0" -> $divide($field("bar"), $literal(Bson.Dec(10.0))),
             "src" -> $$ROOT),
           ExcludeId),
         $sort(NonEmptyList(BsonField.Name("0") -> SortDir.Ascending)),

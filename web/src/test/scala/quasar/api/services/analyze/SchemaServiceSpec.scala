@@ -38,6 +38,7 @@ import quasar.std.IdentityLib
 import argonaut._, Argonaut._, JsonScalaz._
 import eu.timepit.refined.auto._
 import eu.timepit.refined.scalacheck.numeric._
+import eu.timepit.refined.scalaz._
 import matryoshka._
 import matryoshka.data.Fix
 import org.http4s._

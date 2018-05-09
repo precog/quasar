@@ -521,7 +521,6 @@ lazy val repl = project
     connectInput in run := true,
     outputStrategy := Some(StdoutOutput))
   .settings(excludeTypelevelScalaLibrary)
-  .settings(fork := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** An HTTP interface to Quasar.
@@ -537,7 +536,6 @@ lazy val web = project
     mainClass in Compile := Some("quasar.server.Server"),
     libraryDependencies ++= Dependencies.web)
   .settings(excludeTypelevelScalaLibrary)
-  .settings(fork := true)
   .enablePlugins(AutomateHeaderPlugin)
 
 /** Integration tests that have some dependency on a running connector.

@@ -368,6 +368,7 @@ lazy val common = project
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
   .dependsOn(
+    qdata,
     common % BothScopes,
     effect)
   .settings(commonSettings)

@@ -370,6 +370,17 @@ class DataServiceSpec extends quasar.Qspec with FileSystemFixture with Http4s {
                 "path" := "/foo")))) and
           (response.status must_=== Status.NotFound)
         }
+        "qz-3656 inline query and view do not behave the same" >> {
+          val data = Vector(Data.Obj(ListMap("weigth" -> Data.Dec(89.9), "state" -> Data.Str("WA"))))
+          val viewFile = rootDir </> file("view")
+          val dataFile = rootDir </> file("data")
+          val sql = sqlB"""create function agg(:prj, :at) begin case when :at = "round" then round(:prj) when :at = "hour" then date_part("hour", :prj) else :prj end end; select agg(weight, "round"), round(weight) from `/data` group by state"""
+          val view = MountConfig.viewConfig0(sql)
+          val mounts = Map((viewFile: APath) -> view)
+          val service0 = service(InMemState.fromFiles(Map(dataFile -> data)), MountingsConfig(mounts))
+          val response = service0(Request(uri = pathUri(viewFile))).unsafePerformSync
+          response.as[String].unsafePerformSync must_=== """{ "0": 90.0, "1": 90.0 }"""
+        }.pendingUntilFixed("We need an in memory query planner for this to work")
       }
 
       "respond with view cache data" >> {

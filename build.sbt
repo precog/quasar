@@ -235,15 +235,16 @@ lazy val root = project.in(file("."))
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 
-       foundation, //___
-//    /    |      \     \
-    api, effect, ejson, js, //______
-//  /      |        \   /           \
+       foundation, //________
+//    /    |      \     \    \
+    api, effect, ejson, js, qdata,
+//  /      |        \   / \__________
                   common,
 // |       |     /  |   \             \
         frontend,  sql, precog,
 // |   /   |    \   |     |            |
 // |  /    |     \_____   |            |
+// |  |    |        |  \  |            |
      fs,  sst,         blueeyes,
 // |  |    |        |     |            |
 // |  |    |        /     |            |
@@ -296,6 +297,14 @@ lazy val foundation = project
     libraryDependencies ++= Dependencies.foundation)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+lazy val qdata = project
+  .settings(name := "quasar-qdata-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project

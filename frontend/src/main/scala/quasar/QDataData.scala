@@ -22,10 +22,11 @@ import slamdata.Predef.{
   Byte,
   Double,
   Long,
-  String
+  String,
+  StringContext
 }
 
-import quasar.qdata.{QData, QType}
+import quasar.qdata._
 import quasar.time.{DateTimeInterval, OffsetDate}
 
 import spire.math.Real
@@ -41,7 +42,13 @@ import java.time.{
 @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.NonUnitStatements"))
 object QDataData extends QData[Data] {
 
-  def tpe(a: Data): QType = ???
+  def tpe(a: Data): QType = a match {
+    case Data.Null => QNull
+    case Data.Dec(_) => QReal
+    case Data.Bool(_) => QBoolean
+    case Data.Str(_) => QString
+    case _ => scala.sys.error(s"not implemented")
+  }
 
   def getLong(a: Data): Long = ???
   def makeLong(l: Long): Data = ???
@@ -55,10 +62,13 @@ object QDataData extends QData[Data] {
   def getByte(a: Data): Byte = ???
   def makeByte(l: Byte): Data = ???
 
-  def getString(a: Data): String = ???
-  def makeString(l: String): Data = ???
+  def getString(a: Data): String = a match {
+    case Data.Str(value) => value
+    case _ => scala.sys.error(s"Expected a string, received $a")
+  }
+  def makeString(l: String): Data = Data.Str(l)
 
-  def makeNull: Data = ???
+  def makeNull: Data = Data.Null
 
   def getBoolean(a: Data): Boolean = ???
   def makeBoolean(l: Boolean): Data = ???

@@ -17,11 +17,13 @@
 package quasar.qdata
 
 import slamdata.Predef.{
+  Any,
   Boolean,
   Byte,
   Double,
   Long,
-  String
+  String,
+  StringContext
 }
 
 import quasar.time.{DateTimeInterval, OffsetDate}
@@ -110,4 +112,13 @@ trait QData[A] {
   def getMetaValue(a: A): A
   def getMetaMeta(a: A): A
   def makeMeta(value: A, meta: A): A
+
+  ////
+
+  def getValue(a: A): Any = tpe(a) match {
+    case QReal => getReal(a)
+    case QBoolean => getBoolean(a)
+    case QString => getString(a)
+    case _ => scala.sys.error(s"not implemented")
+  }
 }

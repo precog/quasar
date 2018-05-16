@@ -36,10 +36,22 @@ object QDataData extends QData[Data] {
 
   def tpe(a: Data): QType = a match {
     case Data.Null => QNull
-    case Data.Dec(_) => QReal
-    case Data.Bool(_) => QBoolean
     case Data.Str(_) => QString
-    case _ => scala.sys.error(s"not implemented")
+    case Data.Bool(_) => QBoolean
+    case Data.Dec(_) => QReal
+    case Data.Int(_) => QLong // ???
+    case Data.OffsetDateTime(_) => QOffsetDateTime
+    case Data.OffsetDate(_) => QOffsetDate
+    case Data.OffsetTime(_) => QOffsetTime
+    case Data.LocalDateTime(_) => QLocalDateTime
+    case Data.LocalDate(_) => QLocalDate
+    case Data.LocalTime(_) => QLocalTime
+    case Data.Interval(_) => QInterval
+    case Data.Binary(_) => QByte
+    case Data.Id(_) => ???
+    case Data.NA => ???
+    case Data.Obj(_) => QObject
+    case Data.Arr(_) => QArray
   }
 
   def getLong(a: Data): Long = ???
@@ -56,35 +68,59 @@ object QDataData extends QData[Data] {
 
   def getString(a: Data): String = a match {
     case Data.Str(value) => value
-    case _ => scala.sys.error(s"Expected a string, received $a")
+    case _ => scala.sys.error(s"Expected a String, received $a")
   }
   def makeString(l: String): Data = Data.Str(l)
 
   def makeNull: Data = Data.Null
 
-  def getBoolean(a: Data): Boolean = ???
-  def makeBoolean(l: Boolean): Data = ???
+  def getBoolean(a: Data): Boolean = a match {
+    case Data.Bool(value) => value
+    case _ => scala.sys.error(s"Expected a Boolean, received $a")
+  }
+  def makeBoolean(l: Boolean): Data = Data.Bool(l)
 
-  def getLocalDateTime(a: Data): LocalDateTime = ???
-  def makeLocalDateTime(l: LocalDateTime): Data = ???
+  def getLocalDateTime(a: Data): LocalDateTime = a match {
+    case Data.LocalDateTime(value) => value
+    case _ => scala.sys.error(s"Expected a LocalDateTime, received $a")
+  }
+  def makeLocalDateTime(l: LocalDateTime): Data = Data.LocalDateTime(l)
 
-  def getLocalDate(a: Data): LocalDate = ???
-  def makeLocalDate(l: LocalDate): Data = ???
+  def getLocalDate(a: Data): LocalDate = a match {
+    case Data.LocalDate(value) => value
+    case _ => scala.sys.error(s"Expected a LocalDate, received $a")
+  }
+  def makeLocalDate(l: LocalDate): Data = Data.LocalDate(l)
 
-  def getLocalTime(a: Data): LocalTime = ???
-  def makeLocalTime(l: LocalTime): Data = ???
+  def getLocalTime(a: Data): LocalTime = a match {
+    case Data.LocalTime(value) => value
+    case _ => scala.sys.error(s"Expected a LocalTime, received $a")
+  }
+  def makeLocalTime(l: LocalTime): Data = Data.LocalTime(l)
 
-  def getOffsetDateTime(a: Data): OffsetDateTime = ???
-  def makeOffsetDateTime(l: OffsetDateTime): Data = ???
+  def getOffsetDateTime(a: Data): OffsetDateTime = a match {
+    case Data.OffsetDateTime(value) => value
+    case _ => scala.sys.error(s"Expected an OffsetDateTime, received $a")
+  }
+  def makeOffsetDateTime(l: OffsetDateTime): Data = Data.OffsetDateTime(l)
 
-  def getOffsetDate(a: Data): OffsetDate = ???
-  def makeOffsetDate(l: OffsetDate): Data = ???
+  def getOffsetDate(a: Data): OffsetDate = a match {
+    case Data.OffsetDate(value) => value
+    case _ => scala.sys.error(s"Expected an OffsetDate, received $a")
+  }
+  def makeOffsetDate(l: OffsetDate): Data = Data.OffsetDate(l)
 
-  def getOffsetTime(a: Data): OffsetTime = ???
-  def makeOffsetTime(l: OffsetTime): Data = ???
+  def getOffsetTime(a: Data): OffsetTime = a match {
+    case Data.OffsetTime(value) => value
+    case _ => scala.sys.error(s"Expected an OffsetTime, received $a")
+  }
+  def makeOffsetTime(l: OffsetTime): Data = Data.OffsetTime(l)
 
-  def getInterval(a: Data): DateTimeInterval = ???
-  def makeInterval(l: DateTimeInterval): Data = ???
+  def getInterval(a: Data): DateTimeInterval = a match {
+    case Data.Interval(value) => value
+    case _ => scala.sys.error(s"Expected an Interval, received $a")
+  }
+  def makeInterval(l: DateTimeInterval): Data = Data.Interval(l)
 
   // TODO use Natural for the index
   final case class ArrayCursor(index: Int, values: List[Data])

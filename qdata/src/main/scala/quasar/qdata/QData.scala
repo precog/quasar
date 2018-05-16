@@ -17,13 +17,11 @@
 package quasar.qdata
 
 import slamdata.Predef.{
-  Any,
   Boolean,
   Byte,
   Double,
   Long,
-  String,
-  StringContext
+  String
 }
 
 import quasar.time.{DateTimeInterval, OffsetDate}
@@ -115,21 +113,15 @@ trait QData[A] {
 
   ////
 
-  def getValue(a: A): Any = tpe(a) match {
-    case QReal => getReal(a)
-    case QBoolean => getBoolean(a)
-    case QString => getString(a)
-    case QArray => {
-      @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Recursion"))
-      @scala.annotation.tailrec
-      def iterate(cursor: ArrayCursor, nascent: NascentArray): NascentArray =
-        if (hasNextArray(cursor))
-	  iterate(stepArray(cursor), pushArray(getArrayAt(cursor), nascent))
-	else
-	  nascent
+  def getNascentArray(a: A): NascentArray = {
+    @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Recursion"))
+    @scala.annotation.tailrec
+    def iterate(cursor: ArrayCursor, nascent: NascentArray): NascentArray =
+      if (hasNextArray(cursor))
+        iterate(stepArray(cursor), pushArray(getArrayAt(cursor), nascent))
+      else
+        nascent
 
-      iterate(getArrayCursor(a), prepArray)
-    }
-    case _ => scala.sys.error(s"not implemented")
+    iterate(getArrayCursor(a), prepArray)
   }
 }

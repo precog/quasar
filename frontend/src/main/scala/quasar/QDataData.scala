@@ -38,8 +38,8 @@ object QDataData extends QData[Data] {
     case Data.Null => QNull
     case Data.Str(_) => QString
     case Data.Bool(_) => QBoolean
-    case Data.Dec(_) => QReal
-    case Data.Int(_) => QLong // ???
+    case Data.Dec(v) => if (v.isExactDouble) QDouble else QReal
+    case Data.Int(v) => if (v.isValidLong) QLong else QReal
     case Data.OffsetDateTime(_) => QOffsetDateTime
     case Data.OffsetDate(_) => QOffsetDate
     case Data.OffsetTime(_) => QOffsetTime
@@ -54,11 +54,17 @@ object QDataData extends QData[Data] {
     case Data.Arr(_) => QArray
   }
 
-  def getLong(a: Data): Long = ???
-  def makeLong(l: Long): Data = ???
+  def getLong(a: Data): Long = a match {
+    case Data.Int(value) => value.toLong
+    case _ => scala.sys.error(s"Expected a Long, received $a")
+  }
+  def makeLong(l: Long): Data = Data.Int(l)
 
-  def getDouble(a: Data): Double = ???
-  def makeDouble(l: Double): Data = ???
+  def getDouble(a: Data): Double = a match {
+    case Data.Dec(value) => value.toDouble
+    case _ => scala.sys.error(s"Expected a Double, received $a")
+  }
+  def makeDouble(l: Double): Data = Data.Dec(l)
 
   def getReal(a: Data): Real = ???
   def makeReal(l: Real): Data = ???

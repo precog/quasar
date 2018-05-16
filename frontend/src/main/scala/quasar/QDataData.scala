@@ -16,15 +16,7 @@
 
 package quasar
 
-import slamdata.Predef.{
-  ???,
-  Boolean,
-  Byte,
-  Double,
-  Long,
-  String,
-  StringContext
-}
+import slamdata.Predef._
 
 import quasar.qdata._
 import quasar.time.{DateTimeInterval, OffsetDate}
@@ -94,18 +86,22 @@ object QDataData extends QData[Data] {
   def getInterval(a: Data): DateTimeInterval = ???
   def makeInterval(l: DateTimeInterval): Data = ???
 
-  def ArrayCursor = ???
+  // TODO use Natural for the index
+  final case class ArrayCursor(index: Int, values: List[Data])
 
-  def getArrayCursor(a: Data): ArrayCursor = ???
-  def hasNextArray(ac: ArrayCursor): Boolean = ???
-  def getArrayAt(ac: ArrayCursor): Data = ???
-  def stepArray(ac: ArrayCursor): ArrayCursor = ???
+  def getArrayCursor(a: Data): ArrayCursor = a match {
+    case Data.Arr(arr) => ArrayCursor(0, arr)
+    case _ => scala.sys.error(s"Expected an array, received $a")
+  }
+  def hasNextArray(ac: ArrayCursor): Boolean = ac.values.length < ac.index
+  def getArrayAt(ac: ArrayCursor): Data = ac.values(ac.index)
+  def stepArray(ac: ArrayCursor): ArrayCursor = ac.copy(index = ac.index + 1)
 
-  def NascentArray = ???
+  type NascentArray = List[Data]
 
-  def prepArray: NascentArray = ???
-  def pushArray(a: Data, na: NascentArray): NascentArray = ???
-  def makeArray(na: NascentArray): Data = ???
+  def prepArray: NascentArray = List[Data]()
+  def pushArray(a: Data, na: NascentArray): NascentArray = a +: na // prepend
+  def makeArray(na: NascentArray): Data = Data.Arr(na)
 
   def MapCursor = ???
 

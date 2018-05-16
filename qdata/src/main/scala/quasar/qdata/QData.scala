@@ -119,6 +119,17 @@ trait QData[A] {
     case QReal => getReal(a)
     case QBoolean => getBoolean(a)
     case QString => getString(a)
+    case QArray => {
+      // TODO tailrec
+      @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Recursion"))
+      def iterate(cursor: ArrayCursor, nascent: NascentArray): NascentArray =
+        if (hasNextArray(cursor))
+	  iterate(stepArray(cursor), pushArray(getArrayAt(cursor), nascent))
+	else
+	  nascent
+
+      iterate(getArrayCursor(a), prepArray)
+    }
     case _ => scala.sys.error(s"not implemented")
   }
 }

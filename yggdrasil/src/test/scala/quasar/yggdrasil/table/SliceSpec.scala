@@ -105,7 +105,6 @@ class SliceSpec extends Specification with ScalaCheck {
       val key = Slice.fromJValues(keyData)
 
       val result = target.sortWith(key, SortDescending)._1.toJsonElements.toVector
-      println(s"result: $result")
 
       val expectedArray = JParser.parseUnsafe("""[
         { "city": "LOPEZ", "state": "WA" },

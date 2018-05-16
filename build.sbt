@@ -235,29 +235,34 @@ lazy val root = project.in(file("."))
   .settings(excludeTypelevelScalaLibrary)
   .aggregate(
 
-       foundation, //___
-//    /    \      \     \
-    api, effect, ejson, js, //______
-//  /      |        \   /           \
+       foundation, //________
+//    /    |      \     \    \
+    api, effect, ejson, js, qdata,
+//  /      |        \   / \__________
                   common,
-// /       |     /  |   \             \
+// |       |     /  |   \             \
         frontend,  sql, precog,
-// |   /    |  \    |    |             |
-     fs,  sst,            blueeyes,
-// |  |     |   |   |    |             |
-// |  |     |   \   /    |             |
+// |   /   |    \   |     |            |
+// |  /    |     \_____   |            |
+// |  |    |        |  \  |            |
+     fs,  sst,         blueeyes,
+// |  |    |        |     |            |
+// |  |    |        /     |            |
         datagen,
-// |  |__________||      |             |
-// |__|__________||      |             |
-     qscript,         niflheim,
-// |  |          ||      |_____________|__
-     qsu,      core,
-// \____\            \   |             | |
-         connector,   yggdrasil,
-//     /     |   \______|______________|_|_______
-//     |     |         /     \         \ |       \
+// |__|___________/       |            |
+// |  |          /        |            |
+     qscript,          niflheim,
+// |  |      \ /          |            |
+     qsu,   core, //______|____________|
+// |   \    /             |            |
+//  \___\_____            |            |
+//        /   \           |            |
+           connector,  yggdrasil,
+//      /     |  \       |             |
+//      |     |   \______|_____________|__________
+//      |     |      \  /     \         \         \
           skeleton, mimir, marklogic, mongodb, couchbase,
-//     \     |     /          |          |         |
+//      \    |     /          |          |         |
           interface,
 //          /  \              |          |         |
          repl, web,
@@ -292,6 +297,14 @@ lazy val foundation = project
     libraryDependencies ++= Dependencies.foundation)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
+
+lazy val qdata = project
+  .settings(name := "quasar-qdata-internal")
+  .dependsOn(foundation % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
 lazy val api = project
@@ -355,6 +368,7 @@ lazy val common = project
 lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
   .dependsOn(
+    qdata,
     common % BothScopes,
     effect)
   .settings(commonSettings)
@@ -440,9 +454,9 @@ lazy val core = project
   .settings(name := "quasar-core-internal")
   .dependsOn(
     api     % BothScopes,
-    fs      % BothScopes,
     qscript % BothScopes,
     sql     % BothScopes,
+    fs      % "test->test",
     effect  % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)

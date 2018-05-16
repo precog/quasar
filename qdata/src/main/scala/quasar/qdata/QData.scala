@@ -113,6 +113,7 @@ trait QData[A] {
 
   ////
 
+  // TODO write unit test for this
   def getNascentArray(a: A): NascentArray = {
     @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Recursion"))
     @scala.annotation.tailrec

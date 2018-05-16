@@ -120,8 +120,8 @@ trait QData[A] {
     case QBoolean => getBoolean(a)
     case QString => getString(a)
     case QArray => {
-      // TODO tailrec
       @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Recursion"))
+      @scala.annotation.tailrec
       def iterate(cursor: ArrayCursor, nascent: NascentArray): NascentArray =
         if (hasNextArray(cursor))
 	  iterate(stepArray(cursor), pushArray(getArrayAt(cursor), nascent))

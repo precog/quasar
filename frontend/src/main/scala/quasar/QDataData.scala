@@ -47,7 +47,7 @@ object QDataData extends QData[Data] {
     case Data.LocalDate(_) => QLocalDate
     case Data.LocalTime(_) => QLocalTime
     case Data.Interval(_) => QInterval
-    case Data.Binary(_) => QByte
+    case Data.Binary(_) => QByte // ???
     case Data.Id(_) => ???
     case Data.NA => ???
     case Data.Obj(_) => QObject
@@ -129,7 +129,7 @@ object QDataData extends QData[Data] {
     case Data.Arr(arr) => ArrayCursor(0, arr)
     case _ => scala.sys.error(s"Expected an array, received $a")
   }
-  def hasNextArray(ac: ArrayCursor): Boolean = ac.values.length < ac.index
+  def hasNextArray(ac: ArrayCursor): Boolean = ac.values.length > ac.index
   def getArrayAt(ac: ArrayCursor): Data = ac.values(ac.index)
   def stepArray(ac: ArrayCursor): ArrayCursor = ac.copy(index = ac.index + 1)
 

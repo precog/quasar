@@ -23,6 +23,7 @@ import quasar.time.{DateTimeInterval, OffsetDate}
 
 import spire.math.Real
 
+import java.math.MathContext
 import java.time.{
   LocalDate,
   LocalDateTime,
@@ -56,18 +57,21 @@ object QDataData extends QData[Data] {
 
   def getLong(a: Data): Long = a match {
     case Data.Int(value) => value.toLong
-    case _ => scala.sys.error(s"Expected a Long, received $a")
+    case _ => scala.sys.error(s"Expected Data.Int to convert to Long. Received $a")
   }
   def makeLong(l: Long): Data = Data.Int(l)
 
   def getDouble(a: Data): Double = a match {
     case Data.Dec(value) => value.toDouble
-    case _ => scala.sys.error(s"Expected a Double, received $a")
+    case _ => scala.sys.error(s"Expected Data.Dec to convert to Double. Received $a")
   }
   def makeDouble(l: Double): Data = Data.Dec(l)
 
-  def getReal(a: Data): Real = ???
-  def makeReal(l: Real): Data = ???
+  def getReal(a: Data): Real = a match {
+    case Data.Dec(value) => Real.algebra.fromBigDecimal(value)
+    case _ => scala.sys.error(s"Expected Data.Dec to convert to Real. Received $a")
+  }
+  def makeReal(l: Real): Data = Data.Dec(l.toRational.toBigDecimal(MathContext.UNLIMITED))
 
   def getByte(a: Data): Byte = ???
   def makeByte(l: Byte): Data = ???

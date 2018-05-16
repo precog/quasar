@@ -127,7 +127,7 @@ object QDataData extends QData[Data] {
 
   def getArrayCursor(a: Data): ArrayCursor = a match {
     case Data.Arr(arr) => ArrayCursor(0, arr)
-    case _ => scala.sys.error(s"Expected an array, received $a")
+    case _ => scala.sys.error(s"Expected an Array, received $a")
   }
   def hasNextArray(ac: ArrayCursor): Boolean = ac.values.length > ac.index
   def getArrayAt(ac: ArrayCursor): Data = ac.values(ac.index)
@@ -139,19 +139,23 @@ object QDataData extends QData[Data] {
   def pushArray(a: Data, na: NascentArray): NascentArray = a +: na // prepend
   def makeArray(na: NascentArray): Data = Data.Arr(na)
 
-  def MapCursor = ???
+  // TODO use Natural for the index
+  final case class ObjectCursor(index: Int, values: List[(String, Data)])
 
-  def getMapCursor(a: Data): MapCursor = ???
-  def hasNextMap(ac: MapCursor): Boolean = ???
-  def getMapKeyAt(ac: MapCursor): String = ???
-  def getMapValueAt(ac: MapCursor): Data = ???
-  def stepMap(ac: MapCursor): MapCursor = ???
+  def getObjectCursor(a: Data): ObjectCursor = a match {
+    case Data.Obj(obj) => ObjectCursor(0, obj.toList)
+    case _ => scala.sys.error(s"Expected an Object, received $a")
+  }
+  def hasNextObject(ac: ObjectCursor): Boolean = ac.values.length > ac.index
+  def getObjectKeyAt(ac: ObjectCursor): String = ac.values(ac.index)._1
+  def getObjectValueAt(ac: ObjectCursor): Data = ac.values(ac.index)._2
+  def stepObject(ac: ObjectCursor): ObjectCursor = ac.copy(index = ac.index + 1)
 
-  def NascentMap = ???
+  type NascentObject = List[(String, Data)]
 
-  def prepMap: NascentMap = ???
-  def pushMap(key: String, a: Data, na: NascentMap): NascentMap = ???
-  def makeMap(na: NascentMap): Data = ???
+  def prepObject: NascentObject = List[(String, Data)]()
+  def pushObject(key: String, a: Data, na: NascentObject): NascentObject = (key, a) +: na // prepend
+  def makeObject(na: NascentObject): Data = Data.Obj(ListMap(na: _*))
 
   def getMetaValue(a: Data): Data = ???
   def getMetaMeta(a: Data): Data = ???

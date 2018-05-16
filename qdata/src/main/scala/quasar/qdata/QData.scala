@@ -16,13 +16,7 @@
 
 package quasar.qdata
 
-import slamdata.Predef.{
-  Boolean,
-  Byte,
-  Double,
-  Long,
-  String
-}
+import slamdata.Predef._
 
 import quasar.time.{DateTimeInterval, OffsetDate}
 
@@ -93,19 +87,19 @@ trait QData[A] {
   def pushArray(a: A, na: NascentArray): NascentArray
   def makeArray(na: NascentArray): A
 
-  type MapCursor
+  type ObjectCursor
 
-  def getMapCursor(a: A): MapCursor
-  def hasNextMap(ac: MapCursor): Boolean
-  def getMapKeyAt(ac: MapCursor): String
-  def getMapValueAt(ac: MapCursor): A
-  def stepMap(ac: MapCursor): MapCursor
+  def getObjectCursor(a: A): ObjectCursor
+  def hasNextObject(ac: ObjectCursor): Boolean
+  def getObjectKeyAt(ac: ObjectCursor): String
+  def getObjectValueAt(ac: ObjectCursor): A
+  def stepObject(ac: ObjectCursor): ObjectCursor
 
-  type NascentMap
+  type NascentObject
 
-  def prepMap: NascentMap
-  def pushMap(key: String, a: A, na: NascentMap): NascentMap
-  def makeMap(na: NascentMap): A
+  def prepObject: NascentObject
+  def pushObject(key: String, a: A, na: NascentObject): NascentObject
+  def makeObject(na: NascentObject): A
 
   def getMetaValue(a: A): A
   def getMetaMeta(a: A): A
@@ -124,5 +118,20 @@ trait QData[A] {
         nascent
 
     iterate(getArrayCursor(a), prepArray)
+  }
+
+  // TODO write unit test for this
+  def getObject(a: A): NascentObject = {
+    @slamdata.Predef.SuppressWarnings(slamdata.Predef.Array("org.wartremover.warts.Recursion"))
+    @scala.annotation.tailrec
+    def iterate(cursor: ObjectCursor, nascent: NascentObject): NascentObject =
+      if (hasNextObject(cursor))
+        iterate(
+	  stepObject(cursor),
+	  pushObject(getObjectKeyAt(cursor), getObjectValueAt(cursor), nascent))
+      else
+        nascent
+
+    iterate(getObjectCursor(a), prepObject)
   }
 }

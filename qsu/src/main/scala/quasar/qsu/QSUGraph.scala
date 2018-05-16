@@ -156,6 +156,50 @@ final case class QSUGraph[T[_[_]]](
   def overwriteAtRoot(qsu: QScriptUniform[T, Symbol]): QSUGraph[T] =
     QSUGraph(root, vertices.updated(root, qsu))
 
+  def rewriteDownM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
+    type RewriteS = SMap[Symbol, QSUGraph[T]]
+    type VisitedT[X[_], A] = StateT[X, RewriteS, A]
+    type G[A] = VisitedT[F, A]
+
+    val MS = MonadState[G, RewriteS]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(g: QSUGraph[T]): G[QSUGraph[T]] = {
+      def applyAndRecord(g0: QSUGraph[T], pf0: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): G[QSUGraph[T]] =
+        if (pf0.isDefinedAt(g0))
+          pf0(g0).liftM[VisitedT] >>= (n => MS.modify(_ + (g0.root -> n)) >> n.point[G])
+        else
+          g0.point[G]
+
+      for {
+        visited <- MS.get
+
+        back <- visited.get(g.root) match {
+          case Some(result) =>
+            result.point[G]
+
+          case None =>
+            for {
+              applied0 <- applyAndRecord(g, pf)
+              // prevent users from building invalid graphs
+              applied = applied0.copy(root = g.root)
+              recursive <- applied.unfold traverse { sg =>
+                for {
+                  previs  <- MS.gets(_.keySet)
+                  sg2     <- inner(sg)
+                  postvis <- MS.gets(_.keySet)
+                } yield (sg2, postvis diff previs)
+              }
+
+              back = collapseGraph(recursive, g.root)
+            } yield back
+        }
+      } yield back
+    }
+
+    inner(this).eval(SMap())
+  }
+
   /**
    * Allows rewriting of arbitrary subgraphs.  Rewrites are
    * applied in a bottom-up (leaves-first) order, which avoids
@@ -176,6 +220,7 @@ final case class QSUGraph[T[_[_]]](
     type RewriteS = SMap[Symbol, QSUGraph[T]]
     type VisitedT[X[_], A] = StateT[X, RewriteS, A]
     type G[A] = VisitedT[F, A]
+
     val MS = MonadState[G, RewriteS]
 
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -191,41 +236,14 @@ final case class QSUGraph[T[_[_]]](
             for {
               recursive <- g.unfold traverse { sg =>
                 for {
-                  previsM <- MS.get
-                  previs = previsM.keySet
-
-                  sg2 <- inner(sg)
-
-                  postvisM <- MS.get
-                  postvis = postvisM.keySet
-                } yield (sg2, postvis &~ previs)
+                  previs  <- MS.gets(_.keySet)
+                  sg2     <- inner(sg)
+                  postvis <- MS.gets(_.keySet)
+                } yield (sg2, postvis diff previs)
               }
 
-              index = recursive.foldLeft[SMap[Symbol, Set[Symbol]]](SMap()) {
-                case (acc, (sg, snapshot)) =>
-                  val sym = sg.root
-
-                  if (acc.contains(sym))
-                    acc.updated(sym, acc(sym).union(snapshot))
-                  else
-                    acc + (sym -> snapshot)
-              }
-
-              rewritten = QSUGraph.refold[T](g.root, recursive.map(_._1))
-
-              sum = index.values.reduceOption(_ union _).getOrElse(Set())
-
-              // remove the keys which were touched from the original
-              preimage = rewritten.vertices -- sum
-
-              collapsed = recursive.foldLeft[QSUVerts[T]](preimage) {
-                case (acc, (sg, _)) =>
-                  // we need to explicitly remove the rewritten.root
-                  // to avoid it being overwritten by an old version of itself
-                  acc ++ (sg.vertices -- (sum &~ index(sg.root)) - rewritten.root)
-              }
-
-              self2 = rewritten.copy(vertices = collapsed)
+              collapsed = collapseGraph(recursive, g.root)
+              self2     = collapsed.copy(vertices = collapsed.vertices)
 
               applied <- if (pf.isDefinedAt(self2))
                 pf(self2).liftM[VisitedT]
@@ -260,6 +278,35 @@ final case class QSUGraph[T[_[_]]](
    */
   def generateRevIndex: QSUGraph.RevIdx[T] =
     vertices map { case (key, value) => value -> key }
+
+  // g is an unfolded, annotated graph rooted at root
+  private def collapseGraph(g: QScriptUniform[T, (QSUGraph[T], Set[Symbol])], root: Symbol): QSUGraph[T] = {
+    val graph0 = QSUGraph.refold[T](root, g.map(_._1))
+
+    val index = g.foldLeft[SMap[Symbol, Set[Symbol]]](SMap()) {
+      case (acc, (sg, snapshot)) =>
+        val sym = sg.root
+
+        if (acc.contains(sym))
+          acc.updated(sym, acc(sym).union(snapshot))
+        else
+          acc + (sym -> snapshot)
+    }
+
+    val sum = index.values.reduceOption(_ union _).getOrElse(Set())
+
+    // remove the keys which were touched from the original
+    val preimage = graph0.vertices -- sum
+
+    val collapsed = g.foldLeft[QSUVerts[T]](preimage) {
+      case (acc, (sg, _)) =>
+        // we need to explicitly remove the rewritten.root
+        // to avoid it being overwritten by an old version of itself
+        acc ++ (sg.vertices -- sum.diff(index(sg.root)) - root)
+    }
+
+    graph0.copy(vertices = collapsed)
+  }
 }
 
 object QSUGraph extends QSUGraphInstances {

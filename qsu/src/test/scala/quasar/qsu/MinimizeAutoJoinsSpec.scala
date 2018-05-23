@@ -188,25 +188,16 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
           repair must beTreeEqual(
             func.StaticMapS(
-              "0" ->
-                func.StaticMapS(
-                  "0" ->
-                    func.ReduceIndex(\/-(0)),
-                  "1" ->
-                    func.ReduceIndex(\/-(1))),
-              "1" ->
-                func.ReduceIndex(\/-(2))))
+              "0" -> func.ReduceIndex(\/-(0)),
+              "1" -> func.ReduceIndex(\/-(1)),
+              "2" -> func.ReduceIndex(\/-(2))))
 
-          fm.linearize must beTreeEqual(
-            func.Add(
-              func.Add(
-                func.ProjectKeyS(
-                  func.ProjectKeyS(func.Hole, "0"),
-                  "0"),
-                func.ProjectKeyS(
-                  func.ProjectKeyS(func.Hole, "0"),
-                  "1")),
-              func.ProjectKeyS(func.Hole, "1")))
+          fm must beTreeEqual(
+            recFunc.Add(
+              recFunc.Add(
+                recFunc.ProjectKeyS(recFunc.Hole, "0"),
+                recFunc.ProjectKeyS(recFunc.Hole, "1")),
+              recFunc.ProjectKeyS(recFunc.Hole, "2")))
       }
     }
 

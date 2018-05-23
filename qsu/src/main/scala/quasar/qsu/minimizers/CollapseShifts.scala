@@ -252,7 +252,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       }
 
       for {
-        init2 <- updateGraph[T, G](initPattern)
+        init2 <- updateGraph[T, G](initPattern) map (pat => pat :++ src)
 
         reconstructed <- reversed.tail.foldLeftM[G, QSUGraph](init2) {
           case (src, -\/(QSU.LeftShift(_, struct, idStatus, _, repair, rot))) =>
@@ -649,7 +649,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     for {
       // converts all candidates to produce final results wrapped in their relevant indices
-      wrapped <- candidates.zipWithIndex traverse {
+      wrapped0 <- candidates.zipWithIndex traverse {
         case (qgraph @ ConsecutiveBounded(_, shifts), i) =>
           // qgraph must beLike(shifts.head)
 
@@ -690,9 +690,16 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           back.map(g => (g, Set(i)))
       }
 
+
+      wrapped = wrapped0.sortBy {
+        case (Map(_, _), _) => 1
+        case _ => 2
+      }
+
       coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
           val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None)
+
           back.map(g => (g, leftIndices ++ rightIndices))
 
         case ((qgraph, leftIndices), (ConsecutiveBounded(_, shifts), rightIndices)) =>
@@ -707,7 +714,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
         // if they aren't, we're in trouble
         case ((Map(parent1, left), leftIndices), (Map(parent2, right), rightIndices)) =>
           scala.Predef.assert(parent1.root === parent2.root)
-
           val back = mergeIndexMaps(
             parent1,
             left.linearize,

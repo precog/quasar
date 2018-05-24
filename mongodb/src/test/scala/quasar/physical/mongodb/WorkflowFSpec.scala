@@ -25,6 +25,7 @@ import quasar.javascript._
 import quasar.jscore, jscore._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 
 import matryoshka._

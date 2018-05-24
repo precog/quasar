@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.{RenderTree, Type}
+import quasar.{RenderTree, RenderTreeT, Type}
 import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
@@ -36,6 +36,7 @@ import quasar.physical.mongodb.planner.exprOp._
 import quasar.physical.mongodb.planner.workflow._
 import quasar.physical.mongodb.planner.javascript._
 import quasar.physical.mongodb.planner.selector._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript._
 
@@ -45,7 +46,7 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 
-class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
+class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends
     Planner[QScriptCore[T, ?]] {
 
   import MapFuncsCore._
@@ -82,10 +83,11 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
 
         val exprMerge: JoinFunc[T] => M[Fix[ExprOp]] =
           getExprMerge[T, M, EX](
-            cfg.funcHandler, cfg.staticHandler)(_, DocField(rootKey), DocField(structKey))
+            cfg.funcHandler, cfg.staticHandler)(DocField(rootKey), DocField(structKey))
         val jsMerge: JoinFunc[T] => M[JsFn] =
           getJsMerge[T, M](
-            _, jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value), jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
+            jscore.Select(jscore.Ident(JsFn.defaultName), rootKey.value),
+            jscore.Select(jscore.Ident(JsFn.defaultName), structKey.value))
 
         val struct0 = struct.linearize.transCata[FreeMap[T]](orOriginal(rewriteUndefined[Hole]))
         val repair0 = repair.transCata[JoinFunc[T]](orOriginal(rewriteUndefined[JoinSide]))
@@ -152,28 +154,39 @@ class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
                     exprOp.accumulator(ai._1))).toListMap)),
               repair)
         }).join
+
     case Sort(src, bucket, order) =>
       val (keys, dirs) = (bucket.toIList.map((_, SortDir.asc)) <::: order).unzip
       keys.traverse(handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, _))
         .map(ks => WB.sortBy(src, ks.toList, dirs.toList))
+
     case Filter(src0, cond) => {
-      val selectors = getSelector[T, M, EX, Hole](
-        cond.linearize, defaultSelector[T].right, sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].right))
-      val typeSelectors = getSelector[T, M, EX, Hole](
-        cond.linearize, InternalError.fromMsg(s"not a typecheck").left , typeSelector[T])
 
-      def filterBuilder(src: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-          M[WorkflowBuilder[WF]] = {
-        val (sel, inputs) = partialSel
+      def selectors(fm: FreeMap[T]): Output[T] =
+        getSelector[T, M, EX, Hole](
+          fm,
+          defaultSelector[T].some,
+          sel.selector[T](cfg.bsonVersion) ∘ (_ <+> defaultSelector[T].some))
 
-        inputs.traverse(f => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, f(cond.linearize)))
-          .map(WB.filter(src, _, sel))
-      }
+      def typeSelectors(fm: FreeMap[T]): Output[T] = getSelector[T, M, EX, Hole](
+        fm, none, typeSelector[T])
 
-      (selectors.toOption, typeSelectors.toOption) match {
-        case (None, Some(typeSel)) => filterBuilder(src0, typeSel)
-        case (Some(sel), None) => filterBuilder(src0, sel)
-        case (Some(sel), Some(typeSel)) => filterBuilder(src0, typeSel) >>= (filterBuilder(_, sel))
+      def filterBuilder(
+        src: WorkflowBuilder[WF],
+        partialSel: PartialSelector[T],
+        fm: FreeMap[T])
+          : M[WorkflowBuilder[WF]] =
+        getFilterBuilder.filterBuilder(
+          { fm0: FreeMap[T] => handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, fm0) },
+          src,
+          partialSel,
+          fm)
+
+      (selectors(cond.linearize), typeSelectors(cond.linearize)) match {
+        case (None, Some(typeSel)) => filterBuilder(src0, typeSel, cond.linearize)
+        case (Some(sel), None) => filterBuilder(src0, sel, cond.linearize)
+        case (Some(sel), Some(typeSel)) =>
+          filterBuilder(src0, typeSel, cond.linearize) >>= (filterBuilder(_, sel, cond.linearize))
         case _ =>
           handleFreeMap[T, M, EX](cfg.funcHandler, cfg.staticHandler, cond.linearize).map {
             // TODO: Postpone decision until we know whether we are going to

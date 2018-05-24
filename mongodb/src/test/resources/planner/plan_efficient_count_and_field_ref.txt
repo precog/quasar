@@ -47,8 +47,8 @@ Chain
 │        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($left -> Size(0))
-│     ╰─ NotExpr($right -> Size(0))
+│     ├─ NotCExpr($left -> Size(0))
+│     ╰─ NotCExpr($right -> Size(0))
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF

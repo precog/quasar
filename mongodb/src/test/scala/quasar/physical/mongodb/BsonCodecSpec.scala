@@ -22,10 +22,10 @@ import quasar._
 import scala.collection.immutable.ListMap
 import scalaz._, Scalaz._
 
-class BsonCodecSpecs_1_0 extends BsonCodecSpecs(BsonVersion.`1.0`)
-class BsonCodecSpecs_1_1 extends BsonCodecSpecs(BsonVersion.`1.1`)
+class BsonCodec_1_0_Spec extends BsonCodecSpec(BsonVersion.`1.0`)
+class BsonCodec_1_1_Spec extends BsonCodecSpec(BsonVersion.`1.1`)
 
-abstract class BsonCodecSpecs(v: BsonVersion) extends quasar.Qspec {
+abstract class BsonCodecSpec(v: BsonVersion) extends quasar.Qspec {
   import BsonCodec._
 
   import DataGenerators._

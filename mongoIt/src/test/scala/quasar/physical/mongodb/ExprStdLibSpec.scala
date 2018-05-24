@@ -179,22 +179,22 @@ class MongoDbExprStdLibSpec extends MongoDbStdLibSpec {
     queryModel match {
       case MongoQueryModel.`3.6` =>
         (exprOp.getExpr[Fix, PlanStdT, Expr3_6](
-          FuncHandler.handle3_6(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          FuncHandler.handle3_6(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.4.4` =>
         (exprOp.getExpr[Fix, PlanStdT, Expr3_4_4](
-          FuncHandler.handle3_4_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          FuncHandler.handle3_4_4(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.4` =>
         (exprOp.getExpr[Fix, PlanStdT, Expr3_4](
-          FuncHandler.handle3_4(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          FuncHandler.handle3_4(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
 
       case MongoQueryModel.`3.2` =>
         (exprOp.getExpr[Fix, PlanStdT, Expr3_2](
-          FuncHandler.handle3_2(bsonVersion), StaticHandler.handle)(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
+          FuncHandler.handle3_2(bsonVersion), StaticHandler.handle).apply(mf).run(runAt) >>= (build[Workflow3_2F](_, queryModel, coll)))
           .map(wf => (Crystallize[Workflow3_2F].crystallize(wf).inject[WorkflowF], QuasarSigilName))
     }
   }

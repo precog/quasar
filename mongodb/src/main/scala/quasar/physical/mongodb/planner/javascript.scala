@@ -31,7 +31,8 @@ import scalaz._, Scalaz._
 
 object javascript {
   def processMapFunc[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR, A]
-    (fm: FreeMapA[T, A])(recovery: A => JsCore)
+    (recovery: A => JsCore)
+    (fm: FreeMapA[T, A])
       : M[JsCore] =
     fm.cataM(interpretM[M, MapFunc[T, ?], A, JsCore](recovery(_).point[M], javascript))
 
@@ -40,26 +41,23 @@ object javascript {
     JsFuncHandler.handle[MapFunc[T, ?], M]
 
   def getJsMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-    (jf: JoinFunc[T], a1: JsCore, a2: JsCore)
-      : M[JsFn] =
-    processMapFunc[T, M, JoinSide](
-      jf) {
+    (a1: JsCore, a2: JsCore)
+      : JoinFunc[T] => M[JsFn] =
+    processMapFunc[T, M, JoinSide] {
       case LeftSide => a1
       case RightSide => a2
-    } ∘ (JsFn(JsFn.defaultName, _))
+    } (_) ∘ (JsFn(JsFn.defaultName, _))
 
   def getJsRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-    (jr: Free[MapFunc[T, ?], ReduceIndex])
-      : M[JsFn] =
-    processMapFunc[T, M, ReduceIndex](jr)(_.idx.fold(
+      : Free[MapFunc[T, ?], ReduceIndex] => M[JsFn] =
+    processMapFunc[T, M, ReduceIndex](_.idx.fold(
       i => jscore.Select(jscore.Select(jscore.Ident(JsFn.defaultName), "_id"), i.toString),
-      i => jscore.Select(jscore.Ident(JsFn.defaultName), createFieldName("f", i)))) ∘
+      i => jscore.Select(jscore.Ident(JsFn.defaultName), createFieldName("f", i))))(_) ∘
       (JsFn(JsFn.defaultName, _))
 
   def getJsFn[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr: ExecTimeR]
-    (fm: FreeMap[T])
-      : M[JsFn] =
-    processMapFunc[T, M, Hole](fm)(κ(jscore.Ident(JsFn.defaultName))) ∘
+      : FreeMap[T] => M[JsFn] =
+    processMapFunc[T, M, Hole](κ(jscore.Ident(JsFn.defaultName)))(_) ∘
       (JsFn(JsFn.defaultName, _))
 
 }

@@ -2,7 +2,7 @@ Chain
 ├─ $ReadF(db; zips)
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($_id -> Type(Text))
+│     ╰─ CExpr($_id -> Type(Text))
 ├─ $ProjectF
 │  ├─ Name("0" -> {
 │  │       "$cond": [
@@ -18,7 +18,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
+│     ╰─ CExpr($0 -> Eq(Bool(true)))
 ├─ $ProjectF
 │  ├─ Name("right" -> "$src")
 │  ├─ Name("0" -> { "$toLower": "$src._id" })

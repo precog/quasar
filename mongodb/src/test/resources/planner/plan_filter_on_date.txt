@@ -4,24 +4,24 @@ Chain
    ╰─ And
       ├─ Or
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int32))
+      │  │  ╰─ CExpr($ts -> Type(Int32))
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Int64))
+      │  │  ╰─ CExpr($ts -> Type(Int64))
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Dec))
+      │  │  ╰─ CExpr($ts -> Type(Dec))
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Text))
+      │  │  ╰─ CExpr($ts -> Type(Text))
       │  ├─ Doc
-      │  │  ╰─ Expr($ts -> Type(Date))
+      │  │  ╰─ CExpr($ts -> Type(Date))
       │  ╰─ Doc
-      │     ╰─ Expr($ts -> Type(Bool))
+      │     ╰─ CExpr($ts -> Type(Bool))
       ╰─ Or
          ├─ And
          │  ├─ Doc
-         │  │  ╰─ Expr($ts -> Gt(Date(1421884800000)))
+         │  │  ╰─ CExpr($ts -> Gt(Date(1421884800000)))
          │  ├─ Doc
-         │  │  ╰─ Expr($ts -> Lte(Date(1422316800000)))
+         │  │  ╰─ CExpr($ts -> Lte(Date(1422316800000)))
          │  ╰─ Doc
-         │     ╰─ Expr($ts -> Neq(Date(1422144000000)))
+         │     ╰─ CExpr($ts -> Neq(Date(1422144000000)))
          ╰─ Doc
-            ╰─ Expr($ts -> Eq(Date(1422489600000)))
+            ╰─ CExpr($ts -> Eq(Date(1422489600000)))

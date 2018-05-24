@@ -22,6 +22,7 @@ import quasar.common.{Map => _, _}
 import quasar.contrib.specs2.PendingWithActualTracking
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP}
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.std._
 

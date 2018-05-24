@@ -100,7 +100,7 @@ object ExprOp3_4F {
 
     def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT]) = I(_).some
 
-    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = κ(None)
+    def rewriteRefsM[M[_]: Monad](applyVar: PartialFunction[DocVar, M[DocVar]]) = κ(None)
   }
 
   final class fixpoint[T, EX[_]: Functor]

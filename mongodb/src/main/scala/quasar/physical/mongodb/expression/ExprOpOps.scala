@@ -17,11 +17,11 @@
 package quasar.physical.mongodb.expression
 
 import slamdata.Predef._
-import quasar.physical.mongodb.Bson
+import quasar.physical.mongodb.{Bson, BsonField}
 
 import matryoshka._
 import matryoshka.data.Fix
-import scalaz._
+import scalaz._, Scalaz._
 
 trait ExprOpOps[IN[_]] {
   /** Type to be emitted from algebras. */
@@ -35,12 +35,26 @@ trait ExprOpOps[IN[_]] {
   def rebase[T](base: T)(implicit T: Recursive.Aux[T, OUT])
       : TransformM[Option, T, IN, OUT]
 
-  def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]): AlgebraM[Option, IN, Fix[OUT]]
+  def rewriteRefsM[M[_]: Monad](applyVar: PartialFunction[DocVar, M[DocVar]]): AlgebraM[(Option ∘ M)#λ, IN, Fix[OUT]]
+
+  def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]): AlgebraM[Option, IN, Fix[OUT]] =
+    rewriteRefsM[Id](applyVar)
 
   final def rewriteRefs(applyVar: PartialFunction[DocVar, DocVar])(implicit I: IN :<: OUT): Algebra[IN, Fix[OUT]] = {
     val r0 = rewriteRefs0(applyVar)
     x => r0(x).getOrElse(Fix(I.inj(x)))
   }
+
+  def mapUpFieldsM[M[_]: Monad]
+    (f: BsonField => M[BsonField])
+    (implicit I: IN :<: OUT)
+      : AlgebraM[M, IN, Fix[OUT]] = {
+    val applyVar: PartialFunction[DocVar, M[DocVar]] =
+      { case dv => dv.deref.traverse(f) ∘ (x => dv.copy(deref = x)) }
+    val r = rewriteRefsM(applyVar)
+    x => r(x).getOrElse(Fix(I.inj(x)).point[M])
+  }
+
 }
 object ExprOpOps {
   /** Useful in implementations, when you need to require an instance with a
@@ -70,9 +84,9 @@ object ExprOpOps {
       def rebase[T](base: T)(implicit T: Recursive.Aux[T, H]) =
         _.run.fold(F.rebase(base), G.rebase(base))
 
-      override def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {
-        val rf = F.rewriteRefs0(applyVar)
-        val rg = G.rewriteRefs0(applyVar)
+      def rewriteRefsM[M[_]: Monad](applyVar: PartialFunction[DocVar, M[DocVar]]) = {
+        val rf = F.rewriteRefsM[M](applyVar)
+        val rg = G.rewriteRefsM[M](applyVar)
         _.run.fold(rf, rg)
       }
     }

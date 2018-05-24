@@ -2,7 +2,7 @@ Chain
 ├─ $ReadF(db; foo)
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($id -> Exists(true))
+│     ╰─ CExpr($id -> Exists(true))
 ├─ $ProjectF
 │  ├─ Name("left" -> "$$ROOT")
 │  ╰─ ExcludeId
@@ -11,7 +11,7 @@ Chain
 │  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($right -> Type(Doc))
+│     ╰─ CExpr($right -> Type(Doc))
 ├─ $ProjectF
 │  ├─ Name("0" -> {
 │  │       "$cond": [
@@ -29,8 +29,8 @@ Chain
 │  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ Expr($0 -> Eq(Bool(true)))
-│     ╰─ Expr($src.right.id -> Exists(true))
+│     ├─ CExpr($0 -> Eq(Bool(true)))
+│     ╰─ CExpr($src.right.id -> Exists(true))
 ├─ $ProjectF
 │  ├─ Name("left" -> "$src")
 │  ╰─ ExcludeId

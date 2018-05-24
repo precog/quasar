@@ -50,15 +50,15 @@ object Planner {
 
   def apply[T[_[_]], F[_]](implicit ev: Planner.Aux[T, F]) = ev
 
-  implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT]
+  implicit def shiftedReadFile[T[_[_]]: BirecursiveT: ShowT: RenderTreeT]
       : Planner.Aux[T, Const[ShiftedRead[AFile], ?]] =
     new ShiftedReadPlanner[T]
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT]:
+  implicit def qscriptCore[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]:
       Planner.Aux[T, QScriptCore[T, ?]] =
     new QScriptCorePlanner[T]
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT]:
+  implicit def equiJoin[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]:
       Planner.Aux[T, EquiJoin[T, ?]] =
     new EquiJoinPlanner[T]
 

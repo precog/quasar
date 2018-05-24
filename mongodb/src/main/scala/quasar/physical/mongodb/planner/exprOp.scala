@@ -34,8 +34,8 @@ object exprOp {
   def processMapFuncExpr
     [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse, A]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (fm: FreeMapA[T, A])
     (recovery: A => Fix[EX])
+    (fm: FreeMapA[T, A])
     (implicit inj: EX :<: ExprOp)
       : M[Fix[ExprOp]] = {
 
@@ -75,28 +75,25 @@ object exprOp {
     T[_[_]]: BirecursiveT: ShowT,
     M[_]: Monad, EX[_]: Traverse: Inject[?[_], ExprOp]]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (fm: FreeMap[T])
     (implicit EX: ExprOpCoreF :<: EX)
-      : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, Hole](funcHandler, staticHandler)(fm)(κ(fixExprOpCore[EX].$$ROOT))
+      : FreeMap[T] => M[Fix[ExprOp]] =
+    processMapFuncExpr[T, M, EX, Hole](funcHandler, staticHandler)(κ(fixExprOpCore[EX].$$ROOT))
 
   def getExprMerge[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (jf: JoinFunc[T], a1: DocVar, a2: DocVar)
+    (a1: DocVar, a2: DocVar)
     (implicit EX: ExprOpCoreF :<: EX, inj: EX :<: ExprOp)
-      : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, JoinSide](funcHandler, staticHandler)(
-      jf) {
+      : JoinFunc[T] => M[Fix[ExprOp]] =
+    processMapFuncExpr[T, M, EX, JoinSide](funcHandler, staticHandler) {
       case LeftSide => fixExprOpCore[EX].$var(a1)
       case RightSide => fixExprOpCore[EX].$var(a2)
     }
 
   def getExprRed[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX])
-    (jr: FreeMapA[T, ReduceIndex])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
-      : M[Fix[ExprOp]] =
-    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler, staticHandler)(jr)(_.idx.fold(
+      : FreeMapA[T, ReduceIndex] => M[Fix[ExprOp]] =
+    processMapFuncExpr[T, M, EX, ReduceIndex](funcHandler, staticHandler)(_.idx.fold(
       i => fixExprOpCore[EX].$field("_id", i.toString),
       i => fixExprOpCore[EX].$field(createFieldName("f", i))))
 }

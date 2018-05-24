@@ -24,10 +24,11 @@ import quasar.fp._
 import quasar.fp.ski._
 import quasar.javascript._, Js.JSRenderTree
 import quasar.jscore, jscore.{JsCore, JsFn}
-import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, Reshape, Selector, sortDirToBson}
+import quasar.physical.mongodb.{Bson, BsonField, Collection, CollectionName, Grouped, Reshape, sortDirToBson}
 import quasar.physical.mongodb.MapReduce, MapReduce.Scope
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.sigil
 import quasar.physical.mongodb.workflowtask._
 

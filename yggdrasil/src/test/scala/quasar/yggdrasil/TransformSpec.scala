@@ -18,13 +18,17 @@ package quasar.yggdrasil
 
 import quasar.precog.common._
 import quasar.blueeyes._, json._
-import scala.util.Random
-import org.scalacheck.{ Gen, Arbitrary }
-import quasar.yggdrasil.bytecode._
-import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
+import quasar.yggdrasil.bytecode._
 
-trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+import scala.util.Random
+
+import cats.effect.IO
+import org.scalacheck.{ Gen, Arbitrary }
+import scalaz._, Scalaz._
+import shims._
+
+trait TransformSpec extends TableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SJValueGenerators._
   import SampleData._
   import trans._
@@ -37,7 +41,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       val table = fromSample(sample)
       val results = toJson(table.transform(Leaf(Source)))
 
-      results.copoint must_== sample.data
+      results.unsafeRunSync must_== sample.data
     }
   }
 
@@ -79,7 +83,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val results = toJson(table.transform { DeepMap1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "coerceToDouble")) })
     val expected = Stream(JNum(12), JNum(34.5), JNum(31.9), JObject(JField("baz", JNum(31)) :: Nil), JNum(20))
 
-    results.copoint must haveSize(5)
+    results.unsafeRunSync must haveSize(5)
 
     results.getJValues mustEqual expected
   }
@@ -99,7 +103,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
     val results = toJson(table.transform { Map1(DerefObjectStatic(Leaf(Source), CPathField("value")), lookupF1(Nil, "coerceToDouble")) })
     val expected = Stream(JNum(12), JNum(34.5), JNum(31.9), JNum(20))
 
-    results.copoint must haveSize(4)
+    results.unsafeRunSync must haveSize(4)
 
     results.getJValues mustEqual expected
   }
@@ -155,7 +159,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      results.copoint must_== sample.data
+      results.unsafeRunSync must_== sample.data
     }
   }
 
@@ -863,8 +867,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         OuterObjectConcat(Leaf(Source), Leaf(Source))
       })
 
-      resultsInner.copoint must_== sample.data
-      resultsOuter.copoint must_== sample.data
+      resultsInner.unsafeRunSync must_== sample.data
+      resultsOuter.unsafeRunSync must_== sample.data
     }
   }
 
@@ -881,8 +885,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       OuterObjectConcat(Leaf(Source))
     })
 
-    resultsInner.copoint must beEmpty
-    resultsOuter.copoint must beEmpty
+    resultsInner.unsafeRunSync must beEmpty
+    resultsOuter.unsafeRunSync must beEmpty
   }
 
   def testObjectConcatTrivial = {
@@ -898,8 +902,8 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       OuterObjectConcat(Leaf(Source))
     })
 
-    resultsInner.copoint must_== Stream(CEmptyObject)
-    resultsOuter.copoint must_== Stream(CEmptyObject)
+    resultsInner.unsafeRunSync must_== Stream(CEmptyObject)
+    resultsOuter.unsafeRunSync must_== Stream(CEmptyObject)
   }
 
   def testInnerObjectConcatEmptyObject = {
@@ -1106,7 +1110,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
         case obj @ JObject(_) =>
           if (obj \ "value" == JUndefined)
             None
@@ -1143,7 +1147,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1171,7 +1175,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data map { _.toJValue \ "value" } collect {
         case v if (v \ "value1") != JUndefined && (v \ "value2") != JUndefined =>
           JObject(JField("value1", v \ "value2") :: Nil)
       })
@@ -1221,7 +1225,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val results = toJson(table transform spec)
 
-    results.copoint mustEqual Stream()
+    results.unsafeRunSync mustEqual Stream()
   }
 
   def checkArrayConcat = {
@@ -1263,7 +1267,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         )
       })
 
-      def isOk(results: M[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
+      def isOk(results: IO[Stream[RValue]]) = results.getJValues must_== (sample.data.map(_.toJValue) flatMap {
         case obj @ JObject(fields) => {
           (obj \ "value") match {
             case JArray(inner) if inner.length >= 2 =>
@@ -1761,7 +1765,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
 
     val table                           = fromSample(sample)
     val results                         = toJson(table.transform(IsType(Leaf(Source), jtpe)))
-    val schemasSeq: Stream[Seq[JValue]] = toJson(table).copoint.map(rv => Seq(rv.toJValueRaw))
+    val schemasSeq: Stream[Seq[JValue]] = toJson(table).unsafeRunSync.map(rv => Seq(rv.toJValueRaw))
     val schemas0                        = schemasSeq map { inferSchema(_) }
     val schemas                         = schemas0 map { _ map { case (jpath, ctype) => (CPath(jpath), ctype) } }
     val expected                        = schemas map (schema => JBool(Schema.subsumes(schema, jtpe)))
@@ -1920,7 +1924,7 @@ trait TransformSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
       Typed(Leaf(Source), JObjectUnfixedT)
     })
 
-    val resultStream = results.copoint
+    val resultStream = results.unsafeRunSync
     resultStream.map(_.toJValueRaw) must_== data
   }
 

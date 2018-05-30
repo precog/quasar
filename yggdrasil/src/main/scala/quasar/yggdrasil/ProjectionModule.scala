@@ -17,29 +17,28 @@
 package quasar.yggdrasil
 
 import quasar.precog.common._
-import scalaz._, Scalaz._
 
-trait ProjectionModule[M[+ _], Block] {
-  type Projection <: ProjectionLike[M, Block]
-  type ProjectionCompanion <: ProjectionCompanionLike[M]
+import cats.effect.IO
+import scalaz._, Scalaz._
+import shims._
+
+trait ProjectionModule[Block] {
+  type Projection <: ProjectionLike[Block]
+  type ProjectionCompanion <: ProjectionCompanionLike
 
   def Projection: ProjectionCompanion
 
-  trait ProjectionCompanionLike[M0[+ _]] { self =>
-    def apply(path: Path): M0[Option[Projection]]
-
-    def liftM[T[_ [+ _], + _]](implicit T: Hoist[T], M0: Monad[M0]) = new ProjectionCompanionLike[({ type λ[+α] = T[M0, α] })#λ] {
-      def apply(path: Path) = self.apply(path).liftM[T]
-    }
+  trait ProjectionCompanionLike { self =>
+    def apply(path: Path): IO[Option[Projection]]
   }
 }
 
 case class BlockProjectionData[Key, Block](minKey: Key, maxKey: Key, data: Block)
 
-trait ProjectionLike[M[+ _], Block] {
+trait ProjectionLike[Block] {
   type Key
 
-  def structure(implicit M: Monad[M]): M[Set[ColumnRef]]
+  def structure: Set[ColumnRef]
   def length: Long
 
   /**
@@ -48,10 +47,10 @@ trait ProjectionLike[M[+ _], Block] {
     * key. Each resulting block should contain only the columns specified in the
     * column set; if the set of columns is empty, return all columns.
     */
-  def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]] = None)(implicit M: Monad[M]): M[Option[BlockProjectionData[Key, Block]]]
+  def getBlockAfter(id: Option[Key], columns: Option[Set[ColumnRef]] = None): IO[Option[BlockProjectionData[Key, Block]]]
 
-  def getBlockStream(columns: Option[Set[ColumnRef]])(implicit M: Monad[M]): StreamT[M, Block] = {
-    StreamT.unfoldM[M, Block, Option[Key]](None) { key =>
+  def getBlockStream(columns: Option[Set[ColumnRef]]): StreamT[IO, Block] = {
+    StreamT.unfoldM[IO, Block, Option[Key]](none) { key =>
       getBlockAfter(key, columns) map {
         _ map { case BlockProjectionData(_, maxKey, block) => (block, Some(maxKey)) }
       }

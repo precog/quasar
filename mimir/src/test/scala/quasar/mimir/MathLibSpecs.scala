@@ -20,8 +20,8 @@ import quasar.yggdrasil._
 import quasar.precog.common._
 import scalaz._
 
-trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
-    with LongIdMemoryDatasetConsumer[M] { self =>
+trait MathLibSpecs extends EvaluatorSpecification
+    with LongIdMemoryDatasetConsumer { self =>
 
   import dag._
   import instructions._
@@ -2049,4 +2049,4 @@ trait MathLibSpecs[M[+_]] extends EvaluatorSpecification[M]
   }
 }
 
-object MathLibSpecs extends MathLibSpecs[Need]
+object MathLibSpecs extends MathLibSpecs

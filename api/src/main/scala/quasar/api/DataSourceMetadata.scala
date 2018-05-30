@@ -16,7 +16,7 @@
 
 package quasar.api
 
-import slamdata.Predef.Exception
+import slamdata.Predef.{Exception, Option}
 import quasar.Condition
 
 import monocle.macros.Lenses
@@ -26,9 +26,12 @@ import scalaz.syntax.show._
 @Lenses
 final case class DataSourceMetadata(
     kind: DataSourceType,
-    condition: Condition[Exception])
+    status: Condition[Exception])
 
-object DataSourceMetadata extends DataSourceMetadataInstances
+object DataSourceMetadata extends DataSourceMetadataInstances {
+  def fromOption(kind: DataSourceType, optErr: Option[Exception]): DataSourceMetadata =
+    DataSourceMetadata(kind, Condition.optionIso.reverseGet(optErr))
+}
 
 sealed abstract class DataSourceMetadataInstances {
   implicit val show: Show[DataSourceMetadata] = {

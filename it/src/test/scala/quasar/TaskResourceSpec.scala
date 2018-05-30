@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 import scalaz._, Scalaz._
 import scalaz.concurrent.{Task, Strategy}
 
-class TaskResourceSpec extends QuasarSpecification {
+class TaskResourceSpec extends Qspec {
 
   "TaskResource" should {
     def loggingRsrc(ref: TaskRef[List[String]]): Task[TaskResource[Int]] =
@@ -74,7 +74,7 @@ class TaskResourceSpec extends QuasarSpecification {
 
         rez  <- rsrc.get.attempt.map(_.swap.as(()))
       } yield {
-        rez must beRightDisjunction
+        rez must be_\/-
       }).timed(1000.milliseconds).unsafePerformSync
     }
 

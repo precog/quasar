@@ -18,54 +18,55 @@ package quasar.physical.mongodb
 
 import slamdata.Predef._
 import quasar.QuasarSpecification
+import quasar.contrib.specs2.Spec
 
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 
-class ServerVersionSpec extends org.specs2.scalaz.Spec with QuasarSpecification with ArbitraryServerVersion {
+class ServerVersionSpec extends Spec with QuasarSpecification with ArbitraryServerVersion {
   "ServerVersion" should {
     "parse simple version" >> {
-      ServerVersion.fromString("2.6.11") must beRightDisjunction(ServerVersion(2, 6, Some(11), ""))
+      ServerVersion.fromString("2.6.11") must be_\/-(ServerVersion(2, 6, Some(11), ""))
     }
 
     "parse truncated version" >> {
-      ServerVersion.fromString("2.6") must beRightDisjunction(ServerVersion(2, 6, None, ""))
+      ServerVersion.fromString("2.6") must be_\/-(ServerVersion(2, 6, None, ""))
     }
 
     "parse multiple digits" >> {
-      ServerVersion.fromString("22.67.174") must beRightDisjunction(ServerVersion(22, 67, Some(174), ""))
+      ServerVersion.fromString("22.67.174") must be_\/-(ServerVersion(22, 67, Some(174), ""))
     }
 
     "parse with extra" >> {
-      ServerVersion.fromString("3.2.7-50-g67602c7") must beRightDisjunction(ServerVersion(3, 2, Some(7), "50-g67602c7"))
+      ServerVersion.fromString("3.2.7-50-g67602c7") must be_\/-(ServerVersion(3, 2, Some(7), "50-g67602c7"))
     }
 
     "parse with extra (space-separated)" >> {
-      ServerVersion.fromString("0.11.5 RC1") must beRightDisjunction(ServerVersion(0, 11, Some(5), "RC1"))
+      ServerVersion.fromString("0.11.5 RC1") must be_\/-(ServerVersion(0, 11, Some(5), "RC1"))
     }
 
     "parse with extra (_-separated)" >> {
-      ServerVersion.fromString("0.11.5_00") must beRightDisjunction(ServerVersion(0, 11, Some(5), "00"))
+      ServerVersion.fromString("0.11.5_00") must be_\/-(ServerVersion(0, 11, Some(5), "00"))
     }
 
     "parse with extra and no revision" >> {
-      ServerVersion.fromString("3.2-foo") must beRightDisjunction(ServerVersion(3, 2, None, "foo"))
+      ServerVersion.fromString("3.2-foo") must be_\/-(ServerVersion(3, 2, None, "foo"))
     }
 
     "parse with unexpected non-revision" >> {
-      ServerVersion.fromString("3.2.foo") must beRightDisjunction(ServerVersion(3, 2, None, "foo"))
+      ServerVersion.fromString("3.2.foo") must be_\/-(ServerVersion(3, 2, None, "foo"))
     }
 
     "fail with missing minor version" >> {
-      ServerVersion.fromString("4.abc") must beLeftDisjunction("Unable to parse server version: 4.abc")
+      ServerVersion.fromString("4.abc") must be_-\/("Unable to parse server version: 4.abc")
     }
 
     "never throw during parsing" >> prop { (str: String) =>
-        \/.fromTryCatchNonFatal(ServerVersion.fromString(str)) must beRightDisjunction
+        \/.fromTryCatchNonFatal(ServerVersion.fromString(str)) must be_\/-
     }
 
     "round-trip any" >> prop { (vers: ServerVersion) =>
-      ServerVersion.fromString(vers.shows) must beRightDisjunction(vers)
+      ServerVersion.fromString(vers.shows) must be_\/-(vers)
     }
 
     implicit val ord: scala.math.Ordering[ServerVersion] = Order[ServerVersion].toScalaOrdering

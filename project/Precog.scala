@@ -10,13 +10,18 @@ object Build {
     //"-g:vars",
     //"-deprecation",
     //"-unchecked",
+    "-feature",
     //"-Ywarn-value-discard",
     //"-Ywarn-numeric-widen",
     //"-Ywarn-unused",
     "-Ywarn-unused-import")
 
   val defaultArgSet = Seq(
-    "-Ypartial-unification")
+    "-Ypartial-unification",
+    "-language:higherKinds",
+    "-language:postfixOps",
+    "-language:implicitConversions",
+    "-language:existentials")
 
   /** Watch out Jonesy! It's the ol' double-cross!
    *  Why, you...

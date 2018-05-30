@@ -73,11 +73,11 @@ Chain
 ├─ $MatchF
 │  ╰─ Or
 │     ├─ Doc
-│     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│     │  ╰─ CondExpr($0 -> Eq(Bool(true)))
 │     ├─ Doc
-│     │  ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  ╰─ CondExpr($1 -> Eq(Bool(true)))
 │     ╰─ Doc
-│        ╰─ Expr($2 -> Eq(Bool(true)))
+│        ╰─ CondExpr($2 -> Eq(Bool(true)))
 ├─ $SimpleMapF
 │  ├─ Map
 │  │  ╰─ Obj
@@ -126,9 +126,9 @@ Chain
 ├─ $MatchF
 │  ╰─ Or
 │     ├─ Doc
-│     │  ╰─ Expr($value.filter_predicate_0.id -> Regex(^.*Dr.*$,false,true,false,false))
+│     │  ╰─ CondExpr($value.filter_predicate_0.id -> Regex(^.*Dr.*$,false,true,false,false))
 │     ╰─ Doc
-│        ╰─ Expr($value.filter_predicate_1 -> Regex(^.*Dr.*$,false,true,false,false))
+│        ╰─ CondExpr($value.filter_predicate_1 -> Regex(^.*Dr.*$,false,true,false,false))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> "$value.filter_source")
    ╰─ ExcludeId

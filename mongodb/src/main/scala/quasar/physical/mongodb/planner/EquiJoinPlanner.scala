@@ -30,7 +30,7 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT] extends
+class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends
     Planner[EquiJoin[T, ?]] {
 
   type IT[G[_]] = T[G]

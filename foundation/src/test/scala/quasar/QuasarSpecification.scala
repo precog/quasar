@@ -39,9 +39,11 @@ trait QuasarSpecification extends AnyRef
         with org.specs2.matcher.MatchResultCombinators
         with org.specs2.matcher.ValueChecks
         with org.specs2.matcher.MatcherZipOperators
+        with org.specs2.matcher.DisjunctionMatchers
+        with org.specs2.matcher.ValidationMatchers
         with org.specs2.execute.PendingUntilFixed
         with org.specs2.ScalaCheck
-        with org.specs2.scalaz.ScalazMatchers
+        with quasar.contrib.specs2.ScalazEqualityMatchers
         with ScalazSpecs2Instances
 {
   outer =>

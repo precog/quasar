@@ -53,7 +53,7 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
 
   "fromString" should {
     "parse valid config" in {
-      ConfigOps.fromString(TestConfigStr) must beRightDisjunction(TestConfig)
+      ConfigOps.fromString(TestConfigStr) must be_\/-(TestConfig)
     }
   }
 
@@ -68,7 +68,7 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
       withTestConfigFile(fp =>
         configOps.toFile(TestConfig, Some(fp)) *>
         configOps.fromFile(fp).run
-      ).unsafePerformSync must beRightDisjunction(TestConfig)
+      ).unsafePerformSync must be_\/-(TestConfig)
     }
   }
 
@@ -78,7 +78,7 @@ abstract class ConfigSpec[Config: Arbitrary: CodecJson: ConfigOps] extends quasa
         withTestConfigFile(fp =>
           configOps.fromFile(fp).run.map((fp, _))
         ).unsafePerformSync
-      r must beLeftDisjunction(fileNotFound(p))
+      r must be_-\/(equalTo(fileNotFound(p)))
     }
   }
 

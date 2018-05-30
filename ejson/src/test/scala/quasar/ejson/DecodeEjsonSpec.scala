@@ -17,9 +17,9 @@
 package quasar.ejson
 
 import slamdata.Predef.{Char => SChar, String}
+import quasar.contrib.specs2.Spec
 
 import matryoshka.data.Fix
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
 class DecodeEJsonSpec extends Spec {

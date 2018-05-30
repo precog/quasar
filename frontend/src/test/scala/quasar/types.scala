@@ -89,7 +89,7 @@ class TypesSpec extends Qspec with ValidationMatchers {
     }
 
     "fail with type and non-matching constant (reversed)" in {
-      typecheck(Const(Data.Int(0)), Str) should beFailing
+      typecheck(Const(Data.Int(0)), Str) should beFailure
     }
 
     // Properties:
@@ -649,66 +649,66 @@ class TypesSpec extends Qspec with ValidationMatchers {
 
   "arrayElem" should {
     "fail for non-array type" >> prop { (t: Type) =>
-      t.arrayElem(Const(Data.Int(0))) should beFailing//WithClass[TypeError]
+      t.arrayElem(Const(Data.Int(0))) should beFailure//WithClass[TypeError]
     }.setArbitrary(arbitrarySimpleType)
 
     "fail for non-int index"  >> prop { (t: Type) =>
       // TODO: this occasionally get stuck... maybe lub() is diverging?
       lub(t, Int) != Int ==> {
         val arr = Const(Data.Arr(Nil))
-        arr.arrayElem(t) should beFailing
+        arr.arrayElem(t) should beFailure
       }
     }.setArbitrary(arbitrarySimpleType)
 
     "descend into const array with const index" in {
       val arr = Const(Data.Arr(List(Data.Int(0), Data.Str("a"), Data.True)))
-      arr.arrayElem(Const(Data.Int(1))) should beSuccessful(Const(Data.Str("a")))
+      arr.arrayElem(Const(Data.Int(1))) should beSuccess(Const(Data.Str("a")))
     }
 
     "descend into const array with unspecified index" in {
       val arr = Const(Data.Arr(List(Data.Int(0), Data.Str("a"), Data.True)))
       arr.arrayElem(Int) should
-        beSuccessful(Const(Data.Int(0)) ⨿ Const(Data.Str("a")) ⨿ Const(Data.True))
+        beSuccess(Const(Data.Int(0)) ⨿ Const(Data.Str("a")) ⨿ Const(Data.True))
     }
 
     "descend into FlexArr with const index" in {
-      FlexArr(0, None, Str).arrayElem(Const(Data.Int(0))) should beSuccessful(Str)
+      FlexArr(0, None, Str).arrayElem(Const(Data.Int(0))) should beSuccess(Str)
     }
 
     "descend into FlexArr with unspecified index" in {
-      FlexArr(0, None, Str).arrayElem(Int) should beSuccessful(Str)
+      FlexArr(0, None, Str).arrayElem(Int) should beSuccess(Str)
     }
 
     "descend into product of FlexArrs with const index" in {
       val arr = FlexArr(0, None, Int) ⨯ FlexArr(0, None, Str)
-          arr.arrayElem(Const(Data.Int(0))) should beSuccessful(Int ⨿ Str)
+          arr.arrayElem(Const(Data.Int(0))) should beSuccess(Int ⨿ Str)
     }
 
     "descend into product of FlexArrss with unspecified index" in {
       val arr = FlexArr(0, None, Int) ⨯ FlexArr(0, None, Str)
-      arr.arrayElem(Int) should beSuccessful(Int ⨿ Str)
+      arr.arrayElem(Int) should beSuccess(Int ⨿ Str)
     }
 
     "descend into FlexArr with non-int" in {
-      FlexArr(0, None, Str).arrayElem(Str) should beFailing
+      FlexArr(0, None, Str).arrayElem(Str) should beFailure
     }
 
     "descend into Arr" in {
-      Arr(List(Int, Top, Bottom, Str)).arrayElem(Const(Data.Int(3))) should beSuccessful(Str)
+      Arr(List(Int, Top, Bottom, Str)).arrayElem(Const(Data.Int(3))) should beSuccess(Str)
     }
 
     "descend into Arr with wrong index" in {
-      Arr(List(Int, Top, Bottom, Str)).arrayElem(Const(Data.Int(5))) should beSuccessful(Const(Data.NA))
+      Arr(List(Int, Top, Bottom, Str)).arrayElem(Const(Data.Int(5))) should beSuccess(Const(Data.NA))
     }
 
     "descend into multiple Arr" in {
       val arr = Arr(List(Int, Str))
-      arr.arrayElem(Const(Data.Int(1))) should beSuccessful(Str)
+      arr.arrayElem(Const(Data.Int(1))) should beSuccess(Str)
     }
 
     "descend into multi-element Arr with unspecified index" in {
       val arr = Arr(List(Int, Str))
-      arr.arrayElem(Int) should beSuccessful(Int ⨿ Str)
+      arr.arrayElem(Int) should beSuccess(Int ⨿ Str)
     }
 
     // TODO: tests for coproducts

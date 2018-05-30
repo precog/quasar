@@ -22,10 +22,9 @@ import quasar.TreeMatchers
 import quasar.fp._
 import quasar.javascript.Js
 
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 
-class JsCoreSpecs extends quasar.Qspec with TreeMatchers with ScalazMatchers {
+class JsCoreSpecs extends quasar.Qspec with TreeMatchers {
   "toJs" should {
     "de-sugar Let as AnonFunDecl" in {
       val let =

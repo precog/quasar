@@ -22,13 +22,12 @@ import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
+import cats.effect.IO
 import scalaz._
-import Scalaz._
 import java.time._
 
-trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
+trait TableLibModule extends TableModule with TransSpecModule {
   type Lib <: TableLib
-  implicit def M: Monad[M]
 
   object TableLib {
     private val defaultMorphism1Opcode = new java.util.concurrent.atomic.AtomicInteger(0)
@@ -36,10 +35,10 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
   }
 
   trait MorphLogger {
-    def info(msg: String): M[Unit]
-    def warn(msg: String): M[Unit]
-    def error(msg: String): M[Unit]
-    def die(): M[Unit]
+    def info(msg: String): IO[Unit]
+    def warn(msg: String): IO[Unit]
+    def error(msg: String): IO[Unit]
+    def die(): IO[Unit]
   }
 
   trait TableLib extends Library {
@@ -59,14 +58,14 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     def _libReduction: Set[Reduction] = Set()
 
     trait Morph1Apply {
-      def apply(input: Table): M[Table]
+      def apply(input: Table): IO[Table]
     }
 
     sealed trait MorphismAlignment
     object MorphismAlignment {
-      case class Match(morph: M[Morph1Apply])                                                    extends MorphismAlignment
-      case class Cross(morph: M[Morph1Apply])                                                    extends MorphismAlignment
-      case class Custom(alignment: IdentityPolicy, f: (Table, Table) => M[(Table, Morph1Apply)]) extends MorphismAlignment
+      case class Match(morph: IO[Morph1Apply])                                                    extends MorphismAlignment
+      case class Cross(morph: IO[Morph1Apply])                                                    extends MorphismAlignment
+      case class Custom(alignment: IdentityPolicy, f: (Table, Table) => IO[(Table, Morph1Apply)]) extends MorphismAlignment
     }
 
     abstract class Morphism1(val namespace: Vector[String], val name: String) extends Morphism1Like with Morph1Apply {
@@ -106,7 +105,7 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
     }
 
     abstract class Op2(namespace: Vector[String], name: String) extends Morphism2(namespace, name) with Op2Like {
-      val alignment = MorphismAlignment.Match(M.point {
+      val alignment = MorphismAlignment.Match(IO.pure {
         new Morph1Apply {
           def apply(input: Table) = sys.error("morphism application of an op2 is wrong")
         }
@@ -149,7 +148,7 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       def fn: FN
     }
 
-    abstract class Reduction(val namespace: Vector[String], val name: String)(implicit M: Monad[M]) extends ReductionLike with Morph1Apply {
+    abstract class Reduction(val namespace: Vector[String], val name: String) extends ReductionLike with Morph1Apply {
       val opcode: Int       = defaultReductionOpcode.getAndIncrement
       val rowLevel: Boolean = false
 
@@ -160,14 +159,14 @@ trait TableLibModule[M[+ _]] extends TableModule[M] with TransSpecModule {
       def extract(res: Result): Table
       def extractValue(res: Result): Option[RValue]
 
-      def apply(table: Table): M[Table] = table.reduce(reducer)(monoid) map extract
+      def apply(table: Table): IO[Table] = table.reduce(reducer)(monoid) map extract
     }
 
     def coalesce(reductions: List[(Reduction, Option[(JType => JType, ColumnRef => Option[ColumnRef])])]): Reduction
   }
 }
 
-trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTableModule[M] {
+trait ColumnarTableLibModule extends TableLibModule with ColumnarTableModule {
   trait ColumnarTableLib extends TableLib {
     class WrapArrayTableReduction(val r: Reduction, val jtypef: Option[(JType => JType, ColumnRef => Option[ColumnRef])]) extends Reduction(r.namespace, r.name) {
       type Result = r.Result
@@ -259,15 +258,15 @@ trait ColumnarTableLibModule[M[+ _]] extends TableLibModule[M] with ColumnarTabl
   }
 }
 
-trait StdLibModule[M[+ _]]
-    extends InfixLibModule[M]
-    with UnaryLibModule[M]
-    with ArrayLibModule[M]
-    with MathLibModule[M]
-    with TypeLibModule[M]
-    with TimeLibModule[M]
-    with StringLibModule[M]
-    with ReductionLibModule[M] {
+trait StdLibModule
+    extends InfixLibModule
+    with UnaryLibModule
+    with ArrayLibModule
+    with MathLibModule
+    with TypeLibModule
+    with TimeLibModule
+    with StringLibModule
+    with ReductionLibModule {
   type Lib <: StdLib
 
   trait StdLib

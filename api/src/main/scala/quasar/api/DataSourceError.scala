@@ -18,8 +18,10 @@ package quasar.api
 
 import slamdata.Predef.{Nothing, Product, Serializable, String}
 
-import scalaz.{Cord, ISet, NonEmptyList, Show}
+import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
+import scalaz.std.option._
 import scalaz.std.string._
+import scalaz.std.tuple._
 import scalaz.syntax.show._
 
 sealed trait DataSourceError[+C] extends QuasarErrorNG
@@ -53,6 +55,24 @@ object DataSourceError extends DataSourceErrorInstances {
 
 sealed abstract class DataSourceErrorInstances {
   import DataSourceError._
+
+  implicit def equal[C: Equal]: Equal[DataSourceError[C]] =
+    Equal.equalBy {
+      case DataSourceExists(n) =>
+        (some(n), none, none, none, none)
+
+      case DataSourceNotFound(n) =>
+        (none, some(n), none, none, none)
+
+      case DataSourceUnsupported(k, s) =>
+        (none, none, some((k, s)), none, none)
+
+      case MalformedConfiguration(k, c, r) =>
+        (none, none, none, some((k, c, r)), none)
+
+      case InvalidConfiguration(k, c, rs) =>
+        (none, none, none, none, some((k, c, rs)))
+    }
 
   implicit def show[C: Show]: Show[DataSourceError[C]] =
     Show.show {

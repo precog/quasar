@@ -548,6 +548,15 @@ lazy val interface = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
+/** Implementations of the Quasar API. */
+lazy val impl = project
+  .settings(name := "quasar-impl-internal")
+  .dependsOn(api % BothScopes)
+  .settings(commonSettings)
+  .settings(targetSettings)
+  .settings(excludeTypelevelScalaLibrary)
+  .enablePlugins(AutomateHeaderPlugin)
+
 /** An interactive REPL application for Quasar.
   */
 lazy val repl = project
@@ -699,7 +708,6 @@ lazy val blueeyes = project.setup
 lazy val niflheim = project.setup
   .settings(name := "quasar-niflheim-internal")
   .dependsOn(blueeyes % BothScopes)
-  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(libraryDependencies ++= Dependencies.niflheim)
   .settings(headerLicenseSettings)
@@ -728,7 +736,6 @@ lazy val mimir = project.setup
   .dependsOn(
     yggdrasil % BothScopes,
     connector)
-  .scalacArgs("-Ypartial-unification")
   .withWarnings
   .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)

@@ -18,6 +18,7 @@ package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
+import quasar.contrib.cats.effect._
 import quasar.fs.MoveSemantics
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
@@ -26,12 +27,26 @@ import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.nihdb.NIHDBProjection
 import quasar.yggdrasil.vfs._
 
+import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
+import scala.concurrent.duration._
+
+import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
+import java.util.concurrent.atomic.AtomicInteger
+
 import akka.actor.{ActorRef, ActorSystem}
+
+import cats.effect._
+import io.chrisdavenport.scalaz.task._
 
 import delorean._
 
 import fs2.Stream
-import fs2.interop.scalaz._
+import fs2.interop.cats.asyncInstance
+// otherwise ambiguities between shims and fs2 interop cause ambiguities.
+// also, asyncInstance from fs2-scalaz shadows asyncInstance from fs2-cats.
+import fs2.interop.scalaz.{effectToMonadError => _, catchableToMonadError => _, monadToScalaz => _, asyncInstance => _, _}
+
+import shims.{monadToCats => _, _}
 
 import org.slf4s.Logging
 
@@ -44,14 +59,7 @@ import scalaz.syntax.either._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global // FIXME what is this thing
-import scala.concurrent.duration._
-
-import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
-import java.util.concurrent.atomic.AtomicInteger
-
-trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with Logging {
+trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging {
   private type ET[F[_], A] = EitherT[F, ResourceError, A]
 
   private val dbs = new ConcurrentHashMap[(Blob, Version), NIHDB]
@@ -79,24 +87,24 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
   def masterChef: ActorRef
 
-  def openDB(path: AFile): OptionT[Task, ResourceError \/ NIHDB] = {
+  def openDB(path: AFile): OptionT[IO, ResourceError \/ NIHDB] = {
     val failure = ResourceError.fromExtractorError(s"failed to open NIHDB in path $path")
 
     for {
-      blob <- OptionT(vfs.readPath(path))
-      version <- OptionT(vfs.headOfBlob(blob))
+      blob <- OptionT(vfs.readPath(path).to[IO])
+      version <- OptionT(vfs.headOfBlob(blob).to[IO])
 
-      cached <- Task.delay(Option(dbs.get((blob, version)))).liftM[OptionT]
+      cached <- IO(Option(dbs.get((blob, version)))).liftM[OptionT]
 
       nihdb <- cached match {
         case Some(nihdb) =>
-          nihdb.right[ResourceError].point[OptionT[Task, ?]]
+          nihdb.right[ResourceError].point[OptionT[IO, ?]]
 
         case None =>
           for {
-            dir <- vfs.underlyingDir(blob, version).liftM[OptionT]
+            dir <- vfs.underlyingDir(blob, version).to[IO].liftM[OptionT]
 
-            tndb = Task delay {
+            tndb = IO {
               NIHDB.open(
                 masterChef,
                 dir,
@@ -109,12 +117,12 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
             back <- validation.disjunction.leftMap(failure) traverse { nihdb: NIHDB =>
               for {
-                check <- Task.delay(dbs.putIfAbsent((blob, version), nihdb)).liftM[OptionT]
+                check <- IO(dbs.putIfAbsent((blob, version), nihdb)).liftM[OptionT]
 
                 back <- if (check == null)
-                  nihdb.right[ResourceError].point[OptionT[Task, ?]]
+                  nihdb.right[ResourceError].point[OptionT[IO, ?]]
                 else
-                  nihdb.close.toTask.liftM[OptionT] >> openDB(path)
+                  IO.fromFuture(IO(nihdb.close)).liftM[OptionT] >> openDB(path)
               } yield back
             }
           } yield back.flatMap(x => x)
@@ -122,7 +130,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
     } yield nihdb
   }
 
-  def createDB(path: AFile): Task[ResourceError \/ (Blob, Version, NIHDB)] = {
+  def createDB(path: AFile): IO[ResourceError \/ (Blob, Version, NIHDB)] = {
     val failure = ResourceError.fromExtractorError(s"Failed to create NIHDB in $path")
 
     val createBlob: Task[Blob] = for {
@@ -130,14 +138,14 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
       _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
     } yield blob
 
-    for {
+    (for {
       maybeBlob <- vfs.readPath(path)
       blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
 
       version <- vfs.fresh(blob)    // overwrite any previously-existing HEAD
       dir <- vfs.underlyingDir(blob, version)
 
-      validation <- Task delay {
+      validation <- Task.delay {
         NIHDB.create(
           masterChef,
           dir,
@@ -147,66 +155,66 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
       }
 
       disj = validation.disjunction.leftMap(failure)
-    } yield disj.map(n => (blob, version, n))
+    } yield disj.map(n => (blob, version, n))).to[IO]
   }
 
-  def commitDB(blob: Blob, version: Version, db: NIHDB): Task[Unit] = {
+  def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Unit] = {
     // last-wins semantics
-    lazy val replaceM: OptionT[Task, Unit] = for {
-      oldHead <- OptionT(vfs.headOfBlob(blob))
-      oldDB <- OptionT(Task.delay(Option(dbs.get((blob, oldHead)))))
+    lazy val replaceM: OptionT[IO, Unit] = for {
+      oldHead <- OptionT(vfs.headOfBlob(blob).to[IO])
+      oldDB <- OptionT(IO(Option(dbs.get((blob, oldHead)))))
 
-      check <- Task.delay(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
+      check <- IO(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
 
       _ <- if (check)
-        oldDB.close.toTask.liftM[OptionT]
+        IO.fromFuture(IO(oldDB.close)).liftM[OptionT]
       else
         replaceM
     } yield ()
 
     val insert = for {
-      check <- Task.delay(dbs.putIfAbsent((blob, version), db))
+      check <- IO(dbs.putIfAbsent((blob, version), db))
 
       _ <- if (check == null)
-        vfs.commit(blob, version)
+        vfs.commit(blob, version).to[IO]
       else
         commitDB(blob, version, db)
     } yield ()
 
     for {
-      _ <- Task.delay(log.trace(s"attempting to commit blob/version: $blob/$version"))
+      _ <- IO(log.trace(s"attempting to commit blob/version: $blob/$version"))
       _ <- replaceM.getOrElseF(insert)
     } yield ()
   }
 
-  def ingest(path: PrecogPath, ingestion: Stream[Task, JValue]): EitherT[Task, ResourceError, Unit] = {
+  def ingest(path: PrecogPath, ingestion: Stream[IO, JValue]): EitherT[IO, ResourceError, Unit] = {
     for {
-      afile <- pathToAFileET[Task](path)
+      afile <- pathToAFileET[IO](path)
       triple <- EitherT.eitherT(createDB(afile))
       (blob, version, nihdb) = triple
 
       actions = ingestion.chunks.zipWithIndex evalMap {
         case (jvs, offset) =>
           // insertVerified forces sequential behavior and backpressure
-          nihdb.insertVerified(NIHDB.Batch(offset, jvs.toList) :: Nil).toTask
+          IO.fromFuture(IO(nihdb.insertVerified(NIHDB.Batch(offset, jvs.toList) :: Nil)))
       }
 
       driver = actions.drain ++ Stream.eval(commitDB(blob, version, nihdb))
 
-      _ <- EitherT.rightT[Task, ResourceError, Unit](driver.run)
+      _ <- EitherT.rightT[IO, ResourceError, Unit](driver.run)
     } yield ()
   }
 
   // note: this function should almost always be unnecessary, since nihdb includes the append log in snapshots
-  def flush(path: AFile): Task[Unit] = {
+  def flush(path: AFile): IO[Unit] = {
     val ot = for {
-      blob <- OptionT(vfs.readPath(path))
-      head <- OptionT(vfs.headOfBlob(blob))
-      db <- OptionT(Task.delay(Option(dbs.get((blob, head)))))
-      _ <- db.cook.toTask.liftM[OptionT]
+      blob <- OptionT(vfs.readPath(path).to[IO])
+      head <- OptionT(vfs.headOfBlob(blob).to[IO])
+      db <- OptionT(IO(Option(dbs.get((blob, head)))))
+      _ <- IO.fromFuture(IO(db.cook)).liftM[OptionT]
     } yield ()
 
-    ot.getOrElse(Task.now(()))
+    ot.getOrElseF(IO.unit)
   }
 
   object fs {
@@ -284,36 +292,33 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule[Future] with 
 
   trait VFSColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
 
-    def load(table: Table, tpe: JType): EitherT[Future, ResourceError, Table] = {
+    def load(table: Table, tpe: JType): EitherT[IO, ResourceError, Table] = {
       for {
         _ <- EitherT.rightT(table.toJson.map(json => log.trace("Starting load from " + json.toList.map(_.toJValue.renderCompact))))
         paths <- EitherT.rightT(pathsM(table))
 
         projections <- paths.toList traverse { path =>
-          val etask = for {
-            _ <- Task.delay(log.debug("Loading path: " + path)).liftM[ET]
+          for {
+            _ <- IO(log.debug("Loading path: " + path)).liftM[ET]
 
-            afile <- pathToAFileET[Task](path)
+            afile <- pathToAFileET[IO](path)
 
-            nihdb <- EitherT.eitherT[Task, ResourceError, NIHDB](openDB(afile).run map { opt =>
+            nihdb <- EitherT.eitherT[IO, ResourceError, NIHDB](openDB(afile).run map { opt =>
               opt.getOrElse(-\/(ResourceError.notFound(s"unable to locate dataset at path $path")))
             })
 
-            projection <- NIHDBProjection.wrap(nihdb).toTask.liftM[ET]
+            projection <- NIHDBProjection.wrap(nihdb).liftM[ET]
           } yield projection
-
-          etask.mapT(_.unsafeToFuture)
         }
       } yield {
         val length = projections.map(_.length).sum
-        val stream = projections.foldLeft(StreamT.empty[Future, Slice]) { (acc, proj) =>
+        val stream = projections.foldLeft(StreamT.empty[IO, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toList))
-          }
+          val constraints =
+            Some(Schema.flatten(tpe, proj.structure.toList))
 
           log.debug("Appending from projection: " + proj)
-          acc ++ StreamT.wrapEffect(constraints map { c => proj.getBlockStream(c) })
+          acc ++ proj.getBlockStream(constraints)
         }
 
         Table(stream, ExactSize(length))

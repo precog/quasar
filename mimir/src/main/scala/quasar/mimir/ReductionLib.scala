@@ -51,7 +51,7 @@ class LongAdder {
   def total(): BigDecimal = ts.foldLeft(BigDecimal(0))(_ + _) + t
 }
 
-trait ReductionLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait ReductionLibModule extends ColumnarTableLibModule {
   trait ReductionLib extends ColumnarTableLib {
     import BigDecimalOperations._
     val ReductionNamespace = Vector()

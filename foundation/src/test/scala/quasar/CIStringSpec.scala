@@ -17,11 +17,12 @@
 package quasar
 
 import slamdata.Predef.String
+import quasar.contrib.specs2.Spec
 
 import argonaut.CodecJson
 import org.scalacheck.{Arbitrary, Gen}
-import org.specs2.scalaz._
 import scalaz.scalacheck.ScalazProperties._
+import scalaz.syntax.equal._
 
 class CIStringSpec extends Spec with CIStringArbitrary {
   import CIStringSpec.AlphaStr
@@ -33,7 +34,7 @@ class CIStringSpec extends Spec with CIStringArbitrary {
   }
 
   "equal must ignore case for ascii characters" >> prop { as: AlphaStr =>
-    CIString(as.value) equals CIString(as.value.toUpperCase)
+    CIString(as.value) === CIString(as.value.toUpperCase)
   }
 }
 

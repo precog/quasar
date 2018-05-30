@@ -34,7 +34,7 @@ import java.time.format.DateTimeParseException
 
 import scalaz.syntax.show._
 
-trait TimeLibModule[M[+_]] extends ColumnarTableLibModule[M] {
+trait TimeLibModule extends ColumnarTableLibModule {
   trait TimeLib extends ColumnarTableLib {
 
     val TimeNamespace = Vector("std", "time")

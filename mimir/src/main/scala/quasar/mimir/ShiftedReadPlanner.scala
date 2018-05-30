@@ -28,14 +28,12 @@ import quasar.qscript._
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode.JType
 
-import delorean._
 import fs2.interop.scalaz._
+import io.chrisdavenport.scalaz.task._
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
     lift: FileSystemErrT[CakeM, ?] ~> F) {
@@ -58,7 +56,7 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                 val read: EitherT[Task, FileSystemError, P.Table] =
                   P.Table.constString(Set(pathStr))
                     .load(JType.JUniverseT)
-                    .mapT(_.toTask)
+                    .mapT(_.to[Task])
                     .leftMap { err =>
                       val msg = err.messages.toList.reduce(_ + ";" + _)
                       FileSystemError.readFailed(posixCodec.printPath(path), msg)

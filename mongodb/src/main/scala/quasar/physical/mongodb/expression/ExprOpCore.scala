@@ -370,8 +370,8 @@ object ExprOpCoreF {
     // prepend `"$"` to it knowing that this will result in a variable prepended
     // with `"$$"`. Really we should create a `DocVar` with no `BsonField`
     // instead of a `DocField` in the case of a let variable.
-    def rewriteRefs0(applyVar: PartialFunction[DocVar, DocVar]) = {
-      case $varF(f) if !f.isLetVar => applyVar.lift(f).map(fp.$var)
+    def rewriteRefsM[M[_]: Monad](applyVar: PartialFunction[DocVar, M[DocVar]]) = {
+      case $varF(f) if !f.isLetVar => applyVar.lift(f).map(x => x.map(fp.$var))
       case _                       => None
     }
   }

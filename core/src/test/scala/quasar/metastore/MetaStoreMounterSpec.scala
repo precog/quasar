@@ -49,8 +49,8 @@ class MetaStoreMounterSpec extends MountingSpec[MetaStoreMounterSpec.Eff] with S
         κ(().point[ConnectionIO]))
 
     foldMapNT(db).compose(t)                       :+:
-    Failure.toRuntimeError[Task, PathTypeMismatch] :+:
-    Failure.toRuntimeError[Task, MountingError]
+    Failure.showRuntimeError[Task, PathTypeMismatch] :+:
+    Failure.showRuntimeError[Task, MountingError]
   }
 
   val invalidUri = ConnectionUri(uriA.value + "INVALID")

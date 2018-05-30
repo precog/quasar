@@ -24,6 +24,7 @@ import quasar.jscore, jscore.JsCore
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._, transform.wrapArrayInLet
 import quasar.physical.mongodb.optimize.pipeline._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflowtask._
 
 import matryoshka._

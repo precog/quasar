@@ -22,24 +22,21 @@ import quasar.yggdrasil.execution.EvaluationContext
 
 import scalaz._, Scalaz._
 
-trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
+trait MemoryDatasetConsumer extends EvaluatorModule {
   type IdType
 
   type X      = Throwable
   type SEvent = (Vector[IdType], SValue)
 
-  implicit def M: Monad[M] with Comonad[M]
-
-  def Evaluator[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M): EvaluatorLike[N]
+  def Evaluator: EvaluatorLike
 
   def extractIds(jv: JValue): Seq[IdType]
 
   def consumeEval(graph: DepGraph, ctx: EvaluationContext, optimize: Boolean = true): Validation[X, Set[SEvent]] = {
     Validation.fromTryCatchNonFatal {
-      implicit val nt = NaturalTransformation.refl[M]
-      val evaluator   = Evaluator(M)
+      val evaluator   = Evaluator
       val result      = evaluator.eval(graph, ctx, optimize)
-      val json = result.flatMap(_.toJson).copoint filterNot { rvalue =>
+      val json = result.flatMap(_.toJson).unsafeRunSync filterNot { rvalue =>
         (rvalue.toJValue \ "value") == JUndefined
       }
 
@@ -51,7 +48,7 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
       }
 
       val back = events.toSet
-      evaluator.report.done.copoint
+      evaluator.report.done.unsafeRunSync
       back
     }
   }
@@ -67,7 +64,7 @@ trait MemoryDatasetConsumer[M[+ _]] extends EvaluatorModule[M] {
   }
 }
 
-trait LongIdMemoryDatasetConsumer[M[+ _]] extends MemoryDatasetConsumer[M] {
+trait LongIdMemoryDatasetConsumer extends MemoryDatasetConsumer {
   type IdType = SValue
   def extractIds(jv: JValue): Seq[SValue] = (jv --> classOf[JArray]).elements map jvalueToSValue
 }

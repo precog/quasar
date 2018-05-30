@@ -182,18 +182,18 @@ class PrettifySpecs extends quasar.Qspec {
     }
 
     "fail with unmatched brackets" in {
-      Path.parse("foo[0") must beLeftDisjunction
-      Path.parse("foo]") must beLeftDisjunction
+      Path.parse("foo[0") must be_-\/
+      Path.parse("foo]") must be_-\/
     }
 
     "fail with bad index" in {
-      Path.parse("foo[]") must beLeftDisjunction
-      Path.parse("foo[abc]") must beLeftDisjunction
-      Path.parse("foo[-1]") must beLeftDisjunction
+      Path.parse("foo[]") must be_-\/
+      Path.parse("foo[abc]") must be_-\/
+      Path.parse("foo[-1]") must be_-\/
     }
 
     "fail with bad field" in {
-      Path.parse("foo..bar") must beLeftDisjunction
+      Path.parse("foo..bar") must be_-\/
     }
   }
 

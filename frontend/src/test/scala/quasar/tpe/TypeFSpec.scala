@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.contrib.specs2.Spec
 import quasar.ejson.{Decoded, DecodeEJson, EncodeEJson, EJson, EJsonArbitrary, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
@@ -30,9 +31,8 @@ import algebra.laws._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import org.specs2.scalacheck._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
+import scalaz.scalacheck.ScalazProperties.{equal => eql, _}
 import scalaz.scalacheck.ScalazArbitrary._
 
 final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
@@ -47,10 +47,10 @@ final class TypeFSpec extends Spec with TypeFArbitrary with EJsonArbitrary {
   implicit def typeFIntEqual[A: Equal]: Equal[TypeF[Int, A]] =
     TypeF.structuralEqual(Equal[Int])(Equal[A])
 
-  checkAll("structural", equal.laws[TypeF[Int, String]])
+  checkAll("structural", eql.laws[TypeF[Int, String]])
   checkAll(traverse.laws[TypeF[Int, ?]])
   // TODO: Want to check cats.kernel.OrderLaws, but need Cogen
-  checkAll("subtyping", equal.laws[T])
+  checkAll("subtyping", eql.laws[T])
   checkAll(LatticeLaws[T].boundedDistributiveLattice.all)
   checkAll(LatticePartialOrderLaws[T].boundedLatticePartialOrder.all)
 

@@ -129,15 +129,15 @@ class DataCodecSpecs extends quasar.Qspec {
       // Some invalid inputs:
 
       "fail with unescaped leading '$'" in {
-        DataCodec.parse("""{ "$a": 1 }""") must beLeftDisjunction(UnescapedKeyError(jSingleObject("$a", jNumber(1))))
+        DataCodec.parse("""{ "$a": 1 }""") must be_-\/(UnescapedKeyError(jSingleObject("$a", jNumber(1))))
       }
 
       "fail with invalid offset date time value" in {
-        DataCodec.parse("""{ "$offsetdatetime": 123456 }""") must beLeftDisjunction
+        DataCodec.parse("""{ "$offsetdatetime": 123456 }""") must be_-\/
       }
 
       "fail with invalid offset date time string" in {
-        DataCodec.parse("""{ "$offsetdatetime": "10 o'clock this morning" }""") must beLeftDisjunction
+        DataCodec.parse("""{ "$offsetdatetime": "10 o'clock this morning" }""") must be_-\/
       }
     }
   }

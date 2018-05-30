@@ -16,7 +16,7 @@
 
 package quasar.contrib.scalaz
 
-import slamdata.Predef.Unit
+import slamdata.Predef._
 
 import scalaz.\/-
 import scalaz.concurrent.{Strategy, Task}

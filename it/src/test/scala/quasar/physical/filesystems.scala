@@ -51,9 +51,11 @@ object filesystems {
   private val envErr = Failure.Ops[EnvironmentError, Eff]
 
   private val effToTask: Eff ~> Task =
-    Failure.toRuntimeError[Task, ConfigError]      :+:
-    Failure.toRuntimeError[Task, EnvironmentError] :+:
-    Failure.toRuntimeError[Task, PhysicalError]    :+:
+    Failure.showRuntimeError[Task, ConfigError]      :+:
+    Failure.showRuntimeError[Task, EnvironmentError] :+:
+    Failure.toRuntimeError[Task, PhysicalError] {
+      case UnhandledFSError(e) => e
+    }                                                :+:
     NaturalTransformation.refl
 
   private val effMToTask: EffM ~> Task =

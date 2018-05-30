@@ -49,9 +49,6 @@ object compile {
     val CE = CompExec[Free[S, ?]]
     import CE.CompileM
 
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-
     def explainQuery(
       scopedExpr: sql.ScopedExpr[Fix[sql.Sql]],
       vars: Variables,

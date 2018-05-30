@@ -19,9 +19,7 @@ package quasar.yggdrasil.table
 import quasar.yggdrasil.TableModuleSpec
 import quasar.yggdrasil.TableModule._
 
-import scalaz.Need
-
-trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec[Need] with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {
+trait BlockStoreColumnarTableModuleSpec extends TableModuleSpec with BlockLoadSpec with BlockSortSpec with BlockAlignSpec {
   type MemoId = Int
 
   "a block store columnar table" should {

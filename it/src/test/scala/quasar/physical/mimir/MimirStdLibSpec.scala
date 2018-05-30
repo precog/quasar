@@ -45,11 +45,7 @@ import scalaz.syntax.either._
 
 import java.nio.file.Files
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-
 class MimirStdLibSpec extends StdLibSpec with PrecogCake {
-  import scala.concurrent.ExecutionContext.Implicits.global
 
   private val notImplemented: Result = Skipped("TODO")
 
@@ -119,8 +115,9 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
     rvalue.map(cake.trans.transRValue(_, cake.trans.TransSpec1.Id)).getOrElse(cake.trans.TransSpec1.Undef)
   }
 
-  private def actual(table: cake.Table): List[Data] =
-    Await.result(table.toJson.map(_.toList.map(MapFuncCorePlanner.rValueToData)), Duration.Inf)
+  private def actual(table: cake.Table): List[Data] = {
+    table.toJson.map(_.toList.map(MapFuncCorePlanner.rValueToData)).unsafeRunSync
+  }
 
   def runner = new MapFuncStdLibTestRunner {
     def nullaryMapFunc(prg: FreeMapA[Fix, Nothing], expected: Data): Result =
@@ -225,5 +222,5 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 trait PrecogCake extends Scope with AfterAll {
   val cake = Precog(Files.createTempDirectory("mimir").toFile()).unsafePerformSync
 
-  def afterAll(): Unit = Await.result(cake.shutdown, Duration.Inf)
+  def afterAll(): Unit = cake.shutdown.unsafeRunSync
 }

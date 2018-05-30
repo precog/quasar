@@ -18,10 +18,9 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes.json._
-import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait TakeRangeSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
 
   def checkTakeRange = {
@@ -35,7 +34,7 @@ trait TakeRangeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specif
 
       val takeRangeTable = table.takeRange(start, count)
 
-      val result = toJson(takeRangeTable).copoint
+      val result = toJson(takeRangeTable).unsafeRunSync
       val expected =
         if (start < 0) Stream()
         else sample.data.toSeq.drop(start).take(count)

@@ -191,8 +191,8 @@ Chain
 │  │  │     │  │  │        ╰─ Scope(ListMap())
 │  │  │     │  │  ├─ $MatchF
 │  │  │     │  │  │  ╰─ Doc
-│  │  │     │  │  │     ├─ NotExpr($left -> Size(0))
-│  │  │     │  │  │     ╰─ NotExpr($right -> Size(0))
+│  │  │     │  │  │     ├─ NotCondExpr($left -> Size(0))
+│  │  │     │  │  │     ╰─ NotCondExpr($right -> Size(0))
 │  │  │     │  │  ├─ $UnwindF
 │  │  │     │  │  │  ╰─ Path(DocField(BsonField.Name("right")))
 │  │  │     │  │  ├─ $UnwindF
@@ -292,8 +292,8 @@ Chain
 │  │  │     │        ╰─ Scope(ListMap())
 │  │  │     ├─ $MatchF
 │  │  │     │  ╰─ Doc
-│  │  │     │     ├─ NotExpr($left -> Size(0))
-│  │  │     │     ╰─ NotExpr($right -> Size(0))
+│  │  │     │     ├─ NotCondExpr($left -> Size(0))
+│  │  │     │     ╰─ NotCondExpr($right -> Size(0))
 │  │  │     ├─ $UnwindF
 │  │  │     │  ╰─ Path(DocField(BsonField.Name("right")))
 │  │  │     ├─ $UnwindF
@@ -308,9 +308,9 @@ Chain
 │  │  │     ├─ $MatchF
 │  │  │     │  ╰─ Or
 │  │  │     │     ├─ Doc
-│  │  │     │     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│  │  │     │     │  ╰─ CondExpr($0 -> Eq(Bool(true)))
 │  │  │     │     ╰─ Doc
-│  │  │     │        ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │     │        ╰─ CondExpr($1 -> Eq(Bool(true)))
 │  │  │     ├─ $MapF
 │  │  │     │  ├─ JavaScript(function (key, value) {
 │  │  │     │  │               return [
@@ -338,8 +338,8 @@ Chain
 │  │  │        ╰─ Scope(ListMap())
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
-│  │  │     ├─ NotExpr($left -> Size(0))
-│  │  │     ╰─ NotExpr($right -> Size(0))
+│  │  │     ├─ NotCondExpr($left -> Size(0))
+│  │  │     ╰─ NotCondExpr($right -> Size(0))
 │  │  ├─ $UnwindF
 │  │  │  ╰─ Path(DocField(BsonField.Name("right")))
 │  │  ├─ $UnwindF
@@ -368,11 +368,11 @@ Chain
 │  │  ├─ $MatchF
 │  │  │  ╰─ Or
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│  │  │     │  ╰─ CondExpr($0 -> Eq(Bool(true)))
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($1 -> Eq(Bool(true)))
+│  │  │     │  ╰─ CondExpr($1 -> Eq(Bool(true)))
 │  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($2 -> Eq(Bool(true)))
+│  │  │        ╰─ CondExpr($2 -> Eq(Bool(true)))
 │  │  ├─ $SimpleMapF
 │  │  │  ├─ Map
 │  │  │  │  ╰─ Obj
@@ -440,8 +440,8 @@ Chain
 │        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($left -> Size(0))
-│     ╰─ NotExpr($right -> Size(0))
+│     ├─ NotCondExpr($left -> Size(0))
+│     ╰─ NotCondExpr($right -> Size(0))
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF
@@ -457,11 +457,11 @@ Chain
 ├─ $MatchF
 │  ╰─ Or
 │     ├─ Doc
-│     │  ╰─ Expr($0 -> Eq(Bool(true)))
+│     │  ╰─ CondExpr($0 -> Eq(Bool(true)))
 │     ├─ Doc
-│     │  ╰─ Expr($1 -> Eq(Bool(true)))
+│     │  ╰─ CondExpr($1 -> Eq(Bool(true)))
 │     ╰─ Doc
-│        ╰─ Expr($2 -> Eq(Bool(true)))
+│        ╰─ CondExpr($2 -> Eq(Bool(true)))
 ╰─ $SimpleMapF
    ├─ Map
    │  ╰─ Obj

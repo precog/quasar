@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.evaluate
 
 import slamdata.Predef.Option
 import quasar.contrib.pathy.AFile

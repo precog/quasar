@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.evaluate
 
 import slamdata.Predef.{Boolean, List, Option, Stream}
 import quasar.api._, ResourceError._

@@ -17,18 +17,18 @@
 package quasar.api
 
 import slamdata.Predef._
+import quasar.contrib.specs2.ScalazEqualityMatchers
 
 import argonaut._, Argonaut._
 import argonaut.ArgonautScalaz._
 import org.http4s.Status, Status._
 import org.specs2.matcher._
-import org.specs2.scalaz._
 import scalaz.std.anyVal._
 import scalaz.std.string._
 
 object matchers {
   import MustMatchers._
-  import ScalazMatchers._
+  import ScalazEqualityMatchers._
   import ApiError.apiError
 
   def beApiErrorLike[A](a: A)(implicit A: ToApiError[A]): Matcher[ApiError] =

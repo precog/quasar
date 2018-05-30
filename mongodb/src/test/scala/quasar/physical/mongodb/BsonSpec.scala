@@ -24,10 +24,10 @@ import quasar.jscore
 
 import scalaz._, Scalaz._
 
-class BsonSpecs_1_0 extends BsonSpecs(BsonVersion.`1.0`)
-class BsonSpecs_1_1 extends BsonSpecs(BsonVersion.`1.1`)
+class BsonSpec_1_0_Spec extends BsonSpec(BsonVersion.`1.0`)
+class BsonSpec_1_1_Spec extends BsonSpec(BsonVersion.`1.1`)
 
-abstract class BsonSpecs(v: BsonVersion) extends quasar.Qspec {
+abstract class BsonSpec(v: BsonVersion) extends quasar.Qspec {
   import Bson._
 
   "fromRepr" should {

@@ -173,7 +173,7 @@ private[xcc] final class DefaultImpl[F[_]: Monad: Capture: Catchable: SessionRea
       .as(executed)
 
   def insert[C[_]: Foldable](content: C[Content]): F[Vector[XccError]] =
-    withSession(_.insertContentCollectErrors(content.to[Array]))
+    withSession(_.insertContentCollectErrors(content.toList.to[Array]))
       .map(errs => Option(errs).toVector flatMap (_.asScala.toVector))
       .handle { case rex: RequestException => Vector(rex) }
       .map(_ map (XccError.requestError(_)))

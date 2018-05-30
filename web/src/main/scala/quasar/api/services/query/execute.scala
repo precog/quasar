@@ -59,9 +59,6 @@ object execute {
     val CE = CompExec[Free[S, ?]]
     import CE._
 
-    // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-    import EitherT.eitherTMonad
-
     QHttpService {
       case req @ GET -> _ :? Offset(offset) +& Limit(limit) =>
         respond(parsedQueryRequest(req, offset, limit) traverse { case (xpr, basePath, off, lim) =>

@@ -1657,7 +1657,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }.pendingUntilFixed
 
     "fail with ambiguous reference" in {
-      compile(sqlE"select foo from bar, baz") must beLeftDisjunction(
+      compile(sqlE"select foo from bar, baz") must be_-\/(
         NonEmptyList(
           SemanticError.AmbiguousReference(
             ident[Fix[Sql]]("foo").embed,
@@ -1667,11 +1667,11 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     }
 
     "fail with ambiguous reference in cond" in {
-      compile(sqlE"""select (case when a = 1 then "ok" else "reject" end) from bar, baz""") must beLeftDisjunction
+      compile(sqlE"""select (case when a = 1 then "ok" else "reject" end) from bar, baz""") must be_-\/
     }
 
     "fail with ambiguous reference in else" in {
-      compile(sqlE"""select (case when bar.a = 1 then "ok" else foo end) from bar, baz""") must beLeftDisjunction
+      compile(sqlE"""select (case when bar.a = 1 then "ok" else foo end) from bar, baz""") must be_-\/
     }
 
     "fail with duplicate alias" in {
@@ -1800,7 +1800,7 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
 
   List("avg", "sum") foreach { fn =>
     s"passing a literal set of the wrong type to '${fn.toUpperCase}' fails" >> {
-      fullCompile(unsafeParse(s"""select $fn(("one", "two", "three"))""")) must beLeftDisjunction
+      fullCompile(unsafeParse(s"""select $fn(("one", "two", "three"))""")) must be_-\/
     }
   }
 

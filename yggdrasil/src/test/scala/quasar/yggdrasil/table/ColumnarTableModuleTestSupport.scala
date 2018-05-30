@@ -22,12 +22,14 @@ import quasar.blueeyes.json._
 import quasar.precog.common._
 import quasar.precog.util._
 
+import cats.effect.IO
 import scalaz._
 import scalaz.syntax.std.boolean._
+import shims._
 
 import scala.annotation.tailrec
 
-trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with TableModuleTestSupport[M] {
+trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModuleTestSupport {
   def newGroupId: GroupId
 
   def defaultSliceSize = 10
@@ -58,7 +60,7 @@ trait ColumnarTableModuleTestSupport[M[+_]] extends ColumnarTableModule[M] with 
 
     Table(
       StreamT.unfoldM(values) { events =>
-        M.point {
+        IO {
           (!events.isEmpty) option {
             makeSlice(events.toStream, sliceSize)
           }

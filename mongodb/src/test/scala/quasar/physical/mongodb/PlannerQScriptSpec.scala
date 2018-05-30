@@ -27,6 +27,7 @@ import quasar.javascript._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 

@@ -20,14 +20,18 @@ package table
 import quasar.blueeyes._
 import quasar.precog.common._
 
+import cats.effect.IO
+
 import scalaz._, Scalaz._
+
+import shims._
 
 import org.slf4s.Logging
 
 import scala.collection.mutable
 
-trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTableTypes[M] with SliceTransforms[M] {
-  self: ColumnarTableModule[M] =>
+trait IndicesModule extends Logging with TransSpecModule with ColumnarTableTypes with SliceTransforms {
+  self: ColumnarTableModule =>
 
   // we will warn for tables with >1M rows.
   final def InMemoryLimit = 1000000L
@@ -74,7 +78,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       //   log.warn("indexing large table (%s rows > %s)" format (size, InMemoryLimit))
       // }
 
-      Table(StreamT.fromStream(M.point(slices.toStream)), ExactSize(size))
+      Table(StreamT.fromStream(IO(slices.toStream)), ExactSize(size))
     }
   }
 
@@ -90,14 +94,14 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * sequence of "group key" trans-specs, and "value" trans-spec
       * which corresponds to the rows the index will provide.
       *
-      * Despite being in M, the TableIndex will be eagerly constructed
+      * Despite being in IO, the TableIndex will be eagerly constructed
       * as soon as the underlying slices are available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[TableIndex] = {
+    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): IO[TableIndex] = {
 
-      def accumulate(buf: mutable.ListBuffer[SliceIndex], stream: StreamT[M, SliceIndex]): M[TableIndex] =
+      def accumulate(buf: mutable.ListBuffer[SliceIndex], stream: StreamT[IO, SliceIndex]): IO[TableIndex] =
         stream.uncons flatMap {
-          case None             => M.point(new TableIndex(buf.toList))
+          case None             => IO(new TableIndex(buf.toList))
           case Some((si, tail)) => { buf += si; accumulate(buf, tail) }
         }
 
@@ -108,7 +112,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
 
       val indices = table.slices flatMap { slice =>
         val streamTM = SliceIndex.createFromSlice(slice, sts, vt) map { si =>
-          si :: StreamT.empty[M, SliceIndex]
+          si :: StreamT.empty[IO, SliceIndex]
         }
 
         StreamT wrapEffect streamTM
@@ -151,7 +155,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
 //        log.warn("indexing large table (%s rows > %s)" format (size, InMemoryLimit))
 //      }
 
-      Table(StreamT.fromStream(M.point(slices.toStream)), ExactSize(size))
+      Table(StreamT.fromStream(IO(slices.toStream)), ExactSize(size))
     }
   }
 
@@ -241,7 +245,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * Given a set of rows, builds the appropriate subslice.
       */
     private[table] def buildSubTable(rows: ArrayIntList): Table = {
-      val slices = buildSubSlice(rows) :: StreamT.empty[M, Slice]
+      val slices = buildSubSlice(rows) :: StreamT.empty[IO, Slice]
       Table(slices, ExactSize(rows.size))
     }
 
@@ -281,17 +285,17 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * sequence of "group key" trans-specs, and "value" trans-spec
       * which corresponds to the rows the index will provide.
       *
-      * Despite being in M, the SliceIndex will be eagerly constructed
+      * Despite being in IO, the SliceIndex will be eagerly constructed
       * as soon as the underlying Slice is available.
       */
-    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): M[SliceIndex] = {
+    def createFromTable(table: Table, groupKeys: Seq[TransSpec1], valueSpec: TransSpec1): IO[SliceIndex] = {
 
       val sts = groupKeys.map(composeSliceTransform).toArray
       val vt  = composeSliceTransform(valueSpec)
 
       table.slices.uncons flatMap {
         case Some((slice, _)) => createFromSlice(slice, sts, vt)
-        case None             => M.point(SliceIndex.empty)
+        case None             => IO.pure(SliceIndex.empty)
       }
     }
 
@@ -304,7 +308,7 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * necessary to associate them into the maps and sets we
       * ultimately need to construct the SliceIndex.
       */
-    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): M[SliceIndex] = {
+    private[table] def createFromSlice(slice: Slice, sts: Array[SliceTransform1[_]], vt: SliceTransform1[_]): IO[SliceIndex] = {
       val numKeys = sts.length
       val n       = slice.size
       val vals    = mutable.Map[Int, mutable.Set[RValue]]()
@@ -366,13 +370,13 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
       * data store is column-oriented but the associations we want to
       * perform are row-oriented.
       */
-    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): M[Array[Array[RValue]]] = {
+    private[table] def readKeys(slice: Slice, sts: Array[SliceTransform1[_]]): IO[Array[Array[RValue]]] = {
       val n       = slice.size
       val numKeys = sts.length
-      val keys    = new mutable.ArrayBuffer[M[Array[RValue]]](numKeys)
+      val keys    = new mutable.ArrayBuffer[IO[Array[RValue]]](numKeys)
 
       (0 until numKeys) foreach { _ =>
-        keys += null.asInstanceOf[M[Array[RValue]]]
+        keys += null.asInstanceOf[IO[Array[RValue]]]
       }
 
       var k = 0
@@ -400,11 +404,11 @@ trait IndicesModule[M[+ _]] extends Logging with TransSpecModule with ColumnarTa
         k += 1
       }
 
-      val back = (0 until keys.length).foldLeft(M.point(Vector.fill[Array[RValue]](numKeys)(null))) {
+      val back = (0 until keys.length).foldLeft(IO.pure(Vector.fill[Array[RValue]](numKeys)(null))) {
         case (accM, i) => {
           val arrM = keys(i)
 
-          M.apply2(accM, arrM) { (acc, arr) =>
+          Applicative[IO].apply2(accM, arrM) { (acc, arr) =>
             acc.updated(i, arr)
           }
         }

@@ -18,10 +18,9 @@ package quasar.yggdrasil
 package table
 
 import quasar.blueeyes._, json._
-import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait DistinctSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 
@@ -34,7 +33,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
       val result = toJson(distinctTable)
 
-      result.copoint must_== sample.data
+      result.unsafeRunSync must_== sample.data
     }
   }
 
@@ -115,7 +114,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
     val result = toJson(table.distinct(Leaf(Source)))
 
-    result.copoint must_== sample.data.toSeq.distinct
+    result.unsafeRunSync must_== sample.data.toSeq.distinct
   }
 
   def testDistinctAcrossSlices2 = {
@@ -195,7 +194,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
     val result = toJson(table.distinct(Leaf(Source)))
 
-    result.copoint must_== sample.data.toSeq.distinct
+    result.unsafeRunSync must_== sample.data.toSeq.distinct
   }
 
   def removeUndefined(jv: JValue): JValue = jv match {
@@ -211,7 +210,7 @@ trait DistinctSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specifi
 
       val distinctTable = table.distinct(Leaf(Source))
 
-      val result = toJson(distinctTable).copoint
+      val result = toJson(distinctTable).unsafeRunSync
       val expected = sample.data.toSeq.distinct
 
       result must_== expected

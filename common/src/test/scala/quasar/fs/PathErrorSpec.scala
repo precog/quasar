@@ -16,7 +16,8 @@
 
 package quasar.fs
 
-import org.specs2.scalaz.Spec
+import quasar.contrib.specs2.Spec
+
 import scalaz.scalacheck.ScalazProperties
 
 class PathErrorSpec extends Spec {

@@ -26,6 +26,8 @@ import quasar.qscript._
 
 import quasar.yggdrasil.TableModule.SortAscending
 
+import cats.effect.IO
+
 import fs2.interop.scalaz._
 
 import matryoshka.{Hole => _, _}
@@ -36,10 +38,9 @@ import matryoshka.patterns._
 import org.slf4s.Logging
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    liftF: Task ~> F) extends Logging {
+    liftF: IO ~> F) extends Logging {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -139,8 +140,9 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
                   TransSpec1.Undef.point[F]
               }
               newSortOrder = rephrase2(transMiddle, transLKey, transRKey)
-            } yield (lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle),
-                newSortOrder.map(order => SortState(None, order :: Nil)))
+              newSortState = newSortOrder.map(order => SortState(None, order :: Nil))
+              joinedTable = lsorted.cogroup(transLKey, transRKey, rsorted)(transLeft, transRight, transMiddle)
+            } yield (joinedTable, newSortState)
           }
         }
 

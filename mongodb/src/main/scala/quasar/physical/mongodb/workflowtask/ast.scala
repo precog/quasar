@@ -19,7 +19,8 @@ package quasar.physical.mongodb.workflowtask
 import slamdata.Predef._
 import quasar.{RenderTree, Terminal, NonTerminal}
 import quasar.javascript._
-import quasar.physical.mongodb.{Bson, Collection, MapReduce, Selector}
+import quasar.physical.mongodb.{Bson, Collection, MapReduce}
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import MapReduce._
 

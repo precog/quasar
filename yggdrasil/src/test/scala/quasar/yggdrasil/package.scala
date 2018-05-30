@@ -19,6 +19,8 @@ package quasar
 import quasar.blueeyes._
 import quasar.blueeyes.json.JValue
 import quasar.precog.common._
+
+import cats.effect.IO
 import scalaz._, Scalaz._, Ordering._
 
 package object yggdrasil {
@@ -79,11 +81,11 @@ package object yggdrasil {
     }
   }
 
-  implicit class copointJValuesStreamOps[M[_]](val results: M[Stream[RValue]]) extends AnyVal {
-    def getJValues(implicit M: Comonad[M]): Stream[JValue] = M.copoint(results).map(_.toJValueRaw)
+  implicit class ioJValuesStreamOps(val results: IO[Stream[RValue]]) extends AnyVal {
+    def getJValues: Stream[JValue] = results.unsafeRunSync.map(_.toJValueRaw)
   }
 
-  implicit class copointJValuesIterableOps[M[_]](val results: M[Iterable[RValue]]) extends AnyVal {
-    def getJValues(implicit M: Comonad[M]): Iterable[JValue] = M.copoint(results).map(_.toJValueRaw)
+  implicit class ioJValuesIterableOps(val results: IO[Iterable[RValue]]) extends AnyVal {
+    def getJValues: Iterable[JValue] = results.unsafeRunSync.map(_.toJValueRaw)
   }
 }

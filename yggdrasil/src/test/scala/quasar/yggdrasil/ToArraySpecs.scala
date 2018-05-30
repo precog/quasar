@@ -20,7 +20,7 @@ package table
 import quasar.blueeyes.json._
 import quasar.precog.TestSupport._
 
-trait ToArraySpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike {
+trait ToArraySpec extends ColumnarTableModuleTestSupport with SpecificationLike {
   def testToArrayHomogeneous = {
     val data: Stream[JValue] =
       Stream(

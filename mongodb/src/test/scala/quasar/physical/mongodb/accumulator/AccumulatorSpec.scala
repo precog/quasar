@@ -17,11 +17,11 @@
 package quasar.physical.mongodb.accumulator
 
 import quasar.fp._
+import quasar.contrib.specs2.Spec
 
 import org.scalacheck._
 import org.scalacheck.rng.Seed
 
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties._
 

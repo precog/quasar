@@ -101,25 +101,25 @@ trait VCacheFixture extends H2MetaStoreFixture {
 
         val vc: VCacheKVS ~> Task =
           foldMapNT(
-            (fs compose injectNT[ManageFile, FileSystem]) :+:
-            Failure.toRuntimeError[Task, FileSystemError] :+:
-            t.trans                                       :+:
+            (fs compose injectNT[ManageFile, FileSystem])   :+:
+            Failure.showRuntimeError[Task, FileSystemError] :+:
+            t.trans                                         :+:
             cw
           ) compose
             VCache.interp[(ManageFile :\: FileSystemFailure :\: ConnectionIO :/: VCacheExpW)#M]
 
         val viewInterp: ViewEff ~> Task =
-          Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
-          Failure.toRuntimeError[Task, MountingError]             :+:
-          mountingInter                                           :+:
-          vs                                                      :+:
-          s                                                       :+:
-          Read.fromTaskRef(r)                                     :+:
-          cw                                                      :+:
-          reflNT[Task]                                            :+:
-          timingInterp(now)                                       :+:
-          vc                                                      :+:
-          Failure.toRuntimeError[Task, FileSystemError]           :+:
+          Failure.showRuntimeError[Task, Mounting.PathTypeMismatch] :+:
+          Failure.showRuntimeError[Task, MountingError]             :+:
+          mountingInter                                             :+:
+          vs                                                        :+:
+          s                                                         :+:
+          Read.fromTaskRef(r)                                       :+:
+          cw                                                        :+:
+          reflNT[Task]                                              :+:
+          timingInterp(now)                                         :+:
+          vc                                                        :+:
+          Failure.showRuntimeError[Task, FileSystemError]           :+:
           fs
 
         foldMapNT(viewInterp) compose viewInterpF

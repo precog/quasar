@@ -24,7 +24,7 @@ import quasar.yggdrasil.execution.EvaluationContext
 
 import scala.collection.mutable
 
-trait ReductionFinderModule[M[+ _]] extends DAG with EvaluatorMethodsModule[M] with TransSpecableModule[M] {
+trait ReductionFinderModule extends DAG with EvaluatorMethodsModule with TransSpecableModule {
   type TS1 = trans.TransSpec1
   import library._
   import trans._

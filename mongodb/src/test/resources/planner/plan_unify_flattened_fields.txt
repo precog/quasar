@@ -17,7 +17,7 @@ Chain
 │  ╰─ Path(DocField(BsonField.Name("f")))
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($f -> Lt(Int32(0)))
+│     ╰─ CondExpr($f -> Lt(Int32(0)))
 ├─ $ProjectF
 │  ├─ Name("wrap" -> {
 │  │       "$cond": [

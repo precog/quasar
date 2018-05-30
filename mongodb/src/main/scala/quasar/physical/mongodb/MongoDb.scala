@@ -122,9 +122,6 @@ object MongoDb
       : N[Repr] =
     MongoDbPlanner.planExecTime[T, N](qs, ctx, queryModel, anyDoc, execTime)
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
-
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       qs: T[QSM[T, ?]]): Backend[Repr] =

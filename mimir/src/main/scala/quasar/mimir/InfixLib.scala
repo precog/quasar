@@ -21,7 +21,7 @@ import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 import quasar.time.DateTimeInterval
 
-trait InfixLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait InfixLibModule extends ColumnarTableLibModule {
   trait InfixLib extends ColumnarTableLib {
     import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, StrFrom, doubleIsDefined }
 

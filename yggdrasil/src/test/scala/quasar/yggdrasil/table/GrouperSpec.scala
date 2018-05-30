@@ -19,8 +19,10 @@ package table
 
 import quasar.precog.common._
 import quasar.blueeyes._, json._
-import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
+
+import cats.effect.IO
+import scalaz._, Scalaz._
 
 /*
 Here are a number of motivating examples that are not reflected in the tests below, but are representative of solves that need to be
@@ -55,16 +57,13 @@ solve 'a, 'b
 */
 
 trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
-  implicit def M = Need.need
-  private def emptyTestModule = BlockStoreTestModule.empty[Need]
+  private def emptyTestModule = BlockStoreTestModule.empty
 
   def tic_a = CPathField("tic_a")
   def tic_b = CPathField("tic_b")
 
   def tic_aj = JPathField("tic_a")
   def tic_bj = JPathField("tic_b")
-
-  implicit val fid = NaturalTransformation.refl[Need]
 
   val eq12F1 = CF1P("testing::eq12F1") {
     case c: DoubleColumn => new Map1Column(c) with BoolColumn {
@@ -98,7 +97,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       SourceKey.Single, Some(TransSpec1.Id), groupId,
       GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => IO[Table]) =>
       for {
         gs1  <- map(groupId)
         gs1Json <- gs1.toJson.map(_.map(_.toJValue))
@@ -124,7 +123,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultIter = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultIter = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultIter must haveSize(set.distinct.size)
 
@@ -159,7 +158,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       SourceKey.Single, Some(valueTrans), groupId,
       GroupKeySpecSource(tic_a, SourceValue.Single))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => IO[Table]) =>
       for {
         gs1  <- map(groupId)
         gs1Json <- gs1.toJson.map(_.map(_.toJValue))
@@ -184,7 +183,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultIter = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultIter = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultIter must haveSize(set.distinct.size)
 
@@ -215,7 +214,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       SourceKey.Single, Some(TransSpec1.Id), groupId,
       GroupKeySpecSource(tic_a, Map1(SourceValue.Single, mod2)))
 
-    val result = Table.merge(spec) { (key: RValue, map: GroupId => Need[Table]) =>
+    val result = Table.merge(spec) { (key: RValue, map: GroupId => IO[Table]) =>
       for {
         gs1  <- map(groupId)
         gs1Json <- gs1.toJson.map(_.map(_.toJValue))
@@ -240,7 +239,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultIter = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultIter = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultIter must haveSize((set map { _ % 2 } distinct) size)
 
@@ -314,7 +313,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultJson must haveSize(2)
 
@@ -391,7 +390,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
     resultJson must haveSize(8)
 
     forall(resultJson) { v =>
@@ -433,7 +432,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultJson must haveSize(1)
 
@@ -484,7 +483,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultJson must haveSize(5)
 
@@ -558,7 +557,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     resultJson must haveSize((rawData1.toSet intersect rawData2.toSet).size)
 
@@ -641,7 +640,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
 
     val joinKeys = (rawData1.map(_._1).toSet intersect rawData2.toSet)
 
@@ -742,7 +741,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val resultJson = result.flatMap(_.toJson).copoint.map(_.toJValue)
+    val resultJson = result.flatMap(_.toJson).unsafeRunSync.map(_.toJValue)
     val elapsedOverMerge = System.currentTimeMillis - firstMerge
     //println("total elapsed in merge: " + elapsedOverMerge)
     //println("total elapsed outside of body: " + (elapsedOverMerge - elapsed))
@@ -889,7 +888,7 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
       }
     }
 
-    val forallJson = forallResult flatMap { _.toJson } copoint
+    val forallJson = forallResult flatMap { _.toJson } unsafeRunSync
 
     forallJson must not(beEmpty)
     forallJson must haveSize(3)
@@ -1010,4 +1009,4 @@ trait GrouperSpec extends SpecificationLike with ScalaCheck { self =>
   "handle non-trivial group alignment with composite key" in testNonTrivial
 }
 
-object GrouperSpec extends TableModuleSpec[Need] with GrouperSpec
+object GrouperSpec extends TableModuleSpec with GrouperSpec

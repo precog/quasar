@@ -52,7 +52,8 @@ abstract class VCacheSpec extends KeyValueStoreSpec[AFile, ViewCache] with MetaS
       inMem.leftMap(inMemFS =>
         (taskToConnectionIO compose inMemFS compose
           InMemory.fileSystem compose injectNT[ManageFile, FileSystem])            :+:
-        (taskToConnectionIO compose Failure.toRuntimeError[Task, FileSystemError]) :+:
+        (taskToConnectionIO compose
+          Failure.showRuntimeError[Task, FileSystemError])                         :+:
         reflNT[ConnectionIO]                                                       :+:
         (taskToConnectionIO compose Write.fromTaskRef(r))))
 

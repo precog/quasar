@@ -28,6 +28,7 @@ import quasar.javascript._
 import quasar.jscore, jscore.JsFn
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{IdStatus, ShiftType}
 import quasar.std.StdLib._
@@ -663,7 +664,13 @@ object WorkflowBuilder {
   }
 
   object Base {
-    implicit val show: Show[Base] = Show.showFromToString
+    implicit val show: Show[Base] = new Show[Base] {
+      override def shows(b: Base): String = b match {
+        case Root() => "Root()"
+        case Field(n) => s"Field(${n.show})"
+        case Subset(fs) => s"Subset(${fs.show})"
+      }
+    }
   }
 
   /** The content is already at $$ROOT. */

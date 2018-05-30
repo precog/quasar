@@ -18,6 +18,7 @@ package quasar.physical.mongodb.workflowtask
 
 import slamdata.Predef._
 import quasar.physical.mongodb._
+import quasar.physical.mongodb.selector.Selector
 
 import matryoshka.data.Fix
 import scalaz._

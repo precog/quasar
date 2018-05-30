@@ -17,14 +17,16 @@
 package quasar.yggdrasil
 package table
 
+import quasar.blueeyes._, json._
 import quasar.yggdrasil.bytecode._
 import quasar.precog.common._
-
-import quasar.blueeyes._, json._
-import scalaz._, Scalaz._
 import quasar.precog.TestSupport._
 
-trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+import cats.effect.IO
+import scalaz._, Scalaz._
+import shims._
+
+trait PartitionMergeSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import trans.{Range => _, _}
 
   def testPartitionMerge = {
@@ -49,7 +51,7 @@ trait PartitionMergeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with S
       "4a"
     ]""")
 
-    val result: M[Table] = tbl.partitionMerge(DerefObjectStatic(Leaf(Source), CPathField("key"))) { table =>
+    val result: IO[Table] = tbl.partitionMerge(DerefObjectStatic(Leaf(Source), CPathField("key"))) { table =>
       val reducer = new Reducer[String] {
         def reduce(schema: CSchema, range: Range): String = {
           schema.columns(JTextT).head match {

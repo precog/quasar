@@ -20,21 +20,23 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.bytecode._
 
+import cats.effect.IO
 import scalaz._, Scalaz._
+import shims._
 
 //FIXME: This is only used in test at this point, kill with fire in favor of VFSColumnarTableModule
-trait SliceColumnarTableModule[M[+ _]] extends BlockStoreColumnarTableModule[M] with ProjectionModule[M, Slice] {
+trait SliceColumnarTableModule extends BlockStoreColumnarTableModule with ProjectionModule[Slice] {
   type TableCompanion <: SliceColumnarTableCompanion
 
   trait SliceColumnarTableCompanion extends BlockStoreColumnarTableCompanion {
-    def load(table: Table, tpe: JType): EitherT[M, vfs.ResourceError, Table] = EitherT.rightT {
+    def load(table: Table, tpe: JType): EitherT[IO, vfs.ResourceError, Table] = EitherT.rightT {
       for {
         paths <- pathsM(table)
         projections <- paths.toList.traverse(Projection(_)).map(_.flatten)
         totalLength = projections.map(_.length).sum
       } yield {
-        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[M, Slice] = {
-          StreamT.unfoldM[M, Slice, Option[proj.Key]](None) { key =>
+        def slices(proj: Projection, constraints: Option[Set[ColumnRef]]): StreamT[IO, Slice] = {
+          StreamT.unfoldM[IO, Slice, Option[proj.Key]](None) { key =>
             proj.getBlockAfter(key, constraints).map { b =>
               b.map {
                 case BlockProjectionData(_, maxKey, slice) =>
@@ -44,11 +46,10 @@ trait SliceColumnarTableModule[M[+ _]] extends BlockStoreColumnarTableModule[M] 
           }
         }
 
-        val stream = projections.foldLeft(StreamT.empty[M, Slice]) { (acc, proj) =>
+        val stream = projections.foldLeft(StreamT.empty[IO, Slice]) { (acc, proj) =>
           // FIXME: Can Schema.flatten return Option[Set[ColumnRef]] instead?
-          val constraints: M[Option[Set[ColumnRef]]] = proj.structure.map { struct =>
-            Some(Schema.flatten(tpe, struct.toList).toSet)
-          }
+          val constraints: IO[Option[Set[ColumnRef]]] =
+            IO.pure(Some(Schema.flatten(tpe, proj.structure.toList).toSet))
 
           acc ++ StreamT.wrapEffect(constraints map { c =>
             slices(proj, c)

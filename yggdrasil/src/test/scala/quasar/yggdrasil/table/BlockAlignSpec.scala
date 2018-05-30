@@ -17,18 +17,19 @@
 package quasar.yggdrasil
 package table
 
-import quasar.precog.common._
 import quasar.blueeyes._, json._
-import scalaz._, Scalaz._
+import quasar.precog.common._
 import quasar.precog.TestSupport._
+
+import scalaz._, Scalaz._
+import shims._
 import org.scalacheck.Gen._
 // import org.specs2.ScalaCheck
 // import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 
 trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
-  implicit def M = Need.need
-  private def emptyTestModule = BlockStoreTestModule.empty[Need]
+  private def emptyTestModule = BlockStoreTestModule.empty
 
   def testAlign(sample: SampleData) = {
     val module = emptyTestModule
@@ -50,7 +51,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
       (leftResult, rightResult, leftResult2)
     }
 
-    val (leftResult, rightResult, leftResult2) = finalResults.copoint
+    val (leftResult, rightResult, leftResult2) = finalResults.unsafeRunSync
 
     leftResult must_== expected
     rightResult must_== expected
@@ -297,7 +298,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
         rjson <- aligned._2.toJson
       } yield {
         (ljson, rjson)
-      }).copoint
+      }).unsafeRunSync
 
       val (ljsonreversed, rjsonreversed) = (for {
         aligned <- Table.align(rtable, alignOnR, ltable, alignOnL)
@@ -305,7 +306,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
         rjson <- aligned._2.toJson
       } yield {
         (ljson, rjson)
-      }).copoint
+      }).unsafeRunSync
 
       (ljsonreversed.toList must_== rjsondirect.toList) and
       (rjsonreversed.toList must_== ljsondirect.toList)
@@ -429,7 +430,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
   }
 }
 
-object BlockAlignSpec extends TableModuleSpec[Need] with BlockAlignSpec {
+object BlockAlignSpec extends TableModuleSpec with BlockAlignSpec {
   "align" should {
     "a simple example" in alignSimple
     "across slice boundaries" in alignAcrossBoundaries

@@ -19,16 +19,15 @@ package table
 
 import quasar.yggdrasil.bytecode._
 import quasar.blueeyes._, json._
-import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 
-trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait SchemasSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   def testSingleSchema = {
     val expected = Set(JObjectFixedT(Map("a" -> JNumberT, "b" -> JTextT, "c" -> JNullT)))
     val trivialData = Stream.fill(100)(JParser.parseUnsafe("""{ "a": 1, "b": "x", "c": null }"""))
     val sample = SampleData(trivialData)
     val table = fromSample(sample, Some(10))
-    table.schemas.copoint must_== expected
+    table.schemas.unsafeRunSync must_== expected
   }
 
   def testHomogeneousArraySchema = {
@@ -36,7 +35,7 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     val data = Stream.fill(10)(JParser.parseUnsafe("""[1, 2, 3]"""))
     val table0 = fromSample(SampleData(data), Some(10))
     val table = table0.toArray[Long]
-    table.schemas.copoint must_== expected
+    table.schemas.unsafeRunSync must_== expected
   }
 
   def testCrossSliceSchema = {
@@ -47,7 +46,7 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     val data = Stream.fill(10)(JParser.parseUnsafe("""{ "a": 1, "b": "2" }""")) ++
       Stream.fill(10)(JParser.parseUnsafe("""{ "a": "x", "b": 2 }"""))
     val table = fromSample(SampleData(data), Some(10))
-    table.schemas.copoint must_== expected
+    table.schemas.unsafeRunSync must_== expected
   }
 
   def testIntervleavedSchema = {
@@ -62,7 +61,7 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       case _ => JParser.parseUnsafe("""{ "a": [ 1, 2 ], "b": [ "2", {} ] }""")
     }
     val table = fromSample(SampleData(data), Some(10))
-    table.schemas.copoint must_== expected
+    table.schemas.unsafeRunSync must_== expected
   }
 
   def testUndefinedsInSchema = {
@@ -81,7 +80,7 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     }
 
     val table = fromSample(SampleData(data), Some(10))
-    table.schemas.copoint must_== expected
+    table.schemas.unsafeRunSync must_== expected
   }
 
   def testAllTypesInSchema = {
@@ -117,6 +116,6 @@ trait SchemasSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
     ) map (JParser.parseUnsafe(_))
 
     val table = fromSample(SampleData(data), Some(10))
-    table.schemas.copoint must_== expected
+    table.schemas.unsafeRunSync must_== expected
   }
 }

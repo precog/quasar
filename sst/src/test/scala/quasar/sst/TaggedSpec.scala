@@ -18,14 +18,14 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka.arbitrary._
+import quasar.contrib.specs2.Spec
 import quasar.fp._
 
 import matryoshka._
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
+import scalaz.scalacheck.{ScalazProperties => propz}
 
 final class TaggedSpec extends Spec with TaggedArbitrary {
-  checkAll(equal.laws[Tagged[Int]])
-  checkAll(traverse1.laws[Tagged])
+  checkAll(propz.equal.laws[Tagged[Int]])
+  checkAll(propz.traverse1.laws[Tagged])
 }

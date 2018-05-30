@@ -21,6 +21,7 @@ import quasar.common.SortDir
 import quasar.javascript._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 
 import scala.collection.immutable.ListMap
@@ -40,13 +41,13 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
     "write trivial workflow to JS" in {
       val wf = $read[WorkflowF](collection("db", "zips"))
 
-      toJS(wf) must beRightDisjunction("db.zips.find();\n")
+      toJS(wf) must be_\/-("db.zips.find();\n")
     }
 
     "write trivial workflow to JS with fancy collection name" in {
       val wf = $read[WorkflowF](collection("db", "tmp.123"))
 
-      toJS(wf) must beRightDisjunction("db.getCollection(\"tmp.123\").find();\n")
+      toJS(wf) must be_\/-("db.getCollection(\"tmp.123\").find();\n")
     }
 
     "be empty for pure values" in {
@@ -54,7 +55,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         Bson.Doc(ListMap("foo" -> Bson.Int64(1))),
         Bson.Doc(ListMap("bar" -> Bson.Int64(2))))))
 
-        toJS(wf) must beRightDisjunction("")
+        toJS(wf) must be_\/-("")
     }
 
     "write simple query to JS" in {
@@ -63,7 +64,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.find({ "pop": { "$gte": NumberLong("1000") } });
           |""".stripMargin)
     }
@@ -73,7 +74,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $read[WorkflowF](collection("db", "zips")),
         $limit[WorkflowF](10))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.find().limit(10);
           |""".stripMargin)
     }
@@ -87,7 +88,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
             BsonField.Name("city") -> $include().right)),
           ExcludeId))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.find({ "city": true, "_id": false }).limit(10);
           |""".stripMargin)
     }
@@ -103,7 +104,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
             BsonField.Name("city") -> $include().right)),
           ExcludeId))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.find(
           |  { "pop": { "$lt": NumberLong("1000") } },
           |  { "city": true, "_id": false }).limit(
@@ -121,7 +122,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
             BsonField.Name("num") -> $sum($literal(Bson.Int32(1))))),
           $literal(Bson.Null).right))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.count({ "pop": { "$gte": NumberLong("1000") } });
           |""".stripMargin)
     }
@@ -135,7 +136,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
           $literal(Bson.Null).right),
         $limit[WorkflowF](11))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.count();
           |""".stripMargin)
     }
@@ -152,7 +153,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
             BsonField.Name("c") -> $field("_id", "0").right)),
           ExcludeId))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.distinct("city").map(function (elem) { return { "c": elem } });
           |""".stripMargin)
     }
@@ -171,7 +172,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
             BsonField.Name("c") -> $field("_id", "0").right)),
           ExcludeId))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.distinct("city", { "pop": { "$gte": NumberLong("1000") } }).map(
           |  function (elem) { return { "c": elem } });
           |""".stripMargin)
@@ -183,7 +184,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $match[WorkflowF](Selector.Doc(
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(1000)))))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.find({ "pop": { "$gte": NumberLong("1000") } });
           |""".stripMargin)
     }
@@ -197,7 +198,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
           BsonField.Name("pop") -> Selector.Gte(Bson.Int64(100)))),
         $sort[WorkflowF](NonEmptyList(BsonField.Name("city") -> SortDir.Ascending)))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.find(
           |  {
           |    "$and": [
@@ -221,7 +222,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
           $field("city").right),
         $sort[WorkflowF](NonEmptyList(BsonField.Name("_id") -> SortDir.Ascending)))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips.aggregate(
           |  [
           |    {
@@ -250,7 +251,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
             List(Js.Ident("values")))))),
           ListMap()))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         s"""db.zips.mapReduce(
           |  function () {
           |    emit.apply(
@@ -272,7 +273,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
         $read[WorkflowF](collection("db", "zips2")),
         $match[WorkflowF](Selector.Where(Js.Ident("foo"))))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips2.mapReduce(
           |  function () {
           |    emit.apply(
@@ -308,7 +309,7 @@ class JavaScriptWorkflowExecutionSpec extends quasar.Qspec {
                 List(Js.Ident("values")))))),
               ListMap())))
 
-      toJS(wf) must beRightDisjunction(
+      toJS(wf) must be_\/-(
         """db.zips1.aggregate(
           |  [
           |    { "$match": { "city": "BOULDER" } },

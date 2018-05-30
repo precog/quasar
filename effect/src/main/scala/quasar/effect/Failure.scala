@@ -99,9 +99,12 @@ object Failure {
   def toCatchable[F[_], E <: Throwable](implicit C: Catchable[F]): Failure[E, ?] ~> F =
     λ[Failure[E, ?] ~> F]{ case Fail(e) => C.fail(e)}
 
-  def toRuntimeError[F[_]: Catchable, E: Show]: Failure[E, ?] ~> F =
-    toCatchable[F, RuntimeException]
-      .compose[Failure[E, ?]](mapError(e => new RuntimeException(e.shows)))
+  def toRuntimeError[F[_]: Catchable, E](f: E => Exception): Failure[E, ?] ~> F =
+    toCatchable[F, Exception]
+      .compose[Failure[E, ?]](mapError(e => f(e)))
+
+  def showRuntimeError[F[_]: Catchable, E: Show]: Failure[E, ?] ~> F =
+    toRuntimeError(e => new Exception(e.shows))
 
   def attempt[S[_], E](implicit S: Failure[E, ?] :<: S): S ~> EitherT[Free[S, ?], E, ?] = new (S ~> EitherT[Free[S, ?], E, ?]) {
     def apply[A](sa: S[A]) =

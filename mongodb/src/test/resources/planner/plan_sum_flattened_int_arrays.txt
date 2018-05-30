@@ -70,7 +70,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
+│     ╰─ CondExpr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$add": [

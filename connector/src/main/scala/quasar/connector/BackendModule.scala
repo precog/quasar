@@ -26,7 +26,7 @@ import quasar.concurrent.Pools._
 import quasar.contrib.pathy._
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
-import quasar.contrib.scalaz.concurrent._
+import quasar.contrib.scalaz.concurrent.shift
 import quasar.fp._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}

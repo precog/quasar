@@ -55,8 +55,8 @@ class MounterSpec extends MountingSpec[MounterSpec.Eff] {
     val interpMEff: MEff ~> Task =
       reflNT[Task]                                   :+:
       interpMnts                                     :+:
-      Failure.toRuntimeError[Task, MountingError]    :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch]
+      Failure.showRuntimeError[Task, MountingError]    :+:
+      Failure.showRuntimeError[Task, PathTypeMismatch]
 
     free.foldMapNT(interpMEff) compose interpEff
   }

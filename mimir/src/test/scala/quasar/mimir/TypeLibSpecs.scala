@@ -21,8 +21,8 @@ import quasar.yggdrasil._
 
 import scalaz._
 
-trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
-    with LongIdMemoryDatasetConsumer[M] { self =>
+trait TypeLibSpecs extends EvaluatorSpecification
+    with LongIdMemoryDatasetConsumer { self =>
 
   import dag._
   import instructions._
@@ -146,4 +146,4 @@ trait TypeLibSpecs[M[+_]] extends EvaluatorSpecification[M]
   }
 }
 
-object TypeLibSpecs extends TypeLibSpecs[Need]
+object TypeLibSpecs extends TypeLibSpecs

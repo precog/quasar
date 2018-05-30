@@ -54,9 +54,6 @@ class MongoDbFileSystemSpec
   extends FileSystemTest[BackendEffectIO](mongoFsUT map (_ filter (_.ref supports BackendCapability.write())))
   with quasar.ExclusiveQuasarSpecification {
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
-
   val query  = QueryFile.Ops[BackendEffectIO]
   val write  = WriteFile.Ops[BackendEffectIO]
   val manage = ManageFile.Ops[BackendEffectIO]

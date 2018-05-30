@@ -17,13 +17,13 @@
 package quasar.ejson
 
 import slamdata.Predef.{Int => SInt, _}
+import quasar.contrib.specs2.Spec
 
-import org.specs2.scalaz._
 import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalazProperties._
+import scalaz.scalacheck.ScalazProperties
 
 class EqMapSpec extends Spec with EqMapArbitrary {
-  checkAll(equal.laws[EqMap[SInt, String]])
+  checkAll(ScalazProperties.equal.laws[EqMap[SInt, String]])
 
   "operations" >> {
     "insert" >> prop { (m: EqMap[SInt, String], k: SInt, v: String) =>

@@ -612,14 +612,14 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
     "no match" >> {
       resolvedRefs(Map(), lpf.read(rootDir </> file("zips"))) must
-        beRightDisjunction.like { case r => r must beTreeEqual(lpf.read(rootDir </> file("zips"))) }
+        be_\/-.like { case r => r must beTreeEqual(lpf.read(rootDir </> file("zips"))) }
     }
 
     "trivial read" >> {
       val p = rootDir </> dir("view") </> file("justZips")
       val vs = Map[AFile, Fix[Sql]](p -> sqlE"select * from `/zips`")
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
+      resolvedRefs(vs, lpf.read(p)) must be_\/-.like {
         case r => r must beTreeEqual(
           Fix(Squash(lpf.read(rootDir </> file("zips"))))
         )
@@ -634,7 +634,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
           4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, fb, None)
 
-      resolvedRefsVC(Map.empty, Map(fa -> viewCache), lpf.read(fa)) must beRightDisjunction.like {
+      resolvedRefsVC(Map.empty, Map(fa -> viewCache), lpf.read(fa)) must be_\/-.like {
         case r => r must beTreeEqual(
           lpf.read(rootDir </> file("b")))
       }
@@ -644,7 +644,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
       val p = rootDir </> dir("foo") </> file("justZips")
       val vs = Map[AFile, Fix[Sql]](p -> sqlE"select * from zips")
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like {
+      resolvedRefs(vs, lpf.read(p)) must be_\/-.like {
         case r => r must beTreeEqual(
           Fix(Squash(lpf.read(rootDir </> dir("foo") </> file("zips"))))
         )
@@ -675,7 +675,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
             lpf.constant(Data.Int(5))).embed,
           lpf.constant(Data.Int(10))).embed).value.toOption.get
 
-      resolvedRefs(vs, outer) must beRightDisjunction.like {
+      resolvedRefs(vs, outer) must be_\/-.like {
         case r => r must beTreeEqual(exp)
       }
     }
@@ -688,7 +688,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           sqlE"select * from view1")
 
       resolvedRefs(vs, lpf.read(rootDir </> dir("view") </> file("view2"))) must
-        beRightDisjunction.like { case r => r must beTreeEqual(
+        be_\/-.like { case r => r must beTreeEqual(
           Squash(lpf.read(rootDir </> file("zips"))).embed)
         }
     }
@@ -705,7 +705,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
           MountConfig.ViewConfig(sqlB"α", Variables.empty), None, None, 0, None, None,
           4.seconds.toSeconds, nineteenSixty, ViewCache.Status.Successful, None, dest, None))
 
-      resolvedRefsVC(vs, vcache, lpf.read(rootDir </> file("view"))) must beRightDisjunction.like {
+      resolvedRefsVC(vs, vcache, lpf.read(rootDir </> file("view"))) must be_\/-.like {
         case r => r must beTreeEqual(
           Squash(lpf.read(dest)).embed)
       }
@@ -735,7 +735,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         JoinType.Inner,
         JoinCondition('__leftJoin2, '__rightJoin3, lpf.constant(Data.Bool(true))))
 
-      resolvedRefs(vs, q) must beRightDisjunction.like { case r => r must beTreeEqual(exp) }
+      resolvedRefs(vs, q) must be_\/-.like { case r => r must beTreeEqual(exp) }
     }
 
     "self reference" >> {
@@ -752,7 +752,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
 
       val vs = Map[AFile, Fix[Sql]](p -> q)
 
-      resolvedRefs(vs, lpf.read(p)) must beRightDisjunction.like { case r => r must beTreeEqual(qlp) }
+      resolvedRefs(vs, lpf.read(p)) must be_\/-.like { case r => r must beTreeEqual(qlp) }
     }
 
     "circular reference" >> {
@@ -770,7 +770,7 @@ class ViewFileSystemSpec extends quasar.Qspec with TreeMatchers {
         v1p -> unsafeParse(s"select * from `${posixCodec.printPath(v2p)}` offset 5"),
         v2p -> unsafeParse(s"select * from `${posixCodec.printPath(v1p)}` limit 10"))
 
-      resolvedRefs(vs, lpf.read(v2p)) must beRightDisjunction.like {
+      resolvedRefs(vs, lpf.read(v2p)) must be_\/-.like {
         case r => r must beTreeEqual(
           Take(
             Squash(Drop(

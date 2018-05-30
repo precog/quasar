@@ -4,7 +4,7 @@ Chain
 │  │  ├─ $ReadF(db; zips)
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($loc -> ElemMatch(\/-(Exists(true))))
+│  │  │     ╰─ CondExpr($loc -> ElemMatch(\/-(Exists(true))))
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> {
 │  │  │  │       "$cond": [
@@ -20,7 +20,7 @@ Chain
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
+│  │  │     ╰─ CondExpr($0 -> Eq(Bool(true)))
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("s" -> "$src")
 │  │  │  ├─ Name("f" -> "$src.loc")
@@ -47,7 +47,7 @@ Chain
 │     ├─ $ReadF(db; zips)
 │     ├─ $MatchF
 │     │  ╰─ Doc
-│     │     ╰─ Expr($loc -> ElemMatch(\/-(Exists(true))))
+│     │     ╰─ CondExpr($loc -> ElemMatch(\/-(Exists(true))))
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> {
 │     │  │       "$cond": [
@@ -63,7 +63,7 @@ Chain
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Eq(Bool(true)))
+│     │     ╰─ CondExpr($0 -> Eq(Bool(true)))
 │     ├─ $ProjectF
 │     │  ├─ Name("s" -> "$src")
 │     │  ├─ Name("f" -> "$src.loc")
@@ -90,8 +90,8 @@ Chain
 │        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($left -> Size(0))
-│     ╰─ NotExpr($right -> Size(0))
+│     ├─ NotCondExpr($left -> Size(0))
+│     ╰─ NotCondExpr($right -> Size(0))
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF

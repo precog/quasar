@@ -29,6 +29,7 @@ import quasar.jscore, jscore.{JsCore, JsFn}
 import quasar.physical.mongodb._, WorkflowBuilder._
 import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.ExcludeId
 
@@ -304,7 +305,7 @@ object JoinHandler {
 
     // TODO: Do we get any benefit from pre-filtering the join before unwinding?
     //       We should check.
-    val nonEmpty: Selector.SelectorExpr = Selector.NotExpr(Selector.Size(0))
+    val nonEmpty: Selector.ConditionExpr = Selector.NotCondExpr(Selector.Size(0))
 
     def buildJoin(src: WorkflowBuilder[WF], tpe: JoinType): WorkflowBuilder[WF] =
       tpe match {

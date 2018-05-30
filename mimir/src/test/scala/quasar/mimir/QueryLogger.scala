@@ -18,47 +18,49 @@ package quasar.mimir
 
 import org.slf4j.LoggerFactory
 
+import cats.effect.IO
 import scalaz._
 import scalaz.syntax.monad._
+import shims._
 
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-trait QueryLogger[M[+ _], -P] { self =>
-  def contramap[P0](f: P0 => P): QueryLogger[M, P0] = new QueryLogger[M, P0] {
-    def die(): M[Unit]                        = self.die()
-    def error(pos: P0, msg: String): M[Unit]  = self.error(f(pos), msg)
-    def warn(pos: P0, msg: String): M[Unit]   = self.warn(f(pos), msg)
-    def info(pos: P0, msg: String): M[Unit]   = self.info(f(pos), msg)
-    def log(pos: P0, msg: String): M[Unit]    = self.log(f(pos), msg)
-    def timing(pos: P0, nanos: Long): M[Unit] = self.timing(f(pos), nanos)
-    def done: M[Unit]                         = self.done
+trait QueryLogger[-P] { self =>
+  def contramap[P0](f: P0 => P): QueryLogger[P0] = new QueryLogger[P0] {
+    def die(): IO[Unit]                        = self.die()
+    def error(pos: P0, msg: String): IO[Unit]  = self.error(f(pos), msg)
+    def warn(pos: P0, msg: String): IO[Unit]   = self.warn(f(pos), msg)
+    def info(pos: P0, msg: String): IO[Unit]   = self.info(f(pos), msg)
+    def log(pos: P0, msg: String): IO[Unit]    = self.log(f(pos), msg)
+    def timing(pos: P0, nanos: Long): IO[Unit] = self.timing(f(pos), nanos)
+    def done: IO[Unit]                         = self.done
   }
 
-  def die(): M[Unit]
+  def die(): IO[Unit]
 
   /**
     * This reports a error to the user. Depending on the implementation, this may
     * also stop computation completely.
     */
-  def error(pos: P, msg: String): M[Unit]
+  def error(pos: P, msg: String): IO[Unit]
 
   /**
     * Report a warning to the user.
     */
-  def warn(pos: P, msg: String): M[Unit]
+  def warn(pos: P, msg: String): IO[Unit]
 
   /**
     * Report an informational message to the user.
     */
-  def info(pos: P, msg: String): M[Unit]
+  def info(pos: P, msg: String): IO[Unit]
 
   /**
     * Report an information message for internal use only
     */
-  def log(pos: P, msg: String): M[Unit]
+  def log(pos: P, msg: String): IO[Unit]
 
   /**
     * Record timing information for a particular position.  Note that a position
@@ -78,51 +80,46 @@ trait QueryLogger[M[+ _], -P] { self =>
     * seconds to avoid signed Long value overflow.  Conveniently, our query timeout
     * is 300 seconds, so this is not an issue.
     */
-  def timing(pos: P, nanos: Long): M[Unit]
+  def timing(pos: P, nanos: Long): IO[Unit]
 
-  def done: M[Unit]
+  def done: IO[Unit]
 }
 
-trait LoggingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
-  implicit def M: Applicative[M]
+trait LoggingQueryLogger[P] extends QueryLogger[P] {
 
   protected val logger = LoggerFactory.getLogger("quasar.mimir.QueryLogger")
 
-  def die(): M[Unit] = M.point { () }
+  def die(): IO[Unit] = IO { () }
 
-  def error(pos: P, msg: String): M[Unit] = M.point {
+  def error(pos: P, msg: String): IO[Unit] = IO {
     logger.error(pos.toString + " - " + msg)
   }
 
-  def warn(pos: P, msg: String): M[Unit] = M.point {
+  def warn(pos: P, msg: String): IO[Unit] = IO {
     logger.warn(pos.toString + " - " + msg)
   }
 
-  def info(pos: P, msg: String): M[Unit] = M.point {
+  def info(pos: P, msg: String): IO[Unit] = IO {
     logger.info(pos.toString + " - " + msg)
   }
 
-  def debug(pos: P, msg: String): M[Unit] = M.point {
+  def debug(pos: P, msg: String): IO[Unit] = IO {
     logger.debug(pos.toString + " - " + msg)
   }
 
-  def log(pos: P, msg: String): M[Unit] = debug(pos, msg)
+  def log(pos: P, msg: String): IO[Unit] = debug(pos, msg)
 }
 
 object LoggingQueryLogger {
-  def apply[M[+ _]](implicit M0: Monad[M]): QueryLogger[M, Any] = {
-    new LoggingQueryLogger[M, Any] with TimingQueryLogger[M, Any] {
-      val M = M0
-    }
+  def apply: QueryLogger[Any] = {
+    new LoggingQueryLogger[Any] with TimingQueryLogger[Any]
   }
 }
 
-trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
-  implicit def M: Monad[M]
-
+trait TimingQueryLogger[P] extends QueryLogger[P] {
   private val table = new ConcurrentHashMap[P, Stats]
 
-  def timing(pos: P, nanos: Long): M[Unit] = {
+  def timing(pos: P, nanos: Long): IO[Unit] = {
     @tailrec
     def loop() {
       val stats = table get pos
@@ -140,18 +137,18 @@ trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
       }
     }
 
-    M point {
+    IO {
       loop()
     }
   }
 
-  def done: M[Unit] = {
+  def done: IO[Unit] = {
     val logging = table.asScala map {
       case (pos, stats) =>
         log(pos, """{"count":%d,"sum":%d,"sumSq":%d,"min":%d,"max":%d}""".format(stats.count, stats.sum, stats.sumSq, stats.min, stats.max))
     }
 
-    logging reduceOption { _ >> _ } getOrElse (M point ())
+    logging reduceOption { _ >> _ } getOrElse (IO.unit)
   }
 
   private case class Stats(count: Long, sum: Long, sumSq: Long, min: Long, max: Long) {
@@ -161,10 +158,8 @@ trait TimingQueryLogger[M[+ _], P] extends QueryLogger[M, P] {
   }
 }
 
-trait ExceptionQueryLogger[M[+ _], -P] extends QueryLogger[M, P] {
-  implicit def M: Applicative[M]
-
-  abstract override def die(): M[Unit] =
+trait ExceptionQueryLogger[-P] extends QueryLogger[P] {
+  abstract override def die(): IO[Unit] =
     for {
       _ <- super.die()
       _ = throw FatalQueryException("Query terminated abnormally.")

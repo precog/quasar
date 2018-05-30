@@ -17,14 +17,14 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
+import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
-import quasar.fp._
 import quasar.fp.ski._
-import quasar.fs.{Planner => QPlanner}, QPlanner._
-import quasar.physical.mongodb.{BsonVersion, Selector, WorkflowBuilder}, WorkflowBuilder._
+import quasar.physical.mongodb.{BsonVersion, WorkflowBuilder}, WorkflowBuilder._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner.{selector => sel}
 import quasar.physical.mongodb.planner.selector._
+import quasar.physical.mongodb.selector.Selector
 import quasar.qscript._
 
 import matryoshka._
@@ -35,6 +35,18 @@ import scalaz._, Scalaz._
 
 object getFilterBuilder {
 
+  def filterBuilder[T[_[_]], M[_]: Applicative, WF[_], A](
+    handler: FreeMapA[T, A] => M[Expr],
+    src: WorkflowBuilder[WF],
+    partialSel: PartialSelector[T],
+    fm: FreeMapA[T, A])
+    (implicit WB: WorkflowBuilder.Ops[WF])
+      : M[WorkflowBuilder[WF]] = {
+    val (sel, inputs) = partialSel
+
+    inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src, _, sel))
+  }
+
   /* Given a handler of type FreeMapA[T, A] => Expr, a FreeMapA[T, A]
    *  and a source WorkflowBuilder, return a new WorkflowBuilder
    *  filtered according to the `Cond`s found in the FreeMapA[T, A].
@@ -42,7 +54,7 @@ object getFilterBuilder {
    *  of the FreeMapA[T, A]
    */
   def apply
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT: RenderTreeT, M[_]: Monad, WF[_], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp, WB: WorkflowBuilder.Ops[WF])
@@ -50,13 +62,6 @@ object getFilterBuilder {
 
     import MapFuncCore._
     import MapFuncsCore._
-
-    def filterBuilder(src0: WorkflowBuilder[WF], partialSel: PartialSelector[T]):
-        M[WorkflowBuilder[WF]] = {
-      val (sel, inputs) = partialSel
-
-      inputs.traverse(f => handler(f(fm))) ∘ (WB.filter(src0, _, sel))
-    }
 
     def elideCond: CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] = {
       case CoEnv(\/-(MFC(Cond(if_, then_, Embed(CoEnv(\/-(MFC(Undefined())))))))) =>
@@ -68,6 +73,7 @@ object getFilterBuilder {
       interpret(κ(Cofree(ann, MFC(Undefined()))), attributeAlgebra[MapFunc[T, ?], B](κ(ann)))
 
     val undefinedF: MapFunc[T, Cofree[MapFunc[T, ?], Boolean] \/ FreeMapA[T, A]] = MFC(Undefined())
+
     val gcoalg: GCoalgebra[Cofree[MapFunc[T, ?], Boolean] \/ ?, EnvT[Boolean, MapFunc[T, ?], ?], FreeMapA[T, A]] =
       _.fold(κ(envT(false, undefinedF)), {
         case MFC(Cond(if_, then_, undef @ Embed(CoEnv(\/-(MFC(Undefined())))))) =>
@@ -76,7 +82,7 @@ object getFilterBuilder {
         case otherwise => envT(false, otherwise ∘ (_.right))
       })
 
-    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]] = { node =>
+    val galg: GAlgebra[(Cofree[MapFunc[T, ?], Boolean], ?), EnvT[Boolean, MapFunc[T, ?], ?], Output[T]] = { node =>
       def forgetAnn: Cofree[MapFunc[T, ?], Boolean] => T[MapFunc[T, ?]] = _.transCata[T[MapFunc[T, ?]]](_.lower)
 
       node.runEnvT match {
@@ -92,7 +98,7 @@ object getFilterBuilder {
                | MFC(Lte(_, _))
                | MFC(Gt(_, _))
                | MFC(Gte(_, _))
-               | MFC(Undefined()) => defaultSelector[T].right
+               | MFC(Undefined()) => defaultSelector[T].some
             /** The cases here don't readily imply selectors, but
               *  still need to be handled in case a `Cond` is nested
               *  inside one of these.  For instance, if ConcatMaps
@@ -104,7 +110,7 @@ object getFilterBuilder {
             case MFC(MakeMap((_, _), (_, v))) => v.map { case (sel, inputs) => (sel, inputs.map(There(1, _))) }
             case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
             case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-            case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+            case _ => none
           })
 
         case (false, wa) => wa match {
@@ -113,16 +119,16 @@ object getFilterBuilder {
           case MFC(ConcatMaps((_, lhs), (_, rhs))) => invoke2Rel(lhs, rhs)(Selector.Or(_, _))
           case MFC(Guard((_, if_), _, _, _)) => if_.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
           case MFC(Cond((_, pred), _, _)) => pred.map { case (sel, inputs) => (sel, inputs.map(There(0, _))) }
-          case otherwise => InternalError.fromMsg(otherwise.map(_._1).shows).left
+          case _ => none
         }
       }
     }
 
     val sels: Option[PartialSelector[T]] =
       fm.ghylo[(Cofree[MapFunc[T, ?], Boolean], ?), Cofree[MapFunc[T, ?], Boolean] \/ ?]
-        [EnvT[Boolean, MapFunc[T, ?], ?], OutputM[PartialSelector[T]]](distPara, distApo, galg, gcoalg).toOption
+        [EnvT[Boolean, MapFunc[T, ?], ?], Output[T]](distPara, distApo, galg, gcoalg).toOption
 
-    (sels ∘ (filterBuilder(src, _))).cata(
+    (sels ∘ (filterBuilder(handler, src, _, fm))).cata(
       _ strengthR fm.transCata[FreeMapA[T, A]](orOriginal(elideCond)),
       (src, fm).point[M])
   }

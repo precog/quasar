@@ -19,13 +19,14 @@ package table
 
 import quasar.blueeyes._, json._
 
+import cats.effect.IO
 import scalaz.StreamT
-import scalaz.syntax.comonad._
+import shims._
 
 import org.specs2.ScalaCheck
 import org.scalacheck.Gen
 import quasar.precog.TestSupport._
-trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CanonicalizeSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
 
   val table = {
@@ -59,7 +60,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
       val maxLength = minLength + Gen.choose(1, size / 2 + 1).sample.get
 
       val canonicalizedTable = table.canonicalize(minLength, Some(maxLength))
-      val slices = canonicalizedTable.slices.toStream.copoint map (_.size)
+      val slices = canonicalizedTable.slices.toStream.unsafeRunSync map (_.size)
       if (size > 0) {
         slices.init must contain(like[Int]({ case size: Int => size must beBetween(minLength, maxLength) })).forall
         slices.last must be_<=(maxLength)
@@ -78,7 +79,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
       val length = Gen.choose(1, size + 3).sample.get
 
       val canonicalizedTable = table.canonicalize(length)
-      val resultSlices = canonicalizedTable.slices.toStream.copoint
+      val resultSlices = canonicalizedTable.slices.toStream.unsafeRunSync
       val resultSizes = resultSlices.map(_.size)
 
       val expected = {
@@ -95,7 +96,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
   def testCanonicalize = {
     val result = table.canonicalize(3)
 
-    val slices = result.slices.toStream.copoint
+    val slices = result.slices.toStream.unsafeRunSync
     val sizes = slices.map(_.size)
 
     sizes mustEqual Stream(3, 3, 3, 3, 2)
@@ -108,7 +109,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
   def testCanonicalizeBoundary = {
     val result = table.canonicalize(5)
 
-    val slices = result.slices.toStream.copoint
+    val slices = result.slices.toStream.unsafeRunSync
     val sizes = slices.map(_.size)
 
     sizes mustEqual Stream(5, 5, 4)
@@ -117,7 +118,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
   def testCanonicalizeOverBoundary = {
     val result = table.canonicalize(12)
 
-    val slices = result.slices.toStream.copoint
+    val slices = result.slices.toStream.unsafeRunSync
     val sizes = slices.map(_.size)
 
     sizes mustEqual Stream(12, 2)
@@ -125,7 +126,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
 
   def testCanonicalizeEmptySlices = {
     def tableTakeRange(table: Table, start: Int, numToTake: Long) =
-      table.takeRange(start, numToTake).slices.toStream.copoint
+      table.takeRange(start, numToTake).slices.toStream.unsafeRunSync
 
     val emptySlice = Slice(Map(), 0)
     val slices =
@@ -134,9 +135,9 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
       Stream(emptySlice) ++ tableTakeRange(table, 9, 5) ++
       Stream(emptySlice)
 
-    val newTable     = Table(StreamT.fromStream(M.point(slices)), table.size)
+    val newTable     = Table(StreamT.fromStream(IO.pure(slices)), table.size)
     val result       = newTable.canonicalize(4)
-    val resultSlices = result.slices.toStream.copoint
+    val resultSlices = result.slices.toStream.unsafeRunSync
     val resultSizes  = resultSlices.map(_.size)
 
     resultSizes mustEqual Stream(4, 4, 4, 2)
@@ -145,7 +146,7 @@ trait CanonicalizeSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Spe
   def testCanonicalizeEmpty = {
     val table  = Table.empty
     val result = table.canonicalize(3)
-    val slices = result.slices.toStream.copoint
+    val slices = result.slices.toStream.unsafeRunSync
     val sizes  = slices.map(_.size)
 
     sizes mustEqual Stream()

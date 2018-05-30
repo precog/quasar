@@ -24,14 +24,13 @@ import scalaz._
 import scalaz.Ordering._
 import scalaz.Either3._
 import scalaz.std.tuple._
-import scalaz.syntax.comonad._
 
 import org.specs2._
 import org.scalacheck._, Gen._
 
 import scala.annotation.tailrec
 
-trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+trait CogroupSpec extends TableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
   import trans.constants._
@@ -124,7 +123,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
     )
 
     val jsonResult = toJson(f(result))
-    jsonResult.copoint must_== expected.map(RValue.fromJValueRaw)
+    jsonResult.unsafeRunSync must_== expected.map(RValue.fromJValueRaw)
   }
 
   def testTrivialNoRecordCogroup(f: Table => Table = identity[Table]) = {
@@ -271,7 +270,7 @@ trait CogroupSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLik
       Leaf(Source),
       Leaf(Source),
       OuterObjectConcat(WrapObject(SourceKey.Left, "key"), WrapObject(OuterObjectConcat(SourceValue.Left, SourceValue.Right), "value"))
-    )).copoint must throwAn[Exception]
+    )).unsafeRunSync must throwAn[Exception]
   }
 
   def testCogroupPathology1 = {

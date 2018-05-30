@@ -129,7 +129,9 @@ package object fs {
 
   private def fsEffToTask: PhysFsEff ~> Task = λ[PhysFsEff ~> Task](_.run.fold(
     NaturalTransformation.refl[Task],
-    Failure.toRuntimeError[Task, PhysicalError]
+    Failure.toRuntimeError[Task, PhysicalError] {
+      case UnhandledFSError(e) => e
+    }
   ))
 
   private[fs] def asyncClientDef[S[_]](

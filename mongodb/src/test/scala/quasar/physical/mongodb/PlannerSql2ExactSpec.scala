@@ -30,6 +30,7 @@ import quasar.physical.mongodb.accumulator._
 import quasar.physical.mongodb.expression._
 import quasar.physical.mongodb.planner._
 import quasar.physical.mongodb.planner.common._
+import quasar.physical.mongodb.selector.Selector
 import quasar.physical.mongodb.workflow._
 import quasar.qscript.{OnUndefined, ShiftType}
 import quasar.sql._
@@ -62,7 +63,7 @@ class PlannerSql2ExactSpec extends
   import CollectionUtil._
 
   import fixExprOp._
-  import PlannerHelpers._, expr3_4Fp._
+  import PlannerHelpers._, fp34._, fp36._
 
   val dsl =
     quasar.qscript.construction.mkDefaults[Fix, fs.MongoQScript[Fix, ?]]
@@ -546,8 +547,8 @@ class PlannerSql2ExactSpec extends
            ExcludeId)))
     }
 
-    "plan date field extraction: \"isodow\"" in {
-      plan(sqlE"""select date_part("isodow", ts) from days""") must
+    "plan date field extraction: \"isodow\" (3.4.4)" in {
+      plan3_4_4(sqlE"""select date_part("isodow", ts) from days""", defaultStats, defaultIndexes, emptyDoc) must
        beWorkflow(chain[Workflow](
          $read(collection("db", "days")),
          $project(
@@ -560,6 +561,24 @@ class PlannerSql2ExactSpec extends
                  $cond($eq($dayOfWeek($field("ts")), $literal(Bson.Int32(1))),
                    $literal(Bson.Int32(7)),
                    $subtract($dayOfWeek($field("ts")), $literal(Bson.Int32(1)))),
+                 $literal(Bson.Undefined))),
+           ExcludeId)))
+    }
+
+    "plan date field extraction: \"isodow\"" in {
+      plan(sqlE"""select date_part("isodow", ts) from days""") must
+       beWorkflow(chain[Workflow](
+         $read(collection("db", "days")),
+         $project(
+           reshape(
+             sigil.Quasar ->
+               $cond(
+                 $and(
+                   $lte($literal(Check.minDate), $field("ts")),
+                   $lt($field("ts"), $literal(Check.minTimestamp))),
+                 $let(ListMap(
+                   DocVar.Name("parts") -> $dateToParts($field("ts"), None, true.some)),
+                   $field("$parts", "isoDayOfWeek")),
                  $literal(Bson.Undefined))),
            ExcludeId)))
     }
@@ -960,8 +979,8 @@ class PlannerSql2ExactSpec extends
         $match(Selector.And(
           Selector.Doc(
             BsonField.Name("city") -> Selector.Type(BsonType.Text)),
-          Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-            BsonField.Name("city") -> Selector.NotExpr(Selector.Regex("^B[AEIOU]+LD.*", false, true, false, false))))))))
+          Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+            BsonField.Name("city") -> Selector.NotCondExpr(Selector.Regex("^B[AEIOU]+LD.*", false, true, false, false))))))))
     }
 
     "plan filter with !~*" in {
@@ -970,8 +989,8 @@ class PlannerSql2ExactSpec extends
         $match(Selector.And(
           Selector.Doc(
             BsonField.Name("city") -> Selector.Type(BsonType.Text)),
-          Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-            BsonField.Name("city") -> Selector.NotExpr(Selector.Regex("^B[AEIOU]+LD.*", true, true, false, false))))))))
+          Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+            BsonField.Name("city") -> Selector.NotCondExpr(Selector.Regex("^B[AEIOU]+LD.*", true, true, false, false))))))))
     }
 
     "plan filter with alternative ~" in {
@@ -1038,10 +1057,10 @@ class PlannerSql2ExactSpec extends
            Selector.And(
              isNumeric(BsonField.Name("pop")),
              Selector.Or(
-               Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                 BsonField.Name("pop") -> Selector.NotExpr(Selector.Gt(Bson.Int32(0))))),
-               Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-                 BsonField.Name("pop") -> Selector.NotExpr(Selector.Lt(Bson.Int32(1000))))))))))
+               Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+                 BsonField.Name("pop") -> Selector.NotCondExpr(Selector.Gt(Bson.Int32(0))))),
+               Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+                 BsonField.Name("pop") -> Selector.NotCondExpr(Selector.Lt(Bson.Int32(1000))))))))))
     }
 
     "plan filter with not and equality" in {
@@ -1049,8 +1068,8 @@ class PlannerSql2ExactSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(
-            Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("pop") -> Selector.NotExpr(Selector.Eq(Bson.Int32(0))))))))
+            Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+              BsonField.Name("pop") -> Selector.NotCondExpr(Selector.Eq(Bson.Int32(0))))))))
     }
 
     "plan filter with \"is not null\"" in {
@@ -1058,8 +1077,8 @@ class PlannerSql2ExactSpec extends
         beWorkflow(chain[Workflow](
           $read(collection("db", "zips")),
           $match(
-            Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-              BsonField.Name("city") -> Selector.Expr(Selector.Neq(Bson.Null)))))))
+            Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+              BsonField.Name("city") -> Selector.CondExpr(Selector.Neq(Bson.Null)))))))
     }
 
     "filter on constant true" in {
@@ -1930,9 +1949,9 @@ class PlannerSql2ExactSpec extends
         reshape("0" -> $field("_id")),
         Obj(ListMap(Name("0") -> Select(ident("value"), "_id"))).right,
         chain[Workflow](_,
-          $match(Selector.Doc(ListMap[BsonField, Selector.SelectorExpr](
-            JoinHandler.LeftName -> Selector.NotExpr(Selector.Size(0)),
-            JoinHandler.RightName -> Selector.NotExpr(Selector.Size(0))))),
+          $match(Selector.Doc(ListMap[BsonField, Selector.ConditionExpr](
+            JoinHandler.LeftName -> Selector.NotCondExpr(Selector.Size(0)),
+            JoinHandler.RightName -> Selector.NotCondExpr(Selector.Size(0))))),
           $unwind(DocField(JoinHandler.RightName), None, None),
           $unwind(DocField(JoinHandler.LeftName), None, None),
           $project(

@@ -205,11 +205,13 @@ package object main extends Logging {
 
   object QErrs {
     def toCatchable[F[_]: Catchable]: QErrs ~> F =
-      Failure.toRuntimeError[F, PhysicalError]             :+:
-      Failure.toRuntimeError[F, Module.Error]              :+:
-      Failure.toRuntimeError[F, Mounting.PathTypeMismatch] :+:
-      Failure.toRuntimeError[F, MountingError]             :+:
-      Failure.toRuntimeError[F, FileSystemError]
+      Failure.toRuntimeError[F, PhysicalError] {
+        case UnhandledFSError(e) => e
+      }                                                      :+:
+      Failure.showRuntimeError[F, Module.Error]              :+:
+      Failure.showRuntimeError[F, Mounting.PathTypeMismatch] :+:
+      Failure.showRuntimeError[F, MountingError]             :+:
+      Failure.showRuntimeError[F, FileSystemError]
 
     def toMainErrT[F[_]: Catchable: Monad]: QErrs ~> MainErrT[F, ?] =
       liftMT[F, MainErrT].compose(QErrs.toCatchable[F])

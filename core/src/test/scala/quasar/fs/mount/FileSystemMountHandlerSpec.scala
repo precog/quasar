@@ -50,7 +50,6 @@ class FileSystemMountHandlerSpec extends quasar.Qspec {
     new (EffM ~> EffR) {
       type MT[F[_], A] = EitherT[F, String, A]
       type M[A]        = MT[ResMntsS, A]
-      import EitherT.eitherTMonad
 
       val evalAbort: Abort ~> M =
         Failure.toError[M, String]

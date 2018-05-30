@@ -16,7 +16,8 @@
 
 package quasar.fs.mount
 
-import org.specs2.scalaz.Spec
+import quasar.contrib.specs2.Spec
+
 import scalaz.scalacheck.ScalazProperties
 
 class MountingErrorSpec extends Spec {

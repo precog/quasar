@@ -112,8 +112,8 @@ class MountServiceSpec extends quasar.Qspec with Http4s {
           vci                                            :+:
           (fsi compose injectNT[ManageFile, FileSystem]) :+:
           (foldMapNT(meff) compose mounter)              :+:
-          Failure.toRuntimeError[Task, MountingError]    :+:
-          Failure.toRuntimeError[Task, PathTypeMismatch]
+          Failure.showRuntimeError[Task, MountingError]    :+:
+          Failure.showRuntimeError[Task, PathTypeMismatch]
 
         val service = mount.service[Eff].toHttpService(effR).orNotFound
 

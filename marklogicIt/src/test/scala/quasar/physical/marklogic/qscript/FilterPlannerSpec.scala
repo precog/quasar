@@ -42,8 +42,6 @@ import scalaz._, Scalaz._
 import scalaz.concurrent._
 
 final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
-  // Shadow the monadMTMAB instance
-  import EitherT.eitherTMonad
 
   type U      = Fix[Query[Fix[EJson], ?]]
   type SR[A]  = Const[ShiftedRead[ADir], A]

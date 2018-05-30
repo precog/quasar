@@ -27,7 +27,9 @@ import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util.CPathUtils
 
+import cats.effect.IO
 import scalaz._, Scalaz._, Ordering._
+import shims._
 
 import java.nio.CharBuffer
 import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
@@ -764,7 +766,7 @@ trait Slice { source =>
     val order: Array[Int] = Array.range(0, source.size) filter { row =>
       keySlice.isDefinedAt(row) && source.isDefinedAt(row)
     }
-    val rowOrder = if (sortOrder == SortAscending) keySlice.order else keySlice.order.reverse
+    val rowOrder = if (sortOrder == SortAscending) keySlice.order else cats.kernel.Order.reverse(keySlice.order)
     spire.math.MergeSort.sort(order)(rowOrder, implicitly)
 
     val remapOrder = new ArrayIntList(order.size)
@@ -986,9 +988,9 @@ trait Slice { source =>
     }
   }
 
-  def renderJson[M[+ _]](delimiter: String)(implicit M: Monad[M]): (StreamT[M, CharBuffer], Boolean) = {
+  def renderJson(delimiter: String): (StreamT[IO, CharBuffer], Boolean) = {
     if (columns.isEmpty) {
-      (StreamT.empty[M, CharBuffer], false)
+      (StreamT.empty[IO, CharBuffer], false)
     } else {
       val BufferSize = 1024 * 10 // 10 KB
 
@@ -1712,12 +1714,12 @@ trait Slice { source =>
             else
               None
 
-          M.point(back)
+          IO.pure(back)
         }
 
         (stream, rendered)
       }
-      else StreamT.empty[M, CharBuffer] -> false
+      else StreamT.empty[IO, CharBuffer] -> false
     }
   }
 

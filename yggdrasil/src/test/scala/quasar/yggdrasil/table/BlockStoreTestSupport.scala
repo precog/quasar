@@ -20,13 +20,13 @@ package table
 import quasar.blueeyes._, json._
 import quasar.precog.common._
 
+import cats.effect.IO
 import scalaz._, Scalaz._
+import shims._
 
 import scala.annotation.tailrec
 
-trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
-  implicit def M: Monad[M] with Comonad[M]
-
+trait BlockStoreTestModule extends BaseBlockStoreTestModule { self =>
   type GroupId = String
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = "groupId(" + groupId.getAndIncrement + ")"
@@ -36,28 +36,26 @@ trait BlockStoreTestModule[M[+_]] extends BaseBlockStoreTestModule[M] {
   object Table extends TableCompanion
 }
 
-trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
-    with SliceColumnarTableModule[M]
-    with StubProjectionModule[M, Slice] {
+trait BaseBlockStoreTestModule extends ColumnarTableModuleTestSupport
+    with SliceColumnarTableModule
+    with StubProjectionModule[Slice] {
 
   import trans._
 
-  implicit def M: Monad[M] with Comonad[M]
-
   object Projection extends ProjectionCompanion
 
-  case class Projection(data: Stream[JValue]) extends ProjectionLike[M, Slice] {
+  case class Projection(data: Stream[JValue]) extends ProjectionLike[Slice] {
     type Key = JArray
 
-    private val slices = fromJson(data).slices.toStream.copoint
+    private val slices = fromJson(data).slices.toStream.unsafeRunSync
 
     val length: Long = data.length
     val xyz = slices.foldLeft(Set.empty[ColumnRef]) {
       case (acc, slice) => acc ++ slice.columns.keySet
     }
-    def structure(implicit M: Monad[M]) = M.point(xyz)
+    def structure = xyz
 
-    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]])(implicit M: Monad[M]) = M.point {
+    def getBlockAfter(id: Option[JArray], colSelection: Option[Set[ColumnRef]]) = IO {
       @tailrec def findBlockAfter(id: JArray, blocks: Stream[Slice]): Option[Slice] = {
         blocks.filterNot(_.isEmpty) match {
           case x #:: xs =>
@@ -115,8 +113,7 @@ trait BaseBlockStoreTestModule[M[+_]] extends ColumnarTableModuleTestSupport[M]
 }
 
 object BlockStoreTestModule {
-  def empty[M[+_]](implicit M0: Monad[M] with Comonad[M]) = new BlockStoreTestModule[M] {
-    val M = M0
+  val empty = new BlockStoreTestModule {
     val projections = Map.empty[Path, Projection]
   }
 }

@@ -19,7 +19,7 @@ package quasar.mimir
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
 
-trait MathLibModule[M[+ _]] extends ColumnarTableLibModule[M] with InfixLibModule[M] {
+trait MathLibModule extends ColumnarTableLibModule with InfixLibModule {
   trait MathLib extends ColumnarTableLib with InfixLib {
     val MathNamespace = Vector("std", "math")
 

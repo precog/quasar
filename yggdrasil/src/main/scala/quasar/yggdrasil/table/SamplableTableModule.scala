@@ -20,20 +20,24 @@ import quasar.blueeyes._
 import quasar.precog.common._
 import quasar.yggdrasil._
 
+import cats.effect.IO
+
 import scalaz._, Scalaz._
+
+import shims._
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 
-trait SamplableTableModule[M[+ _]] extends TableModule[M] {
+trait SamplableTableModule extends TableModule {
   type Table <: SamplableTable
 
   trait SamplableTable extends TableLike { self: Table =>
-    def sample(sampleSize: Int, specs: Seq[trans.TransSpec1]): M[Seq[Table]]
+    def sample(sampleSize: Int, specs: Seq[trans.TransSpec1]): IO[Seq[Table]]
   }
 }
 
-trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { self: ColumnarTableModule[M] with SliceTransforms[M] =>
+trait SamplableColumnarTableModule extends SamplableTableModule { self: ColumnarTableModule with SliceTransforms =>
 
   import trans._
 
@@ -53,10 +57,10 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
       * Of course, the hope is that this will not be used once we get efficient
       * sampling in that runs in O(m lg n) time.
       */
-    def sample(sampleSize: Int, specs: Seq[TransSpec1]): M[Seq[Table]] = {
+    def sample(sampleSize: Int, specs: Seq[TransSpec1]): IO[Seq[Table]] = {
       case class SampleState(rowInserters: Option[RowInserter], length: Int, transform: SliceTransform1[_])
 
-      def build(states: List[SampleState], slices: StreamT[M, Slice]): M[List[Table]] = {
+      def build(states: List[SampleState], slices: StreamT[IO, Slice]): IO[Seq[Table]] = {
         slices.uncons flatMap {
           case Some((origSlice, tail)) =>
             val nextStates = states map {
@@ -95,14 +99,14 @@ trait SamplableColumnarTableModule[M[+ _]] extends SamplableTableModule[M] { sel
             Traverse[List].sequence(nextStates) flatMap { build(_, tail) }
 
           case None =>
-            M.point {
+            IO {
               states map {
                 case SampleState(inserter, length, _) =>
                   val len = length min sampleSize
                   inserter map { _.toSlice(len) } map { slice =>
-                    Table(slice :: StreamT.empty[M, Slice], ExactSize(len)).paged(Config.maxSliceSize)
+                    Table(slice :: StreamT.empty[IO, Slice], ExactSize(len)).paged(Config.maxSliceSize)
                   } getOrElse {
-                    Table(StreamT.empty[M, Slice], ExactSize(0))
+                    Table(StreamT.empty[IO, Slice], ExactSize(0))
                   }
               }
             }

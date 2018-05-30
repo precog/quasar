@@ -18,10 +18,10 @@ package quasar.sst
 
 import slamdata.Predef._
 import quasar.contrib.algebra._
+import quasar.contrib.specs2.Spec
 import quasar.ejson.{Decoded, DecodeEJson, EJson, EncodeEJson}
 
 import matryoshka.data.Fix
-import org.specs2.scalaz._
 import scalaz.Show
 import scalaz.std.anyVal._
 import scalaz.scalacheck.{ScalazProperties => propz}
@@ -29,7 +29,7 @@ import spire.laws.arb._
 import spire.math.Real
 import spire.std.double._
 
-final class TypeStatSpec extends Spec with ScalazMatchers with TypeStatArbitrary {
+final class TypeStatSpec extends Spec with TypeStatArbitrary {
   import TypeStat._
 
   implicit val realShow: Show[Real] = Show.showFromToString

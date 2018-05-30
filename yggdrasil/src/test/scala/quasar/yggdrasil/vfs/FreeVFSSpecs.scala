@@ -22,7 +22,7 @@ import quasar.fs.MoveSemantics
 import fs2.{Stream, Sink}
 
 import org.specs2.mutable._
-import org.specs2.scalaz.ScalazMatchers._
+import org.specs2.matcher.DisjunctionMatchers
 
 import pathy.Path
 
@@ -37,7 +37,7 @@ import smock._
 
 import java.util.UUID
 
-object FreeVFSSpecs extends Specification {
+object FreeVFSSpecs extends Specification with DisjunctionMatchers {
   import POSIXOp._
   import StreamTestUtils._
 
@@ -263,7 +263,7 @@ object FreeVFSSpecs extends Specification {
 
       val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSyncAttempt
 
-      vfs.leftMap(_.getMessage) must beLeftDisjunction("Unexpected VERSION, 0100000000000000")
+      vfs.leftMap(_.getMessage) must be_-\/("Unexpected VERSION, 0100000000000000")
     }
 
     "initialize from an empty state with pre-existing directory" in {

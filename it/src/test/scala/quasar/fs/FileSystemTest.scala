@@ -254,8 +254,13 @@ object FileSystemTest {
         val toPhysFs = KvsMounter.interpreter[Task, Coproduct[FsAsk, PhysFsEff, ?]](
           KeyValueStore.impl.fromTaskRef(cfgsRef), hfsRef, mntdRef)
 
-        foldMapNT(Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+: reflNT[Task] :+: Failure.toRuntimeError[Task, PhysicalError])
-          .compose(toPhysFs)
+        foldMapNT(
+          Read.constant[Task, BackendDef[PhysFsEffM]](mounts) :+:
+          reflNT[Task] :+:
+          Failure.toRuntimeError[Task, PhysicalError] {
+            case UnhandledFSError(e) => e
+          }
+        ).compose(toPhysFs)
       }
 
       type ViewBackendEffect[A] = (
@@ -269,8 +274,8 @@ object FileSystemTest {
       )#M[A]
 
       val memPlus: ViewBackendEffect ~> Task = mounting :+:
-      Failure.toRuntimeError[Task, Mounting.PathTypeMismatch] :+:
-      Failure.toRuntimeError[Task, MountingError] :+:
+      Failure.showRuntimeError[Task, Mounting.PathTypeMismatch] :+:
+      Failure.showRuntimeError[Task, MountingError] :+:
       viewState :+:
       runConstantVCache[Task](Map.empty) :+:
       MonotonicSeq.fromTaskRef(seqRef) :+:

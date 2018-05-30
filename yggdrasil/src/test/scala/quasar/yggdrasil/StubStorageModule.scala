@@ -17,14 +17,14 @@
 package quasar.yggdrasil
 
 import quasar.precog.common._
+
+import cats.effect.IO
 import scalaz._
 
-trait StubProjectionModule[M[+_], Block] extends ProjectionModule[M, Block] { self =>
-  implicit def M: Monad[M]
-
+trait StubProjectionModule[Block] extends ProjectionModule[Block] { self =>
   protected def projections: Map[Path, Projection]
 
-  class ProjectionCompanion extends ProjectionCompanionLike[M] {
-    def apply(path: Path) = M.point(projections.get(path))
+  class ProjectionCompanion extends ProjectionCompanionLike {
+    def apply(path: Path) = IO.pure(projections.get(path))
   }
 }

@@ -16,7 +16,6 @@
 
 package quasar.yggdrasil.nihdb
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.control.NonFatal
 
@@ -27,9 +26,10 @@ import quasar.yggdrasil.table.Slice
 
 import org.slf4s.Logging
 
-import scalaz.Monad
+import cats.effect.IO
 
-final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends ProjectionLike[Future, Slice] with Logging {
+
+final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends ProjectionLike[Slice] with Logging {
   type Key = Long
 
   private[this] val readers = snapshot.readers
@@ -38,9 +38,9 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends 
 
   override def toString = "NIHDBProjection(id = %d, len = %d)".format(projectionId, length)
 
-  def structure(implicit M: Monad[Future]) = M.point(readers.flatMap(_.structure)(collection.breakOut): Set[ColumnRef])
+  def structure: Set[ColumnRef] = readers.flatMap(_.structure)(collection.breakOut)
 
-  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]])(implicit MP: Monad[Future]): Future[Option[BlockProjectionData[Long, Slice]]] = MP.point {
+  def getBlockAfter(id0: Option[Long], columns: Option[Set[ColumnRef]]): IO[Option[BlockProjectionData[Long, Slice]]] = IO {
     val id = id0.map(_ + 1)
     val index = id getOrElse 0L
     getSnapshotBlock(id, columns.map(_.map(_.selector))) map {
@@ -69,7 +69,7 @@ final class NIHDBProjection(snapshot: NIHDBSnapshot, projectionId: Int) extends 
 }
 
 object NIHDBProjection {
-  def wrap(nihdb: NIHDB): Future[NIHDBProjection] = nihdb.getSnapshot map { snap =>
+  def wrap(nihdb: NIHDB): IO[NIHDBProjection] = IO.fromFuture(IO(nihdb.getSnapshot map { snap =>
     new NIHDBProjection(snap, nihdb.projectionId)
-  }
+  }))
 }

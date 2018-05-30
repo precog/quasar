@@ -22,7 +22,7 @@ import quasar.yggdrasil.table._
 
 import BigDecimal.RoundingMode
 
-trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
+trait UnaryLibModule extends ColumnarTableLibModule {
   trait UnaryLib extends ColumnarTableLib {
     import trans.{Range => _, _}
     import StdLib.{ BoolFrom, DoubleFrom, LongFrom, NumFrom, doubleIsDefined }
@@ -128,7 +128,7 @@ trait UnaryLibModule[M[+ _]] extends ColumnarTableLibModule[M] {
       // this implementation of abs checks for boundary conditions and up-coerces as necessary
       // for example: Long.MinValue.abs == Long.MinValue, which violates invariants
       // we may want to generalize this pattern a bit, since there are other similar functions
-      object Abs extends CMapperS[M] {
+      object Abs extends CMapperS {
 
         def spec[A <: SourceType](source: TransSpec[A]): TransSpec[A] =
           MapWith(source, this)

@@ -18,9 +18,9 @@ package quasar.fp.numeric
 
 import slamdata.Predef._
 import quasar.contrib.algebra._
+import quasar.contrib.specs2.Spec
 
 import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
-import org.specs2.scalaz._
 import scalaz.scalacheck.{ScalazProperties => propz}
 import scalaz.{NonEmptyList, Show}
 import scalaz.std.option._
@@ -30,7 +30,7 @@ import scalaz.syntax.std.boolean._
 import spire.laws.arb._
 import spire.math.Real
 
-final class SampleStatsSpec extends Spec with ScalazMatchers with SampleStatsArbitrary {
+final class SampleStatsSpec extends Spec with SampleStatsArbitrary {
   implicit val showReal: Show[Real] =
     Show.showFromToString
 

@@ -16,7 +16,8 @@
 
 package quasar.tpe
 
-import org.specs2.scalaz._
+import quasar.contrib.specs2.Spec
+
 import scalaz.scalacheck.ScalazProperties._
 
 final class CompositeTypeSpec extends Spec with CompositeTypeArbitrary {

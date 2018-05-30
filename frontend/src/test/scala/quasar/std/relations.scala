@@ -39,61 +39,61 @@ class RelationsSpec extends quasar.Qspec with TypeGenerators {
     "type eq with matching arguments" >> prop { (t : Type) =>
       val expr = Eq.tpe(Func.Input2(t, t))
       t match {
-        case Const(_) => expr should beSuccessful(Const(Bool(true)))
-        case _ => expr should beSuccessful(Type.Bool)
+        case Const(_) => expr should beSuccess(Const(Bool(true)))
+        case _ => expr should beSuccess(Type.Bool)
       }
     }
 
     "fold integer eq" in {
       val expr = Eq.tpe(Func.Input2(Const(Int(1)), Const(Int(1))))
-      expr should beSuccessful(Const(Bool(true)))
+      expr should beSuccess(Const(Bool(true)))
     }
 
     "fold eq with mixed numeric type" in {
       val expr = Eq.tpe(Func.Input2(Const(Int(1)), Const(Dec(1.0))))
-      expr should beSuccessful(Const(Bool(true)))
+      expr should beSuccess(Const(Bool(true)))
     }
 
     "fold eq with mixed type" in {
       val expr = Eq.tpe(Func.Input2(Const(Int(1)), Const(Str("a"))))
-      expr should beSuccessful(Const(Bool(false)))
+      expr should beSuccess(Const(Bool(false)))
     }
 
     "type Eq with Top" >> prop { (t : Type) =>
-      Eq.tpe(Func.Input2(Type.Top, t)) should beSuccessful(Type.Bool)
-      Eq.tpe(Func.Input2(t, Type.Top)) should beSuccessful(Type.Bool)
+      Eq.tpe(Func.Input2(Type.Top, t)) should beSuccess(Type.Bool)
+      Eq.tpe(Func.Input2(t, Type.Top)) should beSuccess(Type.Bool)
     }
 
     "type Neq with Top" >> prop { (t : Type) =>
-      Neq.tpe(Func.Input2(Type.Top, t)) should beSuccessful(Type.Bool)
-      Neq.tpe(Func.Input2(t, Type.Top)) should beSuccessful(Type.Bool)
+      Neq.tpe(Func.Input2(Type.Top, t)) should beSuccess(Type.Bool)
+      Neq.tpe(Func.Input2(t, Type.Top)) should beSuccess(Type.Bool)
     }
 
     "fold neq with mixed type" in {
       val expr = Neq.tpe(Func.Input2(Const(Int(1)), Const(Str("a"))))
-      expr should beSuccessful(Const(Bool(true)))
+      expr should beSuccess(Const(Bool(true)))
     }
 
     // TODO: similar for the rest of the simple relations
 
     "fold cond with true" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Cond.tpe(Func.Input3(Const(Bool(true)), t1, t2))
-      expr must beSuccessful(t1)
+      expr must beSuccess(t1)
     }
 
     "fold cond with false" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Cond.tpe(Func.Input3(Const(Bool(false)), t1, t2))
-      expr must beSuccessful(t2)
+      expr must beSuccess(t2)
     }
 
     "find lub for cond with int" in {
       val expr = Cond.tpe(Func.Input3(Type.Bool, Type.Int, Type.Int))
-      expr must beSuccessful(Type.Int)
+      expr must beSuccess(Type.Int)
     }
 
     "find lub for cond with arbitrary args" >> prop { (t1 : Type, t2 : Type) =>
       val expr = Cond.tpe(Func.Input3(Type.Bool, t1, t2))
-      expr must beSuccessful(Type.lub(t1, t2))
+      expr must beSuccess(Type.lub(t1, t2))
     }
 
     "flip comparison ops" >> Prop.forAll(comparisonOps, arbitrary[BigInt], arbitrary[BigInt]) {

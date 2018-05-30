@@ -20,8 +20,8 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import scalaz._
 
-trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
-    with LongIdMemoryDatasetConsumer[M] { self =>
+trait ReductionLibSpecs extends EvaluatorSpecification
+    with LongIdMemoryDatasetConsumer { self =>
 
   import dag._
   import library._
@@ -415,4 +415,4 @@ trait ReductionLibSpecs[M[+_]] extends EvaluatorSpecification[M]
   }
 }
 
-object ReductionLibSpecs extends ReductionLibSpecs[Need]
+object ReductionLibSpecs extends ReductionLibSpecs

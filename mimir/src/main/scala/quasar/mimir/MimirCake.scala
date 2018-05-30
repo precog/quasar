@@ -21,7 +21,8 @@ import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.yggdrasil.TableModule.{DesiredSortOrder, SortAscending}
 
-import delorean._
+import cats.effect.IO
+
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
@@ -29,9 +30,6 @@ import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.Leibniz.===
 import scalaz.concurrent.Task
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 
 object MimirCake {
 
@@ -46,9 +44,9 @@ object MimirCake {
 
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both
   final case class SortOrdering[TS1](sortKeys: Set[TS1], sortOrder: DesiredSortOrder, unique: Boolean) {
-    def sort(src: Cake)(table: src.Table)(implicit ev: TS1 === src.trans.TransSpec1): Future[src.Table] =
+    def sort(src: Cake)(table: src.Table)(implicit ev: TS1 === src.trans.TransSpec1): IO[src.Table] =
       if (sortKeys.isEmpty) {
-        Future.successful(table)
+        IO.pure(table)
       } else {
         table.sort(ev(sortKeys.head), sortOrder, unique)
       }
@@ -81,7 +79,7 @@ object MimirCake {
       table: c.P.Table,
       sortKey: c.P.trans.TransSpec1,
       sortOrder: DesiredSortOrder = SortAscending,
-      unique: Boolean = false): Task[MimirRepr.Aux[c.P.type]] = {
+      unique: Boolean = false): IO[MimirRepr.Aux[c.P.type]] = {
 
     val newRepr =
       SortState[c.P.trans.TransSpec1](
@@ -89,11 +87,11 @@ object MimirCake {
         orderings = SortOrdering(Set(sortKey), sortOrder, unique) :: Nil)
 
     if (c.lastSort.fold(true)(needToSort(c.P)(_, newSort = newRepr))) {
-      table.sort(sortKey, sortOrder, unique).toTask map { sorted =>
+      table.sort(sortKey, sortOrder, unique) map { sorted =>
         MimirRepr.withSort(c.P)(sorted)(Some(newRepr))
       }
     } else {
-      Task.now(MimirRepr.withSort(c.P)(table)(Some(newRepr)))
+      IO.pure(MimirRepr.withSort(c.P)(table)(Some(newRepr)))
     }
   }
 

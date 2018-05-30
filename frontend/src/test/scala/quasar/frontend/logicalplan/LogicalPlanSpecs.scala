@@ -19,18 +19,18 @@ package quasar.frontend.logicalplan
 import slamdata.Predef._
 import quasar.{Data, Func}
 import quasar.DataGenerators._
+import quasar.contrib.specs2.Spec
 import quasar.fp._
 import quasar.std
 
 import matryoshka._
 import matryoshka.data.Fix
 import org.scalacheck._
-import org.specs2.scalaz.{ScalazMatchers, Spec}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazProperties.{equal => _, _}
 import pathy.Path._
 
-class LogicalPlanSpecs extends Spec with ScalazMatchers {
+class LogicalPlanSpecs extends Spec {
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
   implicit val arbLogicalPlan: Delay[Arbitrary, LogicalPlan] =

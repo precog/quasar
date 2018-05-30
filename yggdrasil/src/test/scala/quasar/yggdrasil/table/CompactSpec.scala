@@ -23,15 +23,18 @@ import quasar.precog.util._
 import quasar.yggdrasil._
 
 import scala.util.Random
-import scalaz._, Scalaz._
 
-trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+import cats.effect.IO
+import scalaz._, Scalaz._
+import shims._
+
+trait CompactSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 
   def tableStats(table: Table) : List[(Int, Int)] = table match {
     case cTable: ColumnarTable =>
-      val slices = cTable.slices.toStream.copoint
+      val slices = cTable.slices.toStream.unsafeRunSync
       val sizes = slices.map(_.size).toList
       val undefined = slices.map { slice =>
         (0 until slice.size).foldLeft(0) {
@@ -62,7 +65,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def chooseColumn(table: Table): TransSpec1 = table match {
     case cTable: ColumnarTable =>
-      cTable.slices.toStream.copoint.headOption.map { slice =>
+      cTable.slices.toStream.unsafeRunSync.headOption.map { slice =>
         val chosenPath = Random.shuffle(slice.columns.keys.map(_.selector)).head
         mkDeref(chosenPath)
       } getOrElse(mkDeref(CPath.Identity))
@@ -70,7 +73,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
   def undefineTable(fullTable: Table): Table = fullTable match {
     case cTable: ColumnarTable =>
-      val slices = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
+      val slices = cTable.slices.toStream.unsafeRunSync // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
 
       val maskedSlices = slices.map { slice =>
@@ -92,12 +95,12 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
         }
       }
 
-      Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
+      Table(StreamT.fromStream(IO.pure(maskedSlices)), UnknownSize)
   }
 
   def undefineColumn(fullTable: Table, path: CPath): Table = fullTable match {
     case cTable: ColumnarTable =>
-      val slices = cTable.slices.toStream.copoint // fuzzing must be done strictly otherwise sadness will ensue
+      val slices = cTable.slices.toStream.unsafeRunSync // fuzzing must be done strictly otherwise sadness will ensue
       val numSlices = slices.size
 
       val maskedSlices = slices.map { slice =>
@@ -119,7 +122,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
         maskedSlice.getOrElse(slice)
       }
 
-      Table(StreamT.fromStream(M.point(maskedSlices)), UnknownSize)
+      Table(StreamT.fromStream(IO.pure(maskedSlices)), UnknownSize)
   }
 
   def testCompactIdentity = {
@@ -130,7 +133,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
 
       val results = toJson(compactTable)
 
-      results.copoint must_== sample.data
+      results.unsafeRunSync must_== sample.data
     }
   }
 
@@ -143,7 +146,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val compactTable = sampleTable.compact(Leaf(Source))
       val results = toJson(compactTable)
 
-      results.copoint must_== sampleJson.copoint
+      results.unsafeRunSync must_== sampleJson.unsafeRunSync
     }
   }
 
@@ -189,7 +192,7 @@ trait CompactSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with Specific
       val resultKey = compactTable.transform(key)
       val resultKeyJson = toJson(resultKey)
 
-      resultKeyJson.copoint must_== sampleKeyJson.copoint
+      resultKeyJson.unsafeRunSync must_== sampleKeyJson.unsafeRunSync
     }
   }
 

@@ -20,7 +20,7 @@ import quasar.precog.common._
 import quasar.yggdrasil._
 import quasar.yggdrasil.TableModule.paths
 
-trait EvaluatorMethodsModule[M[+ _]] extends DAG with TableModule[M] with TableLibModule[M] with OpFinderModule[M] {
+trait EvaluatorMethodsModule extends DAG with TableModule with TableLibModule with OpFinderModule {
   import dag._
   import instructions._
   import trans._

@@ -40,188 +40,188 @@ class StructuralSpecs extends Qspec with ValidationMatchers {
       s.map(c => Data.Str(c.toString)).toList
 
     "type combination of arbitrary strs as str" >> prop { (st1: Type, st2: Type) =>
-      ConcatOp.tpe(Func.Input2(st1, st2)).map(Str contains _) must beSuccessful(true)
-      ConcatOp.tpe(Func.Input2(st2, st1)).map(Str contains _) must beSuccessful(true)
+      ConcatOp.tpe(Func.Input2(st1, st2)).map(Str contains _) must beSuccess(true)
+      ConcatOp.tpe(Func.Input2(st2, st1)).map(Str contains _) must beSuccess(true)
     }.setArbitrary1(arbStrType).setArbitrary2(arbStrType)
 
     "type arbitrary str || unknown as Str" >> prop { (st: Type) =>
-      ConcatOp.tpe(Func.Input2(st, unknown)) must beSuccessful(Str)
-      ConcatOp.tpe(Func.Input2(unknown, st)) must beSuccessful(Str)
+      ConcatOp.tpe(Func.Input2(st, unknown)) must beSuccess(Str)
+      ConcatOp.tpe(Func.Input2(unknown, st)) must beSuccess(Str)
     }.setArbitrary(arbStrType)
 
     "fold constant Strings" >> prop { (s1: String, s2: String) =>
       ConcatOp.tpe(Func.Input2(Const(Data.Str(s1)), Const(Data.Str(s2)))) must
-        beSuccessful(Const(Data.Str(s1 + s2)))
+        beSuccess(Const(Data.Str(s1 + s2)))
     }
 
     "type combination of arbitrary arrays as array" >> prop { (at1: Type, at2: Type) =>
-      ConcatOp.tpe(Func.Input2(at1, at2)).map(_.arrayLike) must beSuccessful(true)
-      ConcatOp.tpe(Func.Input2(at2, at1)).map(_.arrayLike) must beSuccessful(true)
+      ConcatOp.tpe(Func.Input2(at1, at2)).map(_.arrayLike) must beSuccess(true)
+      ConcatOp.tpe(Func.Input2(at2, at1)).map(_.arrayLike) must beSuccess(true)
     }.setArbitrary1(arbArrayType).setArbitrary2(arbArrayType)
 
     "type arbitrary array || unknown as array" >> prop { (at: Type) =>
-      ConcatOp.tpe(Func.Input2(at, unknown)).map(_.arrayLike) must beSuccessful(true)
-      ConcatOp.tpe(Func.Input2(unknown, at)).map(_.arrayLike) must beSuccessful(true)
+      ConcatOp.tpe(Func.Input2(at, unknown)).map(_.arrayLike) must beSuccess(true)
+      ConcatOp.tpe(Func.Input2(unknown, at)).map(_.arrayLike) must beSuccess(true)
     }.setArbitrary(arbArrayType)
 
     "fold constant arrays" >> prop { (ds1: List[Data], ds2: List[Data]) =>
       ConcatOp.tpe(Func.Input2(Const(Data.Arr(ds1)), Const(Data.Arr(ds2)))) must
-        beSuccessful(Const(Data.Arr(ds1 ++ ds2)))
+        beSuccess(Const(Data.Arr(ds1 ++ ds2)))
     }
 
     "type mixed Str and array args as array" >> prop { (st: Type, at: Type) =>
-      ConcatOp.tpe(Func.Input2(st, at)).map(_.arrayLike) must beSuccessful(true)
-      ConcatOp.tpe(Func.Input2(at, st)).map(_.arrayLike) must beSuccessful(true)
+      ConcatOp.tpe(Func.Input2(st, at)).map(_.arrayLike) must beSuccess(true)
+      ConcatOp.tpe(Func.Input2(at, st)).map(_.arrayLike) must beSuccess(true)
     }.setArbitrary1(arbStrType).setArbitrary2(arbArrayType)
 
     "fold constant string || array" >> prop { (s: String, xs: List[Data]) =>
       ConcatOp.tpe(Func.Input2(Const(Data.Str(s)), Const(Data.Arr(xs)))) must
-        beSuccessful(Const(Data.Arr(stringToList(s) ::: xs)))
+        beSuccess(Const(Data.Arr(stringToList(s) ::: xs)))
     }
 
     "fold constant array || string" >> prop { (s: String, xs: List[Data]) =>
       ConcatOp.tpe(Func.Input2(Const(Data.Arr(xs)), Const(Data.Str(s)))) must
-        beSuccessful(Const(Data.Arr(xs ::: stringToList(s))))
+        beSuccess(Const(Data.Arr(xs ::: stringToList(s))))
     }
 
     "propagate unknown types" in {
-      ConcatOp.tpe(Func.Input2(unknown, unknown)) must beSuccessful(unknown)
+      ConcatOp.tpe(Func.Input2(unknown, unknown)) must beSuccess(unknown)
     }
   }
 
   "FlattenMap" should {
     "only accept maps" >> prop { (nonMap: Type) =>
-      FlattenMap.tpe(Func.Input1(nonMap)) must beFailing
+      FlattenMap.tpe(Func.Input1(nonMap)) must beFailure
     }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its values" in {
-      FlattenMap.tpe(Func.Input1(Obj(Map(), Str.some))) must beSuccessful(Str)
+      FlattenMap.tpe(Func.Input1(Obj(Map(), Str.some))) must beSuccess(Str)
     }
 
     "untype to a map type from some value type" in {
-      FlattenMap.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Str.some)))
+      FlattenMap.untpe(Str).map(_.unsized) must beSuccess(List(Obj(Map(), Str.some)))
     }
   }
 
   "FlattenMapKeys" should {
     "only accept maps" >> prop { (nonMap: Type) =>
-      FlattenMapKeys.tpe(Func.Input1(nonMap)) must beFailing
+      FlattenMapKeys.tpe(Func.Input1(nonMap)) must beFailure
     }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its keys" in {
-      FlattenMapKeys.tpe(Func.Input1(Obj(Map(), Int.some))) must beSuccessful(Str)
+      FlattenMapKeys.tpe(Func.Input1(Obj(Map(), Int.some))) must beSuccess(Str)
     }
 
     "untype to a map type from some key type" in {
-      FlattenMapKeys.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Top.some)))
+      FlattenMapKeys.untpe(Str).map(_.unsized) must beSuccess(List(Obj(Map(), Top.some)))
     }
   }
 
   "FlattenArray" should {
     "only accept arrays" >> prop { (nonArr: Type) =>
-      FlattenArray.tpe(Func.Input1(nonArr)) must beFailing
+      FlattenArray.tpe(Func.Input1(nonArr)) must beFailure
     }.setArbitrary(arbStrType)
 
     "convert from an array type to the type of its values" in {
-      FlattenArray.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccessful(Str)
+      FlattenArray.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccess(Str)
     }
 
     "untype to an array type from some value type" in {
-      FlattenArray.untpe(Str).map(_.unsized) must beSuccessful(List(FlexArr(0, None, Str)))
+      FlattenArray.untpe(Str).map(_.unsized) must beSuccess(List(FlexArr(0, None, Str)))
     }
   }
 
   "FlattenArrayIndices" should {
     "only accept arrays" >> prop { (nonArr: Type) =>
-      FlattenArrayIndices.tpe(Func.Input1(nonArr)) must beFailing
+      FlattenArrayIndices.tpe(Func.Input1(nonArr)) must beFailure
     }.setArbitrary(arbStrType)
 
     "convert from an array type to int" in {
-      FlattenArrayIndices.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccessful(Int)
+      FlattenArrayIndices.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccess(Int)
     }
 
     "untype to an array type from int" in {
       FlattenArrayIndices.untpe(Int).map(_.unsized) must
-        beSuccessful(List(FlexArr(0, None, Top)))
+        beSuccess(List(FlexArr(0, None, Top)))
     }
 
   }
 
   "ShiftMap" should {
     "only accept maps" >> prop { (nonMap: Type) =>
-      ShiftMap.tpe(Func.Input1(nonMap)) must beFailing
+      ShiftMap.tpe(Func.Input1(nonMap)) must beFailure
     }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its values" in {
-      ShiftMap.tpe(Func.Input1(Obj(Map(), Str.some))) must beSuccessful(Str)
+      ShiftMap.tpe(Func.Input1(Obj(Map(), Str.some))) must beSuccess(Str)
     }
 
     "untype to a map type from some value type" in {
-      ShiftMap.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Str.some)))
+      ShiftMap.untpe(Str).map(_.unsized) must beSuccess(List(Obj(Map(), Str.some)))
     }
   }
 
   "ShiftMapKeys" should {
     "only accept maps" >> prop { (nonMap: Type) =>
-      ShiftMapKeys.tpe(Func.Input1(nonMap)) must beFailing
+      ShiftMapKeys.tpe(Func.Input1(nonMap)) must beFailure
     }.setArbitrary(arbArrayType)
 
     "convert from a map type to the type of its keys" in {
-      ShiftMapKeys.tpe(Func.Input1(Obj(Map(), Int.some))) must beSuccessful(Str)
+      ShiftMapKeys.tpe(Func.Input1(Obj(Map(), Int.some))) must beSuccess(Str)
     }
 
     "untype to a map type from some key type" in {
-      ShiftMapKeys.untpe(Str).map(_.unsized) must beSuccessful(List(Obj(Map(), Top.some)))
+      ShiftMapKeys.untpe(Str).map(_.unsized) must beSuccess(List(Obj(Map(), Top.some)))
     }
   }
 
   "ShiftArray" should {
     "only accept arrays" >> prop { (nonArr: Type) =>
-      ShiftArray.tpe(Func.Input1(nonArr)) must beFailing
+      ShiftArray.tpe(Func.Input1(nonArr)) must beFailure
     }.setArbitrary(arbStrType)
 
     "convert from an array type to the type of its values" in {
-      ShiftArray.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccessful(Str)
+      ShiftArray.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccess(Str)
     }
 
     "untype to an array type from some value type" in {
-      ShiftArray.untpe(Str).map(_.unsized) must beSuccessful(List(FlexArr(0, None, Str)))
+      ShiftArray.untpe(Str).map(_.unsized) must beSuccess(List(FlexArr(0, None, Str)))
     }
   }
 
   "ShiftArrayIndices" should {
     "only accept arrays" >> prop { (nonArr: Type) =>
-      ShiftArrayIndices.tpe(Func.Input1(nonArr)) must beFailing
+      ShiftArrayIndices.tpe(Func.Input1(nonArr)) must beFailure
     }.setArbitrary(arbStrType)
 
     "convert from an array type to int" in {
-      ShiftArrayIndices.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccessful(Int)
+      ShiftArrayIndices.tpe(Func.Input1(FlexArr(0, None, Str))) must beSuccess(Int)
     }
 
     "untype to an array type from int" in {
       ShiftArrayIndices.untpe(Int).map(_.unsized) must
-        beSuccessful(List(FlexArr(0, None, Top)))
+        beSuccess(List(FlexArr(0, None, Top)))
     }
 
   }
 
   "UnshiftMap" should {
     "convert to a map type from some value type" in {
-      UnshiftMap.tpe(Func.Input2(Top, Str)) must beSuccessful(Obj(Map(), Str.some))
+      UnshiftMap.tpe(Func.Input2(Top, Str)) must beSuccess(Obj(Map(), Str.some))
     }
 
     "untype from a map type to the type of its values" in {
-      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccessful(List(Top, Str))
+      UnshiftMap.untpe(Obj(Map(), Str.some)).map(_.unsized) must beSuccess(List(Top, Str))
     }
   }
 
   "UnshiftArray" should {
     "convert to an array type from some value type" in {
-      UnshiftArray.tpe(Func.Input1(Str)) must beSuccessful(FlexArr(0, None, Str))
+      UnshiftArray.tpe(Func.Input1(Str)) must beSuccess(FlexArr(0, None, Str))
     }
 
     "untype from an array type to the type of its values" in {
-      UnshiftArray.untpe(FlexArr(0, None, Str)).map(_.unsized) must beSuccessful(List(Str))
+      UnshiftArray.untpe(FlexArr(0, None, Str)).map(_.unsized) must beSuccess(List(Str))
     }
   }
 

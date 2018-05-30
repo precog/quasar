@@ -57,7 +57,7 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
   def vcacheInterp(fs: FileSystem ~> Task, cw: VCacheExpW ~> Task): VCacheKVS ~> Task =
     foldMapNT(
       (fs compose injectNT[ManageFile, FileSystem]) :+:
-      Failure.toRuntimeError[Task, FileSystemError] :+:
+      Failure.showRuntimeError[Task, FileSystemError] :+:
       transactor.trans :+:
       cw
     ) compose
@@ -81,10 +81,10 @@ final class CachingSpec extends quasar.Qspec with H2MetaStoreFixture {
       (fs compose Inject[ManageFile, FileSystem])                               :+:
       vcacheInterp(fs, Write.fromTaskRef(r))                                    :+:
       timingInterp(i)                                                           :+:
-      Failure.toRuntimeError[Task, Module.Error]                                :+:
-      Failure.toRuntimeError[Task, PathTypeMismatch]                            :+:
-      Failure.toRuntimeError[Task, MountingError]                               :+:
-      Failure.toRuntimeError[Task, FileSystemError])
+      Failure.showRuntimeError[Task, Module.Error]                              :+:
+      Failure.showRuntimeError[Task, PathTypeMismatch]                          :+:
+      Failure.showRuntimeError[Task, MountingError]                             :+:
+      Failure.showRuntimeError[Task, FileSystemError])
 
   "Caching" should {
     "refresh" >> {

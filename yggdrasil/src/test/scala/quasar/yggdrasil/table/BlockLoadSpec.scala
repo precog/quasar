@@ -24,12 +24,11 @@ import SampleData._
 import SJValueGenerators._
 
 import scalaz._
-import scalaz.syntax.comonad._
 import scalaz.syntax.std.boolean._
+import shims._
 
 trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
-  class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule[Need] {
-    val M = Need.need
+  class BlockStoreLoadTestModule(sampleData: SampleData) extends BlockStoreTestModule {
     val Some((idCount, schema)) = sampleData.schema
     val actualSchema = inferSchema(sampleData.data map { _.toJValue \ "value" })
 
@@ -82,7 +81,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
 
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
-    val result = module.Table.constString(Set("/test")).load(Schema.mkType(cschema).get).flatMap(t => EitherT.rightT(t.toJson)).run.copoint
+    val result = module.Table.constString(Set("/test")).load(Schema.mkType(cschema).get).flatMap(t => EitherT.rightT(t.toJson)).run.unsafeRunSync
     result.map(_.toList) must_== \/.right(expected.toList.map(RValue.fromJValueRaw))
   }
 

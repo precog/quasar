@@ -5,17 +5,17 @@ Chain
 │  │  ├─ $MatchF
 │  │  │  ╰─ Or
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($_id -> Type(Int32))
+│  │  │     │  ╰─ CondExpr($_id -> Type(Int32))
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($_id -> Type(Int64))
+│  │  │     │  ╰─ CondExpr($_id -> Type(Int64))
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($_id -> Type(Dec))
+│  │  │     │  ╰─ CondExpr($_id -> Type(Dec))
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($_id -> Type(Text))
+│  │  │     │  ╰─ CondExpr($_id -> Type(Text))
 │  │  │     ├─ Doc
-│  │  │     │  ╰─ Expr($_id -> Type(Date))
+│  │  │     │  ╰─ CondExpr($_id -> Type(Date))
 │  │  │     ╰─ Doc
-│  │  │        ╰─ Expr($_id -> Type(Bool))
+│  │  │        ╰─ CondExpr($_id -> Type(Bool))
 │  │  ├─ $ProjectF
 │  │  │  ├─ Name("0" -> {
 │  │  │  │       "$cond": [
@@ -51,7 +51,7 @@ Chain
 │  │  │  ╰─ ExcludeId
 │  │  ├─ $MatchF
 │  │  │  ╰─ Doc
-│  │  │     ╰─ Expr($0 -> Eq(Bool(true)))
+│  │  │     ╰─ CondExpr($0 -> Eq(Bool(true)))
 │  │  ├─ $GroupF
 │  │  │  ├─ Grouped
 │  │  │  │  ╰─ Name("0" -> { "$push": "$src" })
@@ -68,17 +68,17 @@ Chain
 │     ├─ $MatchF
 │     │  ╰─ Or
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($_id -> Type(Int32))
+│     │     │  ╰─ CondExpr($_id -> Type(Int32))
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($_id -> Type(Int64))
+│     │     │  ╰─ CondExpr($_id -> Type(Int64))
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($_id -> Type(Dec))
+│     │     │  ╰─ CondExpr($_id -> Type(Dec))
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($_id -> Type(Text))
+│     │     │  ╰─ CondExpr($_id -> Type(Text))
 │     │     ├─ Doc
-│     │     │  ╰─ Expr($_id -> Type(Date))
+│     │     │  ╰─ CondExpr($_id -> Type(Date))
 │     │     ╰─ Doc
-│     │        ╰─ Expr($_id -> Type(Bool))
+│     │        ╰─ CondExpr($_id -> Type(Bool))
 │     ├─ $ProjectF
 │     │  ├─ Name("0" -> {
 │     │  │       "$cond": [
@@ -114,7 +114,7 @@ Chain
 │     │  ╰─ ExcludeId
 │     ├─ $MatchF
 │     │  ╰─ Doc
-│     │     ╰─ Expr($0 -> Eq(Bool(true)))
+│     │     ╰─ CondExpr($0 -> Eq(Bool(true)))
 │     ├─ $GroupF
 │     │  ├─ Grouped
 │     │  │  ╰─ Name("0" -> { "$push": "$src" })
@@ -137,8 +137,8 @@ Chain
 │        ╰─ Scope(ListMap())
 ├─ $MatchF
 │  ╰─ Doc
-│     ├─ NotExpr($left -> Size(0))
-│     ╰─ NotExpr($right -> Size(0))
+│     ├─ NotCondExpr($left -> Size(0))
+│     ╰─ NotCondExpr($right -> Size(0))
 ├─ $UnwindF
 │  ╰─ Path(DocField(BsonField.Name("right")))
 ├─ $UnwindF
@@ -150,7 +150,7 @@ Chain
 │  ╰─ ExcludeId
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($0 -> Eq(Bool(true)))
+│     ╰─ CondExpr($0 -> Eq(Bool(true)))
 ╰─ $ProjectF
    ├─ Name("__quasar_mongodb_sigil" -> {
    │       "$cond": [

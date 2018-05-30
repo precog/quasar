@@ -21,16 +21,13 @@ import quasar.compile.SemanticErrsT
 import quasar.fp.{liftMT, pointNT}
 import quasar.fs.{FileSystemErrT, QueryFile}
 
-import scalaz.{~>, EitherT, Hoist, Monad}
+import scalaz.{~>, Hoist, Monad}
 import scalaz.std.vector._
 
 class CompExec[F[_]: Monad] extends QueryFile.Transforms[F] {
   type H[A] = SemanticErrsT[G, A]
   type CompileM[A] = SemanticErrsT[PhaseResultW, A]
   type CompExecM[A] = FileSystemErrT[H, A]
-
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-  import EitherT.eitherTMonad
 
   val execToCompExec: ExecM ~> CompExecM =
       Hoist[FileSystemErrT].hoist[G, H](liftMT[G, SemanticErrsT])

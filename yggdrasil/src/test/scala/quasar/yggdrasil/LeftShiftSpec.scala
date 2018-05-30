@@ -23,7 +23,7 @@ import org.specs2._
 
 import _root_.scalaz._, Scalaz._
 
-trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike {
+trait LeftShiftSpec extends TableModuleTestSupport with SpecificationLike {
 
   def testTrivialArrayLeftShift = {
     val rec = toRecord(Array(0), JArray(JNum(12) :: JNum(13) :: Nil))
@@ -64,7 +64,7 @@ trait LeftShiftSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationL
         toRecord(Array(1), JArray(JNum(0), JNum(42))),
         toRecord(Array(1), JArray(JNum(1), JNum(43))))
 
-    toJson(table.leftShift(CPath.Identity \ 1)).copoint.toVector.map(_.toJValueRaw) mustEqual expected
+    toJson(table.leftShift(CPath.Identity \ 1)).unsafeRunSync.toVector.map(_.toJValueRaw) mustEqual expected
   }
 
   def testSetArrayLeftShift = {

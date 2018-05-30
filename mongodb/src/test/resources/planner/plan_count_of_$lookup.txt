@@ -2,7 +2,7 @@ Chain
 ├─ $ReadF(db; largeZips)
 ├─ $MatchF
 │  ╰─ Doc
-│     ╰─ Expr($TestProgramId -> Exists(true))
+│     ╰─ CondExpr($TestProgramId -> Exists(true))
 ├─ $ProjectF
 │  ├─ Name("right" -> "$$ROOT")
 │  ╰─ ExcludeId

@@ -21,11 +21,13 @@ import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
 
 import quasar.blueeyes._, json._
+import cats.effect.IO
 import scalaz._, Scalaz._
+import shims._
 
 // TODO: mix in a trait rather than defining Table directly
 
-trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableModuleSpec[M] with IndicesModule[M] {
+trait IndicesSpec extends ColumnarTableModuleTestSupport with TableModuleSpec with IndicesModule { self =>
   type GroupId = Int
 
   import TableModule._
@@ -34,20 +36,20 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
   private val groupId = new java.util.concurrent.atomic.AtomicInteger
   def newGroupId = groupId.getAndIncrement
 
-  class Table(slices: StreamT[M, Slice], size: TableSize) extends ColumnarTable(slices, size) {
+  class Table(slices: StreamT[IO, Slice], size: TableSize) extends ColumnarTable(slices, size) {
     import trans._
     def load(jtpe: JType) = sys.error("todo")
     def sort(sortKey: TransSpec1, sortOrder: DesiredSortOrder, unique: Boolean = false) = sys.error("todo")
-    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): M[Seq[Table]] = sys.error("todo")
+    def groupByN(groupKeys: Seq[TransSpec1], valueSpec: TransSpec1, sortOrder: DesiredSortOrder = SortAscending, unique: Boolean = false): IO[Seq[Table]] = sys.error("todo")
   }
 
   trait TableCompanion extends ColumnarTableCompanion {
-    def apply(slices: StreamT[M, Slice], size: TableSize) = new Table(slices, size)
+    def apply(slices: StreamT[IO, Slice], size: TableSize) = new Table(slices, size)
 
-    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[M, Slice], ExactSize(1))
+    def singleton(slice: Slice) = new Table(slice :: StreamT.empty[IO, Slice], ExactSize(1))
 
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1):
-        M[(Table, Table)] = sys.error("not implemented here")
+        IO[(Table, Table)] = sys.error("not implemented here")
   }
 
   object Table extends TableCompanion
@@ -62,7 +64,7 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
       val keySpecs = Array(groupkey("a"), groupkey("b"))
       val valSpec = valuekey("c")
 
-      val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
+      val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).unsafeRunSync
 
       index.getUniqueKeys(0).size must_== 0
       index.getSubTable(Array(0), Array(CString("a"))).size == ExactSize(0)
@@ -87,7 +89,7 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
     val table             = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
     val keySpecs          = Array(groupkey("a"), groupkey("b"))
     val valSpec           = valuekey("c")
-    val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).copoint
+    val index: TableIndex = TableIndex.createFromTable(table, keySpecs, valSpec).unsafeRunSync
 
     "determine unique groupkey values" in {
       index.getUniqueKeys(0) must_== Set[RValue](CNum(1), CNum(2), CNum(3), CString("foo"))
@@ -106,7 +108,7 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
     }
 
     def subtableSet(index: TableIndex, ids: Seq[Int], vs: Seq[RValue]): Set[RValue] =
-      index.getSubTable(ids, vs).toJson.copoint.toSet
+      index.getSubTable(ids, vs).toJson.unsafeRunSync.toSet
 
     def test(vs: Seq[RValue], result: Set[RValue]) =
       subtableSet(index, Array(0, 1), vs) must_== result
@@ -141,17 +143,17 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
 
     val index1 = TableIndex.createFromTable(
       table, Array(groupkey("a")), valuekey("c")
-    ).copoint
+    ).unsafeRunSync
 
     val index2 = TableIndex.createFromTable(
       table, Array(groupkey("b")), valuekey("c")
-    ).copoint
+    ).unsafeRunSync
 
     "efficiently combine to produce unions" in {
 
       def tryit(tpls: (TableIndex, Seq[Int], Seq[RValue])*)(expected: RValue*) = {
         val table = TableIndex.joinSubTables(tpls.toList)
-        table.toJson.copoint.toSet must_== expected.toSet
+        table.toJson.unsafeRunSync.toSet must_== expected.toSet
       }
 
       // both disjunctions have data
@@ -204,6 +206,4 @@ trait IndicesSpec[M[+_]] extends ColumnarTableModuleTestSupport[M] with TableMod
   }
 }
 
-object IndicesSpec extends IndicesSpec[Need] {
-  implicit def M = Need.need
-}
+object IndicesSpec extends IndicesSpec

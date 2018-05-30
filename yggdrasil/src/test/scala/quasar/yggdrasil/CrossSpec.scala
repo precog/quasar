@@ -17,11 +17,12 @@
 package quasar.yggdrasil
 
 import quasar.blueeyes.json._
-import scalaz.syntax.comonad._
 import quasar.precog.TestSupport._
 import quasar.precog.common._
 
-trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike with ScalaCheck {
+import cats.effect.IO
+
+trait CrossSpec extends TableModuleTestSupport with SpecificationLike with ScalaCheck {
   import SampleData._
   import trans._
 
@@ -46,8 +47,8 @@ trait CrossSpec[M[+_]] extends TableModuleTestSupport[M] with SpecificationLike 
       InnerObjectConcat(WrapObject(Leaf(SourceLeft), "left"), WrapObject(Leaf(SourceRight), "right"))
     )
 
-    val jsonResult: M[Stream[RValue]] = toJson(result)
-    jsonResult.copoint must_== expected
+    val jsonResult: IO[Stream[RValue]] = toJson(result)
+    jsonResult.unsafeRunSync must_== expected
   }
 
   def testSimpleCross = {

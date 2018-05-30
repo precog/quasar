@@ -22,14 +22,12 @@ import scalaz._
 import scalaz.std.anyVal.booleanInstance.disjunction
 import scalaz.std.option.optionFirst
 
-trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
+trait DAGRewriterSpecs extends EvaluatorSpecification {
 
   import dag._
   import instructions._
 
-  implicit val nt = NaturalTransformation.refl[M]
-
-  val evaluator = Evaluator(M)
+  val evaluator = Evaluator
   import evaluator._
   import library._
 
@@ -92,4 +90,4 @@ trait DAGRewriterSpecs[M[+_]] extends EvaluatorSpecification[M] {
   }
 }
 
-object DAGRewriterSpecs extends DAGRewriterSpecs[Need]
+object DAGRewriterSpecs extends DAGRewriterSpecs

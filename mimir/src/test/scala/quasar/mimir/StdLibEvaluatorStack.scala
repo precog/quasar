@@ -19,17 +19,17 @@ package quasar.mimir
 import quasar.yggdrasil.table.cf
 import scalaz._
 
-trait StdLibEvaluatorStack[M[+ _]]
-    extends EvaluatorModule[M]
-    with StdLibModule[M]
-    with StdLibOpFinderModule[M]
-    with ReductionFinderModule[M] {
+trait StdLibEvaluatorStack
+    extends EvaluatorModule
+    with StdLibModule
+    with StdLibOpFinderModule
+    with ReductionFinderModule {
 
   trait Lib extends StdLib with StdLibOpFinder
   object library extends Lib
 
-  abstract class Evaluator[N[+ _]](N0: Monad[N])(implicit mn: M ~> N, nm: N ~> M)
-      extends EvaluatorLike[N](N0)(mn, nm)
+  abstract class Evaluator
+      extends EvaluatorLike
       with StdLibOpFinder {
 
     val Exists = library.Exists

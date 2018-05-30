@@ -57,6 +57,12 @@ object Condition extends ConditionInstances {
       case Normal() => ()
     } (κ(Normal()))
 
+  def disjunctionIso[E]: Iso[Condition[E], E \/ Unit] =
+    Iso[Condition[E], E \/ Unit] {
+      case Abnormal(e) => e.left
+      case Normal()    => ().right
+    } (_.fold(Abnormal(_), κ(Normal())))
+
   def optionIso[E]: Iso[Condition[E], Option[E]] =
     Iso[Condition[E], Option[E]] {
       case Abnormal(e) => Some(e)

@@ -40,7 +40,7 @@ import scalaz._, Scalaz._
 
 object workflow {
   def getStructBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT: RenderTreeT, M[_]: Monad, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse]
     (handler: FreeMap[T] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], struct: FreeMap[T], rootKey: BsonField.Name, structKey: BsonField.Name)
     (implicit ev: EX :<: ExprOp): M[WorkflowBuilder[WF]] =
@@ -49,7 +49,7 @@ object workflow {
     }
 
   def getBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse, A]
+    [T[_[_]]: BirecursiveT: ShowT: RenderTreeT, M[_]: Monad: MonadFsErr, WF[_]: WorkflowBuilder.Ops[?[_]], EX[_]: Traverse, A]
     (handler: FreeMapA[T, A] => M[Expr], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, A])
     (implicit ev: EX :<: ExprOp)
@@ -66,7 +66,7 @@ object workflow {
     }
 
   def getExprBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT: RenderTreeT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMap[T])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp, WF: WorkflowBuilder.Ops[WF])
@@ -74,7 +74,7 @@ object workflow {
     getBuilder[T, M, WF, EX, Hole](handleFreeMap[T, M, EX](funcHandler, staticHandler, _), v)(src, fm)
 
   def getReduceBuilder
-    [T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
+    [T[_[_]]: BirecursiveT: ShowT: RenderTreeT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_], EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX], v: BsonVersion)
     (src: WorkflowBuilder[WF], fm: FreeMapA[T, ReduceIndex])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp, WF: WorkflowBuilder.Ops[WF])
@@ -97,13 +97,13 @@ object workflow {
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX], fm: FreeMap[T])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
       : M[Expr] =
-    exprOrJs(fm)(getExpr[T, M, EX](funcHandler, staticHandler)(_), getJsFn[T, M])
+    exprOrJs(fm)(getExpr[T, M, EX](funcHandler, staticHandler), getJsFn[T, M])
 
   def handleRedRepair[T[_[_]]: BirecursiveT: ShowT, M[_]: Monad: ExecTimeR: MonadFsErr, EX[_]: Traverse]
     (funcHandler: AlgebraM[M, MapFunc[T, ?], Fix[EX]], staticHandler: StaticHandler[T, EX], jr: FreeMapA[T, ReduceIndex])
     (implicit EX: ExprOpCoreF :<: EX, ev: EX :<: ExprOp)
       : M[Expr] =
-    exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler)(_), getJsRed[T, M])
+    exprOrJs(jr)(getExprRed[T, M, EX](funcHandler, staticHandler), getJsRed[T, M])
 
   def rebaseWB
     [T[_[_]]: EqualT, M[_]: Monad: ExecTimeR: MonadFsErr, WF[_]: Functor: Coalesce: Crush, EX[_]: Traverse]

@@ -127,7 +127,7 @@ class CouchbaseStdLibSpec extends StdLibSpec {
       } yield (rq, r)
     ).run.run.run(cfg).foldMap(fs.interp.unsafePerformSync).unsafePerformSync._2
 
-    (r must beRightDisjunction.like { case (q, Vector(d)) =>
+    (r must be_\/-.like { case (q, Vector(d)) =>
       d must beCloseTo(expected).updateMessage(_ ⊹ s"\nquery: $q")
     }).toResult
   }

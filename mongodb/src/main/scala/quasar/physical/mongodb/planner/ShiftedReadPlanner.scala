@@ -17,7 +17,7 @@
 package quasar.physical.mongodb.planner
 
 import slamdata.Predef._
-import quasar.RenderTree
+import quasar.{RenderTree, RenderTreeT}
 import quasar.contrib.pathy.AFile
 import quasar.fs.MonadFsErr
 import quasar.fs.{Planner => QPlanner, _}, QPlanner._
@@ -32,7 +32,8 @@ import quasar.qscript._
 import matryoshka._
 import scalaz._, Scalaz._
 
-class ShiftedReadPlanner[T[_[_]]: BirecursiveT: ShowT] extends Planner[Const[ShiftedRead[AFile], ?]] {
+class ShiftedReadPlanner[T[_[_]]: BirecursiveT: ShowT: RenderTreeT] extends
+  Planner[Const[ShiftedRead[AFile], ?]] {
 
   type IT[G[_]] = T[G]
 

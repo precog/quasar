@@ -228,7 +228,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       }
     }
 
-    def coalesceUneven(shifts: NEL[ShiftGraph], qgraph: QSUGraph, extraFM: Option[FreeMap]): G[QSUGraph] = {
+    def coalesceUneven(shifts: NEL[ShiftGraph], qgraph: QSUGraph): G[QSUGraph] = {
       val origFM = qgraph match {
         case Map(_, fm) => fm
         case _ => recFunc.Hole
@@ -315,20 +315,16 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           case reconstructed @ LeftShift(src, struct, idStatus, onUndefined, repair, rot) =>
             val origLifted = origFM >> recFunc.ProjectKeyS(repair.asRec, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
-            val repair3 = extraFM.cata(efm =>
-              func.ConcatMaps(efm >> func.ProjectKeyS(repair, ResultsField), repair2), repair2)
 
             reconstructed.overwriteAtRoot(
-              QSU.LeftShift(src.root, struct, idStatus, onUndefined, N.freeMF(repair3), rot))
+              QSU.LeftShift(src.root, struct, idStatus, onUndefined, N.freeMF(repair2), rot))
 
           case reconstructed @ MultiLeftShift(src, shifts, onUndefined, repair) =>
             val origLifted = origFM >> recFunc.ProjectKeyS(repair.asRec, OriginalField)
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
-            val repair3 = extraFM.cata(efm =>
-              func.ConcatMaps(efm >> func.ProjectKeyS(repair, ResultsField), repair2), repair2)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair3 /*N.freeMF(repair2)*/))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2 /*N.freeMF(repair2)*/))
 
           case reconstructed => reconstructed
         }
@@ -694,33 +690,33 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           back.map(g => (g, Set(index)))
       }
 
+    def inlineMap(g: QSUGraph): Option[QSUGraph] = g match {
+      case Map(LeftShift(src, struct, idStatus, onUndefined, repair, rot), fm) =>
+        g.overwriteAtRoot(QSU.LeftShift(src.root, struct, idStatus, onUndefined, fm.linearize >> repair, rot)).some
+      case Map(MultiLeftShift(src, shifts, onUndefined, repair), fm) =>
+        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, fm.linearize >> repair)).some
+      case _ => none
+    }
+
     for {
       // converts all candidates to produce final results wrapped in their relevant indices
       wrapped <- candidates.zipWithIndex traverse { case (g, i) => wrapCandidate(g, i) }
+
       coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
         case (g0 @ (ConsecutiveBounded(_, shifts1), leftIndices), g1 @ (ConsecutiveBounded(_, shifts2), rightIndices)) =>
           val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None)
 
-          back.map(g => (g, leftIndices ++ rightIndices))
+          back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
 
-        case ((qgraph, leftIndices), (g1 @ ConsecutiveBounded(_, shifts), rightIndices)) =>
-          val efm = g1 match {
-            case Map(_, f) => f.linearize.some
-            case _ => none
-          }
+        case ((qgraph, leftIndices), (ConsecutiveBounded(_, shifts), rightIndices)) =>
+          val back = coalesceUneven(shifts, qgraph)
 
-          val back = coalesceUneven(shifts, qgraph, efm)
+          back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
 
-          back.map (g => (g, leftIndices ++ rightIndices))
+        case ((ConsecutiveBounded(_, shifts), leftIndices), (qgraph, rightIndices)) =>
+          val back = coalesceUneven(shifts, qgraph)
 
-        case ((g0 @ ConsecutiveBounded(_, shifts), leftIndices), (qgraph, rightIndices)) =>
-          val efm = g0 match {
-            case Map(_, f) => f.linearize.some
-            case _ => none
-          }
-
-          val back = coalesceUneven(shifts, qgraph, efm)
-          back.map(g => (g, leftIndices ++ rightIndices))
+          back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
 
         // these two graphs have to be maps on the same thing
         // if they aren't, we're in trouble

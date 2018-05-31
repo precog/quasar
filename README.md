@@ -4,6 +4,8 @@
 [![Latest version](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web/latest.svg)](https://index.scala-lang.org/quasar-analytics/quasar/quasar-web)
 [![Join the chat at https://gitter.im/quasar-analytics/quasar](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/quasar-analytics/quasar?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+foobar
+
 # Quasar
 
 Quasar is an open source NoSQL analytics engine that can be used as a library or through a REST API to power advanced analytics across a growing range of data sources and databases, including MongoDB.

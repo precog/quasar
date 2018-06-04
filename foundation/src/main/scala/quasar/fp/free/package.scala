@@ -17,6 +17,7 @@
 package quasar.fp
 
 import scalaz._
+import slamdata.Predef.Option
 
 package object free {
   sealed abstract class :+:[F[_], G[_]] {
@@ -32,6 +33,9 @@ package object free {
 
   /** `Inject#inj` as a natural transformation. */
   def injectNT[F[_], G[_]](implicit I: F :<: G) = λ[F ~> G](I inj _)
+
+  /** `Inject#prj` as a natural transformation. */
+  def projectNT[F[_], G[_]](implicit I: F :<: G) = λ[G ~> λ[a => Option[F[a]]]](I prj _)
 
   /** Convenience transformation to inject into a coproduct and lift into Free. */
   def injectFT[F[_], S[_]](implicit S: F :<: S): F ~> Free[S, ?] = liftFT[S] compose injectNT[F, S]

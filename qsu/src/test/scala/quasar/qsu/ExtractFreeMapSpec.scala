@@ -24,6 +24,7 @@ import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fs.Planner.PlannerError
 import quasar.qscript.construction
 import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, RightSide}
@@ -31,7 +32,6 @@ import quasar.{Qspec, TreeMatchers}
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.data.free._
 import pathy.Path
 import scalaz.{\/, \/-, EitherT, ICons, INil, Need, NonEmptyList => NEL, StateT, Free}
 import scalaz.Scalaz._

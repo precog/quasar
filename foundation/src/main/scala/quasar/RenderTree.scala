@@ -26,6 +26,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
+import iotaz.{CopK, TListK}
 
 @typeclass trait RenderTree[A] {
   def render(a: A): RenderedTree
@@ -102,6 +103,8 @@ sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
 
   implicit def renderTreeT[T[_[_]], F[_]: Functor](implicit T: RenderTreeT[T], F: Delay[RenderTree, F]): RenderTree[T[F]] =
     T.renderTree(F)
+
+  implicit def copKRenderTree[LL <: TListK](implicit M: RenderTreeKMaterializer[LL]): Delay[RenderTree, CopK[LL, ?]] = M.materialize(offset = 0)
 
   implicit def coproductDelay[F[_], G[_]](implicit RF: Delay[RenderTree, F], RG: Delay[RenderTree, G]): Delay[RenderTree, Coproduct[F, G, ?]] =
     Delay.fromNT(λ[RenderTree ~> DelayedFG[F, G]#RenderTree](ra =>

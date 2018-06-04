@@ -16,16 +16,21 @@
 
 package quasar.physical.marklogic.qscript
 
+import slamdata.Predef._
+
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.physical.marklogic.cts.Query
 import quasar.physical.marklogic.xquery._
 import quasar.physical.marklogic.xcc._
 import quasar.ejson.EJson
 import quasar.qscript._
+import quasar.contrib.iota.mkInject
 
 import matryoshka._
 import scalaz._, Scalaz._
 import shapeless.Lazy
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 trait Planner[M[_], FMT, F[_], J] {
   def plan[Q](
@@ -63,15 +68,52 @@ object Planner extends PlannerInstances {
 }
 
 sealed abstract class PlannerInstances extends PlannerInstances0 {
-  implicit def coproduct[M[_], FMT, F[_], G[_], J](
-    implicit F: Lazy[Planner[M, FMT, F, J]], G: Lazy[Planner[M, FMT, G, J]]
-  ): Planner[M, FMT, Coproduct[F, G, ?], J] =
-    new Planner[M, FMT, Coproduct[F, G, ?], J] {
-      def plan[Q](
-        implicit Q: Birecursive.Aux[Q, Query[J, ?]]
-      ): AlgebraM[M, Coproduct[F, G, ?], Search[Q] \/ XQuery] =
-        _.run.fold(F.value.plan, G.value.plan)
+
+  implicit def copk[M[_], FMT, LL <: TListK, G](implicit M: Lazy[Materializer[M, FMT, LL, G]]): Planner[M, FMT, CopK[LL, ?], G] =
+    M.value.materialize(offset = 0)
+
+  sealed trait Materializer[M[_], FMT, LL <: TListK, G] {
+    def materialize(offset: Int): Planner[M, FMT, CopK[LL, ?], G]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[M[_], FMT, F[_], G](
+      implicit
+      F: Lazy[Planner[M, FMT, F, G]]
+    ): Materializer[M, FMT, F ::: TNilK, G] = new Materializer[M, FMT, F ::: TNilK, G] {
+      override def materialize(offset: Int): Planner[M, FMT, CopK[F ::: TNilK, ?], G] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Planner[M, FMT, CopK[F ::: TNilK, ?], G] {
+          def plan[Q](
+            implicit Q: Birecursive.Aux[Q, Query[G, ?]]
+          ): AlgebraM[M, CopK[F ::: TNilK, ?], Search[Q] \/ XQuery] = {
+            case I(fa) => F.value.plan.apply(fa)
+          }
+        }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[M[_], FMT, F[_], LL <: TListK, G](
+      implicit
+      F: Lazy[Planner[M, FMT, F, G]],
+      LL: Lazy[Materializer[M, FMT, LL, G]]
+    ): Materializer[M, FMT, F ::: LL, G] = new Materializer[M, FMT, F ::: LL, G] {
+      override def materialize(offset: Int): Planner[M, FMT, CopK[F ::: LL, ?], G] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Planner[M, FMT, CopK[F ::: LL, ?], G] {
+          def plan[Q](
+            implicit Q: Birecursive.Aux[Q, Query[G, ?]]
+          ): AlgebraM[M, CopK[F ::: LL, ?], Search[Q] \/ XQuery] = {
+            case I(fa) => F.value.plan.apply(fa)
+            case other => LL.value.materialize(offset + 1).plan.apply(other.asInstanceOf[CopK[LL, Search[Q] \/ XQuery]])
+          }
+        }
+      }
+    }
+  }
+
 }
 
 sealed abstract class PlannerInstances0 extends PlannerInstances1 {

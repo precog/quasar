@@ -18,6 +18,7 @@ package quasar.qscript
 
 import slamdata.Predef._
 import quasar.fp.ski.κ
+import quasar.contrib.iota.{copkTraverse, mkInject}
 
 import matryoshka._
 import matryoshka.data._
@@ -25,6 +26,8 @@ import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import shapeless.Lazy
+import iotaz.{CopK, TListK, TNilK}
+import iotaz.TListK.:::
 
 /** Extracts paths of particular type from QScript, collecting them in the
   * provided `ApplicativePlus`.
@@ -38,15 +41,45 @@ object ExtractPath extends ExtractPathInstances {
 }
 
 sealed abstract class ExtractPathInstances extends ExtractPathInstances0 {
-  implicit def coproduct[F[_], G[_], P](
-    implicit
-    F: Lazy[ExtractPath[F, P]],
-    G: Lazy[ExtractPath[G, P]]
-  ): ExtractPath[Coproduct[F, G, ?], P] =
-    new ExtractPath[Coproduct[F, G, ?], P] {
-      def extractPath[H[_]: ApplicativePlus]: Algebra[Coproduct[F, G, ?], H[P]] =
-        _.run.fold(F.value.extractPath[H], G.value.extractPath[H])
+  implicit def copk[LL <: TListK, P](implicit M: Materializer[LL, P]): ExtractPath[CopK[LL, ?], P] = M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK, P] {
+    def materialize(offset: Int): ExtractPath[CopK[LL, ?], P]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_], P](
+      implicit
+      F: Lazy[ExtractPath[F, P]]
+    ): Materializer[F ::: TNilK, P] = new Materializer[F ::: TNilK, P] {
+      override def materialize(offset: Int): ExtractPath[CopK[F ::: TNilK, ?], P] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new ExtractPath[CopK[F ::: TNilK, ?], P] {
+          override def extractPath[G[_] : ApplicativePlus]: Algebra[CopK[F ::: TNilK, ?], G[P]] = {
+            case I(fa) => F.value.extractPath[G].apply(fa)
+          }
+        }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK, P](
+      implicit
+      F: Lazy[ExtractPath[F, P]],
+      LL: Materializer[LL, P]
+    ): Materializer[F ::: LL, P] = new Materializer[F ::: LL, P] {
+      override def materialize(offset: Int): ExtractPath[CopK[F ::: LL, ?], P] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new ExtractPath[CopK[F ::: LL, ?], P] {
+          override def extractPath[G[_] : ApplicativePlus]: Algebra[CopK[F ::: LL, ?], G[P]] = {
+            case I(fa) => F.value.extractPath[G].apply(fa)
+            case other => LL.materialize(offset + 1).extractPath[G].apply(other.asInstanceOf[CopK[LL, G[P]]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def constRead[A, P >: A]: ExtractPath[Const[Read[A], ?], P] =
     new ExtractPath[Const[Read[A], ?], P] {

@@ -21,6 +21,7 @@ import slamdata.Predef.{List, Nil}
 import quasar.TreeMatchers
 import quasar.contrib.pathy.AFile
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka._

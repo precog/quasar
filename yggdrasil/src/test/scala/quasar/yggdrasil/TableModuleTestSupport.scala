@@ -21,7 +21,6 @@ import quasar.precog.TestSupport._
 import quasar.precog.common.RValue
 
 import cats.effect.IO
-import scalaz._, Scalaz._
 
 trait TestLib extends TableModule {
   def lookupF1(namespace: List[String], name: String): F1

@@ -23,5 +23,5 @@ final case object OrderPreserved extends OrderSignificance
 final case object OrderIgnored extends OrderSignificance
 
 object OrderSignificance {
-  implicit val equal: Equal[OrderSignificance] = Equal.equalRef
+  implicit val equal: Equal[OrderSignificance] = Equal.equalA
 }

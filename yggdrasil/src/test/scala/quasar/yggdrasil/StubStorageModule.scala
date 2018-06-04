@@ -19,7 +19,6 @@ package quasar.yggdrasil
 import quasar.precog.common._
 
 import cats.effect.IO
-import scalaz._
 
 trait StubProjectionModule[Block] extends ProjectionModule[Block] { self =>
   protected def projections: Map[Path, Projection]

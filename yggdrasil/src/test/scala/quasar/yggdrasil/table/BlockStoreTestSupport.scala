@@ -21,7 +21,6 @@ import quasar.blueeyes._, json._
 import quasar.precog.common._
 
 import cats.effect.IO
-import scalaz._, Scalaz._
 import shims._
 
 import scala.annotation.tailrec

@@ -17,7 +17,6 @@
 package quasar.mimir
 
 import quasar.yggdrasil.table.cf
-import scalaz._
 
 trait StdLibEvaluatorStack
     extends EvaluatorModule

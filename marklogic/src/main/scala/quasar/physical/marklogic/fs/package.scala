@@ -39,6 +39,8 @@ import com.marklogic.xcc.exceptions._
 import com.marklogic.xcc.{ContentSource, Session}
 import scalaz.{Failure => _, _}, Scalaz.{ToIdOps => _, _}
 import scalaz.concurrent.Task
+import iotaz.TListK.:::
+import iotaz.TNilK
 
 package object fs {
   import ReadFile.ReadHandle, WriteFile.WriteHandle, QueryFile.ResultHandle
@@ -79,12 +81,12 @@ package object fs {
   type MLFS[A]  = PrologT[Free[MarkLogicFs, ?], A]
   type MLFSQ[A] = MarkLogicPlanErrT[MLFS, A]
 
-  type MLQScriptCP[T[_[_]]] = (
-    qs.QScriptCore[T, ?]           :\:
-    qs.ThetaJoin[T, ?]             :\:
-    Const[qs.ShiftedRead[ADir], ?] :/:
-    Const[qs.Read[AFile], ?]
-  )
+  type MLQScriptCP[T[_[_]]] =
+    qs.QScriptCore[T, ?]           :::
+    qs.ThetaJoin[T, ?]             :::
+    Const[qs.ShiftedRead[ADir], ?] :::
+    Const[qs.Read[AFile], ?]       :::
+    TNilK
 
   val FsType = FileSystemType("marklogic")
 

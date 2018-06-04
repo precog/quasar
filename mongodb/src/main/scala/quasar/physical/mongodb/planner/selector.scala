@@ -19,6 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar._, Type._
 import quasar.contrib.matryoshka._
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski._
 import quasar.physical.mongodb._
 import quasar.physical.mongodb.expression.ExprOp

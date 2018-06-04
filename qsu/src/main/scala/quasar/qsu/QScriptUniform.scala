@@ -25,6 +25,7 @@ import quasar.ejson.implicits._
 import quasar.contrib.matryoshka._
 import quasar.fp.ski.{ι, κ}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.provenance.JoinKeys
@@ -614,7 +615,7 @@ object QScriptUniform {
 
     private val O = Optics[T]
 
-    def mfc[A] = PrismNT.inject[MapFuncCore, MapFunc].asPrism[A]
+    def mfc[A] = PrismNT.injectCopK[MapFuncCore, MapFunc].asPrism[A]
 
     private def composeLifting[G[_]](optic: Prism[QScriptUniform[A], G[A]]) =
       iso composePrism lifting[QScriptUniform[A], G[A]](optic)

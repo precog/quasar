@@ -27,6 +27,7 @@ import quasar.physical.marklogic.xquery.syntax._
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore, MFC => _, _}
 import slamdata.Predef._
+import quasar.contrib.iota.{copkTraverse, copkFunctor}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._

@@ -185,7 +185,7 @@ trait PlannerWorkflowHelpers extends PlannerHelpers {
   case object ReduceOp extends MongoOp(MapReduce)
 
   implicit val showMongoOp = Show.showFromToString[MongoOp]
-  implicit val equalMongoOp = Equal.equalRef[MongoOp]
+  implicit val equalMongoOp = Equal.equalA[MongoOp]
 
   val pureOp: MongoOp = PureOp
   val readOp: MongoOp = ReadOp

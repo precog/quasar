@@ -20,7 +20,8 @@ import slamdata.Predef.{Map => _, _}
 
 import quasar.ejson
 import quasar.ejson.{EJson, ExtEJson}
-import quasar.fp.PrismNT
+import quasar.contrib.iota.{copkTraverse, mkInject}
+import quasar.fp.{:<<:, ACopK, PrismNT}
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.analysis.Outline
@@ -31,6 +32,9 @@ import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
+
 
 /** A rewrite that, where possible, replaces map key deletion with construction
   * of a new map containing the keys in the complement of the singleton set consisting
@@ -90,14 +94,14 @@ object PreferProjection extends PreferProjectionInstances {
   /** Replaces key deletion of a map having statically known structure with a
     * projection of the complement of the deleted key.
     */
-  def projectComplementƒ[T[_[_]]: BirecursiveT, F[_]: Functor, A]
-      (implicit I: MapFuncCore[T, ?] :<: F)
+  def projectComplementƒ[T[_[_]]: BirecursiveT, F[a] <: ACopK[a] : Functor, A]
+      (implicit I: MapFuncCore[T, ?] :<<: F)
       : ElgotAlgebra[(Outline.Shape, ?), CoEnv[A, F, ?], Free[F, A]] = {
 
     import MapFuncsCore._
 
     type U = Free[F, A]
-    val P = PrismNT.inject[MapFuncCore[T, ?], F] compose PrismNT.coEnv[F, A]
+    val P = PrismNT.injectCopK[MapFuncCore[T, ?], F] compose PrismNT.coEnv[F, A]
 
     {
       case (shape, mfc @ P(DeleteKey(src, _))) =>
@@ -133,19 +137,54 @@ object PreferProjection extends PreferProjectionInstances {
 sealed abstract class PreferProjectionInstances {
   import PreferProjection.projectComplement
 
-  implicit def coproduct[F[_], G[_], T, B[_]](
+  implicit def copk[T, B[_], LL <: TListK](implicit M: Materializer[T, B, LL]): PreferProjection[CopK[LL, ?], T, B] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T, B[_], LL <: TListK] {
+    def materialize(offset: Int): PreferProjection[CopK[LL, ?], T, B]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T, B[_], F[_]](
+      implicit
+      F: PreferProjection[F, T, B]
+    ): Materializer[T, B, F ::: TNilK] = new Materializer[T, B, F ::: TNilK] {
+      override def materialize(offset: Int): PreferProjection[CopK[F ::: TNilK, ?], T, B] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new PreferProjection[CopK[F ::: TNilK, ?], T, B] {
+          type C[A] = CopK[F ::: TNilK, A]
+          type D[A] = CopK[TNilK, A]
+
+          def preferProjectionƒ(BtoC: PrismNT[B, C]): C[(Outline.Shape, T)] => B[T] = {
+            case I(fa) => F.preferProjectionƒ(BtoC andThen PrismNT.injectCopK[F, C](I))(fa)
+          }
+
+        }
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T, B[_], F[_], LL <: TListK](
       implicit
       F: PreferProjection[F, T, B],
-      G: PreferProjection[G, T, B])
-      : PreferProjection[Coproduct[F, G, ?], T, B] =
-    new PreferProjection[Coproduct[F, G, ?], T, B] {
-      type C[A] = Coproduct[F, G, A]
+      LL: Materializer[T, B, LL]
+    ): Materializer[T, B, F ::: LL] = new Materializer[T, B, F ::: LL] {
+      override def materialize(offset: Int): PreferProjection[CopK[F ::: LL, ?], T, B] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new PreferProjection[CopK[F ::: LL, ?], T, B] {
+          type C[A] = CopK[F ::: LL, A]
+          type D[A] = CopK[LL, A]
 
-      def preferProjectionƒ(BtoC: PrismNT[B, C]) =
-        _.run.fold(
-          F.preferProjectionƒ(BtoC andThen PrismNT.inject[F, C]),
-          G.preferProjectionƒ(BtoC andThen PrismNT.inject[G, C]))
+          def preferProjectionƒ(BtoC: PrismNT[B, C]): C[(Outline.Shape, T)] => B[T] = {
+            case I(fa) => F.preferProjectionƒ(BtoC andThen PrismNT.injectCopK[F, C](I))(fa)
+            case other => LL.materialize(offset + 1).preferProjectionƒ(BtoC.asInstanceOf[PrismNT[B, D]])(other.asInstanceOf[D[(Outline.Shape, T)]])
+          }
+
+        }
+      }
     }
+  }
 
   implicit def qScriptCore[T[_[_]]: BirecursiveT: EqualT, U, B[_]: Functor](
       implicit

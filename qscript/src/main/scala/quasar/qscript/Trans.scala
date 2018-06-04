@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.contrib.matryoshka.transHyloM
 import quasar.fp._
+import quasar.contrib.iota._
 
 import matryoshka._
 import matryoshka.data._
@@ -34,16 +35,16 @@ trait Trans[F[_], M[_]] {
 
 object Trans {
 
-  def apply[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
+  def apply[T[_[_]]: BirecursiveT, F[_], G[a] <: ACopK[a]: Traverse, M[_]: Monad]
       (trans: Trans[F, M], t: T[G])
-      (implicit FG: F :<: G, FT: Injectable.Aux[G, QScriptTotal[T, ?]], B: Branches[T, G])
+      (implicit FG: F :<<: G, FT: Injectable[G, QScriptTotal[T, ?]], B: Branches[T, G])
       : M[T[G]] =
-    applyTrans[T, F, G, M](trans, PrismNT.inject)(t)
+    applyTrans[T, F, G, M](trans, PrismNT.injectCopK)(t)
 
   def applyTrans[T[_[_]]: BirecursiveT, F[_], G[_]: Traverse, M[_]: Monad]
       (trans: Trans[F, M], GtoF: PrismNT[G, F])
       (t: T[G])
-      (implicit G: Injectable.Aux[G, QScriptTotal[T, ?]], BR: Branches[T, G])
+      (implicit G: Injectable[G, QScriptTotal[T, ?]], BR: Branches[T, G])
       : M[T[G]] = {
 
     val transG: G[T[G]] => M[G[T[G]]] =

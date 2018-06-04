@@ -16,10 +16,14 @@
 
 package quasar.qscript
 
+import slamdata.Predef._
+
+import quasar.contrib.iota.mkInject
 import matryoshka._
 import matryoshka.patterns._
 import quasar.qscript.RecFreeS.RecOps
-
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 import monocle._
 import scalaz._, Scalaz._
 
@@ -40,20 +44,56 @@ object UnaryFunctions {
         }
     }
 
-  implicit def coproduct[T[_[_]], G[_], H[_]]
-    (implicit G: UnaryFunctions[T, G], H: UnaryFunctions[T, H])
-      : UnaryFunctions[T, Coproduct[G, H, ?]] =
-    new UnaryFunctions[T, Coproduct[G, H, ?]] {
-      def unaryFunctions[A]: Traversal[Coproduct[G, H, A], FreeMap[T]] =
-        new Traversal[Coproduct[G, H, A], FreeMap[T]] {
-          def modifyF[F[_]: Applicative](f: FreeMap[T] => F[FreeMap[T]])(s: Coproduct[G, H, A]): F[Coproduct[G, H, A]] = {
-            s.run.bitraverse[F, G[A], H[A]](
-              G.unaryFunctions.modifyF(f),
-              H.unaryFunctions.modifyF(f)
-            ).map(Coproduct(_))
-          }
+  implicit def copk[T[_[_]], LL <: TListK](implicit M: Materializer[T, LL]): UnaryFunctions[T, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK] {
+    def materialize(offset: Int): UnaryFunctions[T, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: UnaryFunctions[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): UnaryFunctions[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new UnaryFunctions[T, CopK[F ::: TNilK, ?]] {
+          override def unaryFunctions[A]: Traversal[CopK[F ::: TNilK, A], FreeMap[T]] =
+            new Traversal[CopK[F ::: TNilK, A], FreeMap[T]] {
+              override def modifyF[G[_] : Applicative](f: FreeMap[T] => G[FreeMap[T]])(s: CopK[F ::: TNilK, A]): G[CopK[F ::: TNilK, A]] = {
+                s match {
+                  case I(fa) => F.unaryFunctions.modifyF(f)(fa).map(I(_))
+                }
+              }
+            }
         }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK](
+      implicit
+      F: UnaryFunctions[T, F],
+      LL: Materializer[T, LL]
+    ): Materializer[T, F ::: LL] = new Materializer[T, F ::: LL] {
+      override def materialize(offset: Int): UnaryFunctions[T, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new UnaryFunctions[T, CopK[F ::: LL, ?]] {
+          override def unaryFunctions[A]: Traversal[CopK[F ::: LL, A], FreeMap[T]] =
+            new Traversal[CopK[F ::: LL, A], FreeMap[T]] {
+              override def modifyF[G[_] : Applicative](f: FreeMap[T] => G[FreeMap[T]])(s: CopK[F ::: LL, A]): G[CopK[F ::: LL, A]] = {
+                s match {
+                  case I(fa) => F.unaryFunctions.modifyF(f)(fa).map(I(_))
+                  case other => LL.materialize(offset + 1).unaryFunctions.modifyF(f)(other.asInstanceOf[CopK[LL, A]]).asInstanceOf[G[CopK[F ::: LL, A]]]
+                }
+              }
+            }
+        }
+      }
+    }
+  }
 
   implicit def qscriptCore[T[_[_]]]: UnaryFunctions[T, QScriptCore[T, ?]] =
     new UnaryFunctions[T, QScriptCore[T, ?]] {

@@ -20,12 +20,20 @@ import slamdata.Predef._
 
 import java.lang.{Throwable, RuntimeException}
 
+import quasar.fp.{:<<:, ACopK}
+import quasar.fp.free.{injectNT, projectNT}
+
 import scalaz._, Scalaz._, Leibniz.===
 import scalaz.concurrent.Task
 
-trait CatchableInstances {
+trait CatchableInstances extends CatchableInstances0 {
+  implicit def copKinjectableTaskCatchable[S[a] <: ACopK[a]](implicit I: Task :<<: S): Catchable[Free[S, ?]] =
+    catchable.freeCatchable[Task, S](I.inj, I.prj)
+}
+
+trait CatchableInstances0 {
   implicit def injectableTaskCatchable[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] =
-    catchable.freeCatchable[Task, S]
+    catchable.freeCatchable[Task, S](injectNT[Task, S], projectNT[Task, S])
 }
 
 final class CatchableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Catchable[F]) {
@@ -99,20 +107,23 @@ trait ToCatchableOps {
 }
 
 object catchable extends CatchableInstances with ToCatchableOps {
-  def freeCatchable[F[_], S[_]](implicit F: Catchable[F], I: F :<: S): Catchable[Free[S, ?]] =
+  def freeCatchable[F[_], S[_]](
+    inject: F ~> S,
+    project: S ~> λ[a => Option[F[a]]]
+  )(implicit F: Catchable[F]): Catchable[Free[S, ?]] =
     new Catchable[Free[S, ?]] {
       type ExceptT[X[_], A] = EitherT[X, Throwable, A]
 
       private val attemptT: S ~> ExceptT[Free[S, ?], ?] =
         λ[S ~> ExceptT[Free[S, ?], ?]](sa =>
-          EitherT(I.prj(sa).fold(
+          EitherT(project(sa).fold(
             Free.liftF(sa) map (_.right[Throwable]))
-            { case fa => Free.liftF(I(F.attempt(fa))) }))
+            { case fa => Free.liftF(inject(F.attempt(fa))) }))
 
       def attempt[A](fa: Free[S, A]) =
         fa.foldMap(attemptT).run
 
       def fail[A](t: Throwable) =
-        Free.liftF(I(F.fail[A](t)))
+        Free.liftF(inject(F.fail[A](t)))
     }
 }

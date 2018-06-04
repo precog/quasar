@@ -17,6 +17,7 @@
 package quasar.qscript.rewrites
 
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka.data.Fix

@@ -56,6 +56,6 @@ final case object Except       extends BinaryOperator("except")
 final case object UnshiftMap   extends BinaryOperator("{...}")
 
 object BinaryOperator {
-  implicit val equal: Equal[BinaryOperator] = Equal.equalRef
+  implicit val equal: Equal[BinaryOperator] = Equal.equalA
   implicit val show: Show[BinaryOperator] = Show.show(_.sql)
 }

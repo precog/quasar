@@ -22,6 +22,7 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.physical.mongodb.BsonField
 import quasar.physical.mongodb.expression._
 import quasar.qscript._
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka._
 import matryoshka.data._

@@ -22,7 +22,7 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
-import quasar.fp.coproductEqual
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.fp.ski.κ
 import quasar.qscript.{construction, ExcludeId, Hole, IdOnly, IncludeId, OnUndefined, SrcHole}
 

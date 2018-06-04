@@ -22,6 +22,7 @@ import quasar.common.SortDir
 import quasar.contrib.matryoshka._
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
@@ -31,6 +32,8 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
+import iotaz.{ CopK, TListK, TNilK }
+import iotaz.TListK.:::
 
 @typeclass trait Normalizable[F[_]] {
   def normalizeF: NTComp[F, Option]
@@ -62,13 +65,49 @@ trait NormalizableInstances {
       : Normalizable[EquiJoin[T, ?]] =
     normalizable[T].EquiJoin
 
-  implicit def coproduct[F[_], G[_]]
-    (implicit F: Normalizable[F], G: Normalizable[G])
-      : Normalizable[Coproduct[F, G, ?]] =
-    new Normalizable[Coproduct[F, G, ?]] {
-      def normalizeF =
-        λ[Coproduct[F, G, ?] ~> (Option ∘ Coproduct[F, G, ?])#λ](
-          _.run.bitraverse(F.normalizeF(_), G.normalizeF(_)) ∘ (Coproduct(_)))
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Normalizable[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Normalizable[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Normalizable[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Normalizable[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Normalizable[CopK[F ::: TNilK, ?]] {
+          override def normalizeF: NTComp[CopK[F ::: TNilK, ?], Option] = new (CopK[F ::: TNilK, ?] ~> (Option ∘ CopK[F ::: TNilK, ?])#λ) {
+            override def apply[A](cfa: CopK[F ::: TNilK, A]): Option[CopK[F ::: TNilK, A]] = cfa match {
+              case I(fa) => F.normalizeF(fa).map(I(_))
+            }
+          }
+        }
+      }
+    }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Normalizable[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Normalizable[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Normalizable[CopK[F ::: LL, ?]] {
+          override def normalizeF: NTComp[CopK[F ::: LL, ?], Option] = new (CopK[F ::: LL, ?] ~> (Option ∘ CopK[F ::: LL, ?])#λ) {
+            override def apply[A](cfa: CopK[F ::: LL, A]): Option[CopK[F ::: LL, A]] = cfa match {
+              case I(fa) => F.normalizeF(fa).map(I(_))
+              case other => LL.materialize(offset  + 1).normalizeF(other.asInstanceOf[CopK[LL, A]]).asInstanceOf[Option[CopK[F ::: LL, A]]]
+            }
+          }
+        }
+      }
+    }
   }
 }
 

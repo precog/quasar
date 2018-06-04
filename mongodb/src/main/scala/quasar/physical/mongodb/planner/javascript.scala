@@ -18,6 +18,7 @@ package quasar.physical.mongodb.planner
 
 import quasar._
 import quasar.fp.ski._
+import quasar.contrib.iota.copkTraverse
 import quasar.fs.MonadFsErr
 import quasar.jscore.{JsCore, JsFn}
 import quasar.physical.mongodb.planner.common._

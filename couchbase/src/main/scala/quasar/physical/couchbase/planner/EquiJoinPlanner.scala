@@ -18,10 +18,12 @@ package quasar.physical.couchbase.planner
 
 import slamdata.Predef._
 import quasar.effect.NameGenerator
-import quasar.fs.Planner.{PlannerErrorME}
+import quasar.fs.Planner.PlannerErrorME
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski.κ
+import quasar.contrib.iota.copkTraverse
+import quasar.fp.{:<<:, ACopK}
 import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},
@@ -33,6 +35,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
+import iotaz.CopK
 
 // NB: Only handling a limited simple set of cases to start
 
@@ -42,10 +45,10 @@ final class EquiJoinPlanner[
   extends Planner[T, F, EquiJoin[T, ?]] {
 
   object CShiftedRead {
-    def unapply[F[_], A](
+    def unapply[F[a] <: ACopK[a], A](
       fa: F[A]
     )(implicit
-      C: Const[ShiftedRead[AFile], ?] :<: F
+      C: Const[ShiftedRead[AFile], ?] :<<: F
     ): Option[Const[ShiftedRead[AFile], A]] =
       C.prj(fa)
   }
@@ -61,7 +64,7 @@ final class EquiJoinPlanner[
     }
   }
 
-  val QC = Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
+  val QC = CopK.Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
 
   object BranchCollection {
     def unapply(qs: FreeQS[T]): Option[DocTypeValue] = (qs match {

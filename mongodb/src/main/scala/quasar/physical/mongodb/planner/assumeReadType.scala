@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.planner.common._
@@ -34,12 +35,13 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz.{ToIdOps => _, _}
+import iotaz.CopK
 
 object assumeReadType {
 
   object SRT {
     def unapply[T[_[_]], A](qt: QScriptTotal[T, A]): Option[ShiftedRead[AFile]] =
-      Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]].prj(qt).map(_.getConst)
+      CopK.Inject[Const[ShiftedRead[AFile], ?], QScriptTotal[T, ?]].prj(qt).map(_.getConst)
   }
 
   object FreeQS {
@@ -51,10 +53,10 @@ object assumeReadType {
 
   def isRewriteIdStatus(idStatus: IdStatus): Boolean = idStatus === ExcludeId
 
-  def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
-    QC: QScriptCore[T, ?] :<: F,
-    SR: Const[ShiftedRead[AFile], ?] :<: F,
-    FT: Injectable.Aux[F, QScriptTotal[T, ?]],
+  def isRewrite[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[_]: Functor, A](GtoF: PrismNT[G, F], qs: G[A])(implicit
+    QC: QScriptCore[T, ?] :<<: F,
+    SR: Const[ShiftedRead[AFile], ?] :<<: F,
+    FT: Injectable[F, QScriptTotal[T, ?]],
     SP: ShapePreserving[F],
     RA: Recursive.Aux[A, G],
     CA: Corecursive.Aux[A, G])
@@ -96,13 +98,13 @@ object assumeReadType {
     }
   }
 
-def apply[T[_[_]]: BirecursiveT: EqualT, F[_]: Functor, M[_]: Monad: MonadFsErr]
+def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, M[_]: Monad: MonadFsErr]
   (typ: Type)
   (implicit
-    QC: QScriptCore[T, ?] :<: F,
-    EJ: EquiJoin[T, ?] :<: F,
-    SR: Const[ShiftedRead[AFile], ?] :<: F,
-    FT: Injectable.Aux[F, QScriptTotal[T, ?]],
+    QC: QScriptCore[T, ?] :<<: F,
+    EJ: EquiJoin[T, ?] :<<: F,
+    SR: Const[ShiftedRead[AFile], ?] :<<: F,
+    FT: Injectable[F, QScriptTotal[T, ?]],
     SP: ShapePreserving[F])
     : Trans[F, M] =
   new Trans[F, M] {

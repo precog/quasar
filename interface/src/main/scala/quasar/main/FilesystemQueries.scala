@@ -34,8 +34,6 @@ class FilesystemQueries[S[_]](implicit val Q: QueryFile.Ops[S]) {
   val CE = CompExec[Q.FreeS]
   import CE._
 
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
-
   /** Returns the source of values from the result of executing the given
     * SQL^2 query.
     */

@@ -22,6 +22,7 @@ import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.mongodb.{sigil, Collection}
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
+import quasar.fp.{:<<:, ACopK}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -37,11 +38,11 @@ object elideQuasarSigil {
   import FileSystemError.pathErr
   import MapFuncsCore._
 
-  def apply[T[_[_]]: CorecursiveT, F[_]: Functor, M[_]: Monad: MonadFsErr]
+  def apply[T[_[_]]: CorecursiveT, F[a] <: ACopK[a]: Functor, M[_]: Monad: MonadFsErr]
       (anyDoc: Collection => OptionT[M, BsonDocument])
       (implicit
-        SR: Const[ShiftedRead[AFile], ?] :<: F,
-        QC: QScriptCore[T, ?] :<: F)
+        SR: Const[ShiftedRead[AFile], ?] :<<: F,
+        QC: QScriptCore[T, ?] :<<: F)
       : F[T[F]] => M[F[T[F]]] = {
 
     case sr @ SR(Const(ShiftedRead(f, IdOnly))) =>

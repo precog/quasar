@@ -23,6 +23,7 @@ import quasar.contrib.scalaz.catchable._
 import quasar.effect._
 import quasar.ejson.EJson
 import quasar.fp.reflNT
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.free._
 import quasar.physical.marklogic._
 import quasar.physical.marklogic.cts._
@@ -40,12 +41,13 @@ import pathy.Path._
 import scala.util.Random
 import scalaz._, Scalaz._
 import scalaz.concurrent._
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 
 final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
 
   type U      = Fix[Query[Fix[EJson], ?]]
-  type SR[A]  = Const[ShiftedRead[ADir], A]
-  type QSR[A] = Coproduct[QScriptCore[Fix, ?], SR, A]
+  type QSR[A] = CopK[QScriptCore[Fix, ?] ::: Const[ShiftedRead[ADir], ?] ::: TNilK, A]
 
   type M[A] = MarkLogicPlanErrT[PrologT[StateT[Free[XccEvalEff, ?], Long, ?], ?], A]
   type G[A] = WriterT[Id, Prologs, A]
@@ -99,10 +101,10 @@ final class FilterPlannerSpec extends quasar.ExclusiveQuasarSpecification {
       recFunc.ProjectKeyS(recFunc.Hole, str)
 
     def shiftedRead(path: ADir): Fix[QSR] =
-      Fix(Inject[SR, QSR].inj(Const(ShiftedRead(path, IncludeId))))
+      Fix(CopK.Inject[Const[ShiftedRead[ADir], ?], QSR].inj(Const(ShiftedRead(path, IncludeId))))
 
     def filter(src: Fix[QSR], f: RecFreeMap[Fix]): Fix[QSR] =
-      Fix(Inject[QScriptCore[Fix, ?], QSR].inj(Filter(src, f)))
+      Fix(CopK.Inject[QScriptCore[Fix, ?], QSR].inj(Filter(src, f)))
 
     filter(shiftedRead(rootDir[Sandboxed] </> dir("some")), eq(projectField(idxName), "foobar"))
   }

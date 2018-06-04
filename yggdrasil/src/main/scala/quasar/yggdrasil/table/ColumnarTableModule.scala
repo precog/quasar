@@ -1432,37 +1432,27 @@ trait ColumnarTableModule
         val left  = this.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
         val right = that.canonicalize(Config.minIdealSliceSize, Some(Config.maxSliceSize))
 
-        left.slices.uncons flatMap {
-          case Some((lhead, ltail)) =>
-            right.slices.uncons flatMap {
-              case Some((rhead, rtail)) =>
-                for {
-                  lempty <- ltail.isEmpty //TODO: Scalaz result here is negated from what it should be!
-                  rempty <- rtail.isEmpty
+        (left.slices.uncons |@| right.slices.uncons).tupled flatMap {
+          case (Some((lhead, ltail)), Some((rhead, rtail))) =>
+            (ltail.uncons |@| rtail.uncons).tupled flatMap {
+              case (None, None) =>
+                // both are small sets, so find the cross in memory
+                crossBothSingle(lhead, rhead)(transform.initial) map { _._2 }
 
-                  back <- {
-                    // println(s"checking cross: lempty = $lempty; rempty = $rempty")
+              case (None, Some((rthead, rttail))) =>
+                // left side is a small set, so restart it in memory
+                IO(crossLeftSingle(lhead, rhead :: rthead :: rttail)(transform.initial))
 
-                    if (lempty && rempty) {
-                      // both are small sets, so find the cross in memory
-                      crossBothSingle(lhead, rhead)(transform.initial) map { _._2 }
-                    } else if (lempty) {
-                      // left side is a small set, so restart it in memory
-                      IO(crossLeftSingle(lhead, rhead :: rtail)(transform.initial))
-                    } else if (rempty) {
-                      // right side is a small set, so restart it in memory
-                      IO(crossRightSingle(lhead :: ltail, rhead)(transform.initial))
-                    } else {
-                      // both large sets, so just walk the left restarting the right.
-                      IO(crossBoth(lhead :: ltail, rhead :: rtail))
-                    }
-                  }
-                } yield back
+              case (Some((lthead, lttail)), None) =>
+                // right side is a small set, so restart it in memory
+                IO(crossRightSingle(lhead :: lthead :: lttail, rhead)(transform.initial))
 
-              case None => IO.pure(StreamT.empty[IO, Slice])
+              case (Some((lthead, lttail)), Some((rthead, rttail))) =>
+                // both large sets, so just walk the left restarting the right.
+                IO(crossBoth(lhead :: lthead :: lttail, rhead :: rthead :: rttail))
             }
 
-          case None => IO.pure(StreamT.empty[IO, Slice])
+          case _ => IO.pure(StreamT.empty[IO, Slice])
         }
       }
 

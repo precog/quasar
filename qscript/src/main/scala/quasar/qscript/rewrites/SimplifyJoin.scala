@@ -17,6 +17,7 @@
 package quasar.qscript.rewrites
 
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.RecFreeS._
 import quasar.qscript._
 import slamdata.Predef.{Map => _, _}
@@ -24,6 +25,8 @@ import slamdata.Predef.{Map => _, _}
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import scalaz._, Scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Replaces [[ThetaJoin]] with [[EquiJoin]], which is often more feasible for
   * connectors to implement. It potentially adds a [[Filter]] iff there are
@@ -61,11 +64,10 @@ object SimplifyJoin {
     applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
   }
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]]
-    (implicit EJ: EquiJoin[T, ?] :<: F, QC: QScriptCore[T, ?] :<: F)
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+    (implicit EJ: EquiJoin[T, ?] :<<: F, QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
     new SimplifyJoin[ThetaJoin[T, ?]] {
-      import MapFuncCore._
       import MapFuncsCore._
 
       type IT[F[_]] = T[F]
@@ -125,8 +127,8 @@ object SimplifyJoin {
         }
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]]
-    (implicit QC: QScriptCore[T, ?] :<: F)
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+    (implicit QC: QScriptCore[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
     new SimplifyJoin[QScriptCore[T, ?]] {
       type IT[F[_]] = T [F]
@@ -141,8 +143,8 @@ object SimplifyJoin {
           }))
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]]
-    (implicit EJ: EquiJoin[T, ?] :<: F)
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]]
+    (implicit EJ: EquiJoin[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
     new SimplifyJoin[EquiJoin[T, ?]] {
       type IT[F[_]] = T [F]
@@ -157,18 +159,54 @@ object SimplifyJoin {
           ej.combine)))
     }
 
-  implicit def coproduct[T[_[_]], F[_], I[_], J[_]]
-    (implicit I: SimplifyJoin.Aux[T, I, F], J: SimplifyJoin.Aux[T, J, F])
-      : SimplifyJoin.Aux[T, Coproduct[I, J, ?], F] =
-    new SimplifyJoin[Coproduct[I, J, ?]] {
-      type IT[F[_]] = T[F]
-      type G[A] = F[A]
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H)
-          : Coproduct[I, J, T[H]] => H[T[H]] =
-        _.run.fold(I.simplifyJoin(GtoH), J.simplifyJoin(GtoH))
+  implicit def copk[T[_[_]], LL <: TListK, S[_]](implicit M: Materializer[T, LL, S]): SimplifyJoin.Aux[T, CopK[LL, ?], S] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK, S[_]] {
+    def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[LL, ?], S]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_], S[_]](
+      implicit
+      S: SimplifyJoin.Aux[T, F, S]
+    ): Materializer[T, F ::: TNilK, S] = new Materializer[T, F ::: TNilK, S] {
+      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[F ::: TNilK, ?], S] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new SimplifyJoin[CopK[F ::: TNilK, ?]] {
+          type IT[F[_]] = T[F]
+          type G[A] = S[A]
+
+          def simplifyJoin[H[_]: Functor](GtoH: G ~> H): CopK[F ::: TNilK, T[H]] => H[T[H]] = {
+            case I(fa) => S.simplifyJoin(GtoH).apply(fa)
+          }
+        }
+      }
     }
 
-  def default[T[_[_]], F[_], I[_]](implicit F: F :<: I)
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK, S[_]](
+      implicit
+      S: SimplifyJoin.Aux[T, F, S],
+      LL: Materializer[T, LL, S]
+    ): Materializer[T, F ::: LL, S] = new Materializer[T, F ::: LL, S] {
+      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[F ::: LL, ?], S] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new SimplifyJoin[CopK[F ::: LL, ?]] {
+          type IT[F[_]] = T[F]
+          type G[A] = S[A]
+
+          def simplifyJoin[H[_]: Functor](GtoH: G ~> H): CopK[F ::: LL, T[H]] => H[T[H]] = {
+            case I(fa) => S.simplifyJoin(GtoH).apply(fa)
+            case other => LL.materialize(offset + 1).simplifyJoin(GtoH).apply(other.asInstanceOf[CopK[LL, T[H]]])
+          }
+        }
+      }
+    }
+  }
+
+  def default[T[_[_]], F[_], I[a] <: ACopK[a]](implicit F: F :<<: I)
       : SimplifyJoin.Aux[T, F, I] =
     new SimplifyJoin[F] {
       type IT[F[_]] = T[F]
@@ -178,21 +216,21 @@ object SimplifyJoin {
         fa => GtoH(F.inj(fa))
     }
 
-  implicit def deadEnd[T[_[_]], F[_]](implicit DE: Const[DeadEnd, ?] :<: F)
+  implicit def deadEnd[T[_[_]], F[a] <: ACopK[a]](implicit DE: Const[DeadEnd, ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
     default
 
-  implicit def read[T[_[_]], F[_], A](implicit R: Const[Read[A], ?] :<: F)
+  implicit def read[T[_[_]], F[a] <: ACopK[a], A](implicit R: Const[Read[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[_], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<: F)
+  implicit def shiftedRead[T[_[_]], F[a] <: ACopK[a], A]
+    (implicit SR: Const[ShiftedRead[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
     default
 
-  implicit def projectBucket[T[_[_]], F[_]]
-    (implicit PB: ProjectBucket[T, ?] :<: F)
+  implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
+    (implicit PB: ProjectBucket[T, ?] :<<: F)
       : SimplifyJoin.Aux[T, ProjectBucket[T, ?], F] =
     default
 }

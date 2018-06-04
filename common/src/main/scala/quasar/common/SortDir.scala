@@ -29,7 +29,7 @@ object SortDir {
   val asc: SortDir  = Ascending
   val desc: SortDir = Descending
 
-  implicit val equal: Equal[SortDir] = Equal.equalRef
+  implicit val equal: Equal[SortDir] = Equal.equalA
   implicit val show: Show[SortDir] = Show.showFromToString
   implicit val renderTree: RenderTree[SortDir] = RenderTree.fromShow("SortDir")
 }

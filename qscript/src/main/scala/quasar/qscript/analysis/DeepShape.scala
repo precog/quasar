@@ -22,6 +22,7 @@ import quasar._
 import quasar.RenderTree.ops._
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.qscript._
 
@@ -30,6 +31,9 @@ import matryoshka.data.free._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
+
 
 trait DeepShape[T[_[_]], F[_]] {
   def deepShapeƒ: Algebra[F, DeepShape.FreeShape[T]]
@@ -108,13 +112,46 @@ object DeepShape extends DeepShapeInstances {
 sealed abstract class DeepShapeInstances {
   import DeepShape._
 
-  implicit def coproduct[T[_[_]], F[_], G[_]]
-    (implicit F: DeepShape[T, F], G: DeepShape[T, G])
-      : DeepShape[T, Coproduct[F, G, ?]] =
-    new DeepShape[T, Coproduct[F, G, ?]] {
-      def deepShapeƒ: Algebra[Coproduct[F, G, ?], FreeShape[T]] =
-        _.run.fold(F.deepShapeƒ, G.deepShapeƒ)
+  implicit def copk[T[_[_]], LL <: TListK](implicit M: Materializer[T, LL]): DeepShape[T, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK] {
+    def materialize(offset: Int): DeepShape[T, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: DeepShape[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): DeepShape[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new DeepShape[T, CopK[F ::: TNilK, ?]] {
+          override def deepShapeƒ: Algebra[CopK[F ::: TNilK, ?], FreeShape[T]] = {
+            case I(fa) => F.deepShapeƒ(fa)
+          }
+        }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK](
+      implicit
+      F: DeepShape[T, F],
+      LL: Materializer[T, LL]
+    ): Materializer[T, F ::: LL] = new Materializer[T, F ::: LL] {
+      override def materialize(offset: Int): DeepShape[T, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new DeepShape[T, CopK[F ::: LL, ?]] {
+          override def deepShapeƒ: Algebra[CopK[F ::: LL, ?], FreeShape[T]] = {
+            case I(fa) => F.deepShapeƒ(fa)
+            case other => LL.materialize(offset + 1).deepShapeƒ(other.asInstanceOf[CopK[LL, FreeShape[T]]])
+          }
+        }
+      }
+    }
+  }
 
   implicit def coenv[T[_[_]], F[_]](implicit F: DeepShape[T, F])
       : DeepShape[T, CoEnv[Hole, F, ?]] =
@@ -182,9 +219,12 @@ sealed abstract class DeepShapeInstances {
     val proj = new rewrites.SimplifiableProjectionT[T]
 
     new DeepShape[T, ProjectBucket[T, ?]] {
+      private type QSC[A] = CopK[QScriptCore[T, ?] ::: TNilK, A]
+      private val QSC = CopK.Inject[QScriptCore[T, ?], QSC]
+
       def deepShapeƒ: Algebra[ProjectBucket[T, ?], FreeShape[T]] = {
         qs => QS.deepShapeƒ(
-          proj.ProjectBucket[QScriptCore[T, ?]].simplifyProjection(qs))
+          proj.ProjectBucket[QSC].simplifyProjection(qs) match { case QSC(qc) => qc })
       }
     }
   }

@@ -195,7 +195,7 @@ lazy val assemblySettings = Seq(
 )
 
 // Build and publish a project, excluding its tests.
-lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings
+lazy val commonSettings = buildSettings ++ publishSettings ++ assemblySettings ++ (cancelable := false)
 
 // not doing this causes NoSuchMethodErrors when using coursier
 lazy val excludeTypelevelScalaLibrary =
@@ -287,6 +287,7 @@ lazy val root = project.in(file("."))
   * like to push to upstream libraries.
   */
 lazy val foundation = project
+  .gitHubDependency("frees-io", "iota", "e77a8be", Some("corezJVM"))   // TODO replace this with a real dependency once they release
   .settings(name := "quasar-foundation-internal")
   .settings(commonSettings)
   .settings(publishTestsSettings)

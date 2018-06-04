@@ -19,7 +19,6 @@ package quasar.mimir
 import org.slf4j.LoggerFactory
 
 import cats.effect.IO
-import scalaz._
 import scalaz.syntax.monad._
 import shims._
 

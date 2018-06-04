@@ -22,6 +22,7 @@ import quasar._
 import quasar.common._
 import quasar.contrib.scalaz._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fp.ski.κ
 import quasar.precog.common.{CNumericValue, ColumnRef, CPath, CPathField, CPathIndex}

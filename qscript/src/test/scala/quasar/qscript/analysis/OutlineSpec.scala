@@ -21,6 +21,7 @@ import quasar.common.{JoinType, JoinTypeArbitrary, SortDir}
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.ejson
 import quasar.ejson.{CommonEJson, EJson, EJsonArbitrary, ExtEJson}

@@ -23,6 +23,7 @@ import quasar.compile.{queryPlan, CompilerHelpers, SemanticErrsT}
 import quasar.contrib.pathy._, Helpers._
 import quasar.contrib.specs2._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.frontend.{logicalplan => lp}, lp.{JoinDir, LogicalPlan => LP}

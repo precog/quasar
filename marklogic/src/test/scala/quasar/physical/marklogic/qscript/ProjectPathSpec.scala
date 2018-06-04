@@ -18,9 +18,10 @@ package quasar.physical.marklogic.qscript
 
 import slamdata.Predef._
 import quasar.contrib.pathy.ADir
+import quasar.contrib.iota.SubInject
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
-import quasar.fp.free._
+import quasar.contrib.iota._
 import quasar.qscript.MapFuncsCore._
 import quasar.qscript._
 
@@ -29,27 +30,30 @@ import matryoshka.{Hole => _, _}
 import pathy._, Path._
 
 import scalaz._, Scalaz._
+import iotaz.CopK
 
 final class ProjectPathSpec extends quasar.Qspec {
   val json = Fixed[Fix[EJson]]
 
+  implicit val I = SubInject[MapFunc[Fix, ?], PathMapFunc[Fix, ?]]
+
   def projectKey[S[_]: Functor](src: Free[MapFunc[Fix, ?], Hole], str: String)(
-    implicit I: MapFunc[Fix, ?] :<: S
+    implicit I: Injectable[MapFunc[Fix, ?], S]
   ): Free[S, Hole] =
-    Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectKey(src, StrLit(str)))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
+    Free.roll[MapFunc[Fix, ?], Hole](MFC(ProjectKey(src, StrLit(str)))).mapSuspension(I.inject)
 
   def makeMap[S[_]: Functor](key: String, values: Free[MapFunc[Fix, ?], Hole])(
-    implicit I: MapFunc[Fix, ?] :<: S
+    implicit I: Injectable[MapFunc[Fix, ?], S]
   ) : Free[S, Hole] =
-    Free.roll[MapFunc[Fix, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(injectNT[MapFunc[Fix, ?], S])
+    Free.roll[MapFunc[Fix, ?], Hole](MFC(MakeMap(StrLit(key), values))).mapSuspension(I.inject)
 
   def hole[S[_]: Functor](
-    implicit I: MapFunc[Fix, ?] :<: S
+    implicit I: Injectable[MapFunc[Fix, ?], S]
   ): Free[S, Hole] =
-    Free.point[MapFunc[Fix, ?], Hole](SrcHole).mapSuspension(injectNT[MapFunc[Fix, ?], S])
+    Free.point[MapFunc[Fix, ?], Hole](SrcHole).mapSuspension(I.inject)
 
   def projectPath(src: FreePathMap[Fix], path: ADir): FreePathMap[Fix] =
-    Free.roll(Inject[ProjectPath, PathMapFunc[Fix, ?]].inj(ProjectPath(src, path)))
+    Free.roll(CopK.Inject[ProjectPath, PathMapFunc[Fix, ?]].inj(ProjectPath(src, path)))
 
   val root = rootDir[Sandboxed]
 

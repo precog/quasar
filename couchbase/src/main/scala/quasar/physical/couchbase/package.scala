@@ -16,23 +16,30 @@
 
 package quasar.physical
 
-import quasar.fp._
+import quasar.contrib.iota.SubInject
+import quasar.fp.Injectable
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import scalaz.Const
+import iotaz.TListK.:::
+import iotaz.{TNilK, CopK}
 
 package object couchbase {
-  type CouchbaseQScriptCP[T[_[_]]] = QScriptCore[T, ?] :\: EquiJoin[T, ?] :/: Const[ShiftedRead[AFile], ?]
-  
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[CouchbaseQScriptCP[T]#M, QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+  type CouchbaseQScriptCP[T[_[_]]] =
+    QScriptCore[T, ?]            :::
+    EquiJoin[T, ?]               :::
+    Const[ShiftedRead[AFile], ?] :::
+    TNilK
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], CouchbaseQScriptCP[T]#M] =
-    Injectable.inject[QScriptCore[T, ?], CouchbaseQScriptCP[T]#M]
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[CouchbaseQScriptCP[T], ?], QScriptTotal[T, ?]] =
+    SubInject[CopK[CouchbaseQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], CouchbaseQScriptCP[T]#M] =
-    Injectable.inject[EquiJoin[T, ?], CouchbaseQScriptCP[T]#M]
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
+    Injectable.inject[QScriptCore[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], CouchbaseQScriptCP[T]#M] =
-    Injectable.inject[Const[ShiftedRead[AFile], ?], CouchbaseQScriptCP[T]#M]
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]] =
+    Injectable.inject[EquiJoin[T, ?], CopK[CouchbaseQScriptCP[T], ?]]
+
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]] =
+    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[CouchbaseQScriptCP[T], ?]]
 }

@@ -21,13 +21,14 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, SrcHole}
 import quasar.qsu.{QScriptUniform => QSU}
 import slamdata.Predef.{Map => _, _}
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.data.free._
 import org.specs2.matcher.{Expectable, MatchResult, Matcher}
 import pathy.Path._
 import scalaz.{\/, EitherT, Need, StateT}

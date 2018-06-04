@@ -41,6 +41,6 @@ final case object ShiftArrayValues    extends UnaryOperator("shift_array")
 final case object UnshiftArray        extends UnaryOperator("[...]")
 
 object UnaryOperator {
-  implicit val equal: Equal[UnaryOperator] = Equal.equalRef
+  implicit val equal: Equal[UnaryOperator] = Equal.equalA
   implicit val show: Show[UnaryOperator] = Show.show(_.sql)
 }

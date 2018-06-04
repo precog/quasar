@@ -26,6 +26,6 @@ final case object ASC extends OrderType
 final case object DESC extends OrderType
 
 object OrderType {
-  implicit val equal: Equal[OrderType] = Equal.equalRef
+  implicit val equal: Equal[OrderType] = Equal.equalA
   implicit val show: Show[OrderType] = Show.showFromToString
 }

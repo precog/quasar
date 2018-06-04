@@ -19,11 +19,11 @@ package quasar.qscript
 import quasar._
 import quasar.qscript.{MapFuncsCore => C, MapFuncsDerived => D}
 import quasar.std.StdLib._
-import scalaz._
+import quasar.fp.{:<<:, ACopK}
 
 object MapFunc {
-  def translateNullaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
+  def translateNullaryMapping[T[_[_]], MF[a] <: ACopK[a] , A]
+      (implicit MFC: MapFuncCore[T, ?] :<<: MF)
       : scala.PartialFunction[NullaryFunc, MF[A]] = {
     case date.Now => MFC(C.Now())
     case date.NowTime => MFC(C.NowTime())
@@ -31,8 +31,8 @@ object MapFunc {
     case date.CurrentTimeZone => MFC(C.CurrentTimeZone())
   }
 
-  def translateUnaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF)
+  def translateUnaryMapping[T[_[_]], MF[a] <: ACopK[a], A]
+      (implicit MFC: MapFuncCore[T, ?] :<<: MF, MFD: MapFuncDerived[T, ?] :<<: MF)
       : scala.PartialFunction[UnaryFunc, A => MF[A]] = {
     case date.ExtractCentury => a => MFC(C.ExtractCentury(a))
     case date.ExtractDayOfMonth => a => MFC(C.ExtractDayOfMonth(a))
@@ -87,8 +87,8 @@ object MapFunc {
     case structural.Meta => a => MFC(C.Meta(a))
   }
 
-  def translateBinaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF, MFD: MapFuncDerived[T, ?] :<: MF)
+  def translateBinaryMapping[T[_[_]], MF[a] <: ACopK[a], A]
+      (implicit MFC: MapFuncCore[T, ?] :<<: MF, MFD: MapFuncDerived[T, ?] :<<: MF)
       : scala.PartialFunction[BinaryFunc, (A, A) => MF[A]] = {
     // NB: ArrayLength takes 2 params because of SQL, but we really don’t care
     //     about the second. And it shouldn’t even have two in LP.
@@ -127,8 +127,8 @@ object MapFunc {
        | structural.ConcatOp => (a1, a2) => MFC(C.ConcatArrays(a1, a2))
   }
 
-  def translateTernaryMapping[T[_[_]], MF[_], A]
-      (implicit MFC: MapFuncCore[T, ?] :<: MF)
+  def translateTernaryMapping[T[_[_]], MF[a] <: ACopK[a], A]
+      (implicit MFC: MapFuncCore[T, ?] :<<: MF)
       : scala.PartialFunction[TernaryFunc, (A, A, A) => MF[A]] = {
     case relations.Between => (a1, a2, a3) => MFC(C.Between(a1, a2, a3))
     case relations.Cond    => (a1, a2, a3) => MFC(C.Cond(a1, a2, a3))

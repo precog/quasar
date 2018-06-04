@@ -23,6 +23,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.{Planner => QPlanner, _}, QPlanner._
 import quasar.jscore

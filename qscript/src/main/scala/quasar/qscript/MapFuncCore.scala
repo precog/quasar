@@ -24,6 +24,7 @@ import quasar.contrib.matryoshka._
 import quasar.ejson._
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.qscript.rewrites.{DedupeGuards, ExtractFiltering}
 import quasar.time.TemporalPart

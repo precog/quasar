@@ -23,6 +23,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz.eitherT._
 import quasar.effect.MonotonicSeq
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.ι
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fs.Planner.PlannerError

@@ -20,8 +20,6 @@ import quasar.precog.common._
 import quasar.precog.util.Identifier
 import quasar.yggdrasil._
 
-import scalaz._
-
 trait ReductionFinderSpecs extends EvaluatorSpecification {
 
   import instructions._

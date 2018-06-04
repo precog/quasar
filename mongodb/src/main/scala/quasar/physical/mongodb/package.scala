@@ -23,10 +23,13 @@ import quasar.javascript.Js
 import quasar.fs.PhysicalError
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
+import quasar.fp.Injectable
 
 import com.mongodb.async.AsyncBatchCursor
 import org.bson.BsonValue
 import scalaz._
+import iotaz.CopK
+import quasar.contrib.iota.SubInject
 
 package object mongodb {
   type BsonCursor         = AsyncBatchCursor[BsonValue]
@@ -50,16 +53,16 @@ package object mongodb {
     case SortDir.Descending => Bson.Int32(-1)
   }
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MongoQScriptCP[T]#M, QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[fs.MongoQScriptCP[T], ?], QScriptTotal[T, ?]] =
+    SubInject[CopK[fs.MongoQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], fs.MongoQScriptCP[T]#M] =
-    Injectable.inject[QScriptCore[T, ?], fs.MongoQScriptCP[T]#M]
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
+    Injectable.inject[QScriptCore[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], fs.MongoQScriptCP[T]#M] =
-    Injectable.inject[EquiJoin[T, ?], fs.MongoQScriptCP[T]#M]
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]] =
+    Injectable.inject[EquiJoin[T, ?], CopK[fs.MongoQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], fs.MongoQScriptCP[T]#M] =
-    Injectable.inject[Const[ShiftedRead[AFile], ?], fs.MongoQScriptCP[T]#M]
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]] =
+    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[fs.MongoQScriptCP[T], ?]]
 
 }

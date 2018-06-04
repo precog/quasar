@@ -23,6 +23,7 @@ import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
   Hole,
@@ -36,7 +37,8 @@ import quasar.qscript.{
   ReduceIndexF,
   ShiftType,
   SrcHole,
-  Take
+  Take,
+  qScriptReadToQscriptTotal
 }
 import quasar.qscript.MapFuncsCore.{IntLit, RecIntLit}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU

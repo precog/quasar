@@ -26,7 +26,7 @@ case object IncludeId extends IdStatus
 case object ExcludeId extends IdStatus
 
 object IdStatus {
-  implicit def equal: Equal[IdStatus] = Equal.equalRef
+  implicit def equal: Equal[IdStatus] = Equal.equalA
 
   implicit def renderTree: RenderTree[IdStatus] = RenderTree.fromShow("IdStatus")
 

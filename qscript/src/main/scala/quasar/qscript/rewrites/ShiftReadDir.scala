@@ -16,8 +16,12 @@
 
 package quasar.qscript.rewrites
 
+import slamdata.Predef._
+
+
 import quasar.contrib.pathy.AFile
-import quasar.fp.coenvPrism
+import quasar.contrib.iota.{copkTraverse, mkInject}
+import quasar.fp.{coenvPrism, :<<:, ACopK}
 import quasar.qscript._
 import quasar.qscript.rewrites.ShiftRead.FixFreeH
 
@@ -26,6 +30,8 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Like [[ShiftRead]], but only applies when the path is a directory, leaving
   * file reads untouched.
@@ -42,8 +48,8 @@ object ShiftReadDir extends ShiftReadDirInstances {
 }
 
 sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
-  implicit def readFile[T[_[_]], F[_]](
-    implicit RF: Const[Read[AFile], ?] :<: F
+  implicit def readFile[T[_[_]], F[a] <: ACopK[a]](
+    implicit RF: Const[Read[AFile], ?] :<<: F
   ): ShiftReadDir.Aux[T, Const[Read[AFile], ?], F] =
     new ShiftReadDir[Const[Read[AFile], ?]] {
       type G[A] = F[A]
@@ -51,8 +57,8 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
         λ[Const[Read[AFile], ?] ~> FixFreeH[H, ?]](fa => GtoH(RF inj (fa map Free.point)))
     }
 
-  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[_]](
-    implicit QC: QScriptCore[T, ?] :<: F
+  implicit def qscriptCore[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](
+    implicit QC: QScriptCore[T, ?] :<<: F
   ): ShiftReadDir.Aux[T, QScriptCore[T, ?], F] =
     new ShiftReadDir[QScriptCore[T, ?]] {
       type G[A] = F[A]
@@ -67,8 +73,8 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
       )
     }
 
-  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[_]](
-    implicit TJ: ThetaJoin[T, ?] :<: F
+  implicit def thetaJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](
+    implicit TJ: ThetaJoin[T, ?] :<<: F
   ): ShiftReadDir.Aux[T, ThetaJoin[T, ?], F] =
     new ShiftReadDir[ThetaJoin[T, ?]] {
       type G[A] = F[A]
@@ -82,8 +88,8 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
           tj.combine))))
     }
 
-  implicit def equiJoin[T[_[_]]: BirecursiveT, F[_]](
-    implicit EJ: EquiJoin[T, ?] :<: F
+  implicit def equiJoin[T[_[_]]: BirecursiveT, F[a] <: ACopK[a]](
+    implicit EJ: EquiJoin[T, ?] :<<: F
   ): ShiftReadDir.Aux[T, EquiJoin[T, ?], F] =
     new ShiftReadDir[EquiJoin[T, ?]] {
       type G[A] = F[A]
@@ -97,17 +103,52 @@ sealed abstract class ShiftReadDirInstances extends ShiftReadDirInstances0 {
           ej.combine))))
     }
 
-  implicit def coproduct[T[_[_]], F[_], I[_], J[_]](
-    implicit
-    I: ShiftReadDir.Aux[T, I, F],
-    J: ShiftReadDir.Aux[T, J, F]
-  ): ShiftReadDir.Aux[T, Coproduct[I, J, ?], F] =
-    new ShiftReadDir[Coproduct[I, J, ?]] {
-      type G[A] = F[A]
-      def shiftReadDir[H[_]](GtoH: G ~> H) =
-        λ[Coproduct[I, J, ?] ~> FixFreeH[H, ?]](
-          _.run.fold(I.shiftReadDir(GtoH)(_), J.shiftReadDir(GtoH)(_)))
+  implicit def copk[T[_[_]], LL <: TListK, M[_]](implicit M: Materializer[T, LL, M]): ShiftReadDir.Aux[T, CopK[LL, ?], M] =
+    M.materialize(offset = 0)
+  
+  sealed trait Materializer[T[_[_]], LL <: TListK, M[_]] {
+    def materialize(offset: Int): ShiftReadDir.Aux[T, CopK[LL, ?], M]
+  }
+  
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_], M[_]](
+      implicit
+      F: ShiftReadDir.Aux[T, F, M]
+    ): Materializer[T, F ::: TNilK, M] = new Materializer[T, F ::: TNilK, M] {
+      override def materialize(offset: Int): ShiftReadDir.Aux[T, CopK[F ::: TNilK, ?], M] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new ShiftReadDir[CopK[F ::: TNilK, ?]] {
+          type G[A] = M[A]
+          def shiftReadDir[H[_]](GtoH: G ~> H) = new (CopK[F ::: TNilK, ?] ~> FixFreeH[H, ?]) {
+            override def apply[A](cfa: CopK[F ::: TNilK, A]): FixFreeH[H, A] = cfa match {
+              case I(fa) => F.shiftReadDir(GtoH)(fa)
+            }
+          }
+        }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK, M[_]](
+      implicit
+      F: ShiftReadDir.Aux[T, F, M],
+      LL: Materializer[T, LL, M]
+    ): Materializer[T, F ::: LL, M] = new Materializer[T, F ::: LL, M] {
+      override def materialize(offset: Int): ShiftReadDir.Aux[T, CopK[F ::: LL, ?], M] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new ShiftReadDir[CopK[F ::: LL, ?]] {
+          type G[A] = M[A]
+          def shiftReadDir[H[_]](GtoH: G ~> H) = new (CopK[F ::: LL, ?] ~> FixFreeH[H, ?]) {
+            override def apply[A](cfa: CopK[F ::: LL, A]): FixFreeH[H, A] = cfa match {
+              case I(fa) => F.shiftReadDir(GtoH)(fa)
+              case other => LL.materialize(offset + 1).shiftReadDir(GtoH)(other.asInstanceOf[CopK[LL, A]])
+            }
+          }
+        }
+      }
+    }
+  }
 
   ////
 

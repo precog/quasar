@@ -51,10 +51,11 @@ import quasar.time.TemporalPart
 
 import matryoshka.data.Fix
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
-import scalaz.{\/, EitherT, Inject, Need, NonEmptyList => NEL, StateT}
+import scalaz.{\/, EitherT, Need, NonEmptyList => NEL, StateT}
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.show._
 import pathy.Path, Path.{file, Sandboxed}
+import iotaz.CopK
 
 object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
@@ -64,8 +65,8 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
   val reader = ReadLP[Fix, F] _
   val root = Path.rootDir[Sandboxed]
 
-  val IC = Inject[MapFuncCore, MapFunc]
-  val ID = Inject[MapFuncDerived, MapFunc]
+  val IC = CopK.Inject[MapFuncCore, MapFunc]
+  val ID = CopK.Inject[MapFuncDerived, MapFunc]
 
   "reading lp into qsu" should {
     "convert Read nodes" in {

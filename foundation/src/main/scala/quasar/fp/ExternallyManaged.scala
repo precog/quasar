@@ -35,7 +35,7 @@ final case object Extern extends ExternallyManaged
 object ExternallyManaged {
   def unit = Iso[ExternallyManaged, Unit](κ(()))(κ(Extern))
 
-  implicit val equal: Equal[ExternallyManaged] = Equal.equalRef
+  implicit val equal: Equal[ExternallyManaged] = Equal.equalA
   implicit val show: Show[ExternallyManaged] = Show.showFromToString
   implicit val renderTree: RenderTree[ExternallyManaged] =
     RenderTree.fromShow("ExternallyManaged")

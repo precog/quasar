@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar._
 import quasar.common._
 import quasar.fp.ski.κ
+import quasar.contrib.iota.copkTraverse
 import quasar.mimir.MimirCake._
 import quasar.qscript._
 

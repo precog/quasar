@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.effect.NameGenerator
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,

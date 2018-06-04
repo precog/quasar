@@ -21,6 +21,10 @@ import matryoshka.patterns._
 
 import monocle._
 import scalaz._, Scalaz._
+import slamdata.Predef._
+import iotaz.TListK.:::
+import quasar.contrib.iota.mkInject
+import iotaz.{CopK, TListK, TNilK}
 
 trait Branches[T[_[_]], IN[_]] {
   def branches[A]: Traversal[IN[A], FreeQS[T]]
@@ -37,20 +41,57 @@ object Branches {
         }
     }
 
-  implicit def coproduct[T[_[_]], G[_], H[_]]
-    (implicit G: Branches[T, G], H: Branches[T, H])
-      : Branches[T, Coproduct[G, H, ?]] =
-    new Branches[T, Coproduct[G, H, ?]] {
-      def branches[A]: Traversal[Coproduct[G, H, A], FreeQS[T]] =
-        new Traversal[Coproduct[G, H, A], FreeQS[T]] {
-          def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: Coproduct[G, H, A]): F[Coproduct[G, H, A]] = {
-            s.run.bitraverse[F, G[A], H[A]](
-              G.branches.modifyF(f),
-              H.branches.modifyF(f)
-            ).map(Coproduct(_))
+  implicit def copk[T[_[_]], LL <: TListK](implicit M: Materializer[T, LL]): Branches[T, CopK[LL, ?]] = M.materialize(offset = 0)
+
+  sealed trait Materializer[T[_[_]], LL <: TListK] {
+    def materialize(offset: Int): Branches[T, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[T[_[_]], F[_]](
+      implicit
+      F: Branches[T, F]
+    ): Materializer[T, F ::: TNilK] = new Materializer[T, F ::: TNilK] {
+      override def materialize(offset: Int): Branches[T, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Branches[T, CopK[F ::: TNilK, ?]] {
+          override def branches[A]: Traversal[CopK[F ::: TNilK, A], FreeQS[T]] = {
+            new Traversal[CopK[F ::: TNilK, A], FreeQS[T]] {
+              override def modifyF[G[_]: Applicative](f: FreeQS[T] => G[FreeQS[T]])(s: CopK[F ::: TNilK, A]): G[CopK[F ::: TNilK, A]] = {
+                s match {
+                  case I(fa) => F.branches.modifyF(f)(fa).map(I(_))
+                }
+              }
+            }
           }
         }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[T[_[_]], F[_], LL <: TListK](
+      implicit
+      F: Branches[T, F],
+      LL: Materializer[T, LL]
+    ): Materializer[T, F ::: LL] = new Materializer[T, F ::: LL] {
+      override def materialize(offset: Int): Branches[T, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Branches[T, CopK[F ::: LL, ?]] {
+          override def branches[A]: Traversal[CopK[F ::: LL, A], FreeQS[T]] = {
+            new Traversal[CopK[F ::: LL, A], FreeQS[T]] {
+              override def modifyF[G[_]: Applicative](f: FreeQS[T] => G[FreeQS[T]])(s: CopK[F ::: LL, A]): G[CopK[F ::: LL, A]] = {
+                s match {
+                  case I(fa) => F.branches.modifyF(f)(fa).map(I(_))
+                  case other => LL.materialize(offset + 1).branches.modifyF(f)(other.asInstanceOf[CopK[LL, A]]).asInstanceOf[G[CopK[F ::: LL, A]]]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   implicit def qscriptCore[T[_[_]]]: Branches[T, QScriptCore[T, ?]] =
     new Branches[T, QScriptCore[T, ?]] {

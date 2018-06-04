@@ -21,11 +21,13 @@ import quasar.api._, ResourceError._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
 import quasar.fp.PrismNT
+import quasar.contrib.iota.copkTraverse
 import quasar.qscript.{Read => QRead, _}
 
 import matryoshka._
 import pathy.Path.refineType
 import scalaz._, Scalaz._
+import iotaz.CopK
 
 /** A `QueryEvaluator` capable of executing queries against multiple sources. */
 final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] private (
@@ -110,8 +112,8 @@ final class FederatingQueryEvaluator[T[_[_]]: BirecursiveT, F[_]: Monad, S, R] p
   private type SrcsT[X[_], A] = WriterT[X, DList[(AFile, Source[S])], A]
   private type M[A] = SrcsT[EitherT[F, ReadError, ?], A]
 
-  private val IRD = Inject[Const[QRead[ADir], ?], QScriptRead[T, ?]]
-  private val IRF = Inject[Const[QRead[AFile], ?], QScriptRead[T, ?]]
+  private val IRD = CopK.Inject[Const[QRead[ADir], ?], QScriptRead[T, ?]]
+  private val IRF = CopK.Inject[Const[QRead[AFile], ?], QScriptRead[T, ?]]
 
   private val ReadPath: PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]] =
     PrismNT[QScriptRead[T, ?], Const[QRead[APath], ?]](

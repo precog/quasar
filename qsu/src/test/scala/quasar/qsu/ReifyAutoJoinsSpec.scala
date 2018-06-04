@@ -21,11 +21,14 @@ import slamdata.Predef._
 import quasar.{Qspec, TreeMatchers}
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.{construction, MapFuncsCore}
 import quasar.qscript.provenance.JoinKeys
 import quasar.fs.Planner.PlannerError
 
 import matryoshka.data.Fix
+import matryoshka.data.freeEqual
+import matryoshka.delayEqual
 import pathy.Path
 import pathy.Path.Sandboxed
 import scalaz.{EitherT, INil, Need, StateT}

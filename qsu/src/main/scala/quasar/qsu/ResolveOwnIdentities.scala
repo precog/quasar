@@ -21,6 +21,7 @@ import slamdata.Predef.{Boolean, Option, Symbol}
 import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, IdOnly, IdStatus, IncludeId}
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import QSUGraph.Extractors._

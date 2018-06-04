@@ -25,7 +25,7 @@ import quasar.yggdrasil._
 import scala.util.Random
 
 import cats.effect.IO
-import scalaz._, Scalaz._
+import scalaz.StreamT
 import shims._
 
 trait CompactSpec extends ColumnarTableModuleTestSupport with SpecificationLike with ScalaCheck {

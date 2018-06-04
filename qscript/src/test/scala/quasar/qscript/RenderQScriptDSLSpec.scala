@@ -19,8 +19,10 @@ package quasar.qscript
 import slamdata.Predef.{Eq => _, _}
 import quasar.Type
 import quasar.fp._
+import quasar.contrib.iota._
 import matryoshka.Delay
-import matryoshka.data.Fix
+import matryoshka.data.{Fix, freeEqual, freeShow}
+import matryoshka.{delayEqual, delayShow}
 import org.specs2.execute.Result
 import quasar.ejson.{EJson, Extension}
 import quasar.time.TemporalPart
@@ -50,12 +52,13 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       |import quasar.time.TemporalPart
       |import quasar.qscript._
       |import quasar.ejson.{EJson, Fixed}
-      |import quasar.fp._
+      |import quasar.contrib.iota.{copkEqual, copkTraverse}
       |import pathy.Path._
       |import quasar.contrib.pathy._
       |import matryoshka.data.Fix
       |import scalaz.{Const, Inject, NonEmptyList}
       |import scalaz.syntax.either._
+      |import quasar.fp.Injectable
       |type QT[A] = QScriptTotal[Fix, A]
       |type DET[A] = Const[DeadEnd, A]
       |type RTD[A] = Const[Read[ADir], A]

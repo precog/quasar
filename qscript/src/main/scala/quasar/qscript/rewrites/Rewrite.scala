@@ -22,12 +22,14 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.contrib.scalaz.bitraverse._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
+import iotaz.CopK
 
 import scala.collection.immutable.{Map => ScalaMap}
 
@@ -36,7 +38,6 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz.{:+: => _, Divide => _, _},
-  Inject.{ reflexiveInjectInstance => _, _ },
   BijectionT._,
   Leibniz._,
   Scalaz._
@@ -71,46 +72,46 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     }.join
 
   // TODO: make this simply a transform itself, rather than a full traversal.
-  def shiftRead[F[_]: Functor, G[_]: Traverse]
-    (implicit QC: QScriptCore :<: G,
-              TJ: ThetaJoin :<: G,
-              SD: Const[ShiftedRead[ADir], ?] :<: G,
-              SF: Const[ShiftedRead[AFile], ?] :<: G,
-              GI: Injectable.Aux[G, QScriptTotal],
+  def shiftRead[F[_]: Functor, G[a] <: ACopK[a]: Traverse]
+    (implicit QC: QScriptCore :<<: G,
+              TJ: ThetaJoin :<<: G,
+              SD: Const[ShiftedRead[ADir], ?] :<<: G,
+              SF: Const[ShiftedRead[AFile], ?] :<<: G,
+              GI: Injectable[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
       : T[F] => T[G] = {
     _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, ADir](idPrism)) >>>
-      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, AFile](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, ADir](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, AFile](idPrism)) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftRead[G](idPrism.reverseGet)(_)))
   }
 
-  def shiftReadDir[F[_]: Functor, G[_]: Traverse](
+  def shiftReadDir[F[_]: Functor, G[a] <: ACopK[a]: Traverse](
     implicit
-    QC: QScriptCore :<: G,
-    TJ: ThetaJoin :<: G,
-    SD: Const[ShiftedRead[ADir], ?] :<: G,
-    GI: Injectable.Aux[G, QScriptTotal],
+    QC: QScriptCore :<<: G,
+    TJ: ThetaJoin :<<: G,
+    SD: Const[ShiftedRead[ADir], ?] :<<: G,
+    GI: Injectable[G, QScriptTotal],
     S: ShiftReadDir.Aux[T, F, G],
     C: Coalesce.Aux[T, G, G],
     N: Normalizable[G]
   ): T[F] => T[G] =
     _.codyna[G, T[G]](
       normalizeTJ[G] >>>
-      injectRepeatedly[G, G, T[G]](C.coalesceSRNormalize[G, ADir](idPrism)) >>>
+      repeatedly(C.coalesceSRNormalize[G, ADir](idPrism)) >>>
       (_.embed),
       ((_: T[F]).project) >>> (S.shiftReadDir[G](idPrism.reverseGet)(_)))
 
-  def simplifyJoinOnShiftRead[F[_]: Functor, G[_]: Traverse, H[_]: Functor]
-    (implicit QC: QScriptCore :<: G,
-              TJ: ThetaJoin :<: G,
-              SD: Const[ShiftedRead[ADir], ?] :<: G,
-              SF: Const[ShiftedRead[AFile], ?] :<: G,
-              GI: Injectable.Aux[G, QScriptTotal],
+  def simplifyJoinOnShiftRead[F[_]: Functor, G[a] <: ACopK[a]: Traverse, H[_]: Functor]
+    (implicit QC: QScriptCore :<<: G,
+              TJ: ThetaJoin :<<: G,
+              SD: Const[ShiftedRead[ADir], ?] :<<: G,
+              SF: Const[ShiftedRead[AFile], ?] :<<: G,
+              GI: Injectable[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               J: SimplifyJoin.Aux[T, G, H],
               C: Coalesce.Aux[T, G, G],
@@ -145,12 +146,12 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def NoneBranch[F[_], A, B] =
     BranchUnification[F, A, B]((_: JoinFunc) => None)((_: FreeMapA[A]) => None)
 
-  def unifySimpleBranchesJoinSide[F[_], A]
+  def unifySimpleBranchesJoinSide[F[a] <: ACopK[a], A]
     (src: A, left: FreeQS, right: FreeQS)
     (rebase: FreeQS => A => Option[A])
     (implicit
-      QC: QScriptCore :<: F,
-      FI: Injectable.Aux[F, QScriptTotal])
+      QC: QScriptCore :<<: F,
+      FI: Injectable[F, QScriptTotal])
       : BranchUnification[F, JoinSide, A] = {
 
     // Unify (Map, LeftShift)
@@ -195,13 +196,13 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     (left.resumeTwice, right.resumeTwice) match {
       // left side is the data while the right side shifts the same data
-      case (\/-(SrcHole), -\/(r)) => FI.project(r) >>= QC.prj match {
+      case (\/-(SrcHole), -\/(r)) => FI.project(r) >>= QC.prj.apply match {
         case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
               unifyMapRightSideShift(struct, status, shiftType, undef, repair, HoleR, HoleF)
 
-            case -\/(values) => FI.project(values) >>= QC.prj match {
+            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
                 unifyMapRightSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
 
@@ -212,13 +213,13 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       }
 
       // right side is the data while the left side shifts the same data
-      case (-\/(l), \/-(SrcHole)) => FI.project(l) >>= QC.prj match {
+      case (-\/(l), \/-(SrcHole)) => FI.project(l) >>= QC.prj.apply match {
         case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
               unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleR, HoleF)
 
-            case -\/(values) => FI.project(values) >>= QC.prj match {
+            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
                 unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
 
@@ -228,14 +229,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         case _ => NoneBranch
       }
 
-      case (-\/(l), -\/(r)) => (l, r).uTraverse(m => FI.project(m) >>= QC.prj) collect {
+      case (-\/(l), -\/(r)) => (l, r).uTraverse(m => FI.project(m) >>= QC.prj.apply) collect {
         // left side maps over the data while the right side shifts the same data
         case (Map(\/-(SrcHole), mapFn), LeftShift(lshiftSrc, struct, status, stpe, undef, repair)) =>
           lshiftSrc match {
             case \/-(SrcHole) =>
               unifyMapRightSideShift(struct, status, stpe, undef, repair, HoleR, mapFn.linearize)
 
-            case -\/(values) => FI.project(values) >>= QC.prj match {
+            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
                 unifyMapRightSideShift(struct, status, stpe, undef, repair, srcFn, mapFn.linearize)
 
@@ -249,7 +250,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
             case \/-(SrcHole) =>
               unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleR, mapFn.linearize)
 
-            case -\/(values) => FI.project(values) >>= QC.prj match {
+            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
               case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
                 unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, mapFn.linearize)
 
@@ -262,19 +263,19 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     }
   }
 
-  def unifySimpleBranchesHole[F[_], A]
+  def unifySimpleBranchesHole[F[a] <: ACopK[a], A]
     (src: A, left: FreeQS, right: FreeQS)
     (rebase: FreeQS => A => Option[A])
     (implicit
-      QC: QScriptCore :<: F,
-      FI: Injectable.Aux[F, QScriptTotal])
+      QC: QScriptCore :<<: F,
+      FI: Injectable[F, QScriptTotal])
       : BranchUnification[F, Hole, A] = {
     val UnrefedSrc: QScriptTotal[FreeQS] =
-      Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
+      CopK.Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
 
     (left.resumeTwice, right.resumeTwice) match {
       case (-\/(m1), -\/(m2)) =>
-        (FI.project(m1) >>= QC.prj, FI.project(m2) >>= QC.prj) match {
+        (FI.project(m1) >>= QC.prj.apply, FI.project(m2) >>= QC.prj.apply) match {
           // both sides only map over the same data
           case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
             BranchUnification { jf =>
@@ -325,7 +326,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
           case (_, _) => NoneBranch
         }
       // one side maps over the src while the other passes the src untouched
-      case (-\/(m1), \/-(SrcHole)) => (FI.project(m1) >>= QC.prj) match {
+      case (-\/(m1), \/-(SrcHole)) => (FI.project(m1) >>= QC.prj.apply) match {
         case Some(Map(\/-(SrcHole), mf1)) =>
           BranchUnification { jf =>
             (jf >>= {
@@ -343,7 +344,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
         case _ => NoneBranch
       }
       // the other side maps over the src while the one passes the src untouched
-      case (\/-(SrcHole), -\/(m2)) => (FI.project(m2) >>= QC.prj) match {
+      case (\/-(SrcHole), -\/(m2)) => (FI.project(m2) >>= QC.prj.apply) match {
         case Some(Map(\/-(SrcHole), mf2)) =>
           BranchUnification { jf: JoinFunc =>
             (jf >>= {
@@ -369,12 +370,12 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     }
   }
 
-  def unifySimpleBranches[F[_], A]
+  def unifySimpleBranches[F[a] <: ACopK[a], A]
     (src: A, left: FreeQS, right: FreeQS, func: JoinFunc)
     (rebase: FreeQS => A => Option[A])
     (implicit
-      QC: QScriptCore :<: F,
-      FI: Injectable.Aux[F, QScriptTotal])
+      QC: QScriptCore :<<: F,
+      FI: Injectable[F, QScriptTotal])
       : Option[F[A]] = {
     val branchHole: BranchUnification[F, Hole, A] =
       unifySimpleBranchesHole(src, left, right)(rebase)(QC, FI)
@@ -387,9 +388,9 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
   // FIXME: This really needs to ensure that the condition is that of an
   //        autojoin, otherwise it’ll elide things that are truly meaningful.
-  def elideNopJoin[F[_], A]
+  def elideNopJoin[F[a] <: ACopK[a], A]
     (rebase: FreeQS => A => Option[A])
-    (implicit QC: QScriptCore :<: F, FI: Injectable.Aux[F, QScriptTotal])
+    (implicit QC: QScriptCore :<<: F, FI: Injectable[F, QScriptTotal])
       : ThetaJoin[A] => Option[F[A]] = {
     case ThetaJoin(s, l, r, _, _, combine) => unifySimpleBranches[F, A](s, l, r, combine)(rebase)(QC, FI)
     case _                                 => None
@@ -487,15 +488,15 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   // - convert any remaning projects to maps
   // - coalesce nodes
   // - normalize mapfunc
-  private def applyNormalizations[F[_]: Functor: Normalizable, G[_]: Functor](
+  private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C: Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[T[G]] => G[T[G]] = {
 
-    val qcPrism = PrismNT.inject[QScriptCore, F] compose prism
+    val qcPrism = PrismNT.injectCopK[QScriptCore, F] compose prism
 
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
@@ -509,24 +510,24 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     ))(prism(ftf))
   }
 
-  private def normalizeWithBijection[F[_]: Functor: Normalizable, G[_]: Functor, A](
+  private def normalizeWithBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[A] => G[A] =
     fa => applyNormalizations[F, G](prism, normalizeJoins)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
 
-  private def normalizeEJBijection[F[_]: Functor: Normalizable, G[_]: Functor, A](
+  private def normalizeEJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             EJ: EquiJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             EJ: EquiJoin :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[A] => G[A] = {
 
     val normEJ: G[T[G]] => Option[G[T[G]]] =
@@ -535,30 +536,30 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     normalizeWithBijection[F, G, A](bij)(prism, normEJ compose (prism apply _))
   }
 
-  def normalizeEJ[F[_]: Functor: Normalizable](
+  def normalizeEJ[F[a] <: ACopK[a]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             EJ: EquiJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             EJ: EquiJoin :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[T[F]] => F[T[F]] =
     normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism)
 
-  def normalizeEJCoEnv[F[_]: Functor: Normalizable](
+  def normalizeEJCoEnv[F[a] <: ACopK[a]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             EJ: EquiJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             EJ: EquiJoin :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 
-  private def normalizeTJBijection[F[_]: Functor: Normalizable, G[_]: Functor, A](
+  private def normalizeTJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
     prism: PrismNT[G, F],
     rebase: FreeQS => T[G] => Option[T[G]])(
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             TJ: ThetaJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             TJ: ThetaJoin :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[A] => G[A] = {
 
     val normTJ = applyTransforms(
@@ -569,19 +570,19 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     normalizeWithBijection[F, G, A](bij)(prism, normTJ compose (prism apply _))
   }
 
-  def normalizeTJ[F[_]: Traverse: Normalizable](
+  def normalizeTJ[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             TJ: ThetaJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             TJ: ThetaJoin :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[T[F]] => F[T[F]] =
     normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
 
-  def normalizeTJCoEnv[F[_]: Traverse: Normalizable](
+  def normalizeTJCoEnv[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<: F,
-             TJ: ThetaJoin :<: F,
-             FI: Injectable.Aux[F, QScriptTotal]):
+             QC: QScriptCore :<<: F,
+             TJ: ThetaJoin :<<: F,
+             FI: Injectable[F, QScriptTotal]):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
 
@@ -593,14 +594,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: Monad: MonadFsErr, IN[_]: Traverse, OUT[_]: Traverse]
+  def pathify[M[_]: Monad: MonadFsErr, IN[_]: Traverse, OUT[a] <: ACopK[a]: Traverse]
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],
-      RD:  Const[Read[ADir], ?] :<: OUT,
-      RF: Const[Read[AFile], ?] :<: OUT,
-      QC:           QScriptCore :<: OUT,
-      FI: Injectable.Aux[OUT, QScriptTotal])
+      RD:  Const[Read[ADir], ?] :<<: OUT,
+      RF: Const[Read[AFile], ?] :<<: OUT,
+      QC:           QScriptCore :<<: OUT,
+      FI: Injectable[OUT, QScriptTotal])
       : T[IN] => M[T[OUT]] =
     _.cataM[M, List[ADir] \&/ FS.IT[FS.OUT]](FS.discoverPath[M](g)) >>=
       DiscoverPath.unionAll[T, M, OUT](g)

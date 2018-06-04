@@ -20,6 +20,7 @@ import slamdata.Predef.{Map => _, _}
 
 import quasar.contrib.pathy.APath
 import quasar.fp._, ski._
+import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}
@@ -28,6 +29,8 @@ import matryoshka.implicits._
 import matryoshka.data._
 import scalaz._, Scalaz._
 import simulacrum.typeclass
+import iotaz.{CopK, TListK, TNilK}
+import iotaz.TListK.:::
 
 @typeclass
 trait Cost[F[_]] {
@@ -100,12 +103,46 @@ object Cost {
       }
     }
 
-  implicit def coproduct[F[_], G[_]](implicit F: Cost[F], G: Cost[G]):
-      Cost[Coproduct[F, G, ?]] =
-    new Cost[Coproduct[F, G, ?]] {
-      def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, Coproduct[F, G, ?], Int] =
-        _.run.fold(F.evaluate(pathCard), G.evaluate(pathCard))
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Cost[CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Cost[CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Cost[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Cost[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Cost[CopK[F ::: TNilK, ?]] {
+          def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, CopK[F ::: TNilK, ?], Int] = {
+            case I(fa) => F.evaluate(pathCard).apply(fa)
+          }
+        }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Cost[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Cost[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Cost[CopK[F ::: LL, ?]] {
+          def evaluate[M[_] : Monad](pathCard: APath => M[Int]): GAlgebraM[(Int, ?), M, CopK[F ::: LL, ?], Int] = {
+            case I(fa) => F.evaluate(pathCard).apply(fa)
+            case other => LL.materialize(offset + 1).evaluate(pathCard).apply(other.asInstanceOf[CopK[LL, (Int, Int)]])
+          }
+        }
+      }
+    }
+  }
 
   ////////
 

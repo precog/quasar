@@ -24,10 +24,10 @@ import quasar.{Data, DSLTree, RenderDSL, Type, ejson}
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
-import slamdata.Predef
 
-import scalaz.{Const, Coproduct, Free, Functor}
+import scalaz.{Const, Free, Functor}
 import scalaz.syntax.bifunctor._
 import scalaz.syntax.either._
 import scalaz.syntax.std.option._
@@ -36,12 +36,14 @@ import scalaz.syntax.std.tuple._
 import scalaz.std.anyVal._
 import scalaz.std.option._
 import scalaz.std.tuple._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
 object RenderQScriptDSL {
   type RenderQScriptDSL[A] = (String, A) => DSLTree
   implicit def qscriptInstance[T[_[_]]: RecursiveT, F[_]: Functor]
-  (implicit I: Injectable.Aux[F, QScriptTotal[T, ?]]): RenderDSL[T[F]] =
+  (implicit I: Injectable[F, QScriptTotal[T, ?]]): RenderDSL[T[F]] =
     new RenderDSL[T[F]] {
       // hard-coded here to fix.
       def toDsl(a: T[F]) = fixQSRender.apply("fix", a.transCata[Fix[QScriptTotal[T, ?]]](I.inject(_)))
@@ -70,15 +72,47 @@ object RenderQScriptDSL {
       }
     }
 
-  def coproduct[F[_], G[_]]
-  (delF: Delay[RenderQScriptDSL, F], delG: Delay[RenderQScriptDSL, G]): Delay[RenderQScriptDSL, Coproduct[F, G, ?]] =
-    new Delay[RenderQScriptDSL, Coproduct[F, G, ?]] {
-      def apply[A](rec: RenderQScriptDSL[A]) = {
-        (base: Predef.String, a: Coproduct[F, G, A]) =>
-          a.run.fold(delF(rec)(base, _), delG(rec)(base, _))
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): Delay[RenderQScriptDSL, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[LL, ?]]
+  }
+
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: Delay[RenderQScriptDSL, F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new Delay[RenderQScriptDSL, CopK[F ::: TNilK, ?]] {
+          override def apply[A](rec: RenderQScriptDSL[A]): RenderQScriptDSL[CopK[F ::: TNilK, A]] = {
+            case (base, I(fa)) => F(rec)(base, fa)
+          }
+        }
       }
     }
 
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: Delay[RenderQScriptDSL, F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): Delay[RenderQScriptDSL, CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new Delay[RenderQScriptDSL, CopK[F ::: LL, ?]] {
+          override def apply[A](rec: RenderQScriptDSL[A]): RenderQScriptDSL[CopK[F ::: LL, A]] = {
+            case (base, I(fa)) => F(rec)(base, fa)
+            case (base, other) => LL.materialize(offset + 1)(rec)(base, other.asInstanceOf[CopK[LL, A]])
+          }
+        }
+      }
+    }
+  }
+  
   def ejsonRenderQScriptDSLDelay: Delay[RenderQScriptDSL, EJson] = new Delay[RenderQScriptDSL, EJson] {
     def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[EJson[A]] = {
       (base: String, a: EJson[A]) =>
@@ -142,109 +176,111 @@ object RenderQScriptDSL {
       import MapFuncsCore._, MapFuncsDerived._
       def apply[A](fa: RenderQScriptDSL[A]) = {
         (base: String, mf: MapFunc[T, A]) =>
-          val (label, children) = mf.run.fold({
-            case Constant(ejson) => ("Constant", (eJsonRenderQScriptDSL[T].apply(base, ejson).right :: Nil).some)
-            case Undefined()     => ("Undefined", none)
-            case JoinSideName(n) => ("JoinSideName", (n.shows.left :: Nil).some)
-            case Now()           => ("Now", none)
-            case NowTime()       => ("NowTime", none)
-            case NowDate()       => ("NowDate", none)
-            case CurrentTimeZone() => ("CurrentTimeZone", none)
-            case SetTimeZone(a1, a2) => ("SetTimeZone", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case SetTimeZoneMinute(a1, a2) => ("SetTimeZoneMinute", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case SetTimeZoneHour(a1, a2) => ("SetTimeZoneHour", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case ExtractCentury(a1)        => ("ExtractCentury", (fa(base, a1).right :: Nil).some)
-            case ExtractDayOfMonth(a1)     => ("ExtractDayOfMonth", (fa(base, a1).right :: Nil).some)
-            case ExtractDecade(a1)         => ("ExtractDecade", (fa(base, a1).right :: Nil).some)
-            case ExtractDayOfWeek(a1)      => ("ExtractDayOfWeek", (fa(base, a1).right :: Nil).some)
-            case ExtractDayOfYear(a1)      => ("ExtractDayOfYear", (fa(base, a1).right :: Nil).some)
-            case ExtractEpoch(a1)          => ("ExtractEpoch", (fa(base, a1).right :: Nil).some)
-            case ExtractHour(a1)           => ("ExtractHour", (fa(base, a1).right :: Nil).some)
-            case ExtractIsoDayOfWeek(a1)   => ("ExtractIsoDayOfWeek", (fa(base, a1).right :: Nil).some)
-            case ExtractIsoYear(a1)        => ("ExtractIsoYear", (fa(base, a1).right :: Nil).some)
-            case ExtractMicrosecond(a1)    => ("ExtractMicrosecond", (fa(base, a1).right :: Nil).some)
-            case ExtractMillennium(a1)     => ("ExtractMillennium", (fa(base, a1).right :: Nil).some)
-            case ExtractMillisecond(a1)    => ("ExtractMillisecond", (fa(base, a1).right :: Nil).some)
-            case ExtractMinute(a1)         => ("ExtractMinute", (fa(base, a1).right :: Nil).some)
-            case ExtractMonth(a1)          => ("ExtractMonth", (fa(base, a1).right :: Nil).some)
-            case ExtractQuarter(a1)        => ("ExtractQuarter", (fa(base, a1).right :: Nil).some)
-            case ExtractSecond(a1)         => ("ExtractSecond", (fa(base, a1).right :: Nil).some)
-            case ExtractTimeZone(a1)       => ("ExtractTimeZone", (fa(base, a1).right :: Nil).some)
-            case ExtractTimeZoneHour(a1)   => ("ExtractTimeZoneHour", (fa(base, a1).right :: Nil).some)
-            case ExtractTimeZoneMinute(a1) => ("ExtractTimeZoneMinute", (fa(base, a1).right :: Nil).some)
-            case ExtractWeek(a1)           => ("ExtractWeek", (fa(base, a1).right :: Nil).some)
-            case ExtractYear(a1)           => ("ExtractYear", (fa(base, a1).right :: Nil).some)
-            case LocalDateTime(a1)         => ("LocalDateTime", (fa(base, a1).right :: Nil).some)
-            case LocalDate(a1)             => ("LocalDate", (fa(base, a1).right :: Nil).some)
-            case LocalTime(a1)             => ("LocalTime", (fa(base, a1).right :: Nil).some)
-            case OffsetDateTime(a1)        => ("OffsetDateTime", (fa(base, a1).right :: Nil).some)
-            case OffsetDate(a1)            => ("OffsetDate", (fa(base, a1).right :: Nil).some)
-            case OffsetTime(a1)            => ("OffsetTime", (fa(base, a1).right :: Nil).some)
-            case Interval(a1)              => ("Interval", (fa(base, a1).right :: Nil).some)
-            case StartOfDay(a1)            => ("StartOfDay", (fa(base, a1).right :: Nil).some)
-            case TemporalTrunc(a1, a2)     => ("TemporalTrunc", (DSLTree("TemporalPart", a1.shows, none).right :: fa(base, a2).right :: Nil).some)
-            case TimeOfDay(a1)             => ("TimeOfDay", (fa(base, a1).right :: Nil).some)
-            case ToTimestamp(a1)           => ("ToTimestamp", (fa(base, a1).right :: Nil).some)
-            case ToLocal(a1)               => ("ToLocal", (fa(base, a1).right :: Nil).some)
-            case TypeOf(a1)                => ("TypeOf", (fa(base, a1).right :: Nil).some)
-            case ToId(a1)                  => ("ToId", (fa(base, a1).right :: Nil).some)
-            case Negate(a1)                => ("Negate", (fa(base, a1).right :: Nil).some)
-            case Not(a1)                   => ("Not", (fa(base, a1).right :: Nil).some)
-            case Length(a1)                => ("Length", (fa(base, a1).right :: Nil).some)
-            case Lower(a1)                 => ("Lower", (fa(base, a1).right :: Nil).some)
-            case Upper(a1)                 => ("Upper", (fa(base, a1).right :: Nil).some)
-            case Bool(a1)                  => ("Bool", (fa(base, a1).right :: Nil).some)
-            case Integer(a1)               => ("Integer", (fa(base, a1).right :: Nil).some)
-            case Decimal(a1)               => ("Decimal", (fa(base, a1).right :: Nil).some)
-            case Null(a1)                  => ("Null", (fa(base, a1).right :: Nil).some)
-            case ToString(a1)              => ("ToString", (fa(base, a1).right :: Nil).some)
-            case MakeArray(a1)             => ("MakeArray", (fa(base, a1).right :: Nil).some)
-            case Meta(a1)                  => ("Meta", (fa(base, a1).right :: Nil).some)
+          val (label, children) = mf match {
+            case MFC(mfc) => mfc match {
+              case Constant(ejson) => ("Constant", (eJsonRenderQScriptDSL[T].apply(base, ejson).right :: Nil).some)
+              case Undefined() => ("Undefined", none)
+              case JoinSideName(n) => ("JoinSideName", (n.shows.left :: Nil).some)
+              case Now() => ("Now", none)
+              case NowTime() => ("NowTime", none)
+              case NowDate() => ("NowDate", none)
+              case CurrentTimeZone() => ("CurrentTimeZone", none)
+              case SetTimeZone(a1, a2) => ("SetTimeZone", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case SetTimeZoneMinute(a1, a2) => ("SetTimeZoneMinute", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case SetTimeZoneHour(a1, a2) => ("SetTimeZoneHour", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case ExtractCentury(a1) => ("ExtractCentury", (fa(base, a1).right :: Nil).some)
+              case ExtractDayOfMonth(a1) => ("ExtractDayOfMonth", (fa(base, a1).right :: Nil).some)
+              case ExtractDecade(a1) => ("ExtractDecade", (fa(base, a1).right :: Nil).some)
+              case ExtractDayOfWeek(a1) => ("ExtractDayOfWeek", (fa(base, a1).right :: Nil).some)
+              case ExtractDayOfYear(a1) => ("ExtractDayOfYear", (fa(base, a1).right :: Nil).some)
+              case ExtractEpoch(a1) => ("ExtractEpoch", (fa(base, a1).right :: Nil).some)
+              case ExtractHour(a1) => ("ExtractHour", (fa(base, a1).right :: Nil).some)
+              case ExtractIsoDayOfWeek(a1) => ("ExtractIsoDayOfWeek", (fa(base, a1).right :: Nil).some)
+              case ExtractIsoYear(a1) => ("ExtractIsoYear", (fa(base, a1).right :: Nil).some)
+              case ExtractMicrosecond(a1) => ("ExtractMicrosecond", (fa(base, a1).right :: Nil).some)
+              case ExtractMillennium(a1) => ("ExtractMillennium", (fa(base, a1).right :: Nil).some)
+              case ExtractMillisecond(a1) => ("ExtractMillisecond", (fa(base, a1).right :: Nil).some)
+              case ExtractMinute(a1) => ("ExtractMinute", (fa(base, a1).right :: Nil).some)
+              case ExtractMonth(a1) => ("ExtractMonth", (fa(base, a1).right :: Nil).some)
+              case ExtractQuarter(a1) => ("ExtractQuarter", (fa(base, a1).right :: Nil).some)
+              case ExtractSecond(a1) => ("ExtractSecond", (fa(base, a1).right :: Nil).some)
+              case ExtractTimeZone(a1) => ("ExtractTimeZone", (fa(base, a1).right :: Nil).some)
+              case ExtractTimeZoneHour(a1) => ("ExtractTimeZoneHour", (fa(base, a1).right :: Nil).some)
+              case ExtractTimeZoneMinute(a1) => ("ExtractTimeZoneMinute", (fa(base, a1).right :: Nil).some)
+              case ExtractWeek(a1) => ("ExtractWeek", (fa(base, a1).right :: Nil).some)
+              case ExtractYear(a1) => ("ExtractYear", (fa(base, a1).right :: Nil).some)
+              case LocalDateTime(a1) => ("LocalDateTime", (fa(base, a1).right :: Nil).some)
+              case LocalDate(a1) => ("LocalDate", (fa(base, a1).right :: Nil).some)
+              case LocalTime(a1) => ("LocalTime", (fa(base, a1).right :: Nil).some)
+              case OffsetDateTime(a1) => ("OffsetDateTime", (fa(base, a1).right :: Nil).some)
+              case OffsetDate(a1) => ("OffsetDate", (fa(base, a1).right :: Nil).some)
+              case OffsetTime(a1) => ("OffsetTime", (fa(base, a1).right :: Nil).some)
+              case Interval(a1) => ("Interval", (fa(base, a1).right :: Nil).some)
+              case StartOfDay(a1) => ("StartOfDay", (fa(base, a1).right :: Nil).some)
+              case TemporalTrunc(a1, a2) => ("TemporalTrunc", (DSLTree("TemporalPart", a1.shows, none).right :: fa(base, a2).right :: Nil).some)
+              case TimeOfDay(a1) => ("TimeOfDay", (fa(base, a1).right :: Nil).some)
+              case ToTimestamp(a1) => ("ToTimestamp", (fa(base, a1).right :: Nil).some)
+              case ToLocal(a1) => ("ToLocal", (fa(base, a1).right :: Nil).some)
+              case TypeOf(a1) => ("TypeOf", (fa(base, a1).right :: Nil).some)
+              case ToId(a1) => ("ToId", (fa(base, a1).right :: Nil).some)
+              case Negate(a1) => ("Negate", (fa(base, a1).right :: Nil).some)
+              case Not(a1) => ("Not", (fa(base, a1).right :: Nil).some)
+              case Length(a1) => ("Length", (fa(base, a1).right :: Nil).some)
+              case Lower(a1) => ("Lower", (fa(base, a1).right :: Nil).some)
+              case Upper(a1) => ("Upper", (fa(base, a1).right :: Nil).some)
+              case Bool(a1) => ("Bool", (fa(base, a1).right :: Nil).some)
+              case Integer(a1) => ("Integer", (fa(base, a1).right :: Nil).some)
+              case Decimal(a1) => ("Decimal", (fa(base, a1).right :: Nil).some)
+              case Null(a1) => ("Null", (fa(base, a1).right :: Nil).some)
+              case ToString(a1) => ("ToString", (fa(base, a1).right :: Nil).some)
+              case MakeArray(a1) => ("MakeArray", (fa(base, a1).right :: Nil).some)
+              case Meta(a1) => ("Meta", (fa(base, a1).right :: Nil).some)
 
-            case Add(a1, a2)          => ("Add", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Multiply(a1, a2)     => ("Multiply", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Subtract(a1, a2)     => ("Subtract", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Divide(a1, a2)       => ("Divide", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Modulo(a1, a2)       => ("Modulo", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Power(a1, a2)        => ("Power", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Eq(a1, a2)           => ("Eq", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Neq(a1, a2)          => ("Neq", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Lt(a1, a2)           => ("Lt", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Lte(a1, a2)          => ("Lte", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Gt(a1, a2)           => ("Gt", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Gte(a1, a2)          => ("Gte", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case IfUndefined(a1, a2)  => ("IfUndefined", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case And(a1, a2)          => ("And", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Or(a1, a2)           => ("Or", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Within(a1, a2)       => ("Within", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case MakeMap(a1, a2)      => ("MakeMap", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case ConcatMaps(a1, a2)   => ("ConcatMaps", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case ProjectIndex(a1, a2) => ("ProjectIndex", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case ProjectKey(a1, a2)   => ("ProjectKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case DeleteKey(a1, a2)    => ("DeleteKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case ConcatArrays(a1, a2) => ("ConcatArrays", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Range(a1, a2)        => ("Range", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            case Split(a1, a2)        => ("Split", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Add(a1, a2) => ("Add", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Multiply(a1, a2) => ("Multiply", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Subtract(a1, a2) => ("Subtract", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Divide(a1, a2) => ("Divide", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Modulo(a1, a2) => ("Modulo", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Power(a1, a2) => ("Power", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Eq(a1, a2) => ("Eq", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Neq(a1, a2) => ("Neq", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Lt(a1, a2) => ("Lt", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Lte(a1, a2) => ("Lte", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Gt(a1, a2) => ("Gt", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Gte(a1, a2) => ("Gte", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case IfUndefined(a1, a2) => ("IfUndefined", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case And(a1, a2) => ("And", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Or(a1, a2) => ("Or", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Within(a1, a2) => ("Within", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case MakeMap(a1, a2) => ("MakeMap", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case ConcatMaps(a1, a2) => ("ConcatMaps", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case ProjectIndex(a1, a2) => ("ProjectIndex", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case ProjectKey(a1, a2) => ("ProjectKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case DeleteKey(a1, a2) => ("DeleteKey", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case ConcatArrays(a1, a2) => ("ConcatArrays", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Range(a1, a2) => ("Range", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case Split(a1, a2) => ("Split", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
 
-            case Between(a1, a2, a3)    => ("Between", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
-            case Cond(a1, a2, a3)       => ("Cond", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
-            case Search(a1, a2, a3)     => ("Search", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
-            case Substring(a1, a2, a3)  => ("Substring", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
-            case Guard(a1, tpe, a2, a3) =>
-              ("Guard", (fa(base, a1).right :: showType(tpe).left :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
-          },
-            {
-              case Abs(a1)   => ("Abs", (fa(base, a1).right :: Nil).some)
-              case Ceil(a1)  => ("Ceil", (fa(base, a1).right :: Nil).some)
+              case Between(a1, a2, a3) => ("Between", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+              case Cond(a1, a2, a3) => ("Cond", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+              case Search(a1, a2, a3) => ("Search", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+              case Substring(a1, a2, a3) => ("Substring", (fa(base, a1).right :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+              case Guard(a1, tpe, a2, a3) =>
+                ("Guard", (fa(base, a1).right :: showType(tpe).left :: fa(base, a2).right :: fa(base, a3).right :: Nil).some)
+            }
+            case MFD(mfd) => mfd match {
+              case Abs(a1) => ("Abs", (fa(base, a1).right :: Nil).some)
+              case Ceil(a1) => ("Ceil", (fa(base, a1).right :: Nil).some)
               case Floor(a1) => ("Floor", (fa(base, a1).right :: Nil).some)
               case Trunc(a1) => ("Trunc", (fa(base, a1).right :: Nil).some)
               case Round(a1) => ("Round", (fa(base, a1).right :: Nil).some)
               case Typecheck(a, typ) => ("TypeCheck", (fa(base, a).right :: Nil).some)
 
               case FloorScale(a1, a2) => ("FloorScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-              case CeilScale(a1, a2)  => ("CeilScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
+              case CeilScale(a1, a2) => ("CeilScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
               case RoundScale(a1, a2) => ("RoundScale", (fa(base, a1).right :: fa(base, a2).right :: Nil).some)
-            })
+            }
+          }
           DSLTree(prefix, label, children)
       }
     }
@@ -289,16 +325,18 @@ object RenderQScriptDSL {
       DSLTree(base, "ReduceIndex", ((idx.toString + suffix).left :: Nil).some)
   }
 
-  def qscriptTotalRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, QScriptTotal[T, ?]] =
-    coproduct(qscriptCoreRenderDelay[T],
-      coproduct(projectBucketRenderDelay[T],
-        coproduct(thetaJoinRenderDelay[T],
-          coproduct(equiJoinRenderDelay[T],
-            coproduct(shiftedReadDirRenderDelay,
-              coproduct(shiftedReadFileRenderDelay,
-                coproduct(readDirRenderDelay,
-                  coproduct(readFileRenderDelay,
-                    deadEndRenderDelay))))))))
+  def qscriptTotalRenderDelay[T[_[_]]: RecursiveT]: Delay[RenderQScriptDSL, QScriptTotal[T, ?]] = {
+    copk(
+      Materializer.induct(qscriptCoreRenderDelay[T],
+      Materializer.induct(projectBucketRenderDelay[T],
+      Materializer.induct(thetaJoinRenderDelay[T],
+      Materializer.induct(equiJoinRenderDelay[T],
+      Materializer.induct(shiftedReadDirRenderDelay,
+      Materializer.induct(shiftedReadFileRenderDelay,
+      Materializer.induct(readDirRenderDelay,
+      Materializer.induct(readFileRenderDelay,
+      Materializer.base  (deadEndRenderDelay))))))))))
+  }
 
   def freeQSRender[T[_[_]]: RecursiveT]: RenderQScriptDSL[FreeQS[T]] =
     freeDelayRenderQScriptDSL[T, QScriptTotal[T, ?], Hole](qscriptTotalRenderDelay[T], holeRender("free"))

@@ -30,7 +30,7 @@ import slamdata.Predef._
 import matryoshka.data.Fix
 import org.specs2.matcher.Matcher
 import org.specs2.matcher.MatchersImplicits._
-import scalaz.Inject
+import iotaz.CopK
 
 object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
@@ -38,7 +38,7 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
   val qsu = QScriptUniform.DslT[Fix]
   val elim = EliminateUnary[Fix] _
 
-  val IC = Inject[MapFuncCore, MapFunc]
+  val IC = CopK.Inject[MapFuncCore, MapFunc]
 
   val J = Fixed[Fix[EJson]]
 

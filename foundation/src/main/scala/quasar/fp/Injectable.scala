@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package quasar.qscript
+package quasar.fp
 
 import slamdata.Predef._
-import scalaz._, Scalaz._
+import scalaz._
 
 /** This is like [[scalaz.Inject]], but for injecting an arbitrary coproduct
   * where all of the components are in the `OUT` coproduct in any order.
@@ -26,39 +26,24 @@ import scalaz._, Scalaz._
   * this way directly?) But it is temporarily necessary in order to “inject” our
   * more constrained versions of QScript into [[QScriptTotal]].
   */
-trait Injectable[IN[_]] {
-  type OUT[A]
+trait Injectable[IN[_], OUT[_]] {
   def inject: IN ~> OUT
   def project: OUT ~> λ[A => Option[IN[A]]]
 }
 
 object Injectable {
-  type Aux[IN[_], F[_]] = Injectable[IN] { type OUT[A] = F[A] }
 
-  def make[F[_], G[_]](inj: F ~> G, prj: G ~> λ[A => Option[F[A]]]): Aux[F, G] = new Injectable[F] {
-    type OUT[A] = G[A]
-    val inject  = inj
-    val project = prj
-  }
-
-  /** Note: you'd like this to be implicit, but that makes implicit search
-    * quadratic, so instead this is provided so that you can manually construct
-    * instances where they're needed. */
-  def coproduct[F[_], G[_], H[_]](implicit F: Aux[F, H], G: Aux[G, H]): Aux[Coproduct[F, G, ?], H] = make(
-    λ[Coproduct[F, G, ?] ~> H](_.run.fold(F.inject, G.inject)),
-    λ[H ~> λ[A => Option[Coproduct[F, G, A]]]](out =>
-      F.project(out).cata(
-        f => Coproduct(f.left).some,
-        G.project(out) ∘ (g => Coproduct(g.right))
-      )
-    )
-  )
-
-  def id[F[_]]: Aux[F, F] = make(
+  implicit def id[F[_]]: Injectable[F, F] = make(
     NaturalTransformation.refl[F],
     λ[F ~> λ[A => Option[F[A]]]](Some(_))
   )
 
-  implicit def inject[F[_], G[_]](implicit IN: F :<: G): Aux[F, G] =
-    make[F, G](IN, λ[G ~> λ[A => Option[F[A]]]](IN prj _))
+  def make[F[_], G[_]](inj: F ~> G, prj: G ~> λ[A => Option[F[A]]]): Injectable[F, G] = new Injectable[F, G] {
+    val inject  = inj
+    val project = prj
+  }
+
+  implicit def inject[F[_], G[a] <: ACopK[a]](implicit IN: F :<<: G): Injectable[F, G] =
+    make[F, G](IN.inj, IN.prj)
+
 }

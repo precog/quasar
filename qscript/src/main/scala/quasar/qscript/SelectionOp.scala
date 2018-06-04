@@ -30,6 +30,6 @@ final case object Take extends SelectionOp
 final case object Sample extends SelectionOp
 
 object SelectionOp {
-  implicit val equal: Equal[SelectionOp] = Equal.equalRef
+  implicit val equal: Equal[SelectionOp] = Equal.equalA
   implicit val show: Show[SelectionOp] = Show.showFromToString
 }

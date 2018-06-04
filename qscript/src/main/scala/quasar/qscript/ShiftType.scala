@@ -27,7 +27,7 @@ object ShiftType {
   case object Array extends ShiftType
   case object Map extends ShiftType
 
-  implicit def equal: Equal[ShiftType] = Equal.equalRef
+  implicit def equal: Equal[ShiftType] = Equal.equalA
 
   implicit def renderTree: RenderTree[ShiftType] = RenderTree.fromShow("ShiftType")
 

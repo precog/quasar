@@ -16,27 +16,31 @@
 
 package quasar
 
-import quasar.fp._
+import quasar.contrib.iota.SubInject
 import quasar.qscript._
 import quasar.contrib.pathy.AFile
 import scalaz.Const
+import iotaz.TListK.:::
+import iotaz.{TNilK, CopK}
+import quasar.fp.Injectable
 
 package object mimir {
   // pessimistically equal to couchbase's
   type MimirQScriptCP[T[_[_]]] =
-    QScriptCore[T, ?] :\:
-      EquiJoin[T, ?] :/:
-      Const[ShiftedRead[AFile], ?]
+    QScriptCore[T, ?]            :::
+    EquiJoin[T, ?]               :::
+    Const[ShiftedRead[AFile], ?] :::
+    TNilK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[MimirQScriptCP[T]#M, QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::/::[T, EquiJoin[T, ?], Const[ShiftedRead[AFile], ?]])
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]] =
+    SubInject[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]]
 
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], MimirQScriptCP[T]#M] =
-    Injectable.inject[QScriptCore[T, ?], MimirQScriptCP[T]#M]
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]] =
+    Injectable.inject[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]]
 
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable.Aux[EquiJoin[T, ?], MimirQScriptCP[T]#M] =
-    Injectable.inject[EquiJoin[T, ?], MimirQScriptCP[T]#M]
+  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]] =
+    Injectable.inject[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[AFile], ?], MimirQScriptCP[T]#M] =
-    Injectable.inject[Const[ShiftedRead[AFile], ?], MimirQScriptCP[T]#M]
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]] =
+    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]]
 }

@@ -18,6 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef.{Boolean, Option, None, Symbol}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.qscript.{
   Center,

@@ -23,6 +23,8 @@ import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
+import quasar.contrib.iota.SubInject
 import quasar.qscript._
 
 import scala.Predef.implicitly
@@ -31,6 +33,9 @@ import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
 import scalaz._, Scalaz._
+
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 
 class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   val rewrite = new Rewrite[Fix]
@@ -47,29 +52,26 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
     expr.transCata[Fix[QS]](liftFG[QScriptCore, QS, Fix[QS]](
       injectRepeatedly[QScriptCore, QS, Fix[QS]](
-        rewrite.compactLeftShift[QS](PrismNT.inject).apply(_: QScriptCore[Fix[QS]]))))
+        rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
 
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
       (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))(qst)) >>>
       (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))(qst)))
 
-  type QSI[A] =
-    (QScriptCore :\: ProjectBucket :\: ThetaJoin :/: Const[DeadEnd, ?])#M[A]
+  type QSI[A] = CopK[QScriptCore ::: ProjectBucket ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
 
-  implicit val qsc: Injectable.Aux[QScriptCore, QSI] = Injectable.inject[QScriptCore, QSI]
-  implicit val pb: Injectable.Aux[ProjectBucket, QSI] = Injectable.inject[ProjectBucket, QSI]
-  implicit val tj: Injectable.Aux[ThetaJoin, QSI] = Injectable.inject[ThetaJoin, QSI]
-  implicit val de: Injectable.Aux[Const[DeadEnd, ?], QSI] = Injectable.inject[Const[DeadEnd, ?], QSI]
+  implicit val qsc: Injectable[QScriptCore, QSI] = Injectable.inject[QScriptCore, QSI]
+  implicit val pb: Injectable[ProjectBucket, QSI] = Injectable.inject[ProjectBucket, QSI]
+  implicit val tj: Injectable[ThetaJoin, QSI] = Injectable.inject[ThetaJoin, QSI]
+  implicit val de: Injectable[Const[DeadEnd, ?], QSI] = Injectable.inject[Const[DeadEnd, ?], QSI]
 
   val qsidsl = construction.mkDefaults[Fix, QSI]
-  val qscdsl = construction.mkDefaults[Fix, QScriptCore]
 
-  val DEI = implicitly[Const[DeadEnd, ?] :<: QSI]
-  val QCI = implicitly[QScriptCore :<: QSI]
+  val DEI = implicitly[Const[DeadEnd, ?] :<<: QSI]
+  val QCI = implicitly[QScriptCore :<<: QSI]
 
-  implicit def qsiToQscriptTotal: Injectable.Aux[QSI, QST] =
-    ::\::[QScriptCore](::\::[ProjectBucket](::/::[Fix, ThetaJoin, Const[DeadEnd, ?]]))
+  implicit def qsiToQscriptTotal: Injectable[QSI, QST] = SubInject[QSI, QST]
 
   // TODO instead of calling `.toOption` on the `\/`
   // write an `Equal[PlannerError]` and test for specific errors too
@@ -95,8 +97,8 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
     //}
 
     "coalesce a Map into a subsequent LeftShift" in {
-      import qscdsl._
-      val exp: QScriptCore[Fix[QScriptCore]] =
+      import qsidsl._
+      val exp: QSI[Fix[QSI]] =
         fix.LeftShift(
           fix.Map(
             fix.Unreferenced,
@@ -107,7 +109,7 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           OnUndefined.Omit,
           func.RightSide).unFix
 
-      Coalesce[Fix, QScriptCore, QScriptCore].coalesceQC(idPrism).apply(exp) must
+      Coalesce[Fix, QSI, QSI].coalesceQC(idPrism).apply(exp) must
       equal(
         fix.LeftShift(
           fix.Unreferenced,

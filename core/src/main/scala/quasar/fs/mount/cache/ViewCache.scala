@@ -46,7 +46,7 @@ object ViewCache {
     final case object Successful extends Status
     final case object Failed     extends Status
 
-    implicit val equal: Equal[Status] = Equal.equalRef
+    implicit val equal: Equal[Status] = Equal.equalA
   }
 
   def mk(

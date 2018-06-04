@@ -19,6 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Map => _, _}
 import quasar.contrib.matryoshka._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka._
@@ -30,9 +31,9 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
 
   /** Pull more work to _after_ count operations, limiting the dataset. */
   // TODO: we should be able to pull _most_ of a Reduce repair function to after a Subset
-  def subsetBeforeMap[F[_], G[_]: Functor]
+  def subsetBeforeMap[F[a] <: ACopK[a], G[_]: Functor]
     (FtoG: F ~> G)
-    (implicit QC: QScriptCore :<: F)
+    (implicit QC: QScriptCore :<<: F)
       : QScriptCore[T[G]] => Option[QScriptCore[T[G]]] = {
     case Subset(src, from, sel, count) =>
       from.resume.swap.toOption >>= (FI project _) >>= {
@@ -43,7 +44,7 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
     case _ => None
   }
 
-  def filterBeforeUnion[F[_]: Functor](implicit QC: QScriptCore :<: F)
+  def filterBeforeUnion[F[a] <: ACopK[a]: Functor](implicit QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => Option[QScriptCore[T[F]]] = {
     case Filter(Embed(src), fm) =>
       QC.prj(src) match {
@@ -59,11 +60,11 @@ class Optimize[T[_[_]]: BirecursiveT: EqualT: ShowT] extends TTypes[T] {
   /** Should only be applied after all other QScript transformations. This gives
     * the final, optimized QScript for conversion.
     */
-  def optimize[F[_], G[_]: Functor](FtoG: F ~> G)(
+  def optimize[F[a] <: ACopK[a], G[a] <: ACopK[a]: Functor](FtoG: F ~> G)(
     implicit
-      QCF: QScriptCore :<: F,
-      QCG: QScriptCore :<: G)
+      QCF: QScriptCore :<<: F,
+      QCG: QScriptCore :<<: G)
       : F[T[G]] => F[T[G]] =
-      liftFF[QScriptCore, F, T[G]](
+      liftFFCopK[QScriptCore, F, T[G]](
         repeatedly(applyTransforms(subsetBeforeMap[F, G](FtoG), filterBeforeUnion[G])))
 }

@@ -22,6 +22,7 @@ import quasar.common.PhaseResult
 import quasar.connector.{BackendModule, DefaultAnalyzeModule}
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric._
 import quasar.fp.ski.ι
 import quasar.fs._
@@ -46,7 +47,7 @@ object LightweightTester extends BackendModule with DefaultAnalyzeModule {
 
   type QS[T[_[_]]] = TestConnector.QS[T]
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]] =
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]] =
     TestConnector.qScriptToQScriptTotal[T]
 
   type Repr = TestConnector.Repr
@@ -61,7 +62,7 @@ object LightweightTester extends BackendModule with DefaultAnalyzeModule {
   def TraverseQSM[T[_[_]]] = Traverse[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Delay[RenderTree, QSM[T, ?]]]
   def ExtractPathQSM[T[_[_]]: RecursiveT] = ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<: QSM[T, ?]]
+  def QSCoreInject[T[_[_]]] = implicitly[QScriptCore[T, ?] :<<: QSM[T, ?]]
   def MonadM = Monad[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = implicitly[Unirewrite[T, QS[T]]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] = Unicoalesce.Capture[T, QS[T]]

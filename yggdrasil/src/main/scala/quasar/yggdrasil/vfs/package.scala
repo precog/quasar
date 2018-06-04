@@ -35,7 +35,7 @@ package object vfs {
 
   // this is needed kind of a lot
   private[vfs] implicit def catchableForS[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] = {
-    val delegate = catchable.freeCatchable[Task, S]
+    val delegate = catchable.injectableTaskCatchable[S]
 
     new Catchable[Free[S, ?]] {
 

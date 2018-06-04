@@ -19,7 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef.{Array, Option, SuppressWarnings}
 import quasar.Type
 import quasar.ejson.implicits._
-import quasar.fp.coproductEqual
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.qscript.{
   ExtractFunc,
   ExtractFuncDerived,

@@ -21,6 +21,8 @@ import quasar.common.{JoinType, SortDir}
 import quasar.{ejson, qscript}
 import quasar.ejson.EJson
 import quasar.time.TemporalPart
+import quasar.contrib.iota.copkTraverse
+import quasar.fp.Injectable
 
 import matryoshka._
 import matryoshka.data.Fix
@@ -482,8 +484,8 @@ object construction {
 
   final case class Dsl[T[_[_]], F[_], R](embed: F[R] => R)
                                         (implicit corec: CorecursiveT[T],
-                                         injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                         injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]) {
+                                         injCore: Injectable[QScriptCore[T, ?], F],
+                                         injTotal: Injectable[F, QScriptTotal[T, ?]]) {
     private def core(fr: QScriptCore[T, R]): R = embed(injCore.inject(fr))
 
     def Map(r: R, func: RecFreeMap[T]): R =
@@ -526,10 +528,10 @@ object construction {
     def Unreferenced: R =
       core(qscript.Unreferenced())
 
-    def BucketKey(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
+    def BucketKey(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable[ProjectBucket[T, ?], F]): R =
       embed(F.inject(qscript.BucketKey(src, value, name)))
 
-    def BucketIndex(src: R, value: FreeMap[T], index: FreeMap[T])(implicit F: Injectable.Aux[ProjectBucket[T, ?], F]): R =
+    def BucketIndex(src: R, value: FreeMap[T], index: FreeMap[T])(implicit F: Injectable[ProjectBucket[T, ?], F]): R =
       embed(F.inject(qscript.BucketIndex(src, value, index)))
 
     def ThetaJoin(src: R,
@@ -538,7 +540,7 @@ object construction {
                   on: JoinFunc[T],
                   f: JoinType,
                   combine: JoinFunc[T])
-                 (implicit F: Injectable.Aux[ThetaJoin[T, ?], F]): R =
+                 (implicit F: Injectable[ThetaJoin[T, ?], F]): R =
       embed(F.inject(qscript.ThetaJoin(src, lBranch.mapSuspension(injTotal.inject), rBranch.mapSuspension(injTotal.inject), on, f, combine)))
 
     def EquiJoin(src: R,
@@ -547,27 +549,27 @@ object construction {
                  key: List[(FreeMap[T], FreeMap[T])],
                  f: JoinType,
                  combine: JoinFunc[T])
-                (implicit F: Injectable.Aux[EquiJoin[T, ?], F]): R =
+                (implicit F: Injectable[EquiJoin[T, ?], F]): R =
       embed(F.inject(qscript.EquiJoin(src, lBranch.mapSuspension(injTotal.inject), rBranch.mapSuspension(injTotal.inject), key, f, combine)))
 
     def ShiftedRead[A](path: A,
                        idStatus: IdStatus)
-                      (implicit F: Injectable.Aux[Const[ShiftedRead[A], ?], F]): R =
+                      (implicit F: Injectable[Const[ShiftedRead[A], ?], F]): R =
       embed(F.inject(Const(qscript.ShiftedRead(path, idStatus))))
 
     def Read[A](path: A)
-               (implicit F: Injectable.Aux[Const[Read[A], ?], F]): R =
+               (implicit F: Injectable[Const[Read[A], ?], F]): R =
       embed(F.inject(Const(qscript.Read(path))))
 
-    def Root(implicit F: Injectable.Aux[Const[DeadEnd, ?], F]): R =
+    def Root(implicit F: Injectable[Const[DeadEnd, ?], F]): R =
       embed(F.inject(Const(qscript.Root)))
 
     def Hole(implicit ev: Free[F, Hole] === R): R =
       ev(Free.pure(SrcHole))
   }
 
-  class Defaults[T[_[_]]: BirecursiveT, F[_]](implicit injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]) {
+  class Defaults[T[_[_]]: BirecursiveT, F[_]](implicit injCore: Injectable[QScriptCore[T, ?], F],
+                                              injTotal: Injectable[F, QScriptTotal[T, ?]]) {
     val func: Func[T] = Func[T]
     val recFunc: RecFunc[T] = RecFunc[T]
     val free: Dsl[T, F, Free[F, Hole]] = mkFree[T, F]
@@ -575,22 +577,22 @@ object construction {
   }
 
   def mkDefaults[T[_[_]]: BirecursiveT, F[_]](implicit
-                                              injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                              injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): Defaults[T, F] =
+                                              injCore: Injectable[QScriptCore[T, ?], F],
+                                              injTotal: Injectable[F, QScriptTotal[T, ?]]): Defaults[T, F] =
     new Defaults[T, F]
 
   def mkFree[T[_[_]]: CorecursiveT, F[_]](implicit
-                                          injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                          injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): Dsl[T, F, Free[F, Hole]] =
+                                          injCore: Injectable[QScriptCore[T, ?], F],
+                                          injTotal: Injectable[F, QScriptTotal[T, ?]]): Dsl[T, F, Free[F, Hole]] =
     Dsl[T, F, Free[F, Hole]](Free.roll)
 
   def mkFix[T[_[_]]: CorecursiveT, F[_]](implicit
-                                         injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                         injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): Dsl[T, F, Fix[F]] =
+                                         injCore: Injectable[QScriptCore[T, ?], F],
+                                         injTotal: Injectable[F, QScriptTotal[T, ?]]): Dsl[T, F, Fix[F]] =
     Dsl[T, F, Fix[F]](Fix(_))
 
   def mkGeneric[T[_[_]], F[_]: Functor](implicit corec: CorecursiveT[T],
-                                        injCore: Injectable.Aux[QScriptCore[T, ?], F],
-                                        injTotal: Injectable.Aux[F, QScriptTotal[T, ?]]): Dsl[T, F, T[F]] =
+                                        injCore: Injectable[QScriptCore[T, ?], F],
+                                        injTotal: Injectable[F, QScriptTotal[T, ?]]): Dsl[T, F, T[F]] =
     Dsl[T, F, T[F]](corec.embedT(_))
 }

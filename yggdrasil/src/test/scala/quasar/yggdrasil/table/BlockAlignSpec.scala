@@ -21,11 +21,8 @@ import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.precog.TestSupport._
 
-import scalaz._, Scalaz._
 import shims._
 import org.scalacheck.Gen._
-// import org.specs2.ScalaCheck
-// import org.scalacheck._, Gen._, Arbitrary._
 import SampleData._
 
 trait BlockAlignSpec extends SpecificationLike with ScalaCheck {

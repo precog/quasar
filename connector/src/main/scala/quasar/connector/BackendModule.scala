@@ -28,6 +28,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz._, eitherT._
 import quasar.contrib.scalaz.concurrent.shift
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.free._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.frontend.logicalplan.LogicalPlan
@@ -44,12 +45,14 @@ import matryoshka.data._
 import matryoshka.implicits._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
+import iotaz.{CopK, TListK}
+
 
 trait BackendModule {
   import BackendDef.{DefErrT, DefinitionResult}
   import PhaseResults._
 
-  type QSM[T[_[_]], A] = QS[T]#M[A]
+  type QSM[T[_[_]], A] = CopK[QS[T], A]
 
   type ConfiguredT[F[_], A] = Kleisli[F, Config, A]
   type Configured[A]        = ConfiguredT[M, A]
@@ -194,9 +197,9 @@ trait BackendModule {
 
   // everything abstract below this line
 
-  type QS[T[_[_]]] <: CoM
+  type QS[T[_[_]]] <: TListK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[QSM[T, ?], QScriptTotal[T, ?]]
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[QSM[T, ?], QScriptTotal[T, ?]]
 
   type Repr
   type M[A]
@@ -204,7 +207,7 @@ trait BackendModule {
   def FunctorQSM[T[_[_]]]: Functor[QSM[T, ?]]
   def DelayRenderTreeQSM[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Delay[RenderTree, QSM[T, ?]]
   def ExtractPathQSM[T[_[_]]: RecursiveT]: ExtractPath[QSM[T, ?], APath]
-  def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<: QSM[T, ?]
+  def QSCoreInject[T[_[_]]]: QScriptCore[T, ?] :<<: QSM[T, ?]
   def MonadM: Monad[M]
   def UnirewriteT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unirewrite[T, QS[T]]
   def UnicoalesceCap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: Unicoalesce.Capture[T, QS[T]]

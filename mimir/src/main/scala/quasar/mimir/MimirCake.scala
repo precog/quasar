@@ -17,6 +17,7 @@
 package quasar.mimir
 
 import quasar.contrib.scalaz._
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.yggdrasil.TableModule.{DesiredSortOrder, SortAscending}

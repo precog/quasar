@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.fp.symbolOrder
+import quasar.contrib.iota.copkTraverse
 import quasar.qscript.{construction, FreeMap => FM}
 
 import matryoshka.BirecursiveT

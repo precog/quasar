@@ -56,5 +56,5 @@ object PrimaryType {
     case Map  => "map"
   }
 
-  implicit val equal: Equal[PrimaryType] = Equal.equalRef
+  implicit val equal: Equal[PrimaryType] = Equal.equalA
 }

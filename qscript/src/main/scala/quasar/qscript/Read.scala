@@ -20,7 +20,6 @@ import slamdata.Predef._
 import quasar.fp._
 import quasar.RenderTree
 import quasar.contrib.pathy.APath
-import quasar.fp._
 
 import matryoshka._
 import monocle.macros.Lenses

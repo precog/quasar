@@ -23,6 +23,7 @@ import scala.Predef.implicitly
 import quasar.common.{JoinType, SortDir}
 import quasar.qscript._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.qscript.MapFuncsCore._
 
 import matryoshka.Algebra

@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef.Symbol
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.qscript.{FreeMap, FreeMapA}
 

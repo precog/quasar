@@ -20,7 +20,7 @@ import quasar.blueeyes._, json._
 import quasar.yggdrasil._
 import quasar.yggdrasil.execution.EvaluationContext
 
-import scalaz._, Scalaz._
+import scalaz.Validation
 
 trait MemoryDatasetConsumer extends EvaluatorModule {
   type IdType

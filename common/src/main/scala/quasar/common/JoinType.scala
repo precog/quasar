@@ -29,7 +29,7 @@ object JoinType {
   final case object LeftOuter extends JoinType
   final case object RightOuter extends JoinType
 
-  implicit val equal: Equal[JoinType] = Equal.equalRef
+  implicit val equal: Equal[JoinType] = Equal.equalA
   implicit val show: Show[JoinType] = Show.showFromToString
   implicit val renderTree: RenderTree[JoinType] =
     RenderTree.make(t => Terminal(List(t.shows, "JoinType"), None))

@@ -29,6 +29,7 @@ import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.fp._, ski._, numeric.widenPositive
+import quasar.contrib.iota._
 import quasar.fs._
 import quasar.fs.mount._
 import quasar.fs.mount.module.resolveImports
@@ -52,8 +53,6 @@ import spire.std.double._
 
 object Repl {
   import Command.{XDir, XFile}
-
-  // TODO[scalaz]: Shadow the scalaz.Monad.monadMTMAB SI-2712 workaround
 
   val HelpMessage =
     """Quasar REPL, Copyright © 2014–2017 SlamData Inc.

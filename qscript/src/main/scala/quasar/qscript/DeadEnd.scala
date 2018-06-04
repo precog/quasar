@@ -28,7 +28,7 @@ sealed abstract class DeadEnd
 final case object Root extends DeadEnd
 
 object DeadEnd {
-  implicit def equal: Equal[DeadEnd] = Equal.equalRef
+  implicit def equal: Equal[DeadEnd] = Equal.equalA
   implicit def show: Show[DeadEnd] = Show.showFromToString
   implicit def renderTree: RenderTree[DeadEnd] = RenderTree.fromShow("DeadEnd")
 }

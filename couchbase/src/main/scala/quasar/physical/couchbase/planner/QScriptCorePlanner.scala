@@ -22,6 +22,7 @@ import quasar.fs.Planner.{PlannerErrorME, InternalError}
 import quasar.effect.NameGenerator
 import quasar.ejson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.physical.couchbase._,
   common.ContextReader,

@@ -17,11 +17,15 @@
 package quasar.physical
 
 import slamdata.Predef.String
+import quasar.contrib.iota.SubInject
 import quasar.qscript._
 import quasar.contrib.scalaz.MonadError_
 import quasar.contrib.pathy.{ADir, AFile}
+import quasar.fp.Injectable
 
 import scalaz.{Const, NonEmptyList, MonadError}
+
+import iotaz.CopK
 
 package object marklogic {
   type ErrorMessages = NonEmptyList[String]
@@ -38,20 +42,20 @@ package object marklogic {
     def apply[F[_]](implicit F: MonadErrMsgs_[F]): MonadErrMsgs_[F] = F
   }
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable.Aux[fs.MLQScriptCP[T]#M, QScriptTotal[T, ?]] =
-    ::\::[QScriptCore[T, ?]](::\::[ThetaJoin[T, ?]](::/::[T, Const[ShiftedRead[ADir], ?], Const[Read[AFile], ?]]))
+  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[fs.MLQScriptCP[T], ?], QScriptTotal[T, ?]] =
+    SubInject[CopK[fs.MLQScriptCP[T], ?], QScriptTotal[T, ?]]
   
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable.Aux[QScriptCore[T, ?], fs.MLQScriptCP[T]#M] =
-    Injectable.inject[QScriptCore[T, ?], fs.MLQScriptCP[T]#M]
+  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[fs.MLQScriptCP[T], ?]] =
+    Injectable.inject[QScriptCore[T, ?], CopK[fs.MLQScriptCP[T], ?]]
 
-  implicit def thetaJoinToQScript[T[_[_]]]: Injectable.Aux[ThetaJoin[T, ?], fs.MLQScriptCP[T]#M] =
-    Injectable.inject[ThetaJoin[T, ?], fs.MLQScriptCP[T]#M]
+  implicit def thetaJoinToQScript[T[_[_]]]: Injectable[ThetaJoin[T, ?], CopK[fs.MLQScriptCP[T], ?]] =
+    Injectable.inject[ThetaJoin[T, ?], CopK[fs.MLQScriptCP[T], ?]]
 
-  implicit def readToQScript[T[_[_]]]: Injectable.Aux[Const[Read[AFile], ?], fs.MLQScriptCP[T]#M] =
-    Injectable.inject[Const[Read[AFile], ?], fs.MLQScriptCP[T]#M]
+  implicit def readToQScript[T[_[_]]]: Injectable[Const[Read[AFile], ?], CopK[fs.MLQScriptCP[T], ?]] =
+    Injectable.inject[Const[Read[AFile], ?], CopK[fs.MLQScriptCP[T], ?]]
 
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable.Aux[Const[ShiftedRead[ADir], ?], fs.MLQScriptCP[T]#M] =
-    Injectable.inject[Const[ShiftedRead[ADir], ?], fs.MLQScriptCP[T]#M]
+  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[ADir], ?], CopK[fs.MLQScriptCP[T], ?]] =
+    Injectable.inject[Const[ShiftedRead[ADir], ?], CopK[fs.MLQScriptCP[T], ?]]
 
 
 }

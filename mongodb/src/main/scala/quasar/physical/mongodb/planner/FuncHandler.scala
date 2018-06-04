@@ -19,6 +19,7 @@ package quasar.physical.mongodb.planner
 import slamdata.Predef._
 import quasar.Type
 import quasar.fp._
+import quasar.contrib.iota.mkInject
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.physical.mongodb.{Bson, BsonCodec, BsonField, BsonVersion}
@@ -32,6 +33,8 @@ import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import scalaz.{Divide => _, Split => _, _}, Scalaz._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 import simulacrum.typeclass
 
 @typeclass trait FuncHandler[IN[_]] {
@@ -499,43 +502,97 @@ object FuncHandler {
           : AlgebraM[(Option ∘ M)#λ, MapFuncDerived[T, ?], Fix[EX]] = κ(None)
     }
 
-  implicit def mapFuncCoproduct[F[_], G[_]]
-      (implicit F: FuncHandler[F], G: FuncHandler[G])
-      : FuncHandler[Coproduct[F, G, ?]] =
-    new FuncHandler[Coproduct[F, G, ?]] {
-      def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX)
-          : AlgebraM[M, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOpsCore[EX, M](v).apply _,
-          G.handleOpsCore[EX, M](v).apply _)
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL]): FuncHandler[CopK[LL, ?]] =
+    M.materialize(offset = 0)
 
-      def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOps3_4[EX, M](v).apply _,
-          G.handleOps3_4[EX, M](v).apply _)
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int): FuncHandler[CopK[LL, ?]]
+  }
 
-      def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOps3_4_4[EX, M](v).apply _,
-          G.handleOps3_4_4[EX, M](v).apply _)
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: FuncHandler[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int): FuncHandler[CopK[F ::: TNilK, ?]] = {
+        val I = mkInject[F, F ::: TNilK](offset)
+        new FuncHandler[CopK[F ::: TNilK, ?]] {
+          def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX)
+          : AlgebraM[M, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOpsCore[EX, M](v).apply(fa)
+          }
 
-      def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
-        (v: BsonVersion)
-        (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
-          : AlgebraM[(Option ∘ M)#λ, Coproduct[F, G, ?], Fix[EX]] =
-        _.run.fold(
-          F.handleOps3_6[EX, M](v).apply _,
-          G.handleOps3_6[EX, M](v).apply _)
+          def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_4[EX, M](v).apply(fa)
+          }
 
+          def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_4_4[EX, M](v).apply(fa)
+          }
+
+          def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+          (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+          : AlgebraM[(Option ∘ M)#λ, CopK[F ::: TNilK, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_6[EX, M](v).apply(fa)
+          }
+        }
+      }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: FuncHandler[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int): FuncHandler[CopK[F ::: LL, ?]] = {
+        val I = mkInject[F, F ::: LL](offset)
+        new FuncHandler[CopK[F ::: LL, ?]] {
+          def handleOpsCore[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+            (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX)
+              : AlgebraM[M, CopK[F ::: LL, ?], Fix[EX]] = {
+            case I(fa) => F.handleOpsCore[EX, M](v).apply(fa)
+            case other => LL.materialize(offset + 1).handleOpsCore[EX, M](v).apply(other.asInstanceOf[CopK[LL, Fix[EX]]])
+          }
+
+          def handleOps3_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+            (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX)
+              : AlgebraM[(Option ∘ M)#λ, CopK[F ::: LL, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_4[EX, M](v).apply(fa)
+            case other => LL.materialize(offset + 1).handleOps3_4[EX, M](v).apply(other.asInstanceOf[CopK[LL, Fix[EX]]])
+          }
+
+          def handleOps3_4_4[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+            (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX)
+              : AlgebraM[(Option ∘ M)#λ, CopK[F ::: LL, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_4_4[EX, M](v).apply(fa)
+            case other => LL.materialize(offset + 1).handleOps3_4_4[EX, M](v).apply(other.asInstanceOf[CopK[LL, Fix[EX]]])
+          }
+
+          def handleOps3_6[EX[_]: Functor, M[_]: Monad: MonadFsErr: ExecTimeR]
+            (v: BsonVersion)
+            (implicit e32: ExprOpCoreF :<: EX, e34: ExprOp3_4F :<: EX, e344: ExprOp3_4_4F :<: EX, e36: ExprOp3_6F :<: EX)
+              : AlgebraM[(Option ∘ M)#λ, CopK[F ::: LL, ?], Fix[EX]] = {
+            case I(fa) => F.handleOps3_6[EX, M](v).apply(fa)
+            case other => LL.materialize(offset + 1).handleOps3_6[EX, M](v).apply(other.asInstanceOf[CopK[LL, Fix[EX]]])
+          }
+        }
+      }
+    }
+  }
 
   def handle3_2[F[_]: FuncHandler, M[_]: Monad: MonadFsErr: ExecTimeR]
     (v: BsonVersion)

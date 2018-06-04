@@ -17,12 +17,12 @@
 package quasar.yggdrasil
 package table
 
+import quasar.blueeyes._, json._
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode.JType
 
-import quasar.blueeyes._, json._
 import cats.effect.IO
-import scalaz._, Scalaz._
+import scalaz.StreamT
 import shims._
 
 // TODO: mix in a trait rather than defining Table directly
@@ -71,20 +71,20 @@ trait IndicesSpec extends ColumnarTableModuleTestSupport with TableModuleSpec wi
     }
 
     val json = """
-{"a": 1, "b": 2, "c": 3}
-{"a": 1, "b": 2, "c": 999, "d": "foo"}
-{"a": 1, "b": 2, "c": "cat"}
-{"a": 1, "b": 2}
-{"a": 2, "b": 2, "c": 3, "d": 1248}
-{"a": 2, "b": 2, "c": 13}
-{"a": "foo", "b": "bar", "c": 3}
-{"a": 3, "b": "", "c": 333}
-{"a": 3, "b": 2, "c": [1,2,3,4]}
-{"a": 1, "b": 2, "c": {"cat": 13, "dog": 12}}
-{"a": "foo", "b": 999}
-{"b": 2, "c": 9876}
-{"a": 1, "c": [666]}
-"""
+      {"a": 1, "b": 2, "c": 3}
+      {"a": 1, "b": 2, "c": 999, "d": "foo"}
+      {"a": 1, "b": 2, "c": "cat"}
+      {"a": 1, "b": 2}
+      {"a": 2, "b": 2, "c": 3, "d": 1248}
+      {"a": 2, "b": 2, "c": 13}
+      {"a": "foo", "b": "bar", "c": 3}
+      {"a": 3, "b": "", "c": 333}
+      {"a": 3, "b": 2, "c": [1,2,3,4]}
+      {"a": 1, "b": 2, "c": {"cat": 13, "dog": 12}}
+      {"a": "foo", "b": 999}
+      {"b": 2, "c": 9876}
+      {"a": 1, "c": [666]}
+      """
 
     val table             = fromJson(JParser.parseManyFromString(json).valueOr(throw _).toStream)
     val keySpecs          = Array(groupkey("a"), groupkey("b"))

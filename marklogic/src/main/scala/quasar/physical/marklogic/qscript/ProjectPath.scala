@@ -20,7 +20,8 @@ import slamdata.Predef._
 
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy._
-import quasar.fp.free._
+import quasar.contrib.iota.{copkTraverse, copkFunctor}
+import quasar.contrib.iota.SubInject
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.{MapFuncsCore => MFCore, MFC => _, _}
@@ -32,6 +33,7 @@ import matryoshka.patterns._
 import matryoshka.implicits._
 import pathy._, Path._
 import scalaz._, Scalaz._
+import iotaz.CopK
 
 /* TODO switch from ADir to AFile
  *  @tparam A recursive position */
@@ -39,12 +41,12 @@ final case class ProjectPath[A](src: A, path: ADir)
 
 object PathProject {
   def unapply[T[_[_]], A](pr: PathMapFunc[T, A]): Option[ProjectPath[A]] =
-    Inject[ProjectPath, PathMapFunc[T, ?]].prj(pr)
+    CopK.Inject[ProjectPath, PathMapFunc[T, ?]].prj(pr)
 }
 
 object MFPath {
   def unapply[T[_[_]], A](pr: PathMapFunc[T, A]): Option[MapFuncCore[T, A]] =
-    Inject[MapFuncCore[T, ?], PathMapFunc[T, ?]].prj(pr)
+    CopK.Inject[MapFuncCore[T, ?], PathMapFunc[T, ?]].prj(pr)
 }
 
 object ProjectPath extends ProjectPathInstances {
@@ -58,23 +60,24 @@ object ProjectPath extends ProjectPathInstances {
   }
 
   def foldProjectKey[T[_[_]]: RecursiveT](fm: FreeMap[T]): FreePathMap[T] = {
+    val I = SubInject[MapFunc[T, ?], PathMapFunc[T, ?]]
     val alg: AlgebraicGTransform[(FreeMap[T], ?), FreePathMap[T], CoMapFunc[T, ?], CoPathMapFunc[T, ?]] = {
       case CoEnv(\/-(MFC(MFCore.ProjectKey((_, Embed(CoEnv(\/-(PathProject(path))))), (MFCore.StrLit(key), _))))) => {
         val dir0 = path.path </> dir(key)
         val pp   = ProjectPath(path.src, dir0)
 
-        CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
+        CoEnv(CopK.Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
       case CoEnv(\/-(MFC(MFCore.ProjectKey((Embed(CoEnv(src)), _), (MFCore.StrLit(key), _))))) => {
         val dir0 = rootDir[Sandboxed] </> dir(key)
         val desc = src.fold(κ(Free.point[PathMapFunc[T, ?],  Hole](SrcHole)),
-          Free.roll(_).mapSuspension(injectNT[MapFunc[T, ?], PathMapFunc[T, ?]]))
+          Free.roll(_).mapSuspension(I.inject))
         val pp   = ProjectPath(desc, dir0)
 
-        CoEnv(Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
+        CoEnv(CopK.Inject[ProjectPath, PathMapFunc[T, ?]].inj(pp).right)
       }
       case CoEnv(\/-(other)) =>
-        CoEnv(Inject[MapFunc[T, ?], PathMapFunc[T, ?]].inj(other.map(_._2)).right)
+        CoEnv(I.inject(other.map(_._2)).right)
       case CoEnv(-\/(h)) => CoEnv(h.left)
     }
 

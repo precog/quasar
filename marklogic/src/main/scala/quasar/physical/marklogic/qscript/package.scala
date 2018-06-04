@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.scalaz.MonadError_
 import quasar.ejson.{EJson, Str}
 import quasar.fp.coproductShow
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski.κ
 import quasar.contrib.matryoshka.totally
 import quasar.contrib.pathy.{AFile, UriPathCodec}
@@ -36,13 +37,16 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
+import iotaz.CopK
+import iotaz.TNilK
+import iotaz.TListK.:::
 
 package object qscript {
   type MarkLogicPlanErrT[F[_], A] = EitherT[F, MarkLogicPlannerError, A]
 
   type MonadPlanErr[F[_]] = MonadError_[F, MarkLogicPlannerError]
 
-  type PathMapFunc[T[_[_]], A]   = Coproduct[ProjectPath, MapFunc[T, ?], A]
+  type PathMapFunc[T[_[_]], A]   = CopK[ProjectPath ::: MapFuncCore[T, ?] ::: MapFuncDerived[T, ?] ::: TNilK, A]
   type FreePathMap[T[_[_]]]      = Free[PathMapFunc[T, ?], Hole]
   type CoMapFunc[T[_[_]], A]     = CoEnv[Hole, MapFunc[T, ?], A]
   type CoPathMapFunc[T[_[_]], A] = CoEnv[Hole, PathMapFunc[T, ?], A]

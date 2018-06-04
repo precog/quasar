@@ -30,8 +30,9 @@ import quasar.qscript.rewrites._
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.implicits._
 import pathy.Path._
-import scalaz.{:<:, \/, Functor, IMap, Monad}
+import scalaz.{\/, Functor, IMap, Monad}
 import scalaz.syntax.monad._
+import iotaz.{CopK, TListK}
 
 /** A DataSource capable of executing QScript. */
 abstract class HeavyweightDataSource[
@@ -41,15 +42,15 @@ abstract class HeavyweightDataSource[
     extends DataSource[F, T[QScriptRead[T, ?]], R] {
 
   /** QScript used by this DataSource. */
-  type QS[U[_[_]]] <: CoM
-  type QSM[A] = QS[T]#M[A]
+  type QS[U[_[_]]] <: TListK
+  type QSM[A] = CopK[QS[T], A]
 
   /** Executable representation. */
   type Repr
 
   def QSMFunctor: Functor[QSM]
-  def QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM
-  def QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]]
+  def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM
+  def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]]
   def UnirewriteT: Unirewrite[T, QS[T]]
   def UnicoalesceCap: Unicoalesce.Capture[T, QS[T]]
 
@@ -87,8 +88,8 @@ abstract class HeavyweightDataSource[
     }
 
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
-  private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<: QSM = QSMFromQScriptCore
-  private final implicit def _QSMToQScriptTotal: Injectable.Aux[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
+  private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM = QSMFromQScriptCore
+  private final implicit def _QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
   private final implicit def _UnirewriteT: Unirewrite[T, QS[T]] = UnirewriteT
   private final implicit def _UnicoalesceCap: Unicoalesce.Capture[T, QS[T]] = UnicoalesceCap
 }

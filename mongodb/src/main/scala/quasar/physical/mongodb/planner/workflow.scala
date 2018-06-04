@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar._
 import quasar.contrib.scalaz._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.MonadFsErr
 import quasar.jscore.JsFn

@@ -20,6 +20,7 @@ import quasar.common.SortDir
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.physical.mongodb._
 import quasar.qscript._
 import quasar.{Qspec, TreeMatchers, Type}
@@ -43,7 +44,10 @@ class assumeReadTypeSpec extends Qspec with TTypes[Fix] with TreeMatchers {
   val json = Fixed[Fix[EJson]]
 
   def assumeReadTp(qs: Fix[fs.MongoQScript[Fix, ?]]): Either[quasar.fs.FileSystemError, Fix[fs.MongoQScript[Fix, ?]]] =
-    Trans(assumeReadType[Fix, fs.MongoQScript[Fix, ?], quasar.fs.FileSystemError \/ ?](Type.AnyObject), qs).toEither
+    Trans.applyTrans(
+      assumeReadType[Fix, fs.MongoQScript[Fix, ?], quasar.fs.FileSystemError \/ ?](Type.AnyObject),
+      idPrism[fs.MongoQScript[Fix, ?]]
+    )(qs).toEither
 
   val rewriteSrcFree0 = free.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), ExcludeId)
   val rewriteSrcFix0 = fix.ShiftedRead[AFile](rootDir </> dir("db") </> file("zips"), ExcludeId)

@@ -52,7 +52,7 @@ import scalaz.{
   Free,
   Monad,
   NonEmptyList => NEL,
-  Scalaz,
+  Scalaz
 }, Scalaz._
 
 

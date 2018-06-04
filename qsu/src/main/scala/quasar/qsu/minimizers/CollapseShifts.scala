@@ -51,7 +51,7 @@ import scalaz.{
   Free,
   Monad,
   NonEmptyList => NEL,
-  Scalaz
+  Scalaz,
 }, Scalaz._
 
 
@@ -324,7 +324,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
             val repair2 = func.ConcatMaps(func.ProjectKeyS(repair, ResultsField), origLifted.linearize)
 
             reconstructed.overwriteAtRoot(
-              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2 /*N.freeMF(repair2)*/))
+              QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2))
 
           case reconstructed => reconstructed
         }
@@ -692,9 +692,11 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
     def inlineMap(g: QSUGraph): Option[QSUGraph] = g match {
       case Map(LeftShift(src, struct, idStatus, onUndefined, repair, rot), fm) =>
-        g.overwriteAtRoot(QSU.LeftShift(src.root, struct, idStatus, onUndefined, fm.linearize >> repair, rot)).some
+        val repair2 = fm.linearize >> repair
+        g.overwriteAtRoot(QSU.LeftShift(src.root, struct, idStatus, onUndefined, N.freeMF(repair2), rot)).some
       case Map(MultiLeftShift(src, shifts, onUndefined, repair), fm) =>
-        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, fm.linearize >> repair)).some
+        val repair2 = fm.linearize >> repair
+        g.overwriteAtRoot(QSU.MultiLeftShift(src.root, shifts, onUndefined, repair2)).some
       case _ => none
     }
 

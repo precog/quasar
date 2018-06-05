@@ -706,7 +706,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       wrapped <- candidates.zipWithIndex traverse { case (g, i) => wrapCandidate(g, i) }
 
       coalescedPair <- wrapped.tail.foldLeftM[G, (QSUGraph, Set[Int])](wrapped.head) {
-        case (g0 @ (ConsecutiveBounded(_, shifts1), leftIndices), g1 @ (ConsecutiveBounded(_, shifts2), rightIndices)) =>
+        case ((ConsecutiveBounded(_, shifts1), leftIndices), (ConsecutiveBounded(_, shifts2), rightIndices)) =>
           val back = coalesceZip(shifts1.toList.reverse, leftIndices, shifts2.toList.reverse, rightIndices, None)
 
           back.map(g => (inlineMap(g).getOrElse(g), leftIndices ++ rightIndices))
@@ -809,8 +809,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
       case MultiLeftShift(parent, shifts, onUndefined, repair) =>
         Some((parent, NEL(\/-(QSU.MultiLeftShift[T, QSUGraph](parent, shifts, onUndefined, repair)))))
-
-      case Map(Self(parent, inners), fm) => Some((parent, inners))
 
       case _ =>
         None

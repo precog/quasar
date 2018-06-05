@@ -897,21 +897,19 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case
           Map(
-            Map(
-              LeftShift(
-                MultiLeftShift(
-                  LeftShift(Read(_), _, _, _, _, _),
-                  List(
-                    (cstruct, _, _),
-                    (dstruct, _, _)),
-                  OnUndefined.Emit,
-                  innerRepair),
-                outerStruct,
-                _,
+            LeftShift(
+              MultiLeftShift(
+                LeftShift(Read(_), _, _, _, _, _),
+                List(
+                  (cstruct, _, _),
+                  (dstruct, _, _)),
                 OnUndefined.Emit,
-                outerRepair,
-                _),
-              innerFM),
+                innerRepair),
+              outerStruct,
+              _,
+              OnUndefined.Emit,
+              outerRepair,
+              _),
             fm) =>
 
           cstruct must beTreeEqual(func.ProjectKeyS(func.Hole, "c"))
@@ -924,32 +922,24 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               "right" ->
                 Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right)))
 
-          outerStruct.linearize must beTreeEqual(func.ProjectKeyS(func.Hole, "right"))
+          outerStruct must beTreeEqual(recFunc.ProjectKeyS(recFunc.Hole, "right"))
 
           outerRepair must beTreeEqual(
             func.StaticMapS(
-              "left" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.value(_)), "left"),
-              "right" ->
-                func.MakeMapS("1", RightTarget[Fix])))
-
-          innerFM.linearize must beTreeEqual(
-            func.StaticMapS(
               "0" ->
                 func.ProjectKeyS(
-                  func.ProjectKeyS(func.Hole, "left"),
+                  func.ProjectKeyS(
+                    AccessLeftTarget[Fix](Access.value(_)),
+                    "left"),
                   "0"),
-              "1" ->
-                func.ProjectKeyS(
-                  func.ProjectKeyS(func.Hole, "right"),
-                  "1")))
+              "1" -> RightTarget[Fix]))
 
-          fm.linearize must beTreeEqual(
-            func.Divide(
-              func.ProjectKeyS(func.Hole, "0"),
-              func.ProjectKeyS(func.Hole, "1")))
+          fm must beTreeEqual(
+            recFunc.Divide(
+              recFunc.ProjectKeyS(recFunc.Hole, "0"),
+              recFunc.ProjectKeyS(recFunc.Hole, "1")))
       }
-    }.pendingUntilFixed
+    }
 
     // a[*][*][*] + b - c[*] / d[*][*]
     "coalesce a thing that looks a lot like the search card" in {
@@ -1081,8 +1071,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                   "right" ->
                     func.MakeMapS("1", Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right))))))
 
-        singleStruct.linearize must beTreeEqual(
-          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "left"), "results"))
+        singleStruct must beTreeEqual(
+          recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "left"), "results"))
 
         singleRepair must beTreeEqual(
           func.StaticMapS(
@@ -1429,24 +1419,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
-        case
-          Map(
-            Map(
-              LeftShift(
-                MultiLeftShift(
-                  LeftShift(Read(_), _, _, _, _, _),
-                  List(
-                    (innerastruct, _, _),
-                    (innerbstruct, _, _)),
-                  _,
-                  innerRepair),
-                outerStruct,
-                _,
-                _,
-                outerRepair,
-                _),
-              fm),
-            outerFM) =>
+        case Map(
+          LeftShift(
+            MultiLeftShift(
+              LeftShift(Read(_), _, _, _, _, _),
+              List(
+                (innerastruct, _, _),
+                (innerbstruct, _, _)),
+              _,
+              innerRepair),
+            outerStruct,
+            _,
+            _,
+            outerRepair,
+            _),
+          fm) =>
 
           innerastruct must beTreeEqual(func.ProjectKeyS(func.Hole, "a"))
           innerbstruct must beTreeEqual(func.ProjectKeyS(func.Hole, "b"))
@@ -1460,29 +1447,25 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
               "right" ->
                 Free.pure[MapFunc, QAccess[Hole] \/ Int](1.right)))
 
-          outerStruct.linearize must beTreeEqual(
-            func.ProjectKeyS(func.ProjectKeyS(func.Hole, "right"), "c"))
+          outerStruct must beTreeEqual(
+            recFunc.ProjectKeyS(recFunc.ProjectKeyS(recFunc.Hole, "right"), "c"))
 
           outerRepair must beTreeEqual(
             func.StaticMapS(
-              "left" ->
-                func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "left"),
-              "right" ->
-                func.StaticMapS("1" -> RightTarget[Fix])))
-
-          fm.linearize must beTreeEqual(
-            func.StaticMapS(
               "0" ->
-                func.ProjectKeyS(func.ProjectKeyS(func.Hole, "left"), "0"),
-              "1" ->
-                func.ProjectKeyS(func.ProjectKeyS(func.Hole, "right"), "1")))
+                func.ProjectKeyS(
+                  func.ProjectKeyS(
+                    AccessLeftTarget[Fix](Access.valueHole(_)),
+                    "left"),
+                  "0"),
+              "1" -> RightTarget[Fix]))
 
-          outerFM.linearize must beTreeEqual(
-            func.Add(
-              func.ProjectKeyS(func.Hole, "0"),
-              func.ProjectKeyS(func.Hole, "1")))
+          fm must beTreeEqual(
+            recFunc.Add(
+              recFunc.ProjectKeyS(recFunc.Hole, "0"),
+              recFunc.ProjectKeyS(recFunc.Hole, "1")))
       }
-    }.pendingUntilFixed
+    }
 
     // b[*] or b[*][*]
     "correctly coalesce uneven shifts of the same source" in {

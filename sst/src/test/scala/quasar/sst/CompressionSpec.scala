@@ -23,6 +23,7 @@ import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson, ejson.{EJsonArbitrary, TypeTag, z85}
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric.{Natural, Positive}
 import quasar.tpe._
 

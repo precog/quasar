@@ -18,7 +18,7 @@ package quasar
 
 import slamdata.Predef._
 
-import iotaz.CopK
+import quasar.contrib.iota.{:<<:, ACopK}
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
@@ -224,9 +224,6 @@ package object fp
           case (\/-(g1), \/-(g2)) => G(eq).equal(g1, g2)
           case (_,       _)       => false
         })))
-
-  type ACopK[a] = CopK[_, a]
-  type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
 
   implicit def coproductShow[F[_], G[_]](implicit F: Delay[Show, F], G: Delay[Show, G]): Delay[Show, Coproduct[F, G, ?]] =
     Delay.fromNT(λ[Show ~> DelayedFG[F, G]#Show](sh =>

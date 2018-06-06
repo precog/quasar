@@ -22,6 +22,7 @@ import quasar.Data
 import quasar.contrib.argonaut._
 import quasar.effect.Failure
 import quasar.ejson.{EJson, JsonCodec}
+import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski._
 import quasar.fp.numeric._
 import quasar.contrib.pathy.AFile

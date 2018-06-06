@@ -23,6 +23,7 @@ import quasar.contrib.spire.random.dist._
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.numeric.SampleStats
 import quasar.sst.{strings, SST, StructuralType, TypeStat}
 import quasar.tpe.{SimpleType, TypeF}

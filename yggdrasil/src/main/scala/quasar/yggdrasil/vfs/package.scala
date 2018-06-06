@@ -17,13 +17,16 @@
 package quasar.yggdrasil
 
 import quasar.contrib.scalaz.catchable
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import argonaut.{Argonaut, CodecJson, DecodeResult}
 
 import fs2.util.Catchable
 
-import scalaz.{~>, :<:, Coproduct, Free}
+import scalaz.{~>, Free}
 import scalaz.concurrent.Task
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 
 import java.util.UUID
 
@@ -31,11 +34,12 @@ import scala.util.Either
 
 package object vfs {
   type POSIX[A] = Free[POSIXOp, A]
-  type POSIXWithTask[A] = Free[Coproduct[POSIXOp, Task, ?], A]
+  type POSIXWithTaskCopK[A] = CopK[POSIXOp ::: Task ::: TNilK, A]
+  type POSIXWithTask[A] = Free[POSIXWithTaskCopK, A]
 
   // this is needed kind of a lot
-  private[vfs] implicit def catchableForS[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] = {
-    val delegate = catchable.injectableTaskCatchable[S]
+  private[vfs] implicit def catchableForS[S[a] <: ACopK[a]](implicit I: Task :<<: S): Catchable[Free[S, ?]] = {
+    val delegate = catchable.copKinjectableTaskCatchable[S]
 
     new Catchable[Free[S, ?]] {
 
@@ -54,11 +58,17 @@ package object vfs {
   }
 
   object POSIXWithTask {
-    def generalize[S[_]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
+    def generalize[S[a] <: ACopK[a]]: GeneralizeSyntax[S] = new GeneralizeSyntax[S] {}
 
-    trait GeneralizeSyntax[S[_]] {
-      def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, A] =
-        pwt.mapSuspension(λ[Coproduct[POSIXOp, Task, ?] ~> S](_.run.fold(IP.inj, IT.inj)))
+    private val JP = CopK.Inject[POSIXOp, POSIXWithTaskCopK]
+    private val JT = CopK.Inject[Task, POSIXWithTaskCopK]
+
+    trait GeneralizeSyntax[S[a] <: ACopK[a]] {
+      def apply[A](pwt: POSIXWithTask[A])(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): Free[S, A] =
+        pwt.mapSuspension(λ[POSIXWithTaskCopK ~> S] {
+          case JP(p) => IP(p)
+          case JT(t) => IT(t)
+        })
     }
   }
 

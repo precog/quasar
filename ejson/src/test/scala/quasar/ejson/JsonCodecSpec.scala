@@ -21,7 +21,8 @@ import quasar.Qspec
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson.implicits._
-import quasar.fp._
+import quasar.fp._, Helpers._
+import quasar.contrib.iota._
 
 import matryoshka.{equalTEqual => _, _}
 import matryoshka.data.Fix

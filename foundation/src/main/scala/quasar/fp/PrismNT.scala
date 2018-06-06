@@ -17,6 +17,7 @@
 package quasar.fp
 
 import slamdata.Predef._
+import quasar.contrib.iota.{:<<:, ACopK}
 import matryoshka._
 import matryoshka.patterns.CoEnv
 import monocle.Prism

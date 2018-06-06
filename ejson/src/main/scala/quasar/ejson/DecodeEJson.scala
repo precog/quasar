@@ -20,6 +20,7 @@ import slamdata.Predef.{Int => SInt, Char => SChar, Byte => SByte, _}
 import quasar.RenderedTree
 import quasar.contrib.argonaut._
 import quasar.ejson.implicits._
+import quasar.contrib.iota.copkTraverse
 
 import argonaut.{DecodeJson, Json => AJson}
 import matryoshka._

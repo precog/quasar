@@ -26,10 +26,11 @@ import fs2.util.Suspendable
 
 import pathy.Path
 
-import scalaz.{~>, -\/, \/-, Coproduct, Free, Inject}
+import scalaz.{~>, -\/, \/-, Free}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.syntax.traverse._
+import iotaz.CopK
 
 import scodec.bits.ByteVector
 
@@ -148,7 +149,7 @@ object RealPOSIX {
 
   private implicit def pwtSuspendable: Suspendable[POSIXWithTask] =
     new Suspendable[POSIXWithTask] {
-      val I = Inject[Task, Coproduct[POSIXOp, Task, ?]]
+      val I = CopK.Inject[Task, POSIXWithTaskCopK]
 
       def pure[A](a: A): POSIXWithTask[A] =
         Free.pure(a)

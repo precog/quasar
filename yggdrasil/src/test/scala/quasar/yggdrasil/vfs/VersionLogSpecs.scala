@@ -25,9 +25,9 @@ import org.specs2.mutable._
 
 import pathy.Path
 
-import scalaz.Coproduct
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
+import iotaz.CopK
 
 import scodec.bits.ByteVector
 
@@ -40,8 +40,7 @@ object VersionLogSpecs extends Specification {
   import StreamTestUtils._
 
   "version log manager" should {
-    val H = Harness[POSIXOp, Task]
-    val HWT = Harness[Coproduct[POSIXOp, Task, ?], Task]
+    val HWT = Harness[POSIXWithTaskCopK, Task]
 
     val BaseDir = Path.rootDir </> Path.dir("foo")
 
@@ -71,7 +70,7 @@ object VersionLogSpecs extends Specification {
       } yield ()
 
       val result =
-        interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
+        interp(VersionLog.init[POSIXWithTaskCopK](BaseDir)).unsafePerformSync
 
       result mustEqual VersionLog(BaseDir, Nil, Set())
     }
@@ -114,7 +113,7 @@ object VersionLogSpecs extends Specification {
       } yield ()
 
       val result =
-        interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
+        interp(VersionLog.init[POSIXWithTaskCopK](BaseDir)).unsafePerformSync
 
       result mustEqual VersionLog(BaseDir, Nil, Set())
     }
@@ -149,7 +148,7 @@ object VersionLogSpecs extends Specification {
       } yield ()
 
       val result =
-        interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
+        interp(VersionLog.init[POSIXWithTaskCopK](BaseDir)).unsafePerformSync
 
       result mustEqual VersionLog(BaseDir, Nil, versions.toSet)
     }
@@ -186,7 +185,7 @@ object VersionLogSpecs extends Specification {
       } yield ()
 
       val result =
-        interp(VersionLog.init[Coproduct[POSIXOp, Task, ?]](BaseDir)).unsafePerformSync
+        interp(VersionLog.init[POSIXWithTaskCopK](BaseDir)).unsafePerformSync
 
       result mustEqual VersionLog(BaseDir, committed, versions.toSet)
     }
@@ -196,19 +195,19 @@ object VersionLogSpecs extends Specification {
       val uuid = UUID.randomUUID()
 
       val interp = for {
-        _ <- H.pattern[UUID] {
-          case GenUUID => Task.now(uuid)
+        _ <- HWT.pattern[UUID] {
+          case CPL(GenUUID) => Task.now(uuid)
         }
 
-        _ <- H.pattern[Unit] {
-          case MkDir(target) =>
+        _ <- HWT.pattern[Unit] {
+          case CPL(MkDir(target)) =>
             Task delay {
               target mustEqual (BaseDir </> Path.dir(uuid.toString))
             }
         }
       } yield ()
 
-      val (log, version) = interp(VersionLog.fresh[POSIXOp].run(init)).unsafePerformSync
+      val (log, version) = interp(VersionLog.fresh[POSIXWithTaskCopK].run(init)).unsafePerformSync
 
       log mustEqual VersionLog(BaseDir, Nil, Set(Version(uuid)))
       version mustEqual Version(uuid)
@@ -221,23 +220,23 @@ object VersionLogSpecs extends Specification {
       val init = VersionLog(BaseDir, Nil, Set(Version(collision)))
 
       val interp = for {
-        _ <- H.pattern[UUID] {
-          case GenUUID => Task.now(collision)
+        _ <- HWT.pattern[UUID] {
+          case CPL(GenUUID) => Task.now(collision)
         }
 
-        _ <- H.pattern[UUID] {
-          case GenUUID => Task.now(uuid)
+        _ <- HWT.pattern[UUID] {
+          case CPL(GenUUID) => Task.now(uuid)
         }
 
-        _ <- H.pattern[Unit] {
-          case MkDir(target) =>
+        _ <- HWT.pattern[Unit] {
+          case CPL(MkDir(target)) =>
             Task delay {
               target mustEqual (BaseDir </> Path.dir(uuid.toString))
             }
         }
       } yield ()
 
-      val (log, version) = interp(VersionLog.fresh[POSIXOp].run(init)).unsafePerformSync
+      val (log, version) = interp(VersionLog.fresh[POSIXWithTaskCopK].run(init)).unsafePerformSync
 
       log mustEqual VersionLog(BaseDir, Nil, Set(Version(uuid), Version(collision)))
       version mustEqual Version(uuid)
@@ -289,7 +288,7 @@ object VersionLogSpecs extends Specification {
       } yield ()
 
       val state =
-        interp(VersionLog.commit[Coproduct[POSIXOp, Task, ?]](v).exec(init)).unsafePerformSync
+        interp(VersionLog.commit[POSIXWithTaskCopK](v).exec(init)).unsafePerformSync
 
       state mustEqual VersionLog(BaseDir, v :: other :: Nil, Set(v, other))
     }
@@ -299,10 +298,10 @@ object VersionLogSpecs extends Specification {
       val other = Version(UUID.randomUUID())
       val init = VersionLog(BaseDir, List(other), Set(other))
 
-      val interp = ().point[Harness[Coproduct[POSIXOp, Task, ?], Task, ?]]
+      val interp = ().point[Harness[POSIXWithTaskCopK, Task, ?]]
 
       val state =
-        interp(VersionLog.commit[Coproduct[POSIXOp, Task, ?]](v).exec(init)).unsafePerformSync
+        interp(VersionLog.commit[POSIXWithTaskCopK](v).exec(init)).unsafePerformSync
 
       state mustEqual init
     }
@@ -315,35 +314,28 @@ object VersionLogSpecs extends Specification {
       val init = VersionLog(BaseDir, uuids.map(Version), uuids.map(Version).toSet)
 
       val interp = for {
-        _ <- H.pattern[Unit] {
-          case Delete(target) =>
+        _ <- HWT.pattern[Unit] {
+          case CPL(Delete(target)) =>
             Task delay {
               target mustEqual (BaseDir </> Path.dir(back(0).toString))
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case Delete(target) =>
+        _ <- HWT.pattern[Unit] {
+          case CPL(Delete(target)) =>
             Task delay {
               target mustEqual (BaseDir </> Path.dir(back(1).toString))
             }
         }
       } yield ()
 
-      val result = interp(VersionLog.purgeOld[POSIXOp].exec(init)).unsafePerformSync
+      val result = interp(VersionLog.purgeOld[POSIXWithTaskCopK].exec(init)).unsafePerformSync
 
       val committed2 = init.committed.take(5)
       result mustEqual VersionLog(BaseDir, committed2, committed2.toSet)
     }
   }
 
-  object CPR {
-    def unapply[A](cp: Coproduct[POSIXOp, Task, A]): Option[Task[A]] =
-      cp.run.toOption
-  }
-
-  object CPL {
-    def unapply[A](cp: Coproduct[POSIXOp, Task, A]): Option[POSIXOp[A]] =
-      cp.run.swap.toOption
-  }
+  val CPR = CopK.Inject[Task, POSIXWithTaskCopK]
+  val CPL = CopK.Inject[POSIXOp, POSIXWithTaskCopK]
 }

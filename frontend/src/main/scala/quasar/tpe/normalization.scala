@@ -19,6 +19,7 @@ package quasar.tpe
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{Arr => JArr, CommonEJson, EJson, ExtEJson, Map => JMap}
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka._
 import matryoshka.implicits._

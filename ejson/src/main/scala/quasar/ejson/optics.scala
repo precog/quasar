@@ -27,10 +27,10 @@ object optics {
   import Extension.{Optics => EO}
 
   def com[A]: Prism[EJson[A], Common[A]] =
-    PrismNT.inject[Common, EJson].asPrism[A]
+    PrismNT.injectCopK[Common, EJson].asPrism[A]
 
   def ext[A]: Prism[EJson[A], Extension[A]] =
-    PrismNT.inject[Extension, EJson].asPrism[A]
+    PrismNT.injectCopK[Extension, EJson].asPrism[A]
 
   def arr[A]: Prism[EJson[A], List[A]] =
     com composePrism CO.arr

@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.ejson.implicits._
 import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
-import quasar.fp.{coproductEqual, coproductShow, symbolOrder, symbolShow}
+import quasar.fp.{symbolOrder, symbolShow}
 import quasar.qscript.FreeMap
 
 import matryoshka._

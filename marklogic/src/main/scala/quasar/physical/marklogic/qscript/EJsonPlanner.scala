@@ -19,6 +19,7 @@ package quasar.physical.marklogic.qscript
 import quasar.Data
 import quasar.ejson._
 import quasar.physical.marklogic.xquery._
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka._
 import matryoshka.implicits._

@@ -1,0 +1,37 @@
+{
+    "name": "field and flattened map value and key on heterogeneous",
+    "backends": {
+        "couchbase":         "pending",
+        "lwc_local":         "pendingIgnoreFieldOrder",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mimir":             "pendingIgnoreFieldOrder",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_3_4_13":    "pending",
+        "mongodb_3_6":       "pending",
+        "mongodb_read_only": "pending"
+    },
+    "data": "heterogeneous.data",
+    "query": "select a, b{*}, b{*:} as k from heterogeneous",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "a": 1, "b": 42, "k": "x" },
+      { "a": 1, "b": 21, "k": "y" },
+      { "a": 2 },
+      { "a": 3 },
+      { "a": 4 },
+      { "a": 5, "b": "string", "k": "z" },
+      { "a": 6 },
+      { "a": 7 },
+      { "a": 8 },
+      { "a": 9, "b": [ 1, 2, 3 ], "k": "d" },
+      { "a": 9, "b": { "n": 1 }, "k": "e" },
+      { "a": 9, "b": null, "k": "f" },
+      { "a": 9, "b": "foo", "k": "g" },
+      { "a": 9, "b": {  }, "k": "h" },
+      { "a": 9, "b": [], "k": "i" },
+      { "a": 10 }
+    ]
+}

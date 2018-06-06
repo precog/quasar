@@ -21,7 +21,8 @@ import slamdata.Predef.{Map => _, _}
 import quasar.ejson
 import quasar.ejson.{EJson, ExtEJson}
 import quasar.contrib.iota.{copkTraverse, mkInject}
-import quasar.fp.{:<<:, ACopK, PrismNT}
+import quasar.fp.PrismNT
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.analysis.Outline
@@ -154,7 +155,6 @@ sealed abstract class PreferProjectionInstances {
         val I = mkInject[F, F ::: TNilK](offset)
         new PreferProjection[CopK[F ::: TNilK, ?], T, B] {
           type C[A] = CopK[F ::: TNilK, A]
-          type D[A] = CopK[TNilK, A]
 
           def preferProjectionƒ(BtoC: PrismNT[B, C]): C[(Outline.Shape, T)] => B[T] = {
             case I(fa) => F.preferProjectionƒ(BtoC andThen PrismNT.injectCopK[F, C](I))(fa)

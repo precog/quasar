@@ -19,7 +19,7 @@ package quasar.qscript
 import quasar._
 import quasar.qscript.{MapFuncsCore => C, MapFuncsDerived => D}
 import quasar.std.StdLib._
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 object MapFunc {
   def translateNullaryMapping[T[_[_]], MF[a] <: ACopK[a] , A]

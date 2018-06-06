@@ -75,7 +75,6 @@ object Build {
       serialTests scalacPlugins (kindProjector) scalacArgs (defaultArgSet: _*) also(
         organization := "org.quasar-analytics",
         scalaVersion := "2.12.4",
-        logBuffered in Test := false,
-        cancelable := false))
+        logBuffered in Test := false))
   }
 }

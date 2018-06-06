@@ -29,6 +29,7 @@ import quasar.DataCodec, DataCodec.PreciseKeys.{
 import quasar.{Data => QData, Type => QType}
 import quasar.effect.NameGenerator
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.physical.couchbase._, N1QL.{Eq, Split, _}, Case._, Select.{Value, _}
 import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript, qscript.{MapFuncCore, MapFuncsCore => MF}

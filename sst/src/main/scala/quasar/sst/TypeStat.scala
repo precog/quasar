@@ -20,6 +20,7 @@ import slamdata.Predef.{Byte => SByte, Char => SChar, _}
 import quasar.{ejson => ejs}, ejs.{CommonEJson => C, Decoded, DecodeEJson, EJson, ExtEJson => E, EncodeEJson}
 import quasar.ejson.implicits._
 import quasar.fp.numeric.SampleStats
+import quasar.contrib.iota.copkTraverse
 import quasar.tpe.TypeF
 
 import matryoshka._

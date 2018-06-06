@@ -33,6 +33,7 @@ import quasar.contrib.scalaz.MonadState_
 import quasar.effect.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.frontend.{logicalplan => lp}
 import quasar.std.{IdentityLib, SetLib, StructuralLib}
 import quasar.qscript.{

@@ -18,7 +18,7 @@ package quasar.contrib
 
 import slamdata.Predef.Int
 import _root_.matryoshka.Delay
-import _root_.scalaz.{Show, Functor, Equal, Traverse}
+import _root_.scalaz.{Show, Functor, Equal, Traverse, Order}
 import _root_.iotaz.{CopK, TListK}
 
 package object iota {
@@ -26,6 +26,7 @@ package object iota {
   implicit def copkTraverse[LL <: TListK](implicit M: TraverseMaterializer[LL]): Traverse[CopK[LL, ?]] = M.materialize(offset = 0)
   implicit def copkEqual[LL <: TListK](implicit M: EqualKMaterializer[LL]): Delay[Equal, CopK[LL, ?]] = M.materialize(offset = 0)
   implicit def copkShow[LL <: TListK](implicit M: ShowKMaterializer[LL]): Delay[Show, CopK[LL, ?]] = M.materialize(offset = 0)
+  implicit def copkOrder[LL <: TListK](implicit M: OrderKMaterializer[LL]): Delay[Order, CopK[LL, ?]] = M.materialize(offset = 0)
 
   def mkInject[F[_], LL <: TListK](i: Int): CopK.Inject[F, CopK[LL, ?]] = {
     CopK.Inject.injectFromInjectL[F, LL](
@@ -34,5 +35,8 @@ package object iota {
       )
     )
   }
+
+  type ACopK[a] = CopK[_, a]
+  type :<<:[F[_], G[a] <: ACopK[a]] = CopK.Inject[F, G]
 
 }

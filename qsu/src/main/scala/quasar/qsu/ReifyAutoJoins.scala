@@ -21,7 +21,6 @@ import slamdata.Predef._
 import quasar.fs.Planner, Planner.PlannerErrorME
 import quasar.effect.NameGenerator
 import quasar.ejson.implicits._
-import quasar.fp.coproductEqual
 import quasar.qscript.{
   construction,
   Center,

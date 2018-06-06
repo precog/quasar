@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka.arbitrary._
 import quasar.contrib.specs2.Spec
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
+import quasar.contrib.iota._
 
 import scala.Predef.implicitly
 import scala.Predef.$conforms

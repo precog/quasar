@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka.envT
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.tpe.{SimpleType, TypeF}
 import StructuralType.{TagST, TypeST}
 

@@ -1,5 +1,5 @@
-[![Travis](https://travis-ci.org/quasar-analytics/quasar.svg?branch=master)](https://travis-ci.org/quasar-analytics/quasar)
-[![AppVeyor](https://ci.appveyor.com/api/projects/status/pr5he90wye6ii8ml/branch/master?svg=true)](https://ci.appveyor.com/project/djspiewak/quasar/branch/master)
+[![Travis](https://travis-ci.org/slamdata/quasar.svg?branch=master)](https://travis-ci.org/slamdata/quasar)
+[![AppVeyor](https://ci.appveyor.com/api/projects/status/pr5he90wye6ii8ml/branch/master?svg=true)](https://ci.appveyor.com/project/jdegoes/quasar/branch/master)
 [![Discord](https://img.shields.io/discord/373302030460125185.svg?logo=discord)](https://discord.gg/QNjwCg6)
 
 # Quasar
@@ -11,8 +11,6 @@ Quasar is an open source NoSQL analytics engine that can be used as a library or
 SQL² is the dialect of SQL that Quasar understands.
 
 In the following documentation SQL² will be used interchangeably with SQL.
-
-See the [SQL² tutorial](http://quasar-analytics.org/docs/sqltutorial/) for more info on SQL².
 
 SQL² supports variables inside queries (`SELECT * WHERE pop < :cutoff`). Values for these variables, which can be any expression, should be specified as additional parameters in the url, using the variable name prefixed by `var.` (e.g. `var.cutoff=1000`). Failure to specify valid values for all variables used inside a query will result in an error. These values use the same syntax as the query itself; notably, strings should be surrounded by double quotes. Some acceptable values are `123`, `"CO"`, and `DATE("2015-07-06")`.
 
@@ -303,7 +301,6 @@ Prerequisites
 Known Limitations
 - Slow queries — query optimization hasn't been applied
 - Join unimplemented — future support planned
-- [Open issues](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+label%3ACouchbase)
 
 #### MarkLogic
 
@@ -321,7 +318,6 @@ Prerequisites
 - Namespaces used in queries must be defined on the server.
 - Loading schema definitions into the server, while not required, will improve sorting and other operations on types other than `xs:string`. Otherwise, non-string fields may require casting in queries using [SQL² conversion functions](http://docs.slamdata.com/en/v4.0/sql-squared-reference.html#section-11-data-type-conversion).
 
-[Known Limitations](https://github.com/quasar-analytics/quasar/issues?q=is%3Aissue+is%3Aopen+marklogic+label%3A%22topic%3A+MarkLogic%22)
 - It is not possible to query both JSON and XML documents from a single mount, a separate mount with the appropriate `format` value must be created for each type of document.
 - Index usage is currently poor, so performance may degrade on large directories and/or complex queries and joins. This should improve as optimizations are applied both to the MarkLogic connector and the `QScript` compiler.
 
@@ -370,8 +366,6 @@ To create a new module one would send a json blob similar to this one to the mou
 ```json
 { "module": "CREATE FUNCTION ARRAY_LENGTH(:foo) BEGIN COUNT(:foo[_]) END; CREATE FUNCTION USER_DATA(:user_id) BEGIN SELECT * FROM `/root/path/data/` WHERE user_id = :user_id END" }
 ```
-
-See [SQL² reference](http://quasar-analytics.org/docs/sqlreference/) for more info on SQL².
 
 Similar to views, modules can be mounted at any directory path. If a module's path is nested inside the path of a database mount, it will appear alongside the other directory and files in the database. A module will "shadow" any actual directory that would otherwise be mapped to the same path. Any attempt to write data to a module will result in an error.
 
@@ -1181,7 +1175,7 @@ When data is uploaded in CSV format, the headers are interpreted as field names 
 
 ## Troubleshooting
 
-First, make sure that the `quasar-analytics/quasar` Github repo is building correctly (the status is displayed at the top of the README).
+First, make sure that the `slamdata/quasar` Github repo is building correctly (the status is displayed at the top of the README).
 
 Then, you can try the following command:
 
@@ -1191,9 +1185,7 @@ Then, you can try the following command:
 
 This will ensure that your local version is also passing the tests.
 
-Check to see if the problem you are having is mentioned in the [JIRA issues](https://slamdata.atlassian.net/) and, if it isn't, feel free to create a new issue.
-
-You can also discuss issues on Gitter: [quasar-analytics/quasar](https://gitter.im/quasar-analytics/quasar).
+You can also discuss issues [on Discord](https://discord.gg/QNjwCg6).
 
 ## Thanks to Sponsors
 

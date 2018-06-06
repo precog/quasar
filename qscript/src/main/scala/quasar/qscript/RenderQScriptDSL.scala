@@ -22,7 +22,7 @@ import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import quasar.{Data, DSLTree, RenderDSL, Type, ejson}
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.ejson.EJson
+import quasar.ejson.{EJson, ExtEJson, CommonEJson}
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
@@ -117,20 +117,23 @@ object RenderQScriptDSL {
     def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[EJson[A]] = {
       (base: String, a: EJson[A]) =>
         val base = "json"
-        val (label, children) = a.run.fold({
-          case ejson.Meta(value, meta) => ("meta", fa(base, value).right :: fa(base, meta).right :: Nil)
-          case ejson.Map(value)        => ("map",
-            DSLTree("", "List", (value.map(t => DSLTree("", "", t.umap(fa(base, _).right).toIndexedSeq.toList.some).right).some)).right :: Nil)
-          case ejson.Byte(value)       => ("byte", value.toString.left :: Nil)
-          case ejson.Char(value)       => ("char", ("'" + value.toString + "'").left :: Nil)
-          case ejson.Int(value)        => ("int", value.toString.left :: Nil)
-        }, {
-          case ejson.Arr(value)  => ("arr", DSLTree("", "List", value.map(fa(base, _).right).some).right :: Nil)
-          case ejson.Null()      => ("nul", Nil)
-          case ejson.Bool(value) => ("bool", value.toString.left :: Nil)
-          case ejson.Str(value)  => ("str", ("\"" + value + "\"").left :: Nil)
-          case ejson.Dec(value)  => ("dec", value.toString.left :: Nil)
-        })
+        val (label, children) = a match {
+          case ExtEJson(ext) => ext match {
+            case ejson.Meta(value, meta) => ("meta", fa(base, value).right :: fa(base, meta).right :: Nil)
+            case ejson.Map(value)        => ("map",
+              DSLTree("", "List", (value.map(t => DSLTree("", "", t.umap(fa(base, _).right).toIndexedSeq.toList.some).right).some)).right :: Nil)
+            case ejson.Byte(value)       => ("byte", value.toString.left :: Nil)
+            case ejson.Char(value)       => ("char", ("'" + value.toString + "'").left :: Nil)
+            case ejson.Int(value)        => ("int", value.toString.left :: Nil)
+          }
+          case CommonEJson(com) => com match {
+            case ejson.Arr(value)  => ("arr", DSLTree("", "List", value.map(fa(base, _).right).some).right :: Nil)
+            case ejson.Null()      => ("nul", Nil)
+            case ejson.Bool(value) => ("bool", value.toString.left :: Nil)
+            case ejson.Str(value)  => ("str", ("\"" + value + "\"").left :: Nil)
+            case ejson.Dec(value)  => ("dec", value.toString.left :: Nil)
+          }
+        }
         DSLTree(base, label, children.some)
     }
   }

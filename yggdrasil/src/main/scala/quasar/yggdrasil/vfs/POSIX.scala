@@ -17,10 +17,11 @@
 package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, AFile, APath, RPath}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import fs2.{Sink, Stream}
 
-import scalaz.{:<:, Free}
+import scalaz.Free
 
 import scodec.bits.ByteVector
 
@@ -29,33 +30,33 @@ import java.util.UUID
 object POSIX {
   import POSIXOp._
 
-  def genUUID[S[_]](implicit S: POSIXOp :<: S): Free[S, UUID] =
+  def genUUID[S[a] <: ACopK[a]](implicit S: POSIXOp :<<: S): Free[S, UUID] =
     Free.liftF(S.inj(GenUUID))
 
-  def openW[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Sink[POSIXWithTask, ByteVector]] =
+  def openW[S[a] <: ACopK[a]](target: AFile)(implicit S: POSIXOp :<<: S): Free[S, Sink[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenW(target)))
 
-  def openR[S[_]](target: AFile)(implicit S: POSIXOp :<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
+  def openR[S[a] <: ACopK[a]](target: AFile)(implicit S: POSIXOp :<<: S): Free[S, Stream[POSIXWithTask, ByteVector]] =
     Free.liftF(S.inj(OpenR(target)))
 
-  def ls[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, List[RPath]] =
+  def ls[S[a] <: ACopK[a]](target: ADir)(implicit S: POSIXOp :<<: S): Free[S, List[RPath]] =
     Free.liftF(S.inj(Ls(target)))
 
-  def mkDir[S[_]](target: ADir)(implicit S: POSIXOp :<: S): Free[S, Unit] =
+  def mkDir[S[a] <: ACopK[a]](target: ADir)(implicit S: POSIXOp :<<: S): Free[S, Unit] =
     Free.liftF(S.inj(MkDir(target)))
 
-  def linkDir[S[_]](src: ADir, target: ADir)(implicit S: POSIXOp :<: S): Free[S, Boolean] =
+  def linkDir[S[a] <: ACopK[a]](src: ADir, target: ADir)(implicit S: POSIXOp :<<: S): Free[S, Boolean] =
     Free.liftF(S.inj(LinkDir(src, target)))
 
-  def linkFile[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Boolean] =
+  def linkFile[S[a] <: ACopK[a]](src: AFile, target: AFile)(implicit S: POSIXOp :<<: S): Free[S, Boolean] =
     Free.liftF(S.inj(LinkFile(src, target)))
 
-  def move[S[_]](src: AFile, target: AFile)(implicit S: POSIXOp :<: S): Free[S, Unit] =
+  def move[S[a] <: ACopK[a]](src: AFile, target: AFile)(implicit S: POSIXOp :<<: S): Free[S, Unit] =
     Free.liftF(S.inj(Move(src, target)))
 
-  def exists[S[_]](target: APath)(implicit S: POSIXOp :<: S): Free[S, Boolean] =
+  def exists[S[a] <: ACopK[a]](target: APath)(implicit S: POSIXOp :<<: S): Free[S, Boolean] =
     Free.liftF(S.inj(Exists(target)))
 
-  def delete[S[_]](target: APath)(implicit S: POSIXOp :<: S): Free[S, Unit] =
+  def delete[S[a] <: ACopK[a]](target: APath)(implicit S: POSIXOp :<<: S): Free[S, Unit] =
     Free.liftF(S.inj(Delete(target)))
 }

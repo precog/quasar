@@ -25,6 +25,7 @@ import quasar.contrib.pathy._
 import quasar.ejson.{EJson, EncodeEJson}
 import quasar.ejson.implicits._
 import quasar.fp.numeric.{Natural, Positive}
+import quasar.contrib.iota.copkTraverse
 import quasar.fs._
 import quasar.fs.mount.Mounting
 import quasar.fs.mount.module.resolveImports_

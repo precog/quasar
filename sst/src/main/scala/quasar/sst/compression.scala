@@ -20,6 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, CommonEJson => C, Str}
 import quasar.fp.numeric._
+import quasar.contrib.iota.copkTraverse
 import quasar.tpe._
 
 import scala.Byte

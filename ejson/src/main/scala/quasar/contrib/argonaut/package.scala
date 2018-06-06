@@ -18,16 +18,18 @@ package quasar.contrib
 
 import quasar.ejson
 import quasar.RenderTree
+import quasar.contrib.iota.copkTraverse
 
 import scala.collection.immutable.ListMap
 
 import _root_.argonaut._, Argonaut._
 import _root_.matryoshka._
 import _root_.scalaz._
+import iotaz.CopK
 
 package object argonaut {
-  private val CJ = Inject[ejson.Common, ejson.Json]
-  private val OJ = Inject[ejson.Obj,    ejson.Json]
+  private val CJ = CopK.Inject[ejson.Common, ejson.Json]
+  private val OJ = CopK.Inject[ejson.Obj,    ejson.Json]
 
   implicit def jsonRecursive: Recursive.Aux[Json, ejson.Json] =
     new Recursive[Json] {

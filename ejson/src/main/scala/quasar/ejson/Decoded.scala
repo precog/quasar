@@ -19,6 +19,7 @@ package quasar.ejson
 import slamdata.Predef.{Option, String}
 import quasar.{RenderTree, RenderedTree}
 import quasar.fp.ski.κ
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka.Recursive
 import scalaz.{\/, -\/, \/-, Applicative, Cord, Equal, Monad, Plus, Show, Traverse}

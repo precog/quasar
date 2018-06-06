@@ -18,7 +18,8 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Map => _, _}
 
-import quasar.fp.{EndoK, :<<:, ACopK}
+import quasar.fp.EndoK
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.contrib.iota.mkInject
 import quasar.qscript._
 import scalaz._

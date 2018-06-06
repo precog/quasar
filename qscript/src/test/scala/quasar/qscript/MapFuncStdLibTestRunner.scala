@@ -19,6 +19,7 @@ package quasar.qscript
 import slamdata.Predef._
 import quasar.{Data, NullaryFunc, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}

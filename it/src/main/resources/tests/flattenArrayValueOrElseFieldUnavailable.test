@@ -1,0 +1,11 @@
+{
+    "name": "flatten array value or else field unavailable",
+    "backends": {
+        "couchbase": "pending"
+    },
+    "data": "flattenable.data",
+    "query": "select t0.b[*] ?? t0.b from flattenable",
+    "predicate": "exactly",
+    "ignoreResultOrder": false,
+    "expected": []
+}

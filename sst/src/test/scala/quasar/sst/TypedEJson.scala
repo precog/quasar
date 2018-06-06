@@ -19,32 +19,38 @@ package quasar.sst
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson.{
   DecodeEJson,
+  EJsonL,
   EJson,
   EncodeEJson,
   Common,
   Extension,
   CommonEJson,
   ExtEJson,
+  EJsonArbitrary,
   Meta,
   Type => EType,
   SizedType => ESizedType,
-  EJsonArbitrary,
   Null => ENull
 }
 import quasar.ejson.implicits._
-import quasar.fp._
+import quasar.fp._, Helpers._
+import quasar.contrib.iota.copkShow
 import quasar.pkg.tests._
 
 import matryoshka._
 import matryoshka.implicits._
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz._, Scalaz._
+import iotaz.CopK
+import iotaz.TListK.:::
 
 /** EJson that contains `_ejson.type` metadata. */
 final case class TypedEJson[T[_[_]]](ejson: T[EJson])
 
 object TypedEJson extends TypedEJsonInstances {
-  type TEJson[A] = Coproduct[TypeMetadata, EJson, A]
+  import quasar.contrib.iota.copkTraverse
+
+  type TEJson[A] = CopK[TypeMetadata ::: EJsonL, A]
 
   def absorbMetadata[J](implicit J: Birecursive.Aux[J, EJson]): Transform[J, TEJson, EJson] = {
     case TM(TypeMetadata.Type(tag, j))            => ExtEJson(Meta(j, EType(tag)))
@@ -57,13 +63,14 @@ object TypedEJson extends TypedEJsonInstances {
 
   ////
 
-  private val TM = Inject[TypeMetadata, TEJson]
-  private val CJ = Inject[Common, TEJson]
-  private val EJ = Inject[Extension, TEJson]
+  private val TM = CopK.Inject[TypeMetadata, TEJson]
+  private val CJ = CopK.Inject[Common, TEJson]
+  private val EJ = CopK.Inject[Extension, TEJson]
 }
 
 sealed abstract class TypedEJsonInstances extends TypedEJsonInstances0 {
   import EJsonArbitrary._
+  import quasar.contrib.iota.copkTraverse
 
   implicit def arbitrary[T[_[_]]: BirecursiveT]: Arbitrary[TypedEJson[T]] =
     corecursiveArbitrary[T[TypedEJson.TEJson], TypedEJson.TEJson] map { v =>

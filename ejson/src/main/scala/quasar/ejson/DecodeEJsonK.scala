@@ -18,7 +18,7 @@ package quasar.ejson
 
 import slamdata.Predef._
 import quasar.contrib.matryoshka.{envT => cenvT}
-
+import quasar.contrib.iota.copkTraverse
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT

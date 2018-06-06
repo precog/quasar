@@ -22,8 +22,7 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.fs.Planner.PlannerError
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkTraverse}
-import quasar.fp.coproductShow
+import quasar.contrib.iota.{copkEqual, copkTraverse, copkShow}
 import quasar.qscript.{construction, ExcludeId, Hole, MapFuncsCore, ReduceFuncs, SrcHole}
 
 import matryoshka.{delayEqual, delayShow, showTShow, Embed}

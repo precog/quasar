@@ -19,6 +19,7 @@ package quasar.datagen
 import slamdata.Predef.{Stream => _, _}
 import quasar.{Data, DataCodec}
 import quasar.ejson.{optics => eoptics, EJson}
+import quasar.contrib.iota.copkTraverse
 
 import argonaut.{Json, Parse}
 import fs2.{Pipe, Stream}

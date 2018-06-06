@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka.arbitrary._
 import quasar.ejson.{EJson, EJsonArbitrary}
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
+import quasar.contrib.iota._
 
 import scala.Predef.$conforms
 

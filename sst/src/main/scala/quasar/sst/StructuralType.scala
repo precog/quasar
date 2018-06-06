@@ -32,7 +32,8 @@ import quasar.ejson.{
   TypeTag
 }
 import quasar.ejson.implicits._
-import quasar.fp.{coproductEqual, coproductShow}
+import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.ski.κ
 import quasar.tpe._
 
@@ -42,6 +43,8 @@ import matryoshka.implicits._
 import matryoshka.patterns.EnvT
 import monocle.Lens
 import scalaz._, Scalaz._
+import iotaz.{CopK, TNilK}
+import iotaz.TListK.:::
 
 /** A measure annotated Type focused on structure over semantics.
   *
@@ -63,15 +66,15 @@ final case class StructuralType[L, V](toCofree: Cofree[StructuralType.ST[L, ?], 
 }
 
 object StructuralType extends StructuralTypeInstances {
-  type ST[L, A]     = Coproduct[TypeF[L, ?], Tagged, A]
+  type ST[L, A]     = CopK[TypeF[L, ?] ::: Tagged ::: TNilK, A]
   type STF[L, V, A] = EnvT[V, ST[L, ?], A]
 
   object TypeST {
     def apply[L, A](tf: TypeF[L, A]): ST[L, A] =
-      Inject[TypeF[L, ?], ST[L, ?]].inj(tf)
+      CopK.Inject[TypeF[L, ?], ST[L, ?]].inj(tf)
 
     def unapply[L, A](st: ST[L, A]): Option[TypeF[L, A]] =
-      Inject[TypeF[L, ?], ST[L, ?]].prj(st)
+      CopK.Inject[TypeF[L, ?], ST[L, ?]].prj(st)
   }
 
   object TagST {
@@ -79,11 +82,11 @@ object StructuralType extends StructuralTypeInstances {
 
     final class PartiallyApplied[L] {
       def apply[A](tg: Tagged[A]): ST[L, A] =
-        Inject[Tagged, ST[L, ?]].inj(tg)
+        CopK.Inject[Tagged, ST[L, ?]].inj(tg)
     }
 
     def unapply[L, A](st: ST[L, A]): Option[Tagged[A]] =
-      Inject[Tagged, ST[L, ?]].prj(st)
+      CopK.Inject[Tagged, ST[L, ?]].prj(st)
   }
 
   object ConstST {
@@ -152,9 +155,9 @@ object StructuralType extends StructuralTypeInstances {
     ConstST.unapply(st.project).isDefined
 
   /** Unfold a pair of structural types into their deep structural merge. */
-  def mergeƒ[L, V: Semigroup, F[_]: Functor, T](
+  def mergeƒ[L, V: Semigroup, F[a] <: ACopK[a]: Functor, T](
     implicit
-    I: TypeF[L, ?] :<: F,
+    I: TypeF[L, ?] :<<: F,
     F: StructuralMerge[F],
     TC: Corecursive.Aux[T, EnvT[V, F, ?]],
     TR: Recursive.Aux[T, EnvT[V, F, ?]]
@@ -174,9 +177,9 @@ object StructuralType extends StructuralTypeInstances {
     }
 
   /** A transform ensuring unions are disjoint by merging their members. */
-  def disjoinUnionsƒ[L, V: Semigroup, F[_]: Functor, T](
+  def disjoinUnionsƒ[L, V: Semigroup, F[a] <: ACopK[a]: Functor, T](
     implicit
-    I: TypeF[L, ?] :<: F,
+    I: TypeF[L, ?] :<<: F,
     F: StructuralMerge[F],
     TC: Corecursive.Aux[T, EnvT[V, F, ?]],
     TR: Recursive.Aux[T, EnvT[V, F, ?]]

@@ -1,1 +1,0 @@
-- Normalize qscript after each transformation.

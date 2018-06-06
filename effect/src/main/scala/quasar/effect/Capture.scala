@@ -17,7 +17,7 @@
 package quasar.effect
 
 import slamdata.Predef._
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import scalaz._, concurrent.Task
 import scalaz.syntax.monad._

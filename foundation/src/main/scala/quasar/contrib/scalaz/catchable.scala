@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import java.lang.{Throwable, RuntimeException}
 
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.free.{injectNT, projectNT}
 
 import scalaz._, Scalaz._, Leibniz.===

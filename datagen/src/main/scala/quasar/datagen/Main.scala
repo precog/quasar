@@ -21,6 +21,7 @@ import quasar.RenderedTree
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.sst._
+import quasar.contrib.iota.copkTraverse
 
 import java.io.File
 import scala.Console, Console.{RED, RESET}

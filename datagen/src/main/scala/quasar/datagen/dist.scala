@@ -21,6 +21,7 @@ import quasar.contrib.spire.random.dist._
 import quasar.ejson.{DecodeEJson, EJson, Type => EType}
 import quasar.fp.numeric.SampleStats
 import quasar.fp.ski.ι
+import quasar.contrib.iota.copkTraverse
 import quasar.sst.{strings, Population, PopulationSST, SST, StructuralType, Tagged, TypeStat}
 import quasar.tpe.TypeF
 
@@ -39,6 +40,7 @@ import spire.random.{Dist, Gaussian}
 import spire.syntax.convertableFrom._
 import spire.syntax.field._
 import spire.syntax.isReal._
+import iotaz.CopK
 
 object dist {
   import StructuralType.{ST, STF}
@@ -97,8 +99,14 @@ object dist {
       implicit
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
-      : Algebra[STF[J, (A, TypeStat[A]), ?], Option[(A, Dist[J])]] =
-    _.run.traverse(_.run.swap) map {
+      : Algebra[STF[J, (A, TypeStat[A]), ?], Option[(A, Dist[J])]] = {
+    val TF = CopK.Inject[TypeF[J, ?], ST[J, ?]]
+    val TA = CopK.Inject[Tagged, ST[J, ?]]
+
+    _.run.traverse {
+      case TF(a) => \/-(a)
+      case TA(a) => -\/(a)
+    } map {
       case (_, TypeF.Bottom()) =>
         none
 
@@ -167,7 +175,7 @@ object dist {
       case Tagged(t, dist) =>
         dist.map(_.map(_.map(EJson.meta(_, EType(t)))))
     }
-
+  }
   ////
 
   private def clamp[A: Order](min: A, max: A): A => A =

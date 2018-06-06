@@ -19,8 +19,9 @@ package quasar.physical.mongodb
 import slamdata.Predef._
 import quasar._
 import quasar.Data.DateTimeConstants
-import quasar.ejson.{EJson, TypeTag}
+import quasar.ejson.{EJson, TypeTag, ExtEJson, CommonEJson}
 import quasar.fp._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs.Planner, Planner._
 
@@ -206,13 +207,15 @@ object BsonCodec {
     }
   }
 
-  def fromEJson(v: BsonVersion): AlgebraM[PlannerError \/ ?, EJson, Bson] =
-    _.run.fold(fromExtension, fromCommon(v)(_).right)
+  def fromEJson(v: BsonVersion): AlgebraM[PlannerError \/ ?, EJson, Bson] = {
+    case ExtEJson(ext) => fromExtension(ext)
+    case CommonEJson(com) => fromCommon(v)(com).right
+  }
 
   /** Converts the parts of `Bson` that it can, then stores the rest in,
     * effectively, `Free.Pure`.
     */
-  def toEJson[F[_]](implicit C: ejson.Common :<: F, E: ejson.Extension :<: F):
+  def toEJson[F[a] <: ACopK[a]](implicit C: ejson.Common :<<: F, E: ejson.Extension :<<: F):
       ElgotCoalgebra[Bson \/ ?, F, Bson] = {
     case Bson.Arr(value)       => C.inj(ejson.Arr(value)).right
     case Bson.Doc(value)       =>

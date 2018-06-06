@@ -18,7 +18,7 @@ package quasar.fp
 
 import slamdata.Predef._
 import scalaz._
-
+import quasar.contrib.iota.{:<<:, ACopK}
 /** This is like [[scalaz.Inject]], but for injecting an arbitrary coproduct
   * where all of the components are in the `OUT` coproduct in any order.
   *

@@ -25,13 +25,15 @@ import org.specs2.mutable._
 
 import pathy.Path
 
-import scalaz.{~>, Coproduct, NaturalTransformation}
+import scalaz.{~>, NaturalTransformation}
 import scalaz.concurrent.Task
 
 import scodec.bits.ByteVector
 
 import java.nio.file.Files
 import java.io.{File, FileInputStream, FileOutputStream}
+
+import iotaz.CopK
 
 object RealPOSIXSpecs extends Specification {
   import POSIXOp._
@@ -302,7 +304,7 @@ object RealPOSIXSpecs extends Specification {
 
     val nt = λ[UF1[POSIXWithTask, Task]] { pwt =>
       val fullInt =
-        λ[Coproduct[POSIXOp, Task, ?] ~> Task](_.fold(interp, NaturalTransformation.refl[Task]))
+        CopK.NaturalTransformation.of[POSIXWithTaskCopK, Task](interp, NaturalTransformation.refl[Task])
 
       pwt.foldMap(fullInt)
     }

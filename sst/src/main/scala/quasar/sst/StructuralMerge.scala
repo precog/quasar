@@ -19,12 +19,16 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.contrib.matryoshka._
 import quasar.tpe._
+import quasar.contrib.iota.{:<<:, ACopK}
+import quasar.contrib.iota.mkInject
 
 import matryoshka._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import simulacrum._
+import iotaz.{TListK, CopK, TNilK}
+import iotaz.TListK.:::
 
 /** Typeclass defining how to structurally merge a type, where possible. */
 @typeclass
@@ -44,31 +48,64 @@ object StructuralMerge {
       mergePF[V, T].lift(pp)
   }
 
-  implicit def coproductStructuralMerge[F[_]: Functor, G[_]: Functor](
-    implicit
-    F: StructuralMerge[F],
-    G: StructuralMerge[G]
-  ): StructuralMerge[Coproduct[F, G, ?]] =
-    new StructuralMerge[Coproduct[F, G, ?]] {
-      type CP[A] = Coproduct[F, G, A]
+  implicit def copk[LL <: TListK](implicit M: Materializer[LL], F: Functor[CopK[LL, ?]]): StructuralMerge[CopK[LL, ?]] =
+    M.materialize(offset = 0)
 
-      def merge[V, T](pp: (P[V, T], P[V, T]))(implicit V: Semigroup[V], T: Corecursive.Aux[T, P[V, ?]]) = {
-        implicit val FC: Corecursive.Aux[T, EnvT[V, F, ?]] = derivedEnvTCorec[T, V, CP, F]
-        implicit val GC: Corecursive.Aux[T, EnvT[V, G, ?]] = derivedEnvTCorec[T, V, CP, G]
+  sealed trait Materializer[LL <: TListK] {
+    def materialize(offset: Int)(implicit F: Functor[CopK[LL, ?]]): StructuralMerge[CopK[LL, ?]]
+  }
 
-        pp match {
-          case (EnvT((x, Coproduct(-\/(l)))), EnvT((y, Coproduct(-\/(r))))) =>
-            F.merge[V, T]((envT(x, l), envT(y, r)))
-              .map(EnvT.hmap(Inject[F, CP])(_))
+  object Materializer {
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def base[F[_]](
+      implicit
+      F: StructuralMerge[F]
+    ): Materializer[F ::: TNilK] = new Materializer[F ::: TNilK] {
+      override def materialize(offset: Int)(implicit G: Functor[CopK[F ::: TNilK, ?]]): StructuralMerge[CopK[F ::: TNilK, ?]] = {
+        implicit val I = mkInject[F, F ::: TNilK](offset)
+        new StructuralMerge[CopK[F ::: TNilK, ?]] {
+          def merge[V, T](pp: (P[V, T], P[V, T]))(implicit V: Semigroup[V], T: Corecursive.Aux[T, P[V, ?]]) = {
+            implicit val FC: Corecursive.Aux[T, EnvT[V, F, ?]] = derivedEnvTCorec[T, V, CopK[F ::: TNilK, ?], F]
 
-          case (EnvT((x, Coproduct(\/-(l)))), EnvT((y, Coproduct(\/-(r))))) =>
-            G.merge[V, T]((envT(x, l), envT(y, r)))
-              .map(EnvT.hmap(Inject[G, CP])(_))
-
-          case _ => none
+            pp match {
+              case (EnvT((x, I(l))), EnvT((y, I(r)))) =>
+                F.merge[V, T]((envT(x, l), envT(y, r)))
+                  .map(EnvT.hmap(I.inj)(_))
+              case _ => none
+            }
+          }
         }
       }
     }
+
+    @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+    implicit def induct[F[_], LL <: TListK](
+      implicit
+      F: StructuralMerge[F],
+      LL: Materializer[LL]
+    ): Materializer[F ::: LL] = new Materializer[F ::: LL] {
+      override def materialize(offset: Int)(implicit G: Functor[CopK[F ::: LL, ?]]): StructuralMerge[CopK[F ::: LL, ?]] = {
+        implicit val I = mkInject[F, F ::: LL](offset)
+        new StructuralMerge[CopK[F ::: LL, ?]] {
+          def merge[V, T](pp: (P[V, T], P[V, T]))(implicit V: Semigroup[V], T: Corecursive.Aux[T, P[V, ?]]) = {
+            implicit val FC: Corecursive.Aux[T, EnvT[V, F, ?]] = derivedEnvTCorec[T, V, CopK[F ::: LL, ?], F]
+            implicit val LC: Corecursive.Aux[T, EnvT[V, CopK[LL, ?], ?]] = T.asInstanceOf[Corecursive.Aux[T, EnvT[V, CopK[LL, ?], ?]]]
+
+            pp match {
+              case (EnvT((x, I(l))), EnvT((y, I(r)))) =>
+                F.merge[V, T]((envT(x, l), envT(y, r)))
+                  .map(EnvT.hmap(I.inj)(_))
+              case other =>
+                type PVT = EnvT[V, CopK[LL, ?], T]
+                LL.materialize(offset + 1)(G.asInstanceOf[Functor[CopK[LL, ?]]])
+                  .merge(other.asInstanceOf[(PVT, PVT)])
+                  .asInstanceOf[Option[P[V, T \/ (T, T)]]]
+            }
+          }
+        }
+      }
+    }
+  }
 
   implicit val taggedStructuralMerge: StructuralMerge[Tagged] =
     new StructuralMerge.PF[Tagged] {
@@ -146,15 +183,15 @@ object StructuralMerge {
 
   ////
 
-  private def derivedEnvTCorec[T, A, G[_]: Functor, F[_]](
+  private def derivedEnvTCorec[T, A, G[a] <: ACopK[a]: Functor, F[_]](
     implicit
-    F: F :<: G,
+    F: F :<<: G,
     GC: Corecursive.Aux[T, EnvT[A, G, ?]]
   ): Corecursive.Aux[T, EnvT[A, F, ?]] =
     new Corecursive[T] {
       type Base[B] = EnvT[A, F, B]
 
       def embed(ft: Base[T])(implicit BF: Functor[Base]) =
-        GC.embed(EnvT.hmap(F)(ft))
+        GC.embed(EnvT.hmap(F.inj)(ft))
     }
 }

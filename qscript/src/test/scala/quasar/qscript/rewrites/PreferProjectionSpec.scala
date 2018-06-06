@@ -22,6 +22,7 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
 import quasar.contrib.pathy._
 import quasar.fp._
+import quasar.fp.Helpers._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
 import quasar.ejson.{EJson, EJsonArbitrary}

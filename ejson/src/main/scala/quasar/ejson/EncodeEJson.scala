@@ -18,6 +18,7 @@ package quasar.ejson
 
 import slamdata.Predef.{Int => SInt, Char => SChar, Byte => SByte, _}
 import quasar.contrib.argonaut._
+import quasar.contrib.iota.copkTraverse
 
 import argonaut.EncodeJson
 import matryoshka._

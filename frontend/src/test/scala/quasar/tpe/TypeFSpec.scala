@@ -24,6 +24,7 @@ import quasar.contrib.specs2.Spec
 import quasar.ejson.{Decoded, DecodeEJson, EncodeEJson, EJson, EJsonArbitrary, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._, Helpers._
+import quasar.contrib.iota._
 
 import scala.Predef.$conforms
 

@@ -19,6 +19,7 @@ package quasar.ejson
 import slamdata.Predef.{Char => SChar, _}
 import quasar.contrib.matryoshka._
 import quasar.fp.ski.κ
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka._
 import matryoshka.implicits._
@@ -139,7 +140,7 @@ object JsonCodec {
 
   ////
 
-  private def CJ[A] = Prism[Json[A], Common[A]](CommonJson.prj)(CommonJson.inj)
+  private def CJ[A] = Prism[Json[A], Common[A]](CommonJson.prj.apply)(CommonJson.inj.apply)
 
   private def extractC[A, B](p: Prism[Common[A], B], j: Json[A]): Option[B] =
     CJ[A].composePrism(p).getOption(j)

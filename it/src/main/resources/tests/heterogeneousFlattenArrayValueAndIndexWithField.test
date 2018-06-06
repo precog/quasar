@@ -1,0 +1,38 @@
+{
+    "name": "field and flattened array value and index on heterogenous",
+    "backends": {
+        "couchbase":         "pending",
+        "lwc_local":         "pendingIgnoreFieldOrder",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending",
+        "mimir":             "pendingIgnoreFieldOrder",
+        "mongodb_3_2":       "pending",
+        "mongodb_3_4":       "pending",
+        "mongodb_3_4_13":    "pending",
+        "mongodb_3_6":       "pending",
+        "mongodb_read_only": "pending"
+
+    },
+    "data": "heterogeneous.data",
+    "query": "select a, b[*], b[*:] as i from heterogeneous",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      { "a": 1 },
+      { "a": 2, "b": "u", "i": 0 },
+      { "a": 2, "b": "v", "i": 1 },
+      { "a": 3 },
+      { "a": 4 },
+      { "a": 5 },
+      { "a": 6, "b": "w", "i": 0 },
+      { "a": 7 },
+      { "a": 8 },
+      { "a": 9 },
+      { "a": 10, "b": [ 4, 5, 6 ], "i": 0 },
+      { "a": 10, "b": { "m": 1 }, "i": 1 },
+      { "a": 10, "b": null, "i": 2 },
+      { "a": 10, "b": "foo", "i": 3 },
+      { "a": 10, "b": {  }, "i": 4 },
+      { "a": 10, "b": [], "i": 5 }
+    ]
+}

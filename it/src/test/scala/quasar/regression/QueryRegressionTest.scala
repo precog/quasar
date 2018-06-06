@@ -29,6 +29,7 @@ import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.contrib.pathy._
 import quasar.fp._, free._
+import quasar.contrib.iota._
 import quasar.fp.ski._
 import quasar.fs._
 import quasar.main.{physicalFileSystems, CompExec, FilesystemQueries}
@@ -187,7 +188,7 @@ abstract class QueryRegressionTest[S[_]](
     λ[EndoK[ejson.Common]](CO.dec.modify(_.round(TestContext))(_))
 
   val normalizeJson: Json => Json =
-    j => Recursive[Json, ejson.Json].transCata(j)(liftFF(reducePrecision[Json]))
+    j => Recursive[Json, ejson.Json].transCata(j)(liftFFCopK(reducePrecision[Json]))
 
   /** Verify the given results according to the provided expectation. */
   def verifyResults(

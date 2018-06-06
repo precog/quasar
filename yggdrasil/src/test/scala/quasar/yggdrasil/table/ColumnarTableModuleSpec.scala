@@ -327,13 +327,23 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       }
     }
 
-    "in leftShift" >> {
-      "shift a simple array" in testTrivialArrayLeftShift
-      "shift a simple object" in testTrivialObjectLeftShift
-      "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift
-      "shift a set of arrays" in testSetArrayLeftShift
-      "shift a heterogeneous array" in testHeteroArrayLeftShift
-      "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject
+    def emitToString(emit: Boolean) = if (emit) "emit" else "omit"
+
+    List(true, false).foreach { emit =>
+      s"in leftShift (${emitToString(emit)} on undefined)" >> {
+        "shift empty" in testEmptyLeftShift(emit)
+        "shift a string" in testTrivialStringLeftShift(emit)
+        "shift undefined" in testTrivialUndefinedLeftShift(emit)
+        "shift a simple array" in testTrivialArrayLeftShift(emit)
+        "shift a simple empty array" in testTrivialEmptyArrayLeftShift(emit)
+        "shift a simple object" in testTrivialObjectLeftShift(emit)
+        "shift a simple empty object" in testTrivialEmptyObjectLeftShift(emit)
+        "shift a mixture of objects and arrays" in testTrivialObjectArrayLeftShift(emit)
+        "shift a heterogeneous structure" in testHeterogenousLeftShift(emit)
+        "shift a set of arrays" in testSetArrayLeftShift(emit)
+        "shift a heterogeneous array" in testHeteroArrayLeftShift(emit)
+        "shift a simple array with an inner object" in testTrivialArrayLeftShiftWithInnerObject(emit)
+      }
     }
 
     "in transform" >> {

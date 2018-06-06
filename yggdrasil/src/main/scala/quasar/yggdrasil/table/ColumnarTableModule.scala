@@ -21,7 +21,7 @@ import quasar.blueeyes._
 import quasar.precog.{BitSet, MimeType, MimeTypes}
 import quasar.precog.common._
 import quasar.precog.common.ingest.FileContent
-import quasar.precog.util.RawBitSet
+import quasar.precog.util.{BitSetUtil, RawBitSet}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
@@ -1469,57 +1469,84 @@ trait ColumnarTableModule
       }), newSize)
     }
 
-    def leftShift(focus: CPath): Table = {
-      def lens(columns: Map[ColumnRef, Column]): (Map[ColumnRef, Column], Map[ColumnRef, Column]) = {
-        val (focused, unfocused) = columns.partition(_._1.selector.hasPrefix(focus))
+    def leftShift(focus: CPath, emitOnUndef: Boolean): Table = {
 
-        // discard scalar values at focus
-        val typed = focused filter {
+      def lens(slice: Slice): (Map[ColumnRef, Column], BitSet, Map[ColumnRef, Column]) = {
+
+        val (focused: Map[ColumnRef, Column], unfocused: Map[ColumnRef, Column]) =
+          slice.columns.partition(_._1.selector.hasPrefix(focus))
+
+        // partition by elems being flattenable or not
+        val (flattenable, unflattenable) = focused partition {
           case (ColumnRef(`focus`, CArrayType(_)), _) => true
           case (ColumnRef(`focus`, _), _) => false
           case _ => true
         }
 
-        // remap focused to be at "root"
-        val remapped = typed map {
+        // remap focused, flattenables to be at "root"
+        val remapped = flattenable map {
           case (ColumnRef(path, tpe), col) =>
             (ColumnRef(path.dropPrefix(focus).get, tpe), col)
         }
 
-        (remapped, unfocused)
+        val emit =
+          if (emitOnUndef) {
+            val undefineds = focused.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet)
+            undefineds.flip(0, slice.size) //mutation!
+
+            val unflattenables = unflattenable.values.map(_.definedAt(0, slice.size)).reduceOption(_ | _).getOrElse(new BitSet)
+
+            unflattenables | undefineds
+          }
+          else
+            new BitSet
+
+        (remapped, emit, unfocused)
       }
 
       // eagerly force the slices, since we'll be backtracking within each
       val slices2: StreamT[IO, Slice] = slices.map(_.materialized) flatMap { slice =>
-        val (focused, unfocused) = lens(slice.columns)
+        val (focused, emit, unfocused) = lens(slice)
 
-        val innerHeads = {
+        val innerHeads: Vector[CPathNode] = {
           val unsorted = focused.keys.toVector flatMap {
             case ColumnRef(path, _) => path.head.toVector
           }
 
+          // make sure there's at least 1 element when emitOnUndef
+          val unsorted0 =
+            if (unsorted.isEmpty && emitOnUndef)
+              Vector(CPathIndex(0))
+            else
+              unsorted
+
           // sort the index lexicographically except in the case of indices
-          unsorted sortWith {
+          // also: indices come first
+          unsorted0 sortWith {
             case (CPathIndex(i1), CPathIndex(i2)) => i1 < i2
+            case (CPathIndex(i1), p2) => true
+            case (p1, CPathIndex(i2)) => false
             case (p1, p2) => p1.toString < p2.toString
           }
         }
 
-        val innerIndex = Map(innerHeads.zipWithIndex: _*)
+        val innerIndex: Map[CPathNode, Int] = Map(innerHeads.zipWithIndex: _*)
 
-        val primitiveWaterMarks = focused.toList collect {
+        val primitiveWaterMarks: List[Int] = focused.toList collect {
           case (ColumnRef(CPath.Identity, CArrayType(_)), col: HomogeneousArrayColumn[a]) =>
             (0 until slice.size).map(col(_).length).max
         }
 
         // .max doesn't work, because Scala doesn't understand monoids
-        val primitiveMax = primitiveWaterMarks.fold(0)(math.max)
+        val primitiveMax: Int = primitiveWaterMarks.fold(0)(math.max)
 
         // TODO doesn't handle the case where we have a sparse array with a missing column!
         // this value may be 0 if we're looking at CEmptyObject | CEmptyArray
-        val highWaterMark = math.max(innerHeads.length, primitiveMax)
+        // and emitOnUndef = false
+        val highWaterMark: Int =
+          math.max(innerHeads.length, primitiveMax)
 
-        val resplit = if (slice.size * highWaterMark > Config.maxSliceSize) {
+        val resplit: Vector[Slice] = if (slice.size * highWaterMark > Config.maxSliceSize) {
           val numSplits =
             math.ceil((slice.size * highWaterMark).toDouble / Config.maxSliceSize).toInt
 
@@ -1539,13 +1566,13 @@ trait ColumnarTableModule
         // shadow the outer `slice`
         StreamT.fromIterable(resplit).trans(λ[Id.Id ~> IO](IO.pure(_))) map { slice =>
           // ...and the outer `focused` and `unfocused`
-          val (focused, unfocused) = lens(slice.columns)
+          val (focused, emit, unfocused) = lens(slice)
 
           // a CF1 for inflating column sizes to account for shifting
           val expansion = cf.util.Remap(_ / highWaterMark)
 
           // expand all of the unfocused columns, then mostly leave them alone
-          val unfocusedExpanded = unfocused map {
+          val unfocusedExpanded: Map[ColumnRef, Column] = unfocused map {
             case (ref, col) => ref -> expansion(col).get
           }
 
@@ -1578,21 +1605,21 @@ trait ColumnarTableModule
             merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
 
           // move all of our results into second index of an array
-          val indexed = merged map {
+          val indexed: Map[ColumnRef, Column] = merged map {
             case (ColumnRef(path, tpe), col) =>
               ColumnRef(1 \: path, tpe) -> col
           }
 
-          val refinedHeads = innerHeads collect {
+          val refinedHeads: Vector[String \/ Int] = innerHeads collect {
             case CPathField(field) => -\/(field)
             case CPathIndex(idx) => \/-(idx)
           }
 
-          val hasFields = refinedHeads.exists(_.isLeft)
-          val hasIndices = refinedHeads.exists(_.isRight)
+          val hasFields: Boolean = refinedHeads.exists(_.isLeft)
+          val hasIndices: Boolean = refinedHeads.exists(_.isRight)
 
           // generate the field names column
-          val fieldsCol = if (hasFields) {
+          val fieldsCol: Option[Column] = if (hasFields) {
             val loci = refinedHeads.zipWithIndex collect {
               case (-\/(_), i) => i
             } toSet
@@ -1613,7 +1640,7 @@ trait ColumnarTableModule
           }
 
           // generate the array indices column
-          val indicesCol = if (hasIndices) {
+          val indicesCol: Option[Column] = if (hasIndices) {
             val loci = refinedHeads.zipWithIndex collect {
               case (\/-(_), i) => i
             } toSet
@@ -1634,23 +1661,32 @@ trait ColumnarTableModule
           }
 
           // put the fields and index columns into the same path, in the first index of the array
-          val fassigned = fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
-          val iassigned = indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
+          val fassigned: List[(ColumnRef, Column)] =
+            fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
+          val iassigned: List[(ColumnRef, Column)] =
+            indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
 
           // merge them together to produce the heterogeneous output
-          val idCols = Map(fassigned ++ iassigned: _*)
+          val idCols: Map[ColumnRef, Column] = Map(fassigned ++ iassigned: _*)
 
           // put the focus prefix BACK on the results and ids (which are now in an array together)
-          val focusedTransformed = (indexed ++ idCols) map {
+          val focusedTransformed: Map[ColumnRef, Column] = (indexed ++ idCols) map {
             case (ColumnRef(path, tpe), col) =>
               ColumnRef(focus \ path, tpe) -> col
           }
 
+          // additional definedness bitset:
+          // we need to keep every first expanded row
+          // in unfocused that's marked to be kept according to the emit bitset
+          val keep: BitSet = definedness |
+            BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
+              (i % highWaterMark == 0) && emit(i / highWaterMark))
+
           // we need to go back to our original columns and filter them by results
           // if we don't do this, the data will be highly sparse (like an outer join)
-          val unfocusedTransformed = unfocusedExpanded map {
+          val unfocusedTransformed: Map[ColumnRef, Column] = unfocusedExpanded map {
             case (ref, col) =>
-              ref -> cf.util.filter(0, slice.size * highWaterMark, definedness)(col).get
+              ref -> cf.util.filter(0, slice.size * highWaterMark, keep)(col).get
           }
 
           // glue everything back together with the unfocused and compute the new size

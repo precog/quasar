@@ -19,6 +19,7 @@ package quasar
 import slamdata.Predef._
 import quasar.ejson.EJson
 import quasar.time.DateTimeInterval
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka.implicits._
 import matryoshka.patterns._

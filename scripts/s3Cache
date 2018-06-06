@@ -32,7 +32,7 @@ elif [[ "$1" = "cleanup" ]]; then
   aws s3 --only-show-errors rm s3://quasar-build-cache/$NUM --recursive
   echo "done cleaning up!"
 elif [[ "$1" = "cacheCleanUp" ]]; then
-  LIST=$(aws s3 ls s3://quasar-build-cache --profile slamdata-bot |  awk '{print $2}' | cut -d"/" -f1)
+  LIST=$(aws s3 ls s3://quasar-build-cache |  awk '{print $2}' | cut -d"/" -f1)
   OLDBUILDNUM=$((NUM + 50))
   echo "cleaning up old s3 caches"
   while read -r buildNum;

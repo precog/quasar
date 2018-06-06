@@ -16,9 +16,10 @@
 
 package quasar.fp
 
-import matryoshka.∘
+import matryoshka.{Delay, ∘}
 import org.scalacheck._
 import scalaz._
+import iotaz.{TListK, CopK}
 
 object Helpers {
   // NB: Should be exposed via matryoshka-scalacheck, which doesn’t yet exist.
@@ -28,4 +29,8 @@ object Helpers {
     implicit F: Arbitrary ~> (Arbitrary ∘ F)#λ, A: Arbitrary[A]):
       Arbitrary[F[A]] =
     F(A)
+
+  implicit def copkArbitrary[LL <: TListK](implicit M: ArbitraryKMaterializer[LL]): Delay[Arbitrary, CopK[LL, ?]] =
+    M.materialize(offset = 0)
+
 }

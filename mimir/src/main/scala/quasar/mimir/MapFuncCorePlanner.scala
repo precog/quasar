@@ -22,6 +22,7 @@ import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 import matryoshka.{AlgebraM, RecursiveT}
 import matryoshka.implicits._
+import quasar.contrib.iota.copkTraverse
 
 import scalaz.Applicative
 import scalaz.syntax.applicative._

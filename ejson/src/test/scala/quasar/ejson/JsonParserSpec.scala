@@ -18,18 +18,18 @@ package quasar.ejson
 
 import slamdata.Predef._
 import quasar.Qspec
-import quasar.fp._
+import quasar.contrib.iota._
 
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.Inject
+import iotaz.CopK
 
 final class JsonParserSpec extends Qspec {
   type J = Fix[Json]
 
-  val C = Inject[Common, Json]
-  val O = Inject[Obj,    Json]
+  val C = CopK.Inject[Common, Json]
+  val O = CopK.Inject[Obj,    Json]
 
   "EJson JSON parser" should {
     "properly construct values" >> {

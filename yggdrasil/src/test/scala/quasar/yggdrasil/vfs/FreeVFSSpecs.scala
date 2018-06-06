@@ -26,9 +26,10 @@ import org.specs2.matcher.DisjunctionMatchers
 
 import pathy.Path
 
-import scalaz.{Coproduct, Need}
+import scalaz.Need
 import scalaz.concurrent.Task
 import scalaz.syntax.monad._
+import iotaz.CopK
 
 import scodec.Codec
 import scodec.bits.ByteVector
@@ -41,7 +42,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
   import POSIXOp._
   import StreamTestUtils._
 
-  type S[A] = Coproduct[POSIXOp, Task, A]
+  type S[A] = POSIXWithTaskCopK[A]
 
   val H = Harness[S, Task]
 
@@ -1320,13 +1321,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     } yield ()
   }
 
-  object CPR {
-    def unapply[A](cp: Coproduct[POSIXOp, Task, A]): Option[Task[A]] =
-      cp.run.toOption
-  }
-
-  object CPL {
-    def unapply[A](cp: Coproduct[POSIXOp, Task, A]): Option[POSIXOp[A]] =
-      cp.run.swap.toOption
-  }
+  val CPR = CopK.Inject[Task, S]
+  val CPL = CopK.Inject[POSIXOp, S]
 }

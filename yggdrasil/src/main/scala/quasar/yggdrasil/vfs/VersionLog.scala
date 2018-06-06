@@ -18,6 +18,7 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RDir, RFile}
 import quasar.contrib.scalaz.stateT, stateT._
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import argonaut.{Argonaut, Parse}
 
@@ -26,7 +27,7 @@ import fs2.interop.scalaz.StreamScalazOps
 
 import pathy.Path
 
-import scalaz.{:<:, Free, Monad, StateT}
+import scalaz.{Free, Monad, StateT}
 import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.option._
@@ -56,7 +57,7 @@ object VersionLog {
   private val KeepLimit = 5
 
   // TODO failure recovery
-  def init[S[_]](baseDir: ADir)(implicit IP: POSIXOp :<: S, IT: Task :<: S): Free[S, VersionLog] = {
+  def init[S[a] <: ACopK[a]](baseDir: ADir)(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): Free[S, VersionLog] = {
     for {
       exists <- POSIX.exists[S](baseDir </> VersionsJson)
 
@@ -97,7 +98,7 @@ object VersionLog {
     } yield VersionLog(baseDir, committed, versions.toSet)
   }
 
-  def fresh[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Version] = {
+  def fresh[S[a] <: ACopK[a]](implicit I: POSIXOp :<<: S): StateT[Free[S, ?], VersionLog, Version] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       uuid <- POSIX.genUUID[S].liftM[ST]
@@ -120,7 +121,7 @@ object VersionLog {
     StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 
   // TODO add symlink
-  def commit[S[_]](v: Version)(implicit IP: POSIXOp :<: S, IT: Task :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def commit[S[a] <: ACopK[a]](v: Version)(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       log2 = log.copy(committed = v :: log.committed)
@@ -157,7 +158,7 @@ object VersionLog {
     } yield back
   }
 
-  def purgeOld[S[_]](implicit I: POSIXOp :<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def purgeOld[S[a] <: ACopK[a]](implicit I: POSIXOp :<<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       toPurge = log.committed.drop(KeepLimit)

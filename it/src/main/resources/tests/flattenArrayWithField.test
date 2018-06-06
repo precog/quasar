@@ -1,0 +1,21 @@
+{
+    "name": "field and flattened array",
+    "backends": {
+        "couchbase":         "pending",
+        "marklogic_json":    "pending",
+        "marklogic_xml":     "pending"
+    },
+    "data": "flattenable.data",
+    "query": "select a, b[*] from flattenable",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      {"a": 1, "b": true},
+      {"a": 1, "b": true},
+      {"a": 1, "b": true},
+      {"a": 2, "b": false},
+      {"a": 2, "b": false},
+      {"a": 3},
+      {"a": 4}
+    ]
+}

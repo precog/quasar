@@ -23,7 +23,7 @@ import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.fp.ski.κ
 import quasar.contrib.iota.copkTraverse
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.physical.couchbase._,
   common.{ContextReader, DocTypeValue},
   N1QL.{Eq, Unreferenced, _},

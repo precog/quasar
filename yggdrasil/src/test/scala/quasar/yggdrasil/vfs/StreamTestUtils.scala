@@ -18,8 +18,10 @@ package quasar.yggdrasil.vfs
 
 import fs2.{Sink, Stream}
 
-import scalaz.{Coproduct, Free, Inject}
+import scalaz.Free
 import scalaz.concurrent.Task
+
+import iotaz.CopK
 
 import scodec.bits.ByteVector
 
@@ -29,7 +31,7 @@ private[vfs] object StreamTestUtils {
       Stream suspend {
         pred(bv)
 
-        val I = Inject[Task, Coproduct[POSIXOp, Task, ?]]
+        val I = CopK.Inject[Task, POSIXWithTaskCopK]
 
         // this is tricky, but we're doing it specifically so that the
         // number of Task suspensions is equal between failure and

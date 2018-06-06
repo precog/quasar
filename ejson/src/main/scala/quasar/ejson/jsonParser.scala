@@ -17,15 +17,16 @@
 package quasar.ejson
 
 import slamdata.Predef.{Map => SMap, _}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import jawn.{Facade, SimpleFacade, SupportParser}
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.{:<:, Functor}
+import scalaz.Functor
 
 object jsonParser {
-  def apply[T, F[_]: Functor]
-    (implicit T: Corecursive.Aux[T, F], C: Common :<: F, O: Obj :<: F)
+  def apply[T, F[a] <: ACopK[a] : Functor]
+    (implicit T: Corecursive.Aux[T, F], C: Common :<<: F, O: Obj :<<: F)
       : SupportParser[T] =
     new SupportParser[T] {
       implicit val facade: Facade[T] =

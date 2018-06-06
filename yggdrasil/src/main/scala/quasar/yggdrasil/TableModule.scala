@@ -233,7 +233,7 @@ trait TableModule extends TransSpecModule {
       * provided that the focus does indeed refer to arrays/objects and those
       * structures are non-empty.
       */
-    def leftShift(focus: CPath): Table
+    def leftShift(focus: CPath, emitOnUndef: Boolean): Table
 
     /**
       * Force the table to a backing store, and provice a restartable table

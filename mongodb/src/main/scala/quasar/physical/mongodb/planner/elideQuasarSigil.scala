@@ -22,7 +22,7 @@ import quasar.fs.{FileSystemError, MonadFsErr}
 import quasar.physical.mongodb.{sigil, Collection}
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
-import quasar.fp.{:<<:, ACopK}
+import quasar.contrib.iota.{:<<:, ACopK}
 
 import matryoshka._
 import matryoshka.implicits._

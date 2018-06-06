@@ -8,7 +8,7 @@ source scripts/constants
 "$SBT" transferPublishAndTagResources
 
 # Set TRAVIS_JOB_NUMBER as a workaround to meet sbt-slamdata's publishAndTag assumption
-TRAVIS_JOB_NUMBER=1 scripts/publishAndTag 'quasar-analytics/quasar'
+TRAVIS_JOB_NUMBER=1 scripts/publishAndTag 'slamdata/quasar'
 
 
 bumpInSlamdataBackend() { echo $1 > quasar-version; }

@@ -18,17 +18,19 @@ package quasar.ejson
 
 import slamdata.Predef.{Byte => SByte, Char => SChar, Int => _, Map => _, _}
 import quasar.contrib.matryoshka.{project, totally}
+import quasar.contrib.iota.copkTraverse
 
 import matryoshka._
 import matryoshka.implicits._
-import scalaz.Coproduct
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.syntax.traverse._
 
 object EJson {
-  def fromJson[A](f: String => A): Json[A] => EJson[A] =
-    json => Coproduct(json.run.leftMap(Extension.fromObj(f)))
+  def fromJson[A](f: String => A): Json[A] => EJson[A] = {
+    case ObjJson(obj) => ExtEJson(Extension.fromObj(f)(obj))
+    case CommonJson(c) => CommonEJson(c)
+  }
 
   def fromCommon[T](c: Common[T])(implicit T: Corecursive.Aux[T, EJson]): T =
     CommonEJson(c).embed
@@ -41,15 +43,18 @@ object EJson {
       case Map(xs) =>
         xs.traverse {
           case (k, v) => f(k) strengthR v
-        } map (kvs => Coproduct.leftc(Obj(ListMap(kvs : _*))))
+        } map (kvs => ObjJson(Obj(ListMap(kvs : _*))))
 
       case Int(i) =>
-        some(Coproduct.rightc(Dec(BigDecimal(i))))
+        some(CommonJson(Dec(BigDecimal(i))))
 
       case _ => none
     }
 
-    _.run.bitraverse(handleExt, c => some(Coproduct.right[Obj](c))) map (_.merge)
+    {
+      case ExtEJson(ext) => handleExt(ext)
+      case CommonEJson(c) => some(CommonJson(c))
+    }
   }
 
   def arr[T](xs: T*)(implicit T: Corecursive.Aux[T, EJson]): T =

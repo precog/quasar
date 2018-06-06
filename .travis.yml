@@ -13,6 +13,8 @@ stages:
   - name: compile
   - name: unit test
   - name: test
+  - name: testPublish
+    if: type = pull_request
   - name: publish
     # weirdly, we have to add the extra PR check
     if: NOT type = pull_request
@@ -125,6 +127,22 @@ jobs:
             it/sideEffectTestFSConfig \
             "testOnly -- xonly failtrace" \
             "exclusive:testOnly -- xonly failtrace"
+
+    # Make sure we can generate scaladoc as well as build an assembly jar (no duplicate class conflicts) and
+    # test the jar (which makes sure the Quasar server starts and does not crash within 5 seconds)
+    - stage: testPublish
+      env:
+      script:
+        - set -e
+
+        - travis_wait 30 scripts/s3Cache download
+        - ./sbt preBuild
+
+        - './sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION doc web/assembly'
+
+        - scripts/testJar
+
+        - set +e
 
     - stage: publish
       env:

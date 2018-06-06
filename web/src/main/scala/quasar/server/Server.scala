@@ -31,7 +31,7 @@ import quasar.fp.free._
 import quasar.fp.numeric.Natural
 import quasar.fs.mount.cache.VCache, VCache.{VCacheExpR, VCacheExpW}
 import quasar.main._
-import quasar.server.Http4sUtils.{openBrowser, waitForUserEnter}
+import quasar.server.Http4sUtils.openBrowser
 
 import org.http4s.HttpService
 import org.http4s.server._
@@ -191,24 +191,19 @@ object Server {
                val port = webCmdLineCfg.port | wCfg.server.port
                val persistPort = persistPortChange(webCmdLineCfg.configPath)
                (for {
-                 shutdown <- startServer(
-                  quasarInter,
-                  port,
-                  webCmdLineCfg.staticContent,
-                  webCmdLineCfg.redirect,
-                  persistPort,
-                  webCmdLineCfg.recordedExecutions)
-                 _        <- openBrowser(port).whenM(webCmdLineCfg.openClient)
-                 _        <- stdout("Press Enter to stop.")
-                 // If user pressed enter (after this main thread has been blocked on it),
-                 // then we shutdown, otherwise we just run indefinitely until the JVM is killed
-                 // If we don't call shutdown and this main thread completes, the application will
-                 // continue to run indefinitely as `startServer` uses a non-daemon `ExecutorService`
-                 // TODO: Figure out why it's necessary to use a `Task` that never completes to keep the main thread
-                 // from completing instead of simply relying on the fact that the server is using a pool of
-                 // non-daemon threads to ensure the application doesn't shutdown
-                 _        <- waitForUserEnter.ifM(shutdown, Task.async[Unit](_ => ()))
-               } yield ()).liftM[MainErrT]
+                 // We are discarding the shutdown function
+                 // because we will run forever and count on the jvm
+                 // shutting down to kill everything
+                 // Hopefully that's not a crazy strategy
+                 _ <- startServer(
+                        quasarInter,
+                        port,
+                        webCmdLineCfg.staticContent,
+                        webCmdLineCfg.redirect,
+                        persistPort,
+                        webCmdLineCfg.recordedExecutions)
+                 _ <- openBrowser(port).whenM(webCmdLineCfg.openClient)
+               } yield false).liftM[MainErrT]
              },
              persistMetaStore(webCmdLineCfg.configPath))
     } yield ())

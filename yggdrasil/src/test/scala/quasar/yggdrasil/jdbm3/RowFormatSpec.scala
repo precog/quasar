@@ -52,7 +52,7 @@ class RowFormatSpec extends Specification with ScalaCheck with SJValueGenerators
     val generators = groupConsecutive(refs)(_.selector) map (refs =>
       genIndex(refs.size) >> (i =>
         Gen.sequence(refs.zipWithIndex map {
-          case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genCValue(cType), 1 -> Gen.const(CUndefined))
+          case (ColumnRef(_, cType), `i`) => Gen.frequency(5 -> genCValueForType(cType), 1 -> Gen.const(CUndefined))
           case _                          => Gen.const(CUndefined)
         })
       )

@@ -81,7 +81,7 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                             import P.trans._
 
                             // TODO depending on the id status we may not need to wrap the table
-                            P.Table.fromRValues(values.toStream)
+                            P.Table.fromRValues(values.toVector)
                               .transform(OuterObjectConcat(
                                 WrapObject(
                                   Scan(Leaf(Source), P.freshIdScanner),

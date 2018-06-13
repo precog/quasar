@@ -59,14 +59,23 @@ trait RCValueGenerators {
       }
   }
 
-  def genCValue(tpe: CType): Gen[CValue] = tpe match {
+  def genCValueForType(tpe: CType): Gen[CValue] = tpe match {
     case tpe: CValueType[_] => genValueForCValueType(tpe)
     case CNull              => Gen.const(CNull)
     case CEmptyObject       => Gen.const(CEmptyObject)
     case CEmptyArray        => Gen.const(CEmptyArray)
     case invalid            => sys.error("No values for type " + invalid)
   }
+
+  def genCValue: Gen[CValue] = for {
+    tp <- genCType
+    v <- genCValueForType(tp)
+  } yield v
+
+  def genCValues: Gen[Vector[CValue]] = for {
+    n <- Gen.choose(0, 100)
+    l <- Gen.containerOfN(n, genCValue)
+  } yield l
 }
 
 object RCValueGenerators extends RCValueGenerators
-

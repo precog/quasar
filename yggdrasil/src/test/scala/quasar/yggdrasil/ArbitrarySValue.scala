@@ -101,7 +101,7 @@ trait SJValueGenerators extends ArbitraryBigDecimal with RCValueGenerators {
     CLocalDate
   )
 
-  def jvalue(ctype: CType): Gen[JValue] = genCValue(ctype).map(_.toJValue)
+  def jvalue(ctype: CType): Gen[JValue] = genCValueForType(ctype).map(_.toJValue)
 
   def jvalue(schema: Seq[(JPath, CType)]): Gen[JValue] = {
     schema.foldLeft(Gen.const[JValue](JUndefined)) {

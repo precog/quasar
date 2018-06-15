@@ -451,16 +451,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
-        case Map(
-          AutoJoin2C(
-            Read(`afile`),
-            Read(`afile2`),
-            MapFuncsCore.Subtract(LeftSide, RightSide)),
-          fm) =>
-
-          fm.linearize must beTreeEqual(func.Add(func.Hole, func.Constant(J.int(42))))
+        case AutoJoin2(Read(`afile`), Read(`afile2`), fm) =>
+          fm must beTreeEqual(
+            func.Add(
+              func.Subtract(
+                func.LeftSide,
+                func.RightSide),
+              func.Constant(J.int(42))))
       }
-    }.pendingUntilFixed
+    }
 
     "halt minimization at a grouped vertex" in {
       val groupKey =

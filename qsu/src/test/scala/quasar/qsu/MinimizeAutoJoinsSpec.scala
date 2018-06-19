@@ -495,27 +495,21 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           _(MapFuncsCore.ConcatMaps(_, _)))))
 
       runOn(qgraph) must beLike {
-        case AutoJoin2C(
-          Map(
-            Map(Read(_), guardL),
-            minL),
-          Map(
-            QSReduce(
-              Map(Read(_), guardR),
-              bucket :: Nil,
-              ReduceFuncs.Sum(prjPop) :: Nil,
-              _),
-            minR),
-          MapFuncsCore.ConcatMaps(_, _)) =>
+        case AutoJoin2(
+          Map(Read(_), guardL),
+          QSReduce(
+            Map(Read(_), guardR),
+            bucket :: Nil,
+            ReduceFuncs.Sum(prjPop) :: Nil,
+            _),
+          repair) =>
 
           guardL must beTreeEqual(guardR)
 
-          minL must beTreeEqual(
-            recFunc.MakeMapS(
-              "city",
-              recFunc.ProjectKeyS(recFunc.Hole, "city")))
-
-          minR must beTreeEqual(recFunc.MakeMapS("1", recFunc.Hole))
+          repair must beTreeEqual(
+            func.ConcatMaps(
+              func.MakeMapS("city", func.ProjectKeyS(func.LeftSide, "city")),
+              func.MakeMapS("1", func.RightSide)))
 
           prjPop must beTreeEqual(func.ProjectKeyS(func.Hole, "pop"))
       }

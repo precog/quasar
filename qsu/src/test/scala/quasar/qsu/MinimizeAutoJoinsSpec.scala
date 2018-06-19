@@ -508,14 +508,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             minR),
           MapFuncsCore.ConcatMaps(_, _)) =>
 
-          guardL.linearize must beTreeEqual(guardR.linearize)
+          guardL must beTreeEqual(guardR)
 
-          minL.linearize must beTreeEqual(
-            func.MakeMapS(
+          minL must beTreeEqual(
+            recFunc.MakeMapS(
               "city",
-              func.ProjectKeyS(func.Hole, "city")))
+              recFunc.ProjectKeyS(recFunc.Hole, "city")))
 
-          minR.linearize must beTreeEqual(func.MakeMapS("1", func.Hole))
+          minR must beTreeEqual(recFunc.MakeMapS("1", recFunc.Hole))
 
           prjPop must beTreeEqual(func.ProjectKeyS(func.Hole, "pop"))
       }

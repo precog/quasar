@@ -30,6 +30,7 @@ import quasar.qscript.{
   construction,
   Center,
   Hole,
+  JoinSide3,
   LeftSide,
   LeftSide3,
   RightSide,
@@ -179,7 +180,31 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           // we need to re-expand and re-minimize, and we might end up doing additional second-order expansions
           coalesceToMap[G](qgraph, candidates2, fm2)
 
-        case None => none[QSUGraph].point[G]
+        case None =>
+          multiple match {
+            case left :: right :: Nil => {
+              val fm2: JoinFunc = fm map {
+                case 0 => LeftSide
+                case 1 => RightSide
+              }
+
+              updateGraph[T, G](QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2)) map { back =>
+                (back :++ left :++ right).some
+              }
+            }
+            case left :: center :: right :: Nil => {
+              val fm2: FreeMapA[JoinSide3] = fm map {
+                case 0 => LeftSide3
+                case 1 => Center
+                case 2 => RightSide3
+              }
+
+              updateGraph[T, G](QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2)) map { back =>
+                (back :++ left :++ center :++ right).some
+              }
+            }
+            case _ => none[QSUGraph].point[G]
+          }
       }
 
     case multiple =>

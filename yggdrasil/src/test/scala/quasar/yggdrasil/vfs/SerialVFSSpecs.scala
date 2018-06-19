@@ -16,86 +16,70 @@
 
 package quasar.yggdrasil.vfs
 
-import fs2.Stream
-import fs2.interop.scalaz._
+import cats.effect.IO
+import cats.syntax.flatMap._
 
 import org.specs2.mutable._
 
 import pathy.Path
 
-import scalaz.concurrent.Task
-
 import java.io.File
 import java.nio.file.Files
 
-object SerialVFSSpecs extends Specification {
+// For cats.effect.Timer[IO]
+import scala.concurrent.ExecutionContext.Implicits.global
+import shims._
 
+object SerialVFSSpecs extends Specification {
   "serial vfs facade" should {
     "create a scratch directory, assign a path, work with real files, and list" in {
       val base = Files.createTempDirectory("SerialVFSSpecs").toFile
 
-      val test = for {
-        vfs <- SerialVFS(base)
+      val test = SerialVFS[IO](base).flatMap(_(vfs => for {
+        blob <- vfs.scratch
+        version <- vfs.fresh(blob)
+        dir <- vfs.underlyingDir(blob, version)
 
-        ta = for {
-          blob <- vfs.scratch
-          version <- vfs.fresh(blob)
-          dir <- vfs.underlyingDir(blob, version)
+        _ <- IO {
+          dir.exists() mustEqual true
 
-          _ <- Task delay {
-            dir.exists() mustEqual true
+          Files.createFile(new File(dir, "test").toPath())
+        }
 
-            Files.createFile(new File(dir, "test").toPath())
-          }
+        _ <- vfs.commit(blob, version)
+        _ <- vfs.link(blob, Path.rootDir </> Path.file("foo"))
+      } yield ()))
 
-          _ <- vfs.commit(blob, version)
-          _ <- vfs.link(blob, Path.rootDir </> Path.file("foo"))
-        } yield ()
+      val test2 = SerialVFS[IO](base).flatMap(_(vfs => for {
+        ob <- vfs.readPath(Path.rootDir </> Path.file("foo"))
 
-        _ <- Stream.eval(ta)
-      } yield ()
+        blob <- IO {
+          ob must beSome
+          ob.get
+        }
 
-      test.take(1).run.unsafePerformSync
+        ov <- vfs.headOfBlob(blob)
 
-      val test2 = for {
-        vfs <- SerialVFS(base)
+        version <- IO {
+          ov must beSome
+          ov.get
+        }
 
-        ta = for {
-          ob <- vfs.readPath(Path.rootDir </> Path.file("foo"))
+        dir <- vfs.underlyingDir(blob, version)
 
-          blob <- Task delay {
-            ob must beSome
-            ob.get
-          }
+        _ <- IO {
+          dir.exists() mustEqual true
+          new File(dir, "test").exists() mustEqual true
+        }
+      } yield ()))
 
-          ov <- vfs.headOfBlob(blob)
+      val test3 =
+        SerialVFS[IO](base).flatMap(_(_.ls(Path.rootDir)))
 
-          version <- Task delay {
-            ov must beSome
-            ov.get
-          }
+      val result =
+        test >> test2 >> test3
 
-          dir <- vfs.underlyingDir(blob, version)
-
-          _ <- Task delay {
-            dir.exists() mustEqual true
-            new File(dir, "test").exists() mustEqual true
-          }
-        } yield ()
-
-        _ <- Stream.eval(ta)
-      } yield ()
-
-      test2.take(1).run.unsafePerformSync
-
-      val test3 = for {
-        vfs <- SerialVFS(base)
-        paths <- Stream.eval(vfs.ls(Path.rootDir))
-      } yield paths
-
-      val result = test3.take(1).runLast.unsafePerformSync
-
-      result must beSome(List(Path.file("foo")))
+      result.unsafeRunSync must_=== List(Path.file("foo"))
     }
   }
 }

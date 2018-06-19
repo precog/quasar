@@ -113,15 +113,14 @@ trait MapUtils {
 
 class MapExtras[A, B, CC[B] <: sc.GenTraversable[B]](left: sc.GenMap[A, CC[B]]) {
   def cogroup[C, CC2[C] <: sc.GenTraversable[C], Result](right: sc.GenMap[A, CC2[C]])(
-      implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result],
-      cbfLeft: CanBuildFrom[CC[B], B, CC[B]],
-      cbfRight: CanBuildFrom[CC2[C], C, CC2[C]]): Result = {
+      implicit cbf: CanBuildFrom[Nothing, (A, Either3[B, (CC[B], CC2[C]), C]), Result]): Result = {
     val resultBuilder = cbf()
 
     left foreach {
       case (key, leftValues) => {
         right get key map { rightValues =>
-          resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C]((leftValues, rightValues)))
+          val _ =
+            resultBuilder += (key -> Either3.middle3[B, (CC[B], CC2[C]), C]((leftValues, rightValues)))
         } getOrElse {
           leftValues foreach { b =>
             resultBuilder += (key -> Either3.left3[B, (CC[B], CC2[C]), C](b))

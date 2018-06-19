@@ -189,8 +189,6 @@ trait DefaultExtractors {
   }
 
   implicit def StringMapExtractor[V](implicit valueExtractor: Extractor[V]): Extractor[Map[String, V]] = new Extractor[Map[String, V]] {
-    private val ev = (valueExtractor.validated(_: JValue)).second[String]
-
     def validated(jvalue: JValue) = jvalue match {
       case JObject(fields) =>
         Traverse[({ type l[a] = Map[String, a] })#l].sequence[VE, V] {

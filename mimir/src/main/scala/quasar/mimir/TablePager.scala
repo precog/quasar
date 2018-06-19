@@ -18,77 +18,71 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.blueeyes.json.JValue
-import quasar.contrib.cats.effect._
-import io.chrisdavenport.scalaz.task._
 import quasar.yggdrasil.table.{ColumnarTableModule, Slice}
 
 import cats.effect.IO
 
 import fs2.async
 import fs2.async.mutable.Queue
-// really ugly, but required to avoid ambiguity with `shims.functorToScalaz`
-// and yet if we don't import `shims.functorToScalaz`, `Functor[IO]` doesn't resolve.
-import fs2.interop.scalaz.{effectToMonadError => _, catchableToMonadError => _, monadToScalaz => _, _}
 
-import scalaz.{\/, -\/, \/-, ~>, StreamT}
-import scalaz.concurrent.Task
+import scalaz.StreamT
 import scalaz.syntax.monad._
 
-import shims.functorToScalaz
+import shims._
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{Either, Left, Right}
 
 import java.util.concurrent.atomic.AtomicBoolean
 
 trait TablePagerModule extends ColumnarTableModule {
 
   final class TablePager private (
-      slices: StreamT[Task, Slice],
-      queue: Queue[Task, Throwable \/ Vector[Data]]) {
+      slices: StreamT[IO, Slice],
+      queue: Queue[IO, Either[Throwable, Vector[Data]]]) {
 
     private val running = new AtomicBoolean(true)
 
     {
       val driver = slices foreachRec { slice =>
         for {
-          flag <- Task.delay(running.get())
+          flag <- IO(running.get())
 
           _ <- if (flag && !slice.isEmpty) {
             val json = slice.toJsonElements.map(JValue.toData)
 
             if (json.isEmpty)
-              Task.now(())
+              IO.pure(())
             else
-              queue.enqueue1(\/-(json))
+              queue.enqueue1(Right(json))
           } else {
             // we can't terminate early, because there are no finalizers in StreamT
-            Task.now(())
+            IO.pure(())
           }
         } yield ()
       }
 
       // enqueue the empty vector so ReadFile.scan knows when to stop scanning
-      val ta = driver >> queue.enqueue1(\/-(Vector.empty))
+      val ta = driver >> queue.enqueue1(Right(Vector.empty))
 
-      ta unsafePerformAsync {
-        case -\/(t) => queue.enqueue1(-\/(t)).unsafePerformAsync(_ => ())
-        case \/-(_) => ()
+      ta unsafeRunAsync {
+        case Left(t) => queue.enqueue1(Left(t)).unsafeRunAsync(_ => ())
+        case Right(_) => ()
       }
     }
 
-    def more: Task[Vector[Data]] =
-      queue.dequeue1.flatMap(_.fold(Task.fail, Task.now))
+    def more: IO[Vector[Data]] =
+      queue.dequeue1.flatMap(IO.fromEither(_))
 
-    def close: Task[Unit] = Task.delay(running.set(false))
+    def close: IO[Unit] =
+      IO(running.set(false))
   }
 
   object TablePager {
     def apply(table: Table, lookahead: Int = 1): IO[TablePager] = {
       for {
-        q <- async.boundedQueue[Task, Throwable \/ Vector[Data]](lookahead).to[IO]
-        // ambiguity between M and effect-derived monad
-        slices = table.slices.trans(λ[IO ~> Task](_.to[Task]))
-        back <- IO(new TablePager(slices, q))
+        q <- async.boundedQueue[IO, Either[Throwable, Vector[Data]]](lookahead)
+        back <- IO(new TablePager(table.slices, q))
       } yield back
     }
   }

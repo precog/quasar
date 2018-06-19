@@ -18,7 +18,6 @@ package quasar.yggdrasil.table
 
 import quasar.blueeyes.json.JValue
 import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
-import quasar.contrib.cats.effect._
 import quasar.fs.MoveSemantics
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
@@ -36,15 +35,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.{ActorRef, ActorSystem}
 
 import cats.effect._
-import io.chrisdavenport.scalaz.task._
-
-import delorean._
 
 import fs2.Stream
-import fs2.interop.cats.asyncInstance
-// otherwise ambiguities between shims and fs2 interop cause ambiguities.
-// also, asyncInstance from fs2-scalaz shadows asyncInstance from fs2-cats.
-import fs2.interop.scalaz.{effectToMonadError => _, catchableToMonadError => _, monadToScalaz => _, asyncInstance => _, _}
 
 import shims.{monadToCats => _, _}
 
@@ -53,7 +45,6 @@ import org.slf4s.Logging
 import pathy.Path
 
 import scalaz.{-\/, \/, EitherT, Monad, OptionT, StreamT}
-import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.syntax.either._
 import scalaz.syntax.monad._
@@ -83,7 +74,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
   def actorSystem: ActorSystem
   private[this] implicit def _actorSystem = actorSystem
 
-  def vfs: SerialVFS
+  def vfs: SerialVFS[IO]
 
   def masterChef: ActorRef
 
@@ -91,8 +82,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     val failure = ResourceError.fromExtractorError(s"failed to open NIHDB in path $path")
 
     for {
-      blob <- OptionT(vfs.readPath(path).to[IO])
-      version <- OptionT(vfs.headOfBlob(blob).to[IO])
+      blob <- OptionT(vfs.readPath(path))
+      version <- OptionT(vfs.headOfBlob(blob))
 
       cached <- IO(Option(dbs.get((blob, version)))).liftM[OptionT]
 
@@ -102,7 +93,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
 
         case None =>
           for {
-            dir <- vfs.underlyingDir(blob, version).to[IO].liftM[OptionT]
+            dir <- vfs.underlyingDir(blob, version).liftM[OptionT]
 
             tndb = IO {
               NIHDB.open(
@@ -133,19 +124,19 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
   def createDB(path: AFile): IO[ResourceError \/ (Blob, Version, NIHDB)] = {
     val failure = ResourceError.fromExtractorError(s"Failed to create NIHDB in $path")
 
-    val createBlob: Task[Blob] = for {
+    val createBlob: IO[Blob] = for {
       blob <- vfs.scratch
       _ <- vfs.link(blob, path)   // should be `true` because we already looked for path
     } yield blob
 
-    (for {
+    for {
       maybeBlob <- vfs.readPath(path)
-      blob <- maybeBlob.map(Task.now(_)).getOrElse(createBlob)
+      blob <- maybeBlob.map(IO.pure(_)).getOrElse(createBlob)
 
       version <- vfs.fresh(blob)    // overwrite any previously-existing HEAD
       dir <- vfs.underlyingDir(blob, version)
 
-      validation <- Task.delay {
+      validation <- IO {
         NIHDB.create(
           masterChef,
           dir,
@@ -155,13 +146,13 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       }
 
       disj = validation.disjunction.leftMap(failure)
-    } yield disj.map(n => (blob, version, n))).to[IO]
+    } yield disj.map(n => (blob, version, n))
   }
 
   def commitDB(blob: Blob, version: Version, db: NIHDB): IO[Unit] = {
     // last-wins semantics
     lazy val replaceM: OptionT[IO, Unit] = for {
-      oldHead <- OptionT(vfs.headOfBlob(blob).to[IO])
+      oldHead <- OptionT(vfs.headOfBlob(blob))
       oldDB <- OptionT(IO(Option(dbs.get((blob, oldHead)))))
 
       check <- IO(dbs.replace((blob, oldHead), oldDB, db)).liftM[OptionT]
@@ -176,7 +167,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       check <- IO(dbs.putIfAbsent((blob, version), db))
 
       _ <- if (check == null)
-        vfs.commit(blob, version).to[IO]
+        vfs.commit(blob, version)
       else
         commitDB(blob, version, db)
     } yield ()
@@ -208,8 +199,8 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
   // note: this function should almost always be unnecessary, since nihdb includes the append log in snapshots
   def flush(path: AFile): IO[Unit] = {
     val ot = for {
-      blob <- OptionT(vfs.readPath(path).to[IO])
-      head <- OptionT(vfs.headOfBlob(blob).to[IO])
+      blob <- OptionT(vfs.readPath(path))
+      head <- OptionT(vfs.headOfBlob(blob))
       db <- OptionT(IO(Option(dbs.get((blob, head)))))
       _ <- IO.fromFuture(IO(db.cook)).liftM[OptionT]
     } yield ()
@@ -218,35 +209,35 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
   }
 
   object fs {
-    def listContents(dir: ADir): Task[Set[PathSegment]] = {
+    def listContents(dir: ADir): IO[Set[PathSegment]] = {
       vfs.ls(dir) map { paths =>
         paths.map(firstSegmentName).flatMap(_.toList).toSet
       }
     }
 
-    def exists(path: APath): Task[Boolean] = vfs.exists(path)
+    def exists(path: APath): IO[Boolean] = vfs.exists(path)
 
-    def moveFile(from: AFile, to: AFile, semantics: MoveSemantics): Task[Boolean] =
+    def moveFile(from: AFile, to: AFile, semantics: MoveSemantics): IO[Boolean] =
       vfs.moveFile(from, to, semantics)
 
-    def moveDir(from: ADir, to: ADir, semantics: MoveSemantics): Task[Boolean] =
+    def moveDir(from: ADir, to: ADir, semantics: MoveSemantics): IO[Boolean] =
       vfs.moveDir(from, to, semantics)
 
-    def delete(target: APath): Task[Boolean] = {
+    def delete(target: APath): IO[Boolean] = {
       def deleteFile(target: AFile) = {
         for {
           _ <- {
             val ot = for {
               blob <- OptionT(vfs.readPath(target))
               version <- OptionT(vfs.headOfBlob(blob))
-              nihdb <- OptionT(Task.delay(Option(dbs.get((blob, version)))))
+              nihdb <- OptionT(IO(Option(dbs.get((blob, version)))))
 
-              removed <- Task.delay(dbs.remove((blob, version), nihdb)).liftM[OptionT]
+              removed <- IO(dbs.remove((blob, version), nihdb)).liftM[OptionT]
 
               _ <- if (removed)
-                nihdb.close.toTask.liftM[OptionT]
+                IO.fromFuture(IO(nihdb.close)).liftM[OptionT]
               else
-                ().point[OptionT[Task, ?]]
+                ().point[OptionT[IO, ?]]
             } yield ()
 
             ot.run
@@ -256,7 +247,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
         } yield back
       }
 
-      def deleteDir(target: ADir): Task[Boolean] = {
+      def deleteDir(target: ADir): IO[Boolean] = {
         for {
           paths <- vfs.ls(target)
 

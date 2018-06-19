@@ -66,14 +66,6 @@ trait StringLibModule extends ColumnarTableLibModule {
         split,
         splitRegex)
 
-    private def isValidInt(num: BigDecimal): Boolean = {
-      try {
-        num.toIntExact; true
-      } catch {
-        case e: java.lang.ArithmeticException => { false }
-      }
-    }
-
     class Op1SS(name: String, f: String => String) extends Op1F1(StringNamespace, name) {
       //@deprecated, see the DEPRECATED comment in StringLib
       val tpe = UnaryOperationType(JTextT, JNumberT)

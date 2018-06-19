@@ -175,7 +175,7 @@ class RowFormatSpec extends Specification with ScalaCheck with SJValueGenerators
       }
     }
 
-    "survive rountrip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
+    "survive round-trip from CValue -> Array[Byte] -> Column -> Array[Byte] -> CValue" in {
       val size = 10
 
       prop { (refs: List[ColumnRef]) =>

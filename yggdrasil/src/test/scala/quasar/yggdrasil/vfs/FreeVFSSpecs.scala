@@ -17,7 +17,10 @@
 package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RPath}
+import quasar.contrib.scalaz.catchable._
 import quasar.fs.MoveSemantics
+
+import cats.effect.IO
 
 import fs2.{Stream, Sink}
 
@@ -26,10 +29,13 @@ import org.specs2.matcher.DisjunctionMatchers
 
 import pathy.Path
 
-import scalaz.Need
-import scalaz.concurrent.Task
-import scalaz.syntax.monad._
 import iotaz.CopK
+
+import scalaz.Need
+import scalaz.syntax.monad._
+import scalaz.syntax.std.either._
+
+import shims._
 
 import scodec.Codec
 import scodec.bits.ByteVector
@@ -42,57 +48,51 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
   import POSIXOp._
   import StreamTestUtils._
 
-  type S[A] = POSIXWithTaskCopK[A]
+  type S[A] = POSIXWithIOCopK[A]
 
-  val H = Harness[S, Task]
+  val H = Harness[S, IO]
 
   val BaseDir = Path.rootDir </> Path.dir("foo")
 
   val currentVFSVersionBV =
     Codec.encode(FreeVFS.currentVFSVersion)
       .fold(
-        e => Task.fail(new RuntimeException(e.message)),
-        _.toByteVector.η[Task])
-      .unsafePerformSync
+        e => IO.raiseError(new RuntimeException(e.message)),
+        r => IO.pure(r.toByteVector))
+      .unsafeRunSync
 
   val currentMetaVersionBV =
     Codec.encode(FreeVFS.currentMetaVersion)
       .fold(
-        e => Task.fail(new RuntimeException(e.message)),
-        _.toByteVector.η[Task])
-      .unsafePerformSync
+        e => IO.raiseError(new RuntimeException(e.message)),
+        r => IO.pure(r.toByteVector))
+      .unsafeRunSync
 
   "vfs layer" should {
     "initialize from an empty state" in {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
         }
 
-        _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
           case CPL(OpenW(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
               assertionSinkBV(_ mustEqual currentMetaVersionBV)
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
-
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               false
@@ -101,7 +101,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         _ <- H.pattern[Unit] {
           case CPL(MkDir(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
             }
         }
@@ -115,7 +115,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"))
@@ -123,7 +123,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
+      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafeRunSync
 
       vfs must beLike {
         case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
@@ -142,21 +142,25 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               true
             }
         }
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               Stream.emit(currentVFSVersionBV)
             }
         }
+
+        _ <- H.pattern[Unit] {
+          case CPR(io) => io
+        }.replicateM(4)
 
         _ <- H.pattern[FreeVFS.VFSVersion] {
           case CPR(ta) =>
@@ -169,7 +173,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               true
@@ -185,7 +189,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"))
@@ -193,7 +197,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
+      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafeRunSync
 
       vfs must beLike {
         case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
@@ -212,33 +216,27 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               true
             }
         }
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               Stream.emit(ByteVector.fromInt(16384))
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
-
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               true
@@ -254,7 +252,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"))
@@ -262,42 +260,36 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSyncAttempt
+      val vfs = interp(FreeVFS.init[S](BaseDir)).attempt.unsafeRunSync
 
-      vfs.leftMap(_.getMessage) must be_-\/("Unexpected VERSION, 0100000000000000")
+      vfs.disjunction.leftMap(_.getMessage) must be_-\/("Unexpected VERSION, 0100000000000000")
     }
 
     "initialize from an empty state with pre-existing directory" in {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
         }
 
-        _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
           case CPL(OpenW(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               assertionSinkBV(_ mustEqual currentVFSVersionBV)
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
-
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               true
@@ -313,7 +305,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"))
@@ -321,7 +313,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
+      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafeRunSync
 
       vfs must beLike {
         case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
@@ -342,29 +334,27 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
         }
 
-        _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
           case CPL(OpenW(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               (_ => Stream.empty)
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               true
@@ -375,27 +365,31 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         headDir = BaseDir </> Path.dir("META") </> Path.dir(version.value.toString)
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (headDir </> Path.file("paths.json"))
 
               Stream(ByteVector("{}".getBytes))
             }
         }
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- drainIO
+
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (headDir </> Path.file("index.json"))
 
               Stream(ByteVector("{}".getBytes))
             }
         }
 
+        _ <- drainIO
+
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"))
@@ -403,7 +397,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
+      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafeRunSync
 
       vfs must beLike {
         case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
@@ -425,29 +419,27 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
         }
 
-        _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
           case CPL(OpenW(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               (_ => Stream.empty)
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               true
@@ -458,27 +450,31 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         headDir = BaseDir </> Path.dir("META") </> Path.dir(version.value.toString)
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (headDir </> Path.file("paths.json"))
 
               Stream(ByteVector(s"""{"/foo/bar":"${blob.value}"}""".getBytes))
             }
         }
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- drainIO
+
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (headDir </> Path.file("index.json"))
 
               Stream(ByteVector("""{"/foo/":["./bar"],"/":["./foo/"]}""".getBytes))
             }
         }
 
+        _ <- drainIO
+
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"), Path.dir(blob.value.toString))
@@ -486,7 +482,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
+      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafeRunSync
 
       vfs must beLike {
         case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
@@ -522,29 +518,27 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val interp = for {
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               false
             }
         }
 
-        _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
           case CPL(OpenW(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.file("VFSVERSION"))
 
               (_ => Stream.empty)
             }
         }
 
-        _ <- H.pattern[Unit] {
-          case CPR(ta) => ta
-        }
+        _ <- drainIO
 
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir("META"))
 
               true
@@ -555,27 +549,31 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         headDir = BaseDir </> Path.dir("META") </> Path.dir(version.value.toString)
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (headDir </> Path.file("paths.json"))
 
               Stream(ByteVector(s"""{"/foo/bar":"${blob.value}"}""".getBytes))
             }
         }
 
-        _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+        _ <- drainIO
+
+        _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
           case CPL(OpenR(target)) =>
-            Task delay {
+            IO {
               target mustEqual (headDir </> Path.file("index.json"))
 
               Stream(ByteVector("""{"/foo/":["./bar"],"/":["./foo/"]}""".getBytes))
             }
         }
 
+        _ <- drainIO
+
         _ <- H.pattern[List[RPath]] {
           case CPL(Ls(target)) =>
-            Task delay {
+            IO {
               target mustEqual BaseDir
 
               List(Path.dir("META"), Path.dir(blob.value.toString), Path.dir(extra.value.toString))
@@ -583,7 +581,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         }
       } yield ()
 
-      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafePerformSync
+      val vfs = interp(FreeVFS.init[S](BaseDir)).unsafeRunSync
 
       vfs must beLike {
         case VFS(BaseDir, VersionLog(vlogBase, committed, versions), paths, index, vlogs, blobs) =>
@@ -628,12 +626,12 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
       val interp = for {
         _ <- H.pattern[UUID] {
-          case CPL(GenUUID) => Task.now(blob.value)
+          case CPL(GenUUID) => IO.pure(blob.value)
         }
 
         _ <- H.pattern[Unit] {
           case CPL(MkDir(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir(blob.value.toString))
             }
         }
@@ -641,7 +639,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         _ <- vlogInit(BaseDir </> Path.dir(blob.value.toString), None)
       } yield ()
 
-      val result = interp(FreeVFS.scratch[S].eval(BlankVFS)).unsafePerformSync
+      val result = interp(FreeVFS.scratch[S].eval(BlankVFS)).unsafeRunSync
 
       result mustEqual blob
     }
@@ -652,16 +650,16 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
       val interp = for {
         _ <- H.pattern[UUID] {
-          case CPL(GenUUID) => Task.now(conflict.value)
+          case CPL(GenUUID) => IO.pure(conflict.value)
         }
 
         _ <- H.pattern[UUID] {
-          case CPL(GenUUID) => Task.now(blob.value)
+          case CPL(GenUUID) => IO.pure(blob.value)
         }
 
         _ <- H.pattern[Unit] {
           case CPL(MkDir(target)) =>
-            Task delay {
+            IO {
               target mustEqual (BaseDir </> Path.dir(blob.value.toString))
             }
         }
@@ -669,7 +667,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
         _ <- vlogInit(BaseDir </> Path.dir(blob.value.toString), None)
       } yield ()
 
-      val result = interp(FreeVFS.scratch[S].eval(BlankVFS.copy(blobs = Set(conflict)))).unsafePerformSync
+      val result = interp(FreeVFS.scratch[S].eval(BlankVFS.copy(blobs = Set(conflict)))).unsafeRunSync
 
       result mustEqual blob
     }
@@ -700,9 +698,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val blob = Blob(UUID.randomUUID())
       val target = Path.rootDir </> Path.file("foo")
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
-      val result = interp(FreeVFS.link[S](blob, target).eval(BlankVFS)).unsafePerformSync
+      val result = interp(FreeVFS.link[S](blob, target).eval(BlankVFS)).unsafeRunSync
 
       result mustEqual false
     }
@@ -716,9 +714,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           paths = Map(target -> blob),
           blobs = Set(blob))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
-      val result = interp(FreeVFS.link[S](blob, target).eval(vfs)).unsafePerformSync
+      val result = interp(FreeVFS.link[S](blob, target).eval(vfs)).unsafeRunSync
 
       result mustEqual false
     }
@@ -748,7 +746,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
               (indexJson mustEqual """{"/":["./bar","./foo"]}""")
           })
 
-      val (vfs2, result) = interp(FreeVFS.link[S](blob, target).apply(vfs)).unsafePerformSync
+      val (vfs2, result) = interp(FreeVFS.link[S](blob, target).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -765,10 +763,10 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
       val result =
-        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).eval(BlankVFS)).unsafePerformSync
+        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).eval(BlankVFS)).unsafeRunSync
 
       result mustEqual false
     }
@@ -780,10 +778,10 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
       val vfs = BlankVFS.copy(paths = Map(from -> Blob(UUID.randomUUID()), to -> blob))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
       val result =
-        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).eval(vfs)).unsafePerformSync
+        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).eval(vfs)).unsafeRunSync
 
       result mustEqual false
     }
@@ -793,12 +791,12 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = Path.rootDir </> Path.file("foo")
       val to = Path.rootDir </> Path.file("bar")
 
-      val vfs = BlankVFS.copy(paths = Map(from -> Blob(UUID.randomUUID())))
+      val vfs = BlankVFS.copy(paths = Map(from -> blob))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
       val result =
-        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfMissing).eval(vfs)).unsafePerformSync
+        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfMissing).eval(vfs)).unsafeRunSync
 
       result mustEqual false
     }
@@ -822,7 +820,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           _ mustEqual """{"/":["./bar"]}""")
 
       val (vfs2, result) =
-        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.Overwrite).apply(vfs)).unsafePerformSync
+        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.Overwrite).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -852,7 +850,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           _ mustEqual """{"/":["./bar"]}""")
 
       val (vfs2, result) =
-        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).apply(vfs)).unsafePerformSync
+        interp(FreeVFS.moveFile[S](from, to, MoveSemantics.FailIfExists).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -864,18 +862,14 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     }
 
     "moveDir fails with a non-existent source" in {
-      val blob = Blob(UUID.randomUUID())
-
       val source = Path.rootDir </> Path.dir("source")
-      val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
       val result =
-        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).eval(BlankVFS)).unsafePerformSync
+        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).eval(BlankVFS)).unsafeRunSync
 
       result mustEqual false
     }
@@ -888,7 +882,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(
@@ -898,10 +891,10 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             source -> Vector(Path.file("foo")),
             target -> Vector(Path.file("bar"))))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
       val result =
-        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).eval(vfs)).unsafePerformSync
+        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).eval(vfs)).unsafeRunSync
 
       result mustEqual false
     }
@@ -913,7 +906,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       val from = source </> Path.file("foo")
 
       val target = Path.rootDir </> Path.dir("target")
-      val to = target </> Path.file("foo")
 
       val vfs =
         BlankVFS.copy(
@@ -922,10 +914,10 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
             Path.rootDir -> Vector(Path.dir("source")),
             source -> Vector(Path.file("foo"))))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
       val result =
-        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfMissing).eval(vfs)).unsafePerformSync
+        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfMissing).eval(vfs)).unsafeRunSync
 
       result mustEqual false
     }
@@ -960,7 +952,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           })
 
       val (vfs2, result) =
-        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.Overwrite).apply(vfs)).unsafePerformSync
+        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.Overwrite).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -999,7 +991,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           })
 
       val (vfs2, result) =
-        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).apply(vfs)).unsafePerformSync
+        interp(FreeVFS.moveDir[S](source, target, MoveSemantics.FailIfExists).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -1013,9 +1005,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     "delete fails with non-existent target" in {
       val target = Path.rootDir </> Path.file("foo")
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
-      val result = interp(FreeVFS.delete[S](target).eval(BlankVFS)).unsafePerformSync
+      val result = interp(FreeVFS.delete[S](target).eval(BlankVFS)).unsafeRunSync
 
       result mustEqual false
     }
@@ -1036,7 +1028,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           _ mustEqual "{}",
           _ mustEqual "{}")
 
-      val (vfs2, result) = interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
+      val (vfs2, result) = interp(FreeVFS.delete[S](target).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -1066,7 +1058,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           _ mustEqual "{}")
 
       val (vfs2, result) =
-        interp(FreeVFS.delete[S](target).apply(vfs)).unsafePerformSync
+        interp(FreeVFS.delete[S](target).apply(vfs)).unsafeRunSync
 
       result mustEqual true
 
@@ -1100,9 +1092,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           List(version),
           Set(version))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
-      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafePerformSync
+      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(BlankVFS)).unsafeRunSync
 
       result must beNone
     }
@@ -1122,9 +1114,9 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           versions = Map(blob -> blobVLog),
           blobs = Set(blob))
 
-      val interp = ().point[Harness[S, Task, ?]]
+      val interp = ().point[Harness[S, IO, ?]]
 
-      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(vfs)).unsafePerformSync
+      val result = interp(FreeVFS.underlyingDir[S](blob, version).eval(vfs)).unsafeRunSync
 
       result must beSome(BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
     }
@@ -1143,7 +1135,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
       val interp = vlogInit(BaseDir </> Path.dir(blob.value.toString), Some(List(version)))
 
-      val (vfs2, result) = interp(FreeVFS.underlyingDir[S](blob, version).apply(vfs)).unsafePerformSync
+      val (vfs2, result) = interp(FreeVFS.underlyingDir[S](blob, version).apply(vfs)).unsafeRunSync
 
       result must beSome(BaseDir </> Path.dir(blob.value.toString) </> Path.dir(version.value.toString))
 
@@ -1155,11 +1147,11 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     // headOfBlob, fresh and commit are trivial delegates to VersionLog
   }
 
-  def vlogInit(baseDir: ADir, versions: Option[List[Version]]): Harness[S, Task, Unit] = {
+  def vlogInit(baseDir: ADir, versions: Option[List[Version]]): Harness[S, IO, Unit] = {
     for {
       _ <- H.pattern[Boolean] {
         case CPL(Exists(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.file("versions.json"))
 
             versions.isDefined
@@ -1169,18 +1161,20 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
       _ <- versions match {
         case Some(versions) =>
           for {
-            _ <- H.pattern[Stream[POSIXWithTask, ByteVector]] {
+            _ <- H.pattern[Stream[POSIXWithIO, ByteVector]] {
               case CPL(OpenR(target)) =>
-                Task delay {
+                IO {
                   target mustEqual (baseDir </> Path.file("versions.json"))
 
                   Stream(ByteVector(versions.map(v => s""""${v.value}"""").mkString("[", ",", "]").getBytes))
                 }
             }
 
+            _ <- drainIO
+
             _ <- H.pattern[List[RPath]] {
               case CPL(Ls(target)) =>
-                Task delay {
+                IO {
                   target mustEqual baseDir
 
                   versions.map(_.value.toString).map(Path.dir(_))
@@ -1190,18 +1184,20 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
         case None =>
           for {
-            _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+            _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
               case CPL(OpenW(target)) =>
-                Task delay {
+                IO {
                   target mustEqual (baseDir </> Path.file("versions.json.new"))
 
                   (_ => Stream.empty)
                 }
             }
 
+            _ <- drainIO
+
             _ <- H.pattern[Unit] {
               case CPL(Move(from, to)) =>
-                Task delay {
+                IO {
                   from mustEqual (baseDir </> Path.file("versions.json.new"))
                   to mustEqual (baseDir </> Path.file("versions.json"))
                 }
@@ -1209,7 +1205,7 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
             _ <- H.pattern[List[RPath]] {
               case CPL(Ls(target)) =>
-                Task delay {
+                IO {
                   target mustEqual baseDir
 
                   versions.toList.flatMap(_.map(v => Path.dir(v.value.toString)))
@@ -1223,12 +1219,12 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
   def persistMeta(
       baseDir: ADir,
       pathTest: String => Unit,
-      indexTest: String => Unit): Harness[S, Task, Unit] = {
+      indexTest: String => Unit): Harness[S, IO, Unit] = {
 
     for {
       uuid <- H.patternWithState[UUID, UUID] {
         case CPL(GenUUID) =>
-          Task delay {
+          IO {
             val uuid = UUID.randomUUID()
 
             (uuid, uuid)
@@ -1237,66 +1233,54 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
       _ <- H.pattern[Unit] {
         case CPL(MkDir(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.dir(uuid.toString))
           }
       }
 
-      _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+      _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("METAVERSION"))
             assertionSinkBV(_ mustEqual currentMetaVersionBV)
           }
       }
 
-      _ <- H.pattern[Unit] {
-        case CPR(ta) => ta
-      }
+      _ <- drainIO
 
-      _ <- H.pattern[Unit] {
-        case CPR(ta) => ta
-      }
-
-      _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+      _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("paths.json"))
             assertionSink(pathTest)
           }
       }
 
-      _ <- H.pattern[Unit] {
-        case CPR(ta) => ta
-      }
+      _ <- drainIO
 
-      _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+      _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.dir(uuid.toString) </> Path.file("index.json"))
             assertionSink(indexTest)
           }
       }
 
-      _ <- H.pattern[Unit] {
-        case CPR(ta) => ta
-      }
+      _ <- drainIO
 
-      _ <- H.pattern[Sink[POSIXWithTask, ByteVector]] {
+      _ <- H.pattern[Sink[POSIXWithIO, ByteVector]] {
         case CPL(OpenW(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.file("versions.json.new"))
             assertionSink(_ mustEqual s"""["${uuid.toString}"]""")
           }
       }
 
-      _ <- H.pattern[Unit] {
-        case CPR(ta) => ta
-      }
+      _ <- drainIO
 
       _ <- H.pattern[Unit] {
         case CPL(Move(from, to)) =>
-          Task delay {
+          IO {
             from mustEqual (baseDir </> Path.file("versions.json.new"))
             to mustEqual (baseDir </> Path.file("versions.json"))
           }
@@ -1304,14 +1288,14 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
 
       _ <- H.pattern[Unit] {
         case CPL(Delete(target)) =>
-          Task delay {
+          IO {
             target mustEqual (baseDir </> Path.dir("HEAD"))
           }
       }
 
       _ <- H.pattern[Boolean] {
         case CPL(LinkDir(from, to)) =>
-          Task delay {
+          IO {
             from mustEqual (baseDir </> Path.dir(uuid.toString))
             to mustEqual (baseDir </> Path.dir("HEAD"))
 
@@ -1321,6 +1305,11 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
     } yield ()
   }
 
-  val CPR = CopK.Inject[Task, S]
+  val CPR = CopK.Inject[IO, S]
+
   val CPL = CopK.Inject[POSIXOp, S]
+
+  val drainIO = H.whileDefined[Unit] {
+    case CPR(ioa) => ioa
+  }
 }

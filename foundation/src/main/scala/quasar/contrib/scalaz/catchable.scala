@@ -23,6 +23,7 @@ import java.lang.{Throwable, RuntimeException}
 import quasar.contrib.iota.{:<<:, ACopK}
 import quasar.fp.free.{injectNT, projectNT}
 
+import cats.effect.IO
 import scalaz._, Scalaz._, Leibniz.===
 import scalaz.concurrent.Task
 
@@ -34,6 +35,15 @@ trait CatchableInstances extends CatchableInstances0 {
 trait CatchableInstances0 {
   implicit def injectableTaskCatchable[S[_]](implicit I: Task :<: S): Catchable[Free[S, ?]] =
     catchable.freeCatchable[Task, S](injectNT[Task, S], projectNT[Task, S])
+
+  implicit val catsIOCatchable: Catchable[IO] =
+    new Catchable[IO] {
+      def attempt[A](ioa: IO[A]): IO[Throwable \/ A] =
+        ioa.attempt.map(_.disjunction)
+
+      def fail[A](err: Throwable): IO[A] =
+        IO.raiseError(err)
+    }
 }
 
 final class CatchableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Catchable[F]) {

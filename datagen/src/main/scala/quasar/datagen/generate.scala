@@ -20,8 +20,8 @@ import slamdata.Predef.Option
 import quasar.ejson.EJson
 import quasar.sst.{PopulationSST, SST}
 
+import cats.effect.Sync
 import fs2.Stream
-import fs2.util.Suspendable
 import matryoshka.{Corecursive, Recursive}
 import scalaz.{\/, Equal, Order}
 import scalaz.Scalaz._
@@ -37,7 +37,7 @@ object generate {
           maxCollLen: A,
           sst: PopulationSST[J, A] \/ SST[J, A])(
           implicit
-          F: Suspendable[F],
+          F: Sync[F],
           JC: Corecursive.Aux[J, EJson],
           JR: Recursive.Aux[J, EJson])
           : Option[Stream[F, J]] =

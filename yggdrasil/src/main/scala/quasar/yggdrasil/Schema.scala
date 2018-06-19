@@ -186,13 +186,13 @@ object Schema {
       case JNumberT | JTextT | JBooleanT | JNullT |
            JLocalDateTimeT | JLocalTimeT | JLocalDateT |
            JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT |
-           JIntervalT => leaf
-      case JArrayFixedT(elements)                                     => JArrayFixedT(elements.mapValues(inner))
-      case JObjectFixedT(fields)                                      => JObjectFixedT(fields.mapValues(inner))
-      case JUnionT(left, right)                                       => JUnionT(inner(left), inner(right))
-      case JArrayHomogeneousT(tpe)                                    => JArrayHomogeneousT(inner(tpe))
-      case arr @ JArrayUnfixedT                                       => arr
-      case obj @ JObjectUnfixedT                                      => obj
+           JIntervalT              => leaf
+      case JArrayFixedT(elements)  => JArrayFixedT(elements.mapValues(inner))
+      case JObjectFixedT(fields)   => JObjectFixedT(fields.mapValues(inner))
+      case JUnionT(left, right)    => JUnionT(inner(left), inner(right))
+      case JArrayHomogeneousT(tpe) => JArrayHomogeneousT(inner(tpe))
+      case JArrayUnfixedT          => JArrayUnfixedT
+      case JObjectUnfixedT         => JObjectUnfixedT
     }
 
     inner(jtype)
@@ -429,25 +429,25 @@ object Schema {
 
     case JTextT => ctpes.contains(CPath.Identity -> CString)
 
-    case JBooleanT => ctpes.contains(CPath.Identity, CBoolean)
+    case JBooleanT => ctpes.contains(CPath.Identity -> CBoolean)
 
-    case JNullT => ctpes.contains(CPath.Identity, CNull)
+    case JNullT => ctpes.contains(CPath.Identity -> CNull)
 
-    case JOffsetDateTimeT => ctpes.contains(CPath.Identity, COffsetDateTime)
-    case JOffsetTimeT     => ctpes.contains(CPath.Identity, COffsetTime)
-    case JOffsetDateT     => ctpes.contains(CPath.Identity, COffsetDate)
-    case JLocalDateTimeT  => ctpes.contains(CPath.Identity, CLocalDateTime)
-    case JLocalTimeT      => ctpes.contains(CPath.Identity, CLocalTime)
-    case JLocalDateT      => ctpes.contains(CPath.Identity, CLocalDate)
-    case JIntervalT       => ctpes.contains(CPath.Identity, CInterval)
+    case JOffsetDateTimeT => ctpes.contains(CPath.Identity -> COffsetDateTime)
+    case JOffsetTimeT     => ctpes.contains(CPath.Identity -> COffsetTime)
+    case JOffsetDateT     => ctpes.contains(CPath.Identity -> COffsetDate)
+    case JLocalDateTimeT  => ctpes.contains(CPath.Identity -> CLocalDateTime)
+    case JLocalTimeT      => ctpes.contains(CPath.Identity -> CLocalTime)
+    case JLocalDateT      => ctpes.contains(CPath.Identity -> CLocalDate)
+    case JIntervalT       => ctpes.contains(CPath.Identity -> CInterval)
 
-    case JObjectUnfixedT if ctpes.contains(CPath.Identity, CEmptyObject) => true
+    case JObjectUnfixedT if ctpes.contains(CPath.Identity -> CEmptyObject) => true
     case JObjectUnfixedT =>
       ctpes.exists {
         case (CPath(CPathField(_), _ *), _) => true
         case _                              => false
       }
-    case JObjectFixedT(fields) if fields.isEmpty => ctpes.contains(CPath.Identity, CEmptyObject)
+    case JObjectFixedT(fields) if fields.isEmpty => ctpes.contains(CPath.Identity -> CEmptyObject)
     case JObjectFixedT(fields) => {
       val keys = fields.keySet
       keys.forall { key =>
@@ -455,14 +455,14 @@ object Schema {
       }
     }
 
-    case JArrayUnfixedT if ctpes.contains(CPath.Identity, CEmptyArray) => true
+    case JArrayUnfixedT if ctpes.contains(CPath.Identity -> CEmptyArray) => true
     case JArrayUnfixedT =>
       ctpes.exists {
         case (CPath(CPathArray, _ *), _)    => true
         case (CPath(CPathIndex(_), _ *), _) => true
         case _                              => false
       }
-    case JArrayFixedT(elements) if elements.isEmpty => ctpes.contains(CPath.Identity, CEmptyArray)
+    case JArrayFixedT(elements) if elements.isEmpty => ctpes.contains(CPath.Identity -> CEmptyArray)
     case JArrayFixedT(elements) => {
       val indices = elements.keySet
       indices.forall { i =>

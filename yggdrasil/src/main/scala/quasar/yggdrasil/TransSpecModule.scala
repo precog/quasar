@@ -273,24 +273,24 @@ trait TransSpecModule extends FNModule {
       def normalize[A <: SourceType](ts: TransSpec[A], undef: TransSpec[A]): TransSpec[A] = {
         import scalaz.syntax.std.option._, scalaz.std.option._
         def flattenConcats: Option[TransSpec[A]] = {
-          def flattenOuterArrayConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+          def flattenOuterArrayConcats[X <: SourceType](proj: TransSpec[X]): Option[List[TransSpec[X]]] = proj match {
             case OuterArrayConcat(ls@_*) =>
               Some(ls.toList.flatMap(a => flattenOuterArrayConcats(a).getOrElse(a :: Nil)))
             case _ => None
           }
 
-          def flattenOuterObjectConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+          def flattenOuterObjectConcats[X <: SourceType](proj: TransSpec[X]): Option[List[TransSpec[X]]] = proj match {
             case OuterObjectConcat(ls@_*) =>
               Some(ls.toList.flatMap(a => flattenOuterObjectConcats(a).getOrElse(a :: Nil)))
             case _ => None
           }
 
-          def flattenInnerArrayConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+          def flattenInnerArrayConcats[X <: SourceType](proj: TransSpec[X]): Option[List[TransSpec[X]]] = proj match {
             case InnerArrayConcat(ls@_*) =>
               Some(ls.toList.flatMap(a => flattenInnerArrayConcats(a).getOrElse(a :: Nil)))
             case _ => None
           }
-          def flattenInnerObjectConcats[A <: SourceType](proj: TransSpec[A]): Option[List[TransSpec[A]]] = proj match {
+          def flattenInnerObjectConcats[X <: SourceType](proj: TransSpec[X]): Option[List[TransSpec[X]]] = proj match {
             case InnerObjectConcat(ls@_*) =>
               Some(ls.toList.flatMap(a => flattenInnerObjectConcats(a).getOrElse(a :: Nil)))
             case _ => None

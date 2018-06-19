@@ -16,32 +16,33 @@
 
 package quasar.yggdrasil.vfs
 
+import cats.effect.IO
+
 import fs2.{Sink, Stream}
 
 import scalaz.Free
-import scalaz.concurrent.Task
 
 import iotaz.CopK
 
 import scodec.bits.ByteVector
 
 private[vfs] object StreamTestUtils {
-  def assertionSinkBV(pred: ByteVector => Unit): Sink[POSIXWithTask, ByteVector] = { s =>
+  def assertionSinkBV(pred: ByteVector => Unit): Sink[POSIXWithIO, ByteVector] = { s =>
     s flatMap { bv =>
       Stream suspend {
         pred(bv)
 
-        val I = CopK.Inject[Task, POSIXWithTaskCopK]
+        val I = CopK.Inject[IO, POSIXWithIOCopK]
 
         // this is tricky, but we're doing it specifically so that the
-        // number of Task suspensions is equal between failure and
+        // number of IO suspensions is equal between failure and
         // success of the predicate (predicate assertion failure will be
-        // a suspended Task.fail)
-        Stream.eval(Free.liftF(I.inj(Task.now(()))))
+        // a suspended IO.raiseError)
+        Stream.eval(Free.liftF(I.inj(IO.pure(()))))
       }
     }
   }
 
-  def assertionSink(pred: String => Unit): Sink[POSIXWithTask, ByteVector] =
+  def assertionSink(pred: String => Unit): Sink[POSIXWithIO, ByteVector] =
     assertionSinkBV(bv => pred(new String(bv.toArray)))
 }

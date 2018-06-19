@@ -469,7 +469,7 @@ object CValueType {
 // Homogeneous arrays
 //
 case class CArray[A](value: Array[A], cType: CArrayType[A]) extends CWrappedValue[Array[A]] {
-  private final def leafEquiv[A](as: Array[A], bs: Array[A]): Boolean = {
+  private final def leafEquiv[X](as: Array[X], bs: Array[X]): Boolean = {
     var i      = 0
     var result = as.length == bs.length
     while (result && i < as.length) {

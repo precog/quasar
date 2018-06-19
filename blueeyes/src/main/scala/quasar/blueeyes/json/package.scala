@@ -28,8 +28,6 @@ package object json {
   def jobject(fields: JField*): JValue                                     = JObject(fields.toList)
   def jfield[A](name: String, value: A)(implicit d: Decomposer[A]): JField = JField(name, d(value))
 
-  private def ppath(p: String) = if (p startsWith ".") p else "." + p
-
   implicit def liftJPathField(name: String): JPathNode = JPathField(name)
   implicit def liftJPathIndex(index: Int): JPathNode   = JPathIndex(index)
   implicit def liftJPath(path: String): JPath          = JPath(path)

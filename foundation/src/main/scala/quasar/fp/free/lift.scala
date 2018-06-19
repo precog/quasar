@@ -24,6 +24,7 @@ object lift {
 
     def into[G[_]](implicit I: F :<: G): Free[G, A] =
       Free.liftF(I.inj(fa))
+
     def intoCopK[G[a] <: ACopK[a]](implicit I: F :<<: G): Free[G, A] =
       Free.liftF(I.inj(fa))
   }

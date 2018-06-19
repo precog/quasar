@@ -96,7 +96,7 @@ trait EvaluatorTestSupport extends StdLibEvaluatorStack
 
   object Table extends TableCompanion
 
-  private var initialIndices = mutable.Map[Path, Int]()    // if we were doing this for real: j.u.c.HashMap
-  private var currentIndex   = 0                      // if we were doing this for real: j.u.c.a.AtomicInteger
-  private val indexLock      = new AnyRef             // if we were doing this for real: DIE IN A FIRE!!!
+  private val initialIndices = mutable.Map[Path, Int]() // if we were doing this for real: j.u.c.HashMap
+  private var currentIndex   = 0                        // if we were doing this for real: j.u.c.a.AtomicInteger
+  private val indexLock      = new AnyRef               // if we were doing this for real: DIE IN A FIRE!!!
 }

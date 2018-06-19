@@ -22,9 +22,9 @@ import quasar._
 import quasar.blueeyes.json.JValue
 import quasar.common._
 import quasar.connector._
-import quasar.contrib.cats.effect._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.numeric._
@@ -39,13 +39,14 @@ import quasar.yggdrasil.bytecode.JType
 
 import argonaut._, Argonaut._
 
+import cats.Parallel
 import cats.effect.IO
-import io.chrisdavenport.scalaz.task._
+import cats.instances.list._
 
 import fs2.{async, Stream}
 import fs2.async.mutable.{Queue, Signal}
-import fs2.interop.cats.asyncInstance
-import fs2.interop.scalaz.{asyncInstance => scalazAsyncInstance}
+
+import iotaz.CopK
 
 import matryoshka._
 import matryoshka.implicits._
@@ -57,7 +58,8 @@ import pathy.Path._
 
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
-import iotaz.CopK
+
+import shims.monadToScalaz
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -150,12 +152,17 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
   def compile(cfg: Config): BackendDef.DefErrT[Task, (M ~> Task, Task[Unit])] = {
     val t: Task[String \/ (M ~> Task, Task[Unit])] = for {
-      cake <- Precog(cfg.dataDir)
+      cake <- Precog(cfg.dataDir).to[Task]
       connector <- lwc.init(cfg.uri).run
     } yield {
       connector.map {
         case (fs, shutdown) =>
-          (λ[M ~> Task](_.run((cake: Cake, fs))), cake.shutdown.to[Task] >> shutdown)
+          val dispose =
+            cake.mapK(λ[IO ~> Task](_.to[Task]))
+              .onDispose(shutdown)
+              .dispose
+
+          (λ[M ~> Task](_.run((cake.unsafeValue: Cake, fs))), dispose)
       }
     }
 
@@ -171,8 +178,6 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   // f.cataM(interpretM)
   def plan[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
       cp: T[QSM[T, ?]]): Backend[Repr] = {
-
-    def mapFuncPlanner[F[_]: Monad] = MapFuncPlanner[T, F, MapFunc[T, ?]]
 
     def qScriptCorePlanner = new QScriptCorePlanner[T, Backend](
       λ[IO ~> Backend](_.to[Task].liftM[MT].liftB),
@@ -195,7 +200,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan.apply(value)
         case _ => ???
       }
     }
@@ -207,7 +212,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(value)
+        case ShiftedRead(value) => shiftedReadPlanner.plan.apply(value)
       }
     }
 
@@ -215,6 +220,9 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
   }
 
   private def fileToPath(file: AFile): Path = Path(pathy.Path.posixCodec.printPath(file))
+
+  private def ioB[A](ioa: IO[A]): Backend[A] =
+    ioa.to[Task].liftM[MT].liftB
 
   object QueryFileModule extends QueryFileModule {
     import QueryFile._
@@ -246,13 +254,13 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
 
         populatorWithTermination = populator.flatMap(_ => q.enqueue1(Vector.empty))
 
-        ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits)).run
+        ingestor = repr.P.ingest(path, q.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits(_).covary[IO])).run
 
         // generally this function is bad news (TODO provide a way to ingest as a Stream)
-        _ <- Task.gatherUnordered(Seq(populatorWithTermination.to[Task], ingestor.to[Task])).to[IO]
+        _ <- Parallel.parSequence_[List, IO, IO.Par, Any](List(populatorWithTermination, ingestor))
       } yield ()
 
-      driver.to[Task].liftM[MT].liftB
+      ioB(driver)
     }
 
     def evaluatePlan(repr: Repr): Backend[ResultHandle] = {
@@ -262,26 +270,26 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         _ <- IO(map.put(handle, pager))
       } yield handle
 
-      t.to[Task].liftM[MT].liftB
+      ioB(t)
     }
 
     def more(h: ResultHandle): Backend[Vector[Data]] = {
       val t = for {
-        pager <- Task.delay(Option(map.get(h)).get)
+        pager <- IO(Option(map.get(h)).get)
         chunk <- pager.more
       } yield chunk
 
-      t.liftM[MT].liftB
+      ioB(t)
     }
 
     def close(h: ResultHandle): Configured[Unit] = {
       val t = for {
-        pager <- Task.delay(Option(map.get(h)).get)
-        check <- Task.delay(map.remove(h, pager))
-        _ <- if (check) pager.close else Task.now(())
+        pager <- IO(Option(map.get(h)).get)
+        check <- IO(map.remove(h, pager))
+        _ <- if (check) pager.close else IO.pure(())
       } yield ()
 
-      t.liftM[MT].liftM[ConfiguredT]
+      t.to[Task].liftM[MT].liftM[ConfiguredT]
     }
 
     def explain(repr: Repr): Backend[String] = "🤹".point[Backend]
@@ -291,10 +299,10 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         connectors <- cake[Backend]
         (precog, lwfs) = connectors
 
-        existsPrecog <- precog.fs.exists(dir).liftM[MT].liftB
+        existsPrecog <- ioB(precog.fs.exists(dir))
 
         backPrecog <- if (existsPrecog) {
-          precog.fs.listContents(dir).map(_.some).liftM[MT].liftB
+          ioB(precog.fs.listContents(dir)).map(_.some)
         } else {
           none[Set[PathSegment]].point[Backend]
         }
@@ -319,7 +327,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         connectors <- cake[Configured]
         (precog, lwfs) = connectors
 
-        precogExists <- precog.fs.exists(file).liftM[MT].liftM[ConfiguredT]
+        precogExists <- precog.fs.exists(file).to[Task].liftM[MT].liftM[ConfiguredT]
 
         back <- if (precogExists)
           true.point[Configured]
@@ -385,7 +393,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         }
 
         chunk <- reader.fold(
-          _.more,
+          _.more.to[Task],
           {
             case (bool, data) if !bool.getAndSet(true) =>
               // FIXME this pages the entire lwc dataset into memory, crashing the server
@@ -400,7 +408,7 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
       val t = for {
         reader <- Task.delay(Option(readMap.get(h)).get)
         check <- Task.delay(readMap.remove(h, reader))
-        _ <- if (check) reader.fold(_.close, _ => Task.now(())) else Task.now(())
+        _ <- if (check) reader.fold(_.close.to[Task], _ => Task.now(())) else Task.now(())
       } yield ()
 
       t.liftM[MT].liftM[ConfiguredT]
@@ -427,11 +435,11 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         val handle = WriteHandle(file, id)
 
         for {
-          queue <- Queue.bounded[IO, Vector[Data]](QueueLimit)(asyncInstance).to[Task].liftM[MT]
-          signal <- fs2.async.signalOf[IO, Boolean](false)(asyncInstance).to[Task].liftM[MT]
+          queue <- Queue.bounded[IO, Vector[Data]](QueueLimit).to[Task].liftM[MT]
+          signal <- fs2.async.signalOf[IO, Boolean](false).to[Task].liftM[MT]
 
           path = fileToPath(file)
-          jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits).map(JValue.fromData)
+          jvs = queue.dequeue.takeWhile(_.nonEmpty).flatMap(Stream.emits(_).covary[IO]).map(JValue.fromData)
 
           connectors <- cake[M]
           (precog, _) = connectors
@@ -505,14 +513,14 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
             connectors <- cake[Backend]
             (precog, _) = connectors
 
-            exists <- precog.fs.exists(from).liftM[MT].liftB
+            exists <- ioB(precog.fs.exists(from))
 
             _ <- if (exists)
               ().point[Backend]
             else
               MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
 
-            result <- precog.fs.moveDir(from, to, semantics).liftM[MT].liftB
+            result <- ioB(precog.fs.moveDir(from, to, semantics))
 
             _ <- if (result) {
               ().point[Backend]
@@ -531,14 +539,14 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
             connectors <- cake[Backend]
             (precog, _) = connectors
 
-            exists <- precog.fs.exists(from).liftM[MT].liftB
+            exists <- ioB(precog.fs.exists(from))
 
             _ <- if (exists)
               ().point[Backend]
             else
               MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(from)))
 
-            result <- precog.fs.moveFile(from, to, semantics).liftM[MT].liftB
+            result <- ioB(precog.fs.moveFile(from, to, semantics))
 
             _ <- if (result) {
               ().point[Backend]
@@ -562,14 +570,14 @@ trait SlamEngine extends BackendModule with Logging with DefaultAnalyzeModule {
         connectors <- cake[Backend]
         (precog, _) = connectors
 
-        exists <- precog.fs.exists(path).liftM[MT].liftB
+        exists <- ioB(precog.fs.exists(path))
 
         _ <- if (exists)
           ().point[Backend]
         else
           MonadError_[Backend, FileSystemError].raiseError(pathErr(pathNotFound(path)))
 
-        _ <- precog.fs.delete(path).liftM[MT].liftB
+        _ <- ioB(precog.fs.delete(path))
       } yield ()
     }
 

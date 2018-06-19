@@ -40,9 +40,6 @@ trait MemoryDatasetConsumer extends EvaluatorModule {
         (rvalue.toJValue \ "value") == JUndefined
       }
 
-      var extractIdTime: Long      = 0L
-      var jvalueToSValueTime: Long = 0L
-
       val events = json map { rvalue =>
         (Vector(extractIds(rvalue.toJValue \ "key"): _*), jvalueToSValue(rvalue.toJValue \ "value"))
       }

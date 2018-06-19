@@ -615,7 +615,7 @@ object Codec {
 
     def writeMore(more: S, sink: ByteBuffer): Option[S] = more match {
       case Left(as)       => writeInit(as, sink)
-      case Right((s, as)) => elemCodec.writeMore(s, sink) map (Right(_, as)) orElse writeArray(as.toList, sink)
+      case Right((s, as)) => elemCodec.writeMore(s, sink) map (s => Right((s, as))) orElse writeArray(as.toList, sink)
     }
 
     def read(src: ByteBuffer): IndexedSeq[A] =

@@ -165,7 +165,7 @@ trait TransSpecableModule extends TransSpecModule with TableModule with Evaluato
             result <- if (al == ar) {
                        set(pl, (transFromBinOp(op)(l, r), al))
                      } else {
-                       init(Leaf(Source), node)
+                       init(Leaf(Source) -> node)
                      }
           } yield result
         }
@@ -176,7 +176,7 @@ trait TransSpecableModule extends TransSpecModule with TableModule with Evaluato
             (l, al) = get(pl)
             pr <- rightParent
             (r, ar) = get(pr)
-            result <- if (al == ar) set(pl, (trans.Filter(l, r), al)) else init(Leaf(Source), node)
+            result <- if (al == ar) set(pl, (trans.Filter(l, r), al)) else init(Leaf(Source) -> node)
           } yield result
 
         def WrapArray(node: Operate)(parent: N[S]) =
@@ -197,7 +197,7 @@ trait TransSpecableModule extends TransSpecModule with TableModule with Evaluato
             result <- if (ap == al && al == ar)
                        set(pp, (trans.Cond(p, l, r), ap))
                      else
-                       init(Leaf(Source), node)
+                       init(Leaf(Source) -> node)
           } yield result
         }
 
@@ -211,9 +211,9 @@ trait TransSpecableModule extends TransSpecModule with TableModule with Evaluato
           }
         }
 
-        def unmatched(node: DepGraph) = init(Leaf(Source), node)
+        def unmatched(node: DepGraph) = init(Leaf(Source) -> node)
 
-        def done(node: DepGraph) = init(Leaf(Source), node)
+        def done(node: DepGraph) = init(Leaf(Source) -> node)
       }
     }
 
@@ -223,7 +223,6 @@ trait TransSpecableModule extends TransSpecModule with TableModule with Evaluato
                                                get: S => (TransSpec1, DepGraph),
                                                set: (S, (TransSpec1, DepGraph)) => N[S],
                                                init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
-
       foldDownTransSpecable(to, from)(transFold[N, S](to, from, ctx, get, set, init))
     }
 
@@ -233,7 +232,6 @@ trait TransSpecableModule extends TransSpecModule with TableModule with Evaluato
                                                     get: S => (TransSpec1, DepGraph),
                                                     set: (S, (TransSpec1, DepGraph)) => N[S],
                                                     init: ((TransSpec1, DepGraph)) => N[S]): N[S] = {
-
       foldDownTransSpecableOrder(to, from)(transFold[N, S](to, from, ctx, get, set, init))
     }
 

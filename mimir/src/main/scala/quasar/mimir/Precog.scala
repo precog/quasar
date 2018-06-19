@@ -16,6 +16,7 @@
 
 package quasar.mimir
 
+import quasar.Disposable
 import quasar.contrib.cats.effect._
 import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
 
@@ -33,23 +34,24 @@ import akka.routing.{
 }
 
 import cats.effect.IO
-import fs2.async
-import fs2.interop.scalaz._
-import io.chrisdavenport.scalaz.task._
+
+import shims._
 
 import org.slf4s.Logging
 
 import scalaz.concurrent.Task
+import scalaz.syntax.apply._
 
 import java.io.File
-import java.util.concurrent.CountDownLatch
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
 
-// calling this constructor is a side-effect; you must always shutdown allocated instances
-final class Precog private (dataDir0: File)
+final class Precog private (
+    dataDir0: File,
+    val actorSystem: ActorSystem,
+    val vfs: SerialVFS[IO])
     extends VFSColumnarTableModule
     with TablePagerModule
     with StdLibModule {
@@ -65,32 +67,6 @@ final class Precog private (dataDir0: File)
 
   val CookThreshold: Int = 20000
   val StorageTimeout: FiniteDuration = 300.seconds
-
-  private var _vfs: SerialVFS = _
-  def vfs = _vfs
-
-  private val vfsLatch = new CountDownLatch(1)
-
-  private val vfsShutdownSignal =
-    async.signalOf[Task, Option[Unit]](Some(())).unsafePerformSync
-
-  {
-    // setup VFS stuff as a side-effect (and a race condition!)
-    val vfsStr = SerialVFS(dataDir0).evalMap { v =>
-      Task delay {
-        _vfs = v
-        vfsLatch.countDown()
-      }
-    }
-
-    val gated = vfsStr.mergeHaltBoth(vfsShutdownSignal.discrete.noneTerminate.drain)
-
-    Precog.startTask(gated.run, vfsLatch.countDown()).unsafePerformSync
-    vfsLatch.await()      // sigh....
-  }
-
-  val actorSystem: ActorSystem =
-    ActorSystem("nihdbExecutorActorSystem", classLoader = Some(getClass.getClassLoader))
 
   private val props: Props = Props(Chef(
     VersionedCookedBlockFormat(Map(1 -> V1CookedBlockFormat)),
@@ -113,19 +89,26 @@ final class Precog private (dataDir0: File)
   // Members declared in quasar.yggdrasil.TableModule
   sealed trait TableCompanion extends VFSColumnarTableCompanion
   object Table extends TableCompanion
-
-  def shutdown: IO[Unit] = {
-    for {
-      _ <- vfsShutdownSignal.set(None).to[IO]
-      _ <- IO.fromFuture(IO(actorSystem.terminate.map(_ => ())))
-    } yield ()
-  }
 }
 
 object Precog extends Logging {
 
-  def apply(dataDir: File): Task[Precog] =
-    Task.delay(new Precog(dataDir))
+  def apply(dataDir: File): IO[Disposable[IO, Precog]] =
+    for {
+      vfsd <- SerialVFS[IO](dataDir)
+
+      sysd <- IO {
+        val sys = ActorSystem(
+          "nihdbExecutorActorSystem",
+          classLoader = Some(getClass.getClassLoader))
+
+        Disposable(sys, IO.fromFuture(IO(sys.terminate.map(_ => ()))))
+      }
+
+      pcd <- IO((vfsd |@| sysd) {
+        case (vfs, sys) => new Precog(dataDir, sys, vfs)
+      })
+    } yield pcd
 
   // utility function for running a Task in the background
   def startTask(ta: Task[_], cb: => Unit): Task[Unit] =

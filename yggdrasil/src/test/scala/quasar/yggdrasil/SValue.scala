@@ -187,8 +187,6 @@ trait SValueInstances {
 
     private val stringOrder = scalaz.Order[String].order _ curried
     private val boolOrder   = scalaz.Order[Boolean].order _ curried
-    private val longOrder   = scalaz.Order[Long].order _ curried
-    private val doubleOrder = scalaz.Order[Double].order _ curried
     private val numOrder    = scalaz.Order[BigDecimal].order _ curried
 
     def order(sv1: SValue, sv2: SValue) = paired(sv1, sv2).fold(typeIndex(sv1) ?|? typeIndex(sv2))(
@@ -218,8 +216,6 @@ trait SValueInstances {
 
     private val stringEqual = (Equal[String].equal _).curried
     private val boolEqual   = (Equal[Boolean].equal _).curried
-    private val longEqual   = (Equal[Long].equal _).curried
-    private val doubleEqual = (Equal[Double].equal _).curried
     private val numEqual    = (Equal[BigDecimal].equal _).curried
 
     def equal(sv1: SValue, sv2: SValue) = paired(sv1, sv2).fold(false)(

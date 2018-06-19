@@ -326,8 +326,11 @@ trait ColumnarTableModule
     with SamplableColumnarTableModule
     with IndicesModule {
 
-  // shadow instance of scalaz type classes for `Id`
-  private val idInstance: Int = 1
+  // shadow instance of scalaz type classes for `Id`,
+  // because with shims we have ambiguous instances
+  // the right-hand side is necessary to prevent `idInstance`
+  // from being marked unused.
+  private val idInstance: Int = idInstance + 1
 
   import TableModule._
   import trans.{Range => _, _}
@@ -1504,6 +1507,144 @@ trait ColumnarTableModule
         (remapped, emit, unfocused)
       }
 
+      def merge(focused: Map[ColumnRef, Column], innerIndex: Map[CPathNode, Int], expansion: CF1, highWaterMark: Int)
+          : Map[ColumnRef, Column] = {
+
+        val remapped: List[(ColumnRef, Column)] = focused.toList map {
+          case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
+            ???
+
+          // because of how we have defined things, path is guaranteed NOT to be Identity now
+          case (ColumnRef(path, tpe), col) =>
+            val head = path.head.get
+            val locus = innerIndex(head)
+
+            // explode column and then sparsen by mod ring
+            val expanded =
+              expansion.andThen(cf.util.filterBy(_ % highWaterMark == locus))(col).get
+
+            ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
+        }
+
+        // put together all the same-ref columns which now are mapped to the same path
+        remapped.groupBy(_._1).map({
+          // the key here is the column ref; the value is the list of same-type pairs
+          case (ref, toMerge) =>
+            ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
+        })(collection.breakOut)
+      }
+
+      def idColumns(innerHeads: Vector[CPathNode], pathNode: CPathNode, definedness: BitSet)
+          : Map[ColumnRef, Column] = {
+
+        val refinedHeads: Vector[String \/ Int] = innerHeads collect {
+          case CPathField(field) => -\/(field)
+          case CPathIndex(idx) => \/-(idx)
+        }
+
+        val hasFields: Boolean = refinedHeads.exists(_.isLeft)
+        val hasIndices: Boolean = refinedHeads.exists(_.isRight)
+
+        // generate the field names column
+        val fieldsCol: Option[Column] = if (hasFields) {
+          val loci = refinedHeads.zipWithIndex collect {
+            case (-\/(_), i) => i
+          } toSet
+
+          val col = new StrColumn {
+            def apply(row: Int) = {
+              val -\/(back) = refinedHeads(row % refinedHeads.length)
+              back
+            }
+
+            def isDefinedAt(row: Int) =
+              loci(row % refinedHeads.length) && definedness(row)
+          }
+
+          Some(col)
+        } else {
+          None
+        }
+
+        // generate the array indices column
+        val indicesCol: Option[Column] = if (hasIndices) {
+          val loci = refinedHeads.zipWithIndex collect {
+            case (\/-(_), i) => i
+          } toSet
+
+          val col = new LongColumn {
+            def apply(row: Int) = {
+              val \/-(back) = refinedHeads(row % refinedHeads.length)
+              back
+            }
+
+            def isDefinedAt(row: Int) =
+              loci(row % refinedHeads.length) && definedness(row)
+          }
+
+          Some(col)
+        } else {
+          None
+        }
+
+        // put the fields and index columns into the same path, in the first index of the array
+        val fassigned: List[(ColumnRef, Column)] =
+          fieldsCol.map(col => ColumnRef(pathNode, CString) -> col).toList
+        val iassigned: List[(ColumnRef, Column)] =
+          indicesCol.map(col => ColumnRef(pathNode, CLong) -> col).toList
+
+        // merge them together to produce the heterogeneous output
+        Map(fassigned ++ iassigned: _*)
+      }
+
+      def leftShiftFocused(merged: Map[ColumnRef, Column], innerHeads: Vector[CPathNode], definedness: BitSet)
+          : Map[ColumnRef, Column] = {
+
+        // move all of our results into index 1 of an array
+        val indexed: Map[ColumnRef, Column] = merged map {
+          case (ColumnRef(path, tpe), col) =>
+            ColumnRef(1 \: path, tpe) -> col
+        }
+
+        // .. and our ids into index 0 of an array
+        val idCols: Map[ColumnRef, Column] = idColumns(innerHeads, CPathIndex(0), definedness)
+
+        // put the focus prefix BACK on the results and ids (which are now in an array together)
+        (indexed ++ idCols) map {
+          case (ColumnRef(path, tpe), col) =>
+            ColumnRef(focus \ path, tpe) -> col
+        }
+      }
+
+      def leftshiftUnfocused(
+        unfocused: Map[ColumnRef, Column],
+        size: Int,
+        definedness: BitSet,
+        emit: BitSet,
+        expansion: CF1,
+        highWaterMark: Int)
+          : Map[ColumnRef, Column] = {
+
+        // expand all of the unfocused columns
+        val unfocusedExpanded: Map[ColumnRef, Column] = unfocused map {
+          case (ref, col) => ref -> expansion(col).get
+        }
+
+        // additional definedness bitset:
+        // we need to keep every first expanded row
+        // in unfocused that's marked to be kept according to the emit bitset
+        val keep: BitSet = definedness |
+          BitSetUtil.filteredRange(0, size * highWaterMark)(i =>
+            (i % highWaterMark == 0) && emit(i / highWaterMark))
+
+        // we need to go back to our original columns and filter them by results
+        // if we don't do this, the data will be highly sparse (like an outer join)
+        unfocusedExpanded map {
+          case (ref, col) =>
+            ref -> cf.util.filter(0, size * highWaterMark, keep)(col).get
+        }
+      }
+
       // eagerly force the slices, since we'll be backtracking within each
       val slices2: StreamT[IO, Slice] = slices.map(_.materialized) flatMap { slice =>
         val (focused, emit, unfocused) = lens(slice)
@@ -1571,123 +1712,19 @@ trait ColumnarTableModule
           // a CF1 for inflating column sizes to account for shifting
           val expansion = cf.util.Remap(_ / highWaterMark)
 
-          // expand all of the unfocused columns, then mostly leave them alone
-          val unfocusedExpanded: Map[ColumnRef, Column] = unfocused map {
-            case (ref, col) => ref -> expansion(col).get
-          }
-
-          val remapped: List[(ColumnRef, Column)] = focused.toList map {
-            case (ColumnRef(CPath.Identity, CArrayType(tpe)), col: HomogeneousArrayColumn[a]) =>
-              ???
-
-            // because of how we have defined things, path is guaranteed NOT to be Identity now
-            case (ColumnRef(path, tpe), col) =>
-              val head = path.head.get
-              val locus = innerIndex(head)
-
-              // explode column and then sparsen by mod ring
-              val expanded =
-                expansion.andThen(cf.util.filterBy(_ % highWaterMark == locus))(col).get
-
-              ColumnRef(path.dropPrefix(head).get, tpe) -> expanded
-          }
-
-          // put together all the same-ref columns which now are mapped to the same path
-          val merged: Map[ColumnRef, Column] = remapped.groupBy(_._1).map({
-            // the key here is the column ref; the value is the list of same-type pairs
-            case (ref, toMerge) =>
-              ref -> toMerge.map(_._2).reduce(cf.util.UnionRight(_, _).get)
-          })(collection.breakOut)
+          val merged: Map[ColumnRef, Column] =
+            merge(focused, innerIndex, expansion, highWaterMark)
 
           // figure out the definedness of the exploded, filtered result
           // this is necessary so we can implement inner-concat semantics
           val definedness: BitSet =
             merged.values.map(_.definedAt(0, slice.size * highWaterMark)).reduceOption(_ | _).getOrElse(new BitSet)
 
-          // move all of our results into second index of an array
-          val indexed: Map[ColumnRef, Column] = merged map {
-            case (ColumnRef(path, tpe), col) =>
-              ColumnRef(1 \: path, tpe) -> col
-          }
+          val focusedTransformed: Map[ColumnRef, Column] =
+            leftShiftFocused(merged, innerHeads, definedness)
 
-          val refinedHeads: Vector[String \/ Int] = innerHeads collect {
-            case CPathField(field) => -\/(field)
-            case CPathIndex(idx) => \/-(idx)
-          }
-
-          val hasFields: Boolean = refinedHeads.exists(_.isLeft)
-          val hasIndices: Boolean = refinedHeads.exists(_.isRight)
-
-          // generate the field names column
-          val fieldsCol: Option[Column] = if (hasFields) {
-            val loci = refinedHeads.zipWithIndex collect {
-              case (-\/(_), i) => i
-            } toSet
-
-            val col = new StrColumn {
-              def apply(row: Int) = {
-                val -\/(back) = refinedHeads(row % refinedHeads.length)
-                back
-              }
-
-              def isDefinedAt(row: Int) =
-                loci(row % refinedHeads.length) && definedness(row)
-            }
-
-            Some(col)
-          } else {
-            None
-          }
-
-          // generate the array indices column
-          val indicesCol: Option[Column] = if (hasIndices) {
-            val loci = refinedHeads.zipWithIndex collect {
-              case (\/-(_), i) => i
-            } toSet
-
-            val col = new LongColumn {
-              def apply(row: Int) = {
-                val \/-(back) = refinedHeads(row % refinedHeads.length)
-                back
-              }
-
-              def isDefinedAt(row: Int) =
-                loci(row % refinedHeads.length) && definedness(row)
-            }
-
-            Some(col)
-          } else {
-            None
-          }
-
-          // put the fields and index columns into the same path, in the first index of the array
-          val fassigned: List[(ColumnRef, Column)] =
-            fieldsCol.map(col => ColumnRef(CPathIndex(0), CString) -> col).toList
-          val iassigned: List[(ColumnRef, Column)] =
-            indicesCol.map(col => ColumnRef(CPathIndex(0), CLong) -> col).toList
-
-          // merge them together to produce the heterogeneous output
-          val idCols: Map[ColumnRef, Column] = Map(fassigned ++ iassigned: _*)
-
-          // put the focus prefix BACK on the results and ids (which are now in an array together)
-          val focusedTransformed: Map[ColumnRef, Column] = (indexed ++ idCols) map {
-            case (ColumnRef(path, tpe), col) =>
-              ColumnRef(focus \ path, tpe) -> col
-          }
-
-          // additional definedness bitset:
-          // we need to keep every first expanded row
-          // in unfocused that's marked to be kept according to the emit bitset
-          val keep: BitSet = definedness |
-            BitSetUtil.filteredRange(0, slice.size * highWaterMark)(i =>
-              (i % highWaterMark == 0) && emit(i / highWaterMark))
-
-          // we need to go back to our original columns and filter them by results
-          // if we don't do this, the data will be highly sparse (like an outer join)
-          val unfocusedTransformed: Map[ColumnRef, Column] = unfocusedExpanded map {
-            case (ref, col) =>
-              ref -> cf.util.filter(0, slice.size * highWaterMark, keep)(col).get
-          }
+          val unfocusedTransformed: Map[ColumnRef, Column] =
+            leftshiftUnfocused(unfocused, slice.size, definedness, emit, expansion, highWaterMark)
 
           // glue everything back together with the unfocused and compute the new size
           Slice(focusedTransformed ++ unfocusedTransformed, slice.size * highWaterMark)

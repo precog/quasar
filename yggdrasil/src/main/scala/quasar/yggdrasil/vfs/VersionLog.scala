@@ -22,18 +22,18 @@ import quasar.contrib.iota.{:<<:, ACopK}
 
 import argonaut.{Argonaut, Parse}
 
+import cats.effect.IO
 import fs2.Stream
-import fs2.interop.scalaz.StreamScalazOps
 
 import pathy.Path
 
 import scalaz.{Free, Monad, StateT}
-import scalaz.concurrent.Task
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.string._
 import scalaz.syntax.monad._
 import scalaz.syntax.traverse._
+import shims.{monadToCats => _, _}
 
 import scodec.bits.ByteVector
 
@@ -57,7 +57,7 @@ object VersionLog {
   private val KeepLimit = 5
 
   // TODO failure recovery
-  def init[S[a] <: ACopK[a]](baseDir: ADir)(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): Free[S, VersionLog] = {
+  def init[S[a] <: ACopK[a]](baseDir: ADir)(implicit IP: POSIXOp :<<: S, IT: IO :<<: S): Free[S, VersionLog] = {
     for {
       exists <- POSIX.exists[S](baseDir </> VersionsJson)
 
@@ -67,16 +67,17 @@ object VersionLog {
 
           // TODO character encoding!
           fileString = fileStream.map(_.toArray).map(new String(_)).foldMonoid
-          json <- POSIXWithTask.generalize[S](fileString.runLast)
+          json <- POSIXWithIO.generalize[S](fileString.compile.last)
         } yield json.flatMap(Parse.decodeOption[List[Version]](_)).getOrElse(Nil)
       } else {
         for {
+
           vnew <- POSIX.openW[S](baseDir </> VersionsJsonNew)
 
           json = List[Version]().asJson.nospaces
           // TODO character encoding!
-          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
-          _ <- POSIXWithTask.generalize(writer)
+          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).run
+          _ <- POSIXWithIO.generalize(writer)
 
           _ <- POSIX.move[S](baseDir </> VersionsJsonNew, baseDir </> VersionsJson)
         } yield Nil
@@ -121,7 +122,7 @@ object VersionLog {
     StateTContrib.get[F, VersionLog].map(_.baseDir </> Path.dir(v.value.toString))
 
   // TODO add symlink
-  def commit[S[a] <: ACopK[a]](v: Version)(implicit IP: POSIXOp :<<: S, IT: Task :<<: S): StateT[Free[S, ?], VersionLog, Unit] = {
+  def commit[S[a] <: ACopK[a]](v: Version)(implicit IP: POSIXOp :<<: S, IT: IO :<<: S): StateT[Free[S, ?], VersionLog, Unit] = {
     for {
       log <- StateTContrib.get[Free[S, ?], VersionLog]
       log2 = log.copy(committed = v :: log.committed)
@@ -134,8 +135,8 @@ object VersionLog {
 
           json = log2.committed.asJson.nospaces
           // TODO character encoding!
-          writer = Stream.emit(ByteVector(json.getBytes)).to(vnew).run
-          _ <- POSIXWithTask.generalize(writer).liftM[ST]
+          writer = Stream.emit(ByteVector(json.getBytes)).covary[POSIXWithIO].to(vnew).run
+          _ <- POSIXWithIO.generalize(writer).liftM[ST]
 
           _ <- POSIX.move[S](log.baseDir </> VersionsJsonNew, log.baseDir </> VersionsJson).liftM[ST]
 

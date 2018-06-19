@@ -52,7 +52,11 @@ object ArrayHomogeneousArrayColumn {
   def apply[@specialized(Boolean, Long, Double) A: CValueType](defined: BitSet, values: Array[Array[A]]) =
     new ArrayHomogeneousArrayColumn(defined.copy, values)(CArrayType(CValueType[A]))
   def empty[@specialized(Boolean, Long, Double) A](size: Int)(implicit elemType: CValueType[A]): ArrayHomogeneousArrayColumn[A] = {
+    // this *is* used by the compiler to make the new array,
+    // by generating a `ClassTag[Array[A]]`.
     implicit val m: ClassTag[A] = elemType.classTag
+
+    val _ = m
 
     new ArrayHomogeneousArrayColumn(new BitSet, new Array[Array[A]](size))(CArrayType(elemType))
   }

@@ -113,7 +113,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
               // since -inf is not a legal value, it's a great starting point for
               // finding the max because any legal value will be greater.
               var zmax = Double.NegativeInfinity
-              val seen = RangeUtil.loopDefined(range, col) { i =>
+              RangeUtil.loopDefined(range, col) { i =>
                 val z = col(i)
                 if (z > zmax) zmax = z
               }
@@ -231,7 +231,7 @@ trait ReductionLibModule extends ColumnarTableLibModule {
             // TODO: exactness + overflow
             case col: DoubleColumn =>
               var t = 0.0
-              var seen = RangeUtil.loopDefined(range, col) { i =>
+              val seen = RangeUtil.loopDefined(range, col) { i =>
                 t += col(i)
               }
               if (seen) Some(BigDecimal(t)) else None
@@ -436,8 +436,8 @@ trait ReductionLibModule extends ColumnarTableLibModule {
         val result = schema.columns(JNumberT) map {
           case col: LongColumn =>
             var count = 0L
-            var sum   = new LongAdder()
-            var sumsq = new LongAdder()
+            val sum   = new LongAdder()
+            val sumsq = new LongAdder()
             val seen = RangeUtil.loopDefined(range, col) { i =>
               val z = col(i)
               count += 1

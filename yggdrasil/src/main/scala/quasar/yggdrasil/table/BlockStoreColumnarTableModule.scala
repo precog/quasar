@@ -754,10 +754,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
                 case (nextKeyTransform, kslice) => {
                   val (keyColumnRefs, keyColumns) = kslice.columns.toList.sortBy(_._1).unzip
                   if (keyColumnRefs.nonEmpty) {
-                    val keyRowFormat     = RowFormat.forSortingKey(keyColumnRefs)
-                    val keyColumnEncoder = keyRowFormat.ColumnEncoder(keyColumns)
-                    val keyComparator    = SortingKeyComparator(keyRowFormat, sortOrder.isAscending)
-
                     writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, streamId, jdbmState) flatMap { newJdbmState =>
                       storeTransformed(newJdbmState, tail, (nextKeyTransform, streamId) :: updatedTransforms)
                     }
@@ -785,9 +781,6 @@ trait BlockStoreColumnarTableModule extends ColumnarTableModule {
       val dataColumnEncoder       = dataRowFormat.ColumnEncoder(vColumns)
 
       val (keyColumnRefs, keyColumns) = kslice.columns.toList.sortBy(_._1).unzip
-      val keyRowFormat                = RowFormat.forSortingKey(keyColumnRefs)
-      val keyColumnEncoder            = keyRowFormat.ColumnEncoder(keyColumns)
-      val keyComparator               = SortingKeyComparator(keyRowFormat, sortOrder.isAscending)
 
       //M.point(println("writing slice from writeAligned; key: \n" + kslice + "\nvalue\n" + vslice)) >>
       writeRawSlices(kslice, sortOrder, vslice, vColumnRefs, dataColumnEncoder, indexNamePrefix, jdbmState)

@@ -18,6 +18,7 @@ package quasar.mimir
 
 import quasar.Data
 import quasar.contrib.pathy.{ADir, AFile, PathSegment}
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.fp.PrismNT
 import quasar.fs.{FileSystem, FileSystemType, Local, QueryFile, ReadFile}
 import quasar.fs.mount.ConnectionUri
@@ -52,17 +53,10 @@ object LocalLightweightFileSystem extends LightweightFileSystem {
         interp.apply(toFS(ReadFile.Read(handle))).map(_.toOption)
       }
     } yield {
-      // TODO don't create this manually
-      implicit val fs2ApplicativeTask = new fs2.util.Applicative[Task] {
-        def pure[A](a: A): Task[A] = scalaz.Applicative[Task].pure(a)
-        def ap[A,B](fa: Task[A])(f: Task[A => B]): Task[B] = scalaz.Apply[Task].ap(fa)(f)
-        def map[A,B](a: Task[A])(f: A => B): Task[B] = scalaz.Functor[Task].map(a)(f)
-      }
-
       val close: Task[Unit] =
         interp.apply(toFS(ReadFile.Close(handle)))
 
-      Stream.apply[Task, Data](data: _*).onFinalize(close)
+      Stream(data: _*).covary[Task].onFinalize(close)
     }
 
     back.run

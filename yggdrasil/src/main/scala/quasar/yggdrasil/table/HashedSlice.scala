@@ -106,37 +106,31 @@ private final case class BoolColumnHasher(columnRef: ColumnRef, column: BoolColu
 }
 
 private final case class OffsetDateTimeColumnHasher(columnRef: ColumnRef, column: OffsetDateTimeColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
   // TODO: come up with a good hash function
   protected final def hashImpl(row: Int): Int = ???
 }
 
 private final case class OffsetTimeColumnHasher(columnRef: ColumnRef, column: OffsetTimeColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
   // TODO: come up with a good hash function
   protected final def hashImpl(row: Int): Int = ???
 }
 
 private final case class OffsetDateColumnHasher(columnRef: ColumnRef, column: OffsetDateColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
   // TODO: come up with a good hash function
   protected final def hashImpl(row: Int): Int = ???
 }
 
 private final case class LocalDateTimeColumnHasher(columnRef: ColumnRef, column: LocalDateTimeColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
   // TODO: come up with a good hash function
   protected final def hashImpl(row: Int): Int = ???
 }
 
 private final case class LocalTimeColumnHasher(columnRef: ColumnRef, column: LocalTimeColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
   // TODO: come up with a good hash function
   protected final def hashImpl(row: Int): Int = ???
 }
 
 private final case class LocalDateColumnHasher(columnRef: ColumnRef, column: LocalDateColumn) extends ColumnHasher {
-  private val pathHash = columnRef.selector.hashCode
   // TODO: come up with a good hash function
   protected final def hashImpl(row: Int): Int = ???
 }

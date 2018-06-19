@@ -314,7 +314,6 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
         )
 
         val dataset1 = fromJson(sample.toStream, Some(3))
-        val dataset2 = fromJson(sample.toStream, Some(3))
 
         dataset1.cross(dataset1)(InnerObjectConcat(Leaf(SourceLeft), Leaf(SourceRight))).slices.uncons.unsafeRunSync must beLike {
           case Some((head, _)) => head.size must beLessThanOrEqualTo(Config.maxSliceSize)

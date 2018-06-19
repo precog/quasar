@@ -38,7 +38,7 @@ final class PreciseDataCodecSpec extends quasar.Qspec with DataGenerators {
     // NB: Because we may have elided any `NA` values from `d` when rendering.
     val decoded = encoded flatMap parsePrecise
 
-    Stream.pure(encoded)
+    Stream.emit(encoded)
       .unNone
       .through(codec.ejsonDecodePreciseData[Pure, J])
       .through(codec.ejsonEncodePreciseData[Pure, J])

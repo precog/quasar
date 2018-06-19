@@ -19,26 +19,32 @@ package quasar.mimir
 import slamdata.Predef._
 
 import quasar.blueeyes.json.JValue
+import quasar.contrib.fs2.convert.toStreamT
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._, eitherT._
+import quasar.contrib.scalaz.concurrent.task._
 import quasar.fs._
 import quasar.mimir.MimirCake._
 import quasar.precog.common.RValue
 import quasar.qscript._
+import quasar.yggdrasil.UnknownSize
 import quasar.yggdrasil.TransSpecModule.paths.{Key, Value}
 import quasar.yggdrasil.bytecode.JType
+import quasar.yggdrasil.table.Slice
 
-import fs2.interop.scalaz._
-import io.chrisdavenport.scalaz.task._
+import cats.arrow.FunctionK
+import cats.effect.{Effect, IO}
 import matryoshka._
 import pathy.Path._
 import scalaz._, Scalaz._
 import scalaz.concurrent.Task
 
+import scala.concurrent.ExecutionContext
+
 final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
     lift: FileSystemErrT[CakeM, ?] ~> F) {
 
-  def plan: AlgebraM[F, Const[ShiftedRead[AFile], ?], MimirRepr] = {
+  def plan(implicit ex: ExecutionContext): AlgebraM[F, Const[ShiftedRead[AFile], ?], MimirRepr] = {
     case Const(ShiftedRead(path, status)) => {
       type X[A] = EitherT[CakeM, FileSystemError, A]
 
@@ -73,16 +79,19 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                     // read from the lwc
                     case -\/(_) =>
                       lwfs.read(path) flatMap {
-                        case Some(stream) => for {
-                          // FIXME this pages the entire fs2.Stream into memory
-                          values <- stream
-                            .map(data => RValue.fromJValueRaw(JValue.fromData(data)))
-                            .runLog
-                          } yield {
+                        case Some(stream) =>
+                          val slices = stream.chunks.map { ch =>
+                            Slice.fromRValues(
+                              ch.toList.toStream.map(data =>
+                                RValue.fromJValueRaw(JValue.fromData(data))))
+                          }.translate(Lambda[FunctionK[Task, IO]](Effect[Task].toIO(_)))
+
+                          // TODO leaks resources
+                          val resultIO = toStreamT(slices).map(_.unsafeValue) map { slicesT =>
                             import P.trans._
 
                             // TODO depending on the id status we may not need to wrap the table
-                            P.Table.fromRValues(values.toStream)
+                            P.Table(slicesT, UnknownSize)
                               .transform(OuterObjectConcat(
                                 WrapObject(
                                   Scan(Leaf(Source), P.freshIdScanner),
@@ -91,6 +100,8 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                                   Leaf(Source),
                                   Value.name))).right[FileSystemError]
                           }
+
+                          resultIO.to[Task]
 
                         case None =>
                           Task.now(FileSystemError.readFailed(

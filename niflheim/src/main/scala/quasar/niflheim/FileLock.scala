@@ -21,14 +21,14 @@ import java.io.RandomAccessFile
 import java.nio.channels.{ FileChannel, FileLock => JFileLock }
 
 trait FileLock {
-  def release: Unit
+  def release(): Unit
 }
 
 class FileLockException(message: String) extends Exception(message)
 
 object FileLock {
   private case class LockHolder(channel: FileChannel, lock: JFileLock, lockFile: Option[File]) extends FileLock {
-    def release = {
+    def release() = {
       lock.release
       channel.close
 

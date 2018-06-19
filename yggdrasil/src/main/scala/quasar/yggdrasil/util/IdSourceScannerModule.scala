@@ -26,7 +26,7 @@ trait IdSourceScannerModule {
   def freshIdScanner = new CScanner {
     type A = Long
     def init = 0
-    private val id = Config.idSource.nextId()
+    val id = Config.idSource.nextId()
 
     def scan(pos: Long, cols: Map[ColumnRef, Column], range: Range): (A, Map[ColumnRef, Column]) = {
       val rawCols = cols.values.toArray

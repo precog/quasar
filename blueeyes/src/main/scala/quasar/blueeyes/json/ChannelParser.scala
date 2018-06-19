@@ -39,19 +39,19 @@ private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncPar
   @inline final def mask    = bufsize - 1
 
   // these are the actual byte arrays we'll use
-  var curr = new Array[Byte](bufsize)
-  var next = new Array[Byte](bufsize)
+  private var curr = new Array[Byte](bufsize)
+  private var next = new Array[Byte](bufsize)
 
   // these are the bytebuffers used to load the data
-  var bcurr = ByteBufferWrap(curr)
-  var bnext = ByteBufferWrap(next)
+  private var bcurr = ByteBufferWrap(curr)
+  private var bnext = ByteBufferWrap(next)
 
   // these are the bytecounts for each array
-  var ncurr = ch.read(bcurr)
-  var nnext = ch.read(bnext)
+  private var ncurr = ch.read(bcurr)
+  private var nnext = ch.read(bnext)
 
   var line = 0
-  var pos  = 0
+  private var pos  = 0
   protected[this] final def newline(i: Int) { line += 1; pos = i }
   protected[this] final def column(i: Int) = i - pos
 
@@ -65,9 +65,9 @@ private[json] final class ChannelParser(ch: ReadableByteChannel) extends SyncPar
     * clear that data and swap the buffers.
     */
   final def swap() {
-    var tmp  = curr; curr = next; next = tmp
-    var btmp = bcurr; bcurr = bnext; bnext = btmp
-    var ntmp = ncurr; ncurr = nnext; nnext = ntmp
+    val tmp  = curr; curr = next; next = tmp
+    val btmp = bcurr; bcurr = bnext; bnext = btmp
+    val ntmp = ncurr; ncurr = nnext; nnext = ntmp
   }
 
   /**

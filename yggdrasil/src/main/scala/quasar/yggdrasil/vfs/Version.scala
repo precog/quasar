@@ -14,21 +14,27 @@
  * limitations under the License.
  */
 
-package quasar.precog
+package quasar.yggdrasil.vfs
 
-import java.util.concurrent.atomic.AtomicInteger
+import argonaut._
 
-package object util {
-  /**
-    * Opaque symbolic identifier (like Int, but better!).
-    */
-  final class Identifier extends AnyRef
+import java.util.UUID
 
-  // Shared Int could easily overflow: Unshare? Extend to a Long? Different approach?
-  object IdGen extends IdGen
-  class IdGen {
-    private[this] val currentId = new AtomicInteger(0)
-    def nextInt(): Int = currentId.getAndIncrement()
-  }
 
+final case class Version(value: UUID) extends AnyVal
+
+object Version extends (UUID => Version) {
+  import Argonaut._
+
+  implicit val codec: CodecJson[Version] =
+    CodecJson[Version](v => jString(v.value.toString), { c =>
+      c.as[String] flatMap { str =>
+        try {
+          DecodeResult.ok(Version(UUID.fromString(str)))
+        } catch {
+          case _: IllegalArgumentException =>
+            DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+        }
+      }
+    })
 }

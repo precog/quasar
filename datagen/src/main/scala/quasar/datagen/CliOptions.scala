@@ -26,7 +26,7 @@ import java.nio.file.StandardOpenOption
 import scala.Console, Console.{RED, RESET}
 import scala.Predef.implicitly
 
-import fs2.util.Suspendable
+import cats.effect.Sync
 import eu.timepit.refined.scalaz._
 import monocle.macros.Lenses
 import monocle.syntax.fields._
@@ -63,7 +63,7 @@ object CliOptions extends CliOptionsInstances {
   object parse {
     def apply[F[_]] = new PartiallyApplied[F]
     final class PartiallyApplied[F[_]] {
-      def apply[C[_]: Foldable](args: C[String])(implicit F: Suspendable[F]): F[Option[CliOptions]] =
+      def apply[C[_]: Foldable](args: C[String])(implicit F: Sync[F]): F[Option[CliOptions]] =
         F.delay(Parser.parse(args.toList, InitialOpts) flatMap {
           case (i, n, o, soo, w) => (i |@| n |@| o)(CliOptions(_, _, _, soo, w))
         })

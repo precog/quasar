@@ -23,5 +23,5 @@ import fs2.Stream
 package object datagen {
   /** A stream that is failed with the given reason. */
   def failedStream[F[_], A](reason: String): Stream[F, A] =
-    Stream.fail(new RuntimeException(reason))
+    Stream.raiseError(new RuntimeException(reason)).covary[F]
 }

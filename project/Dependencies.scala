@@ -20,21 +20,17 @@ object Dependencies {
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
   private val http4sVersion       = "0.16.6a"
-  private val scalacheckVersion   = "1.13.4"
-  private val scalazVersion       = "7.2.18"
+  private val scalacheckVersion   = "1.14.0"
+  private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  // For unknown reason sbt-slamdata's specsVersion, 3.8.7,
-  // leads to a ParquetRDDE failure under a full test run
-  private val specsVersion        = "4.0.2"
+  private val specsVersion        = "4.2.0"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val deloreanVersion     = "1.2.42-scalaz-7.2"
-  private val fs2Version          = "0.9.6"
-  private val fs2ScalazVersion    = "0.2.0"
-  private val fs2CatsVersion      = "0.5.0"
+  private val fs2Version          = "1.0.0-M1"
 
   def foundation = Seq(
     "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
@@ -42,12 +38,9 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.codecommit"             %% "shims"                     % "1.2.1",
-    "org.typelevel"              %% "cats-effect"               % "1.0.0-RC",
-    "io.chrisdavenport"          %% "scalaz-task-effect"        % "0.1.0",
+    "org.typelevel"              %% "cats-effect"               % "1.0.0-RC2",
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "co.fs2"                     %% "fs2-io"                    % fs2Version,
-    "co.fs2"                     %% "fs2-scalaz"                % fs2ScalazVersion,
-    "co.fs2"                     %% "fs2-cats"                  % fs2CatsVersion,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
     "org.typelevel"              %% "algebra"                   % algebraVersion,
     "org.typelevel"              %% "spire"                     % spireVersion,
@@ -60,7 +53,7 @@ object Dependencies {
     "com.chuusai"                %% "shapeless"                 % shapelessVersion,
     "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
     "com.propensive"             %% "contextual"                % "1.0.1",
-    "io.frees"                   %% "iotaz-core"                % "0.3.8-SNAPSHOT",
+    "io.frees"                   %% "iotaz-core"                % "0.3.8",
     "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
     "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
     "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
@@ -68,7 +61,7 @@ object Dependencies {
     "org.specs2"                 %% "specs2-core"               % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
     "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
-    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.13") % Test,
+    "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
     "org.typelevel"              %% "shapeless-scalacheck"      % "0.6.1"                              % Test
   )
 
@@ -93,7 +86,6 @@ object Dependencies {
   def datagen = Seq(
     "co.fs2"           %% "fs2-core"       % fs2Version,
     "co.fs2"           %% "fs2-io"         % fs2Version,
-    "co.fs2"           %% "fs2-scalaz"     % fs2ScalazVersion,
     "com.github.scopt" %% "scopt"          % scoptVersion,
     "eu.timepit"       %% "refined-scalaz" % refinedVersion
   )
@@ -187,15 +179,13 @@ object Dependencies {
 
   def mimir = Seq(
     "io.verizon.delorean" %% "core" % deloreanVersion,
-    "co.fs2" %% "fs2-core"   % fs2Version,
-    "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion
+    "co.fs2" %% "fs2-core"   % fs2Version
   )
   def yggdrasil = Seq(
     "io.verizon.delorean" %% "core" % deloreanVersion,
     "co.fs2" %% "fs2-core"   % fs2Version,
     "co.fs2" %% "fs2-io"     % fs2Version,
-    "co.fs2" %% "fs2-scalaz" % fs2ScalazVersion,
-    "com.codecommit" %% "smock" % "0.3.1-specs2-4.0.2" % "test"
+    "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
   )
   def niflheim = Seq(
     "com.typesafe.akka"  %% "akka-actor" % akkaVersion,

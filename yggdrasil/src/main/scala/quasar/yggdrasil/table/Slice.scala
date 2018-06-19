@@ -32,7 +32,7 @@ import scalaz._, Scalaz._, Ordering._
 import shims._
 
 import java.nio.CharBuffer
-import java.time.{Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
+import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
 
 import scala.annotation.{switch, tailrec}
 import scala.collection.mutable
@@ -109,8 +109,8 @@ trait Slice { source =>
     val cols0 = (source.columns).toList sortBy { case (ref, _) => ref.selector }
     val cols  = cols0 map { case (_, col)                      => col }
 
-    def inflate[@specialized A: ClassTag](cols: Array[Int => A], row: Int) = {
-      val as = new Array[A](cols.length)
+    def inflate[@specialized X: ClassTag](cols: Array[Int => X], row: Int) = {
+      val as = new Array[X](cols.length)
       var i = 0
       while (i < cols.length) {
         as(i) = cols(i)(row)
@@ -119,7 +119,7 @@ trait Slice { source =>
       as
     }
 
-    def loopForall[A <: Column](cols: Array[A])(row: Int) = !cols.isEmpty && Loop.forall(cols)(_ isDefinedAt row)
+    def loopForall[X <: Column](cols: Array[X])(row: Int) = !cols.isEmpty && Loop.forall(cols)(_ isDefinedAt row)
 
     val columns: Map[ColumnRef, Column] = {
       Map((ColumnRef(CPath(CPathArray), CArrayType(tpe0)), tpe0 match {
@@ -1340,11 +1340,6 @@ trait Slice { source =>
         @inline
         def renderEmptyArray() {
           pushStr("[]")
-        }
-
-        @inline
-        def renderTimestamp(instant: Instant) {
-          renderString(instant.toString)
         }
 
         @inline

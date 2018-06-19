@@ -45,11 +45,11 @@ trait TransSpecModuleSpec extends TransSpecModule with FNDummyModule with Specif
         WrapObject(
           InnerArrayConcat(
             InnerArrayConcat(
-              WrapArray(DerefArrayStatic(Leaf(Source),CPathIndex(4))),
-              WrapArray(WrapObject(DerefArrayStatic(Leaf(Source),CPathIndex(6)),"baz"))),
+              WrapArray(leafSpec(4)),
+              WrapArray(WrapObject(leafSpec(6),"baz"))),
             WrapArray(DerefArrayStatic(Leaf(Source),CPathIndex(2)))),"bar"),
           WrapObject(
-            DerefArrayStatic(Leaf(Source),CPathIndex(0)),"foo"))
+            leafSpec(0),"foo"))
 
       result mustEqual expected
     }

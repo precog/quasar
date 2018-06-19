@@ -30,8 +30,8 @@ object POSIXOp {
 
   case object GenUUID extends POSIXOp[UUID]
 
-  final case class OpenW(target: AFile) extends POSIXOp[Sink[POSIXWithTask, ByteVector]]
-  final case class OpenR(target: AFile) extends POSIXOp[Stream[POSIXWithTask, ByteVector]]
+  final case class OpenW(target: AFile) extends POSIXOp[Sink[POSIXWithIO, ByteVector]]
+  final case class OpenR(target: AFile) extends POSIXOp[Stream[POSIXWithIO, ByteVector]]
 
   final case class Ls(target: ADir) extends POSIXOp[List[RPath]]
 

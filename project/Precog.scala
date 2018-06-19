@@ -14,6 +14,7 @@ object Build {
     //"-Ywarn-value-discard",
     //"-Ywarn-numeric-widen",
     //"-Ywarn-unused",
+    "-Xlint",
     "-Ywarn-unused-import")
 
   val defaultArgSet = Seq(

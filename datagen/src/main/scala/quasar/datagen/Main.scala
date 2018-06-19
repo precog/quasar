@@ -26,32 +26,34 @@ import quasar.contrib.iota.copkTraverse
 import java.io.File
 import scala.Console, Console.{RED, RESET}
 
+import cats.effect.{ExitCode, IO, IOApp, Sync}
+import cats.syntax.functor._
 import fs2.Stream
-import fs2.{io, text}
-import fs2.interop.scalaz._
-import fs2.util.Suspendable
+import fs2.text
+import fs2.io.file
 import matryoshka.data.Mu
-import scalaz.{\/, ImmutableArray}
-import scalaz.concurrent._
+import scalaz.\/
 import scalaz.std.anyVal._
+import scalaz.std.list._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
 import spire.std.double._
 
-object Main extends TaskApp {
+object Main extends IOApp {
 
-  override def run(args: ImmutableArray[String]) =
-    Stream.eval(CliOptions.parse[Task](args))
+  def run(args: List[String]) =
+    Stream.eval(CliOptions.parse[IO](args))
       .unNone
       .flatMap(opts =>
-        sstsFromFile[Task](opts.sstFile, opts.sstSource)
-          .flatMap(generatedJson[Task])
+        sstsFromFile[IO](opts.sstFile, opts.sstSource)
+          .flatMap(generatedJson[IO])
           .take(opts.outSize.value)
           .intersperse("\n")
           .through(text.utf8Encode)
-          .through(io.file.writeAllAsync(opts.outFile.toPath, opts.writeOptions)))
-      .run
-      .handleWith(printErrors)
+          .through(file.writeAllAsync(opts.outFile.toPath, opts.writeOptions)))
+      .compile
+      .drain
+      .redeemWith(printErrors, _ => IO.pure(ExitCode.Success))
 
   ////
 
@@ -62,17 +64,17 @@ object Main extends TaskApp {
   val MaxCollLength: Double = 10.0
 
   /** A stream of JSON-encoded records generated from the input `SSTS`. */
-  def generatedJson[F[_]: Suspendable](ssts: SSTS): Stream[F, String] =
+  def generatedJson[F[_]: Sync](ssts: SSTS): Stream[F, String] =
     generate.ejson[F](MaxCollLength, ssts)
       .getOrElse(failedStream("Unable to generate data from the provided SST."))
       .through(codec.ejsonEncodePreciseData[F, EJ])
 
   /** A stream of `SSTS` decoded from the given file. */
-  def sstsFromFile[F[_]: Suspendable](src: File, kind: SstSource): Stream[F, SSTS] = {
+  def sstsFromFile[F[_]: Sync](src: File, kind: SstSource): Stream[F, SSTS] = {
     def decodingErr[F[_], A](t: RenderedTree, msg: String): Stream[F, A] =
       failedStream(s"Failed to decode SST: ${msg}\n\n${t.shows}")
 
-    io.file.readAll[F](src.toPath, 4096)
+    file.readAll[F](src.toPath, 4096)
       .through(text.utf8Decode)
       .through(text.lines)
       .take(1)
@@ -81,10 +83,10 @@ object Main extends TaskApp {
         kind.fold(
           ej.decodeAs[PopulationSST[EJ, Double]] map (_.left),
           ej.decodeAs[SST[EJ, Double]] map (_.right)
-        ).fold(decodingErr, Stream.emit))
+        ).fold(decodingErr, Stream.emit(_).covary[F]))
   }
 
-  val printErrors: PartialFunction[Throwable, Task[Unit]] = {
+  val printErrors: PartialFunction[Throwable, IO[ExitCode]] = {
     case alreadyExists: java.nio.file.FileAlreadyExistsException =>
       printError(s"Output file already exists: ${alreadyExists.getFile}.")
 
@@ -95,6 +97,7 @@ object Main extends TaskApp {
       printError(other.getMessage)
   }
 
-  def printError(msg: String): Task[Unit] =
-    Task.delay(Console.err.println(s"${RESET}${RED}[ERROR] ${msg}${RESET}"))
+  def printError(msg: String): IO[ExitCode] =
+    IO(Console.err.println(s"${RESET}${RED}[ERROR] ${msg}${RESET}"))
+      .as(ExitCode.Error)
 }

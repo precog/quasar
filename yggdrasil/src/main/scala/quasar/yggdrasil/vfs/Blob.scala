@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.yggdrasil.vfs
 
-import quasar.{Data, Disposable}
-import quasar.api.DataSourceType
-import quasar.api.DataSourceError.InitializationError
-import quasar.connector.datasource.LightweightDataSource
+import argonaut._
 
-import argonaut.Json
-import cats.effect.Async
-import fs2.Stream
-import scalaz.\/
+import java.util.UUID
 
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
+final case class Blob(value: UUID) extends AnyVal
 
-  def lightweightDataSource[
-      F[_]: Async,
-      G[_]: Async](
-      config: Json)
-      : F[InitializationError[Json] \/ LightweightDataSource[F, Disposable[G, Stream[G, Data]]]]
+object Blob extends (UUID => Blob) {
+  import Argonaut._
+
+  implicit val codec: CodecJson[Blob] =
+    CodecJson[Blob](v => jString(v.value.toString), { c =>
+      c.as[String] flatMap { str =>
+        try {
+          DecodeResult.ok(Blob(UUID.fromString(str)))
+        } catch {
+          case _: IllegalArgumentException =>
+            DecodeResult.fail(s"string '${str}' is not a valid UUID", c.history)
+        }
+      }
+    })
 }

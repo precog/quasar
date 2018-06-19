@@ -14,24 +14,18 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.precog.util
 
-import quasar.{Data, Disposable}
-import quasar.api.DataSourceType
-import quasar.api.DataSourceError.InitializationError
-import quasar.connector.datasource.LightweightDataSource
+import java.util.concurrent.atomic.AtomicInteger
 
-import argonaut.Json
-import cats.effect.Async
-import fs2.Stream
-import scalaz.\/
+/**
+  * Opaque symbolic identifier (like Int, but better!).
+  */
+final class Identifier extends AnyRef
 
-trait LightweightDataSourceModule {
-  def kind: DataSourceType
-
-  def lightweightDataSource[
-      F[_]: Async,
-      G[_]: Async](
-      config: Json)
-      : F[InitializationError[Json] \/ LightweightDataSource[F, Disposable[G, Stream[G, Data]]]]
+// Shared Int could easily overflow: Unshare? Extend to a Long? Different approach?
+object IdGen extends IdGen
+class IdGen {
+  private[this] val currentId = new AtomicInteger(0)
+  def nextInt(): Int = currentId.getAndIncrement()
 }

@@ -19,18 +19,14 @@ package quasar.yggdrasil.vfs
 import quasar.contrib.pathy.APath
 import quasar.precog.util.IOUtils
 
+import cats.effect.Sync
 import fs2.{Chunk, Stream}
-import fs2.interop.scalaz._
 import fs2.io.file.{readAll, writeAll}
-import fs2.util.Suspendable
 
 import pathy.Path
 
-import scalaz.{~>, -\/, \/-, Free}
-import scalaz.concurrent.Task
-import scalaz.std.list._
-import scalaz.syntax.traverse._
-import iotaz.CopK
+import scalaz.{~>, -\/, \/-, Scalaz}, Scalaz._
+import shims._
 
 import scodec.bits.ByteVector
 
@@ -41,40 +37,40 @@ import java.util.UUID
 object RealPOSIX {
   import POSIXOp._
 
-  def apply(root: File): Task[POSIXOp ~> Task] = {
+  def apply[F[_]](root: File)(implicit F: Sync[F]): F[POSIXOp ~> F] = {
     def canonicalize(path: APath): File =
       new File(root, Path.posixCodec.printPath(path))
 
     mkdir(root) map { _ =>
-      λ[POSIXOp ~> Task] {
+      λ[POSIXOp ~> F] {
         case GenUUID =>
-          Task.delay(UUID.randomUUID())
+          F.delay(UUID.randomUUID())
 
         case OpenR(target) =>
           val ptarget = canonicalize(target).toPath()
 
           val stream =
-            readAll[POSIXWithTask](ptarget, 4096).chunks.map(c => ByteVector(c.toArray))
+            readAll[POSIXWithIO](ptarget, 4096).chunks.map(c => ByteVector(c.toArray))
 
-          Task.now(stream)
+          F.pure(stream)
 
         case OpenW(target) =>
           val ptarget = canonicalize(target).toPath()
 
-          val cmap: Stream[POSIXWithTask, ByteVector] => Stream[POSIXWithTask, Byte] =
-            _.map(_.toArray).map(Chunk.bytes).flatMap(Stream.chunk)
+          val cmap: Stream[POSIXWithIO, ByteVector] => Stream[POSIXWithIO, Byte] =
+            _.map(_.toArray).map(Chunk.bytes).flatMap(Stream.chunk(_).covary[POSIXWithIO])
 
-          val sink = writeAll[POSIXWithTask](ptarget).compose(cmap)
-          Task.now(sink)
+          val sink = writeAll[POSIXWithIO](ptarget).compose(cmap)
+          F.pure(sink)
 
         case Ls(target) =>
           val ftarget = canonicalize(target)
 
           for {
-            contents <- Task.delay(ftarget.list().toList)
+            contents <- F.delay(ftarget.list().toList)
 
             paths <- contents traverse { name =>
-              Task.delay(new File(ftarget, name).isDirectory()) map { isd =>
+              F.delay(new File(ftarget, name).isDirectory()) map { isd =>
                 if (isd)
                   Path.dir(name)
                 else
@@ -84,13 +80,13 @@ object RealPOSIX {
           } yield paths
 
         case MkDir(target) =>
-          Task.delay(canonicalize(target).mkdirs()).void
+          F.delay(canonicalize(target).mkdirs()).void
 
         case LinkDir(src, target) =>
           val psrc = canonicalize(src).toPath()
           val ptarget = canonicalize(target).toPath()
 
-          Task delay {
+          F.delay {
             try {
               Files.createSymbolicLink(ptarget, psrc)
 
@@ -104,7 +100,7 @@ object RealPOSIX {
           val psrc = canonicalize(src).toPath()
           val ptarget = canonicalize(target).toPath()
 
-          Task delay {
+          F.delay {
             try {
               Files.createSymbolicLink(ptarget, psrc)
 
@@ -118,49 +114,33 @@ object RealPOSIX {
           val psrc = canonicalize(src).toPath()
           val ptarget = canonicalize(target).toPath()
 
-          Task delay {
+          F.delay {
             Files.move(psrc, ptarget, StandardCopyOption.ATOMIC_MOVE)
 
             ()
           }
 
         case Exists(target) =>
-          Task.delay(canonicalize(target).exists())
+          F.delay(canonicalize(target).exists())
 
         case Delete(target) =>
           val ftarget = canonicalize(target)
 
           Path.refineType(target) match {
             case -\/(dir) =>
-              Task delay {
+              F.delay {
                 if (Files.isSymbolicLink(ftarget.toPath()))
                   Files.delete(ftarget.toPath())
                 else
                   IOUtils.recursiveDelete(ftarget).unsafePerformIO()
               }
 
-            case \/-(file) => Task.delay(ftarget.delete()).void
+            case \/-(file) => F.delay(ftarget.delete()).void
           }
       }
     }
   }
 
-  private def mkdir(root: File): Task[Unit] = Task.delay(root.mkdirs())
-
-  private implicit def pwtSuspendable: Suspendable[POSIXWithTask] =
-    new Suspendable[POSIXWithTask] {
-      val I = CopK.Inject[Task, POSIXWithTaskCopK]
-
-      def pure[A](a: A): POSIXWithTask[A] =
-        Free.pure(a)
-
-      def flatMap[A, B](fa: POSIXWithTask[A])(f: A => POSIXWithTask[B]): POSIXWithTask[B] =
-        fa.flatMap(f)
-
-      def suspend[A](fa: => POSIXWithTask[A]): POSIXWithTask[A] =
-        flatMap(delay(fa))(x => x)
-
-      override def delay[A](a: => A): POSIXWithTask[A] =
-        Free.liftF(I.inj(Task.delay(a)))
-    }
+  private def mkdir[F[_]](root: File)(implicit F: Sync[F]): F[Unit] =
+    F.delay(root.mkdirs())
 }

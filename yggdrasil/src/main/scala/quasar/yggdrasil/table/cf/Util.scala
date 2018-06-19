@@ -131,7 +131,7 @@ object util {
 
     // Closest thing we can get to casting an array. This is completely unsafe.
     private def copyCastArray[A: ClassTag](as: Array[_]): Array[A] = {
-      var bs = new Array[A](as.length)
+      val bs = new Array[A](as.length)
       System.arraycopy(as, 0, bs, 0, as.length)
       bs
     }

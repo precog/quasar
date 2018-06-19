@@ -107,7 +107,7 @@ trait EvaluatorModule
               for {
                 pending <- f(graph)
                 _ <- monadState.modify { state =>
-                      state.copy(assume = state.assume + (graph -> (pending.table, pending.sort)))
+                      state.copy(assume = state.assume + (graph -> (pending.table -> pending.sort)))
                     }
               } yield pending
             }
@@ -130,7 +130,7 @@ trait EvaluatorModule
         def set0(pt: PendingTable, tg: (TransSpec1, DepGraph)): StateT[IO, EvaluatorState, PendingTable] = {
           for {
             _ <- monadState.modify { state =>
-                  state.copy(assume = state.assume + (tg._2 -> (pt.table, pt.sort)))
+                  state.copy(assume = state.assume + (tg._2 -> (pt.table -> pt.sort)))
                 }
           } yield pt.copy(trans = tg._1, graph = tg._2)
         }
@@ -453,7 +453,7 @@ trait EvaluatorModule
 
               _ <- monadState.modify { state =>
                     state.copy(
-                      assume = state.assume + (m         -> (wrapped, IdentityOrder.empty)),
+                      assume = state.assume + (m         -> (wrapped -> IdentityOrder.empty)),
                       reductions = state.reductions + (m -> rvalue)
                     )
                   }

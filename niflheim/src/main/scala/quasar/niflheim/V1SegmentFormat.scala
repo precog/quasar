@@ -31,8 +31,6 @@ import scalaz.{Validation, Success, Failure}
 import scalaz.syntax.monad._
 
 object V1SegmentFormat extends SegmentFormat {
-  private val checksum = true
-
   object reader extends SegmentReader {
     private def wrapException[A](f: => A): Validation[IOException, A] = try {
       Success(f)

@@ -104,7 +104,7 @@ object AsyncParserSpec extends Specification {
   }
 
   private def chunkAll(async: AsyncParser, data: Array[Byte], f: () => Int) = {
-    var vs = mutable.ArrayBuffer.empty[JValue]
+    val vs = mutable.ArrayBuffer.empty[JValue]
     val n = data.length
     var i                   = 0
     var parser: AsyncParser = async
@@ -186,9 +186,9 @@ object AsyncParserSpec extends Specification {
   }
 
   def run1(chunks: Seq[Input], expected: Int) = {
-    var parser: AsyncParser = AsyncParser.stream()
-    var t0                  = System.nanoTime
-    var count               = 0
+    var parser = AsyncParser.stream()
+    val t0     = System.nanoTime
+    var count  = 0
     chunks.foreach { input =>
       val (AsyncParse(errors, results), p0) = parser(input)
       if (!errors.isEmpty) sys.error("errors: %s" format errors)
@@ -255,7 +255,7 @@ xyz
     val bs = json.getBytes(Utf8Charset)
     val c  = chunk(bs, 0, bs.length)
 
-    var p = AsyncParser.stream()
+    val p = AsyncParser.stream()
     val (AsyncParse(es, js), p2) = p(c)
 
     // we should only have parsed 1 valid record, and seen 1 error
@@ -386,7 +386,6 @@ object ArrayUnwrappingSpec extends Specification {
       }
 
       var i      = 0
-      var offset = 0
       var p      = parser
       var done   = false
       var seen   = 0

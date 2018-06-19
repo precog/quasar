@@ -29,8 +29,6 @@ import quasar.yggdrasil.TableModule.SortAscending
 
 import cats.effect.IO
 
-import fs2.interop.scalaz._
-
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._

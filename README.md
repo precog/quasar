@@ -1,6 +1,7 @@
 [![Travis](https://travis-ci.org/slamdata/quasar.svg?branch=master)](https://travis-ci.org/slamdata/quasar)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/pr5he90wye6ii8ml/branch/master?svg=true)](https://ci.appveyor.com/project/jdegoes/quasar/branch/master)
 [![Discord](https://img.shields.io/discord/373302030460125185.svg?logo=discord)](https://discord.gg/QNjwCg6)
+foo2
 
 # Quasar
 

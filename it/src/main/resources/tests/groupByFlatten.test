@@ -2,15 +2,9 @@
     "name": "group by flattened field",
     "backends": {
         "couchbase":         "pending",
-        "lwc_local":         "pendingIgnoreFieldOrder",
-        "marklogic_xml":     "pending",
-        "marklogic_json":    "pendingIgnoreFieldOrder",
-        "mimir":             "pendingIgnoreFieldOrder",
-        "mongodb_3_2":       "pending",
-        "mongodb_3_4":       "pending",
-        "mongodb_3_4_13":    "pending",
-        "mongodb_3_6":       "pending",
-        "mongodb_read_only": "pending"
+        "lwc_local":         "ignoreFieldOrder",
+        "marklogic_json":    "ignoreFieldOrder",
+        "mimir":             "ignoreFieldOrder"
     },
     "data": "slamengine_commits.data",
     "query": "select substring(parents[*].sha, 0, 1), count(*) from slamengine_commits group by substring(parents[*].sha, 0, 1)",

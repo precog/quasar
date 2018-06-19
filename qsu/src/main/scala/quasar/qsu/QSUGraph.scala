@@ -157,6 +157,26 @@ final case class QSUGraph[T[_[_]]](
   def overwriteAtRoot(qsu: QScriptUniform[T, Symbol]): QSUGraph[T] =
     QSUGraph(root, vertices.updated(root, qsu))
 
+  def corewriteM[F[_]: Monad](pf: PartialFunction[QSUGraph[T], F[QSUGraph[T]]]): F[QSUGraph[T]] = {
+    type ModifiedT[G[_], A] = StateT[G, QSUVerts[T], A]
+    val MS = MonadState[ModifiedT[F, ?], QSUVerts[T]]
+
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    def inner(g: QSUGraph[T]): F[QSUGraph[T]] =
+      pf.applyOrElse[QSUGraph[T], F[QSUGraph[T]]](g, _ => g.point[F]) >>= { transformed =>
+        val added: QSUVerts[T] = transformed.vertices -- g.vertices.keySet
+        transformed.unfold.traverse[ModifiedT[F, ?], QSUGraph[T]] { g0 =>
+          for {
+            prevVertices <- MS.get
+            newGraph     <- inner(g0.copy(vertices = g0.vertices ++ prevVertices)).liftM[ModifiedT]
+            _            <- MS.modify(_ ++ newGraph.vertices)
+          } yield newGraph
+        }.map(qsu => QSUGraph.refold(g.root, qsu)).eval(added)
+      }
+
+    inner(this)
+  }
+
   /**
    * Allows rewriting of arbitrary subgraphs.  Rewrites are
    * applied in a bottom-up (leaves-first) order, which avoids

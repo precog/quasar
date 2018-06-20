@@ -19,6 +19,7 @@ package quasar.yggdrasil.table
 import quasar.RCValueGenerators
 import quasar.blueeyes._
 import quasar.blueeyes.json._
+import quasar.fp.ski.ι
 import quasar.precog.BitSet
 import quasar.precog.TestSupport._
 import quasar.precog.common._
@@ -27,12 +28,11 @@ import quasar.time.DateGenerators
 import quasar.yggdrasil.TableModule.SortDescending
 
 import scala.util.Random
-import org.scalacheck.{Arbitrary, Gen}
-import Gen.listOfN
 
-class SliceSpec extends Specification with ScalaCheck {
-  import ArbitrarySlice._
+import org.scalacheck.{Arbitrary, Gen}, Gen.listOfN
+import org.specs2.matcher.Matcher
 
+class SliceSpec extends Specification with ScalaCheck with RCValueGenerators {
   import ArbitrarySlice._
 
   implicit def cValueOrdering: Ordering[CValue] = CValue.CValueOrder.toScalaOrdering
@@ -57,7 +57,7 @@ class SliceSpec extends Specification with ScalaCheck {
     })(collection.breakOut)
   }
 
-  def toCValues(slice: Slice) = sortableCValues(slice, Vector.empty) map (_._2)
+  def toCValues(slice: Slice): List[List[CValue]] = sortableCValues(slice, Vector.empty) map (_._2)
 
   def fakeSort(slice: Slice, sortKey: Vector[CPath]) =
     sortableCValues(slice, sortKey).sortBy(_._1).map(_._2)
@@ -71,6 +71,94 @@ class SliceSpec extends Specification with ScalaCheck {
   def stripUndefineds(cvals: List[CValue]): Set[CValue] =
     (cvals filter (_ != CUndefined)).toSet
 
+  def assertSlices(values: Vector[CValue], slices: Vector[Slice], expectedSliceSize: Matcher[Int]) = {
+    if (values.isEmpty) slices.size must be_==(0)
+    else slices.size must expectedSliceSize
+
+    slices.map(s => toCValues(s)).foldLeft(List.empty[CValue])(_ ++ _.flatten) must_==(values.toList)
+    slices.map(s => toCValues(s).isEmpty).exists(ι) must_==(false)
+  }
+
+  def valueCalcs(values: Vector[CValue]) = {
+    val totalRows = values.size
+
+    val columnsPerValue: Vector[Vector[ColumnRef]] = values.map(_.flattenWithPath.map { case (p, v) => ColumnRef(p, v.cType) })
+    val totalColumns = columnsPerValue.flatten.toSet.size
+    val nrColumnsBiggestValue = columnsPerValue.map(_.size).foldLeft(0)(Math.max(_, _))
+
+    (totalRows, nrColumnsBiggestValue, totalColumns)
+  }
+
+  def testFromRValuesMaxSliceColumnsEqualsBiggestValue(values: Vector[CValue]) = {
+    val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
+
+    val slices = Slice.fromRValues(values, maxRows = Math.max(totalRows, 1), maxColumns = nrColumnsBiggestValue).toVector
+    assertSlices(values, slices, be_>(0))
+  }
+
+  def testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values: Vector[CValue]) = {
+    val (totalRows, nrColumnsBiggestValue, totalColumns) = valueCalcs(values)
+
+    val slices = Slice.fromRValues(values, maxRows = Math.max(totalRows, 1), maxColumns = nrColumnsBiggestValue - 1).toVector
+    assertSlices(values, slices, be_>(0))
+  }
+
+  def testFromRValuesMaxSliceRowsOverflow(values: Vector[CValue]) = {
+    val (totalRows, _, totalColumns) = valueCalcs(values)
+    val maxSliceRows = Math.max(1, Math.ceil(totalRows.toDouble / 3).toInt)
+    val expectedNrSlices = Math.min(Math.ceil(totalRows.toDouble / maxSliceRows).toInt, 3)
+
+    val slices = Slice.fromRValues(values, maxRows = maxSliceRows, maxColumns = totalColumns).toVector
+    assertSlices(values, slices, be_==(expectedNrSlices))
+  }
+
+  def testFromRValuesMaxSliceRows1(values: Vector[CValue]) = {
+    val (totalRows, _, totalColumns) = valueCalcs(values)
+    val maxSliceRows = 1
+
+    val slices = Slice.fromRValues(values, maxRows = maxSliceRows, maxColumns = totalColumns).toVector
+    assertSlices(values, slices, be_==(totalRows))
+  }
+
+  def testFromRValuesFittingIn1Slice(values: Vector[CValue]) = {
+    val (totalRows, _, totalColumns) = valueCalcs(values)
+
+    // test with a slice that's just big enough to hold the values
+    val slices = Slice.fromRValues(values, maxRows = Math.max(totalRows, 1), maxColumns = totalColumns).toVector
+    assertSlices(values, slices, be_==(1))
+  }
+
+  "fromRValues" should {
+
+    val v = Vector(CString("x"), CNum(42))
+
+    "construct slices from a simple vector" in {
+      "fits in 1 slice" >> testFromRValuesFittingIn1Slice(v)
+      "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v)
+      "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v)
+      "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v)
+    }
+
+    val v1 = Vector.tabulate(10000)(CNum(_))
+
+    "construct slices from a big vector" in {
+      "fits in 1 slice" >> testFromRValuesFittingIn1Slice(v1)
+      "maxSliceRows < nrRows" >> testFromRValuesMaxSliceRowsOverflow(v1)
+      "maxSliceRows = 1" >> testFromRValuesMaxSliceRows1(v1)
+      "maxSliceColumns = nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsEqualsBiggestValue(v1)
+      "maxSliceColumns < nrColumns of biggest value" >> testFromRValuesMaxSliceColumnsLowerThanBiggestValue(v1)
+    }
+
+    "construct slices from arbitrary values" in Prop.forAll(genCValues){ values =>
+      testFromRValuesFittingIn1Slice(values) and
+      testFromRValuesMaxSliceRowsOverflow(values) and
+      testFromRValuesMaxSliceRows1(values) and
+      testFromRValuesMaxSliceColumnsEqualsBiggestValue(values) and
+      testFromRValuesMaxSliceColumnsLowerThanBiggestValue(values)
+    }
+  }
+
   "sortBy" should {
     "stably sort a slice by a projection" in {
       val array = JParser.parseUnsafe("""[
@@ -81,14 +169,14 @@ class SliceSpec extends Specification with ScalaCheck {
         ]""".stripMargin)
 
       val data = array match {
-        case JArray(rows) => rows.toStream
+        case JArray(rows) => rows.toVector
         case _ => ???
       }
 
       val target = Slice.fromJValues(data)
 
-      // Note the monitonically decreasing sequence
-      // associated with the keys, due having repated
+      // Note the monotonically decreasing sequence
+      // associated with the keys, due to repeated
       // states being sorted in descending order.
       val keyArray = JParser.parseUnsafe("""[
           [ "CA", 0 ],
@@ -98,13 +186,17 @@ class SliceSpec extends Specification with ScalaCheck {
         ]""".stripMargin)
 
       val keyData = keyArray match {
-        case JArray(rows) => rows.toStream
+        case JArray(rows) => rows.toVector
         case _ => ???
       }
 
-      val key = Slice.fromJValues(keyData)
+      val key = {
+        val slices = Slice.fromJValues(keyData)
+        slices.size mustEqual 1
+        slices(0)
+      }
 
-      val result = target.sortWith(key, SortDescending)._1.toJsonElements.toVector
+      val result = target.map(_.sortWith(key, SortDescending)._1.toJsonElements.toVector)
 
       val expectedArray = JParser.parseUnsafe("""[
         { "city": "LOPEZ", "state": "WA" },
@@ -118,7 +210,7 @@ class SliceSpec extends Specification with ScalaCheck {
         case _ => ???
       }
 
-      result mustEqual expected
+      result mustEqual Vector(expected)
     }
 
       // Commented out for now. sortWith is correct semantically, but it ruins

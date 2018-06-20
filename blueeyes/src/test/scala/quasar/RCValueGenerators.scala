@@ -66,7 +66,16 @@ trait RCValueGenerators {
     case CEmptyArray        => Gen.const(CEmptyArray)
     case invalid            => sys.error("No values for type " + invalid)
   }
+
+  def genCValue0: Gen[CValue] = for {
+    tp <- genCType
+    v <- genCValue(tp)
+  } yield v
+
+  def genCValues: Gen[Vector[CValue]] = for {
+    n <- Gen.choose(0, 100)
+    l <- Gen.containerOfN(n, genCValue0)
+  } yield l
 }
 
 object RCValueGenerators extends RCValueGenerators
-

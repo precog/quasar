@@ -19,8 +19,9 @@ package quasar.yggdrasil
 object Config {
   val idSource = new FreshAtomicIdSource
 
-  def hashJoins         = true
-  def maxSliceSize: Int = 20000
+  def hashJoins = true
+  def maxSliceSize: Int = 16384 // should be power of 2
+  def maxSliceColumns: Int = 150
 
   // This is a slice size that we'd like our slices to be at least as large as.
   def minIdealSliceSize: Int = maxSliceSize / 4

@@ -515,8 +515,18 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       "return the slice size in correct bound using scalacheck with range" in checkBoundedCanonicalize
       "return the correct slice sizes in a trivial case" in testCanonicalize
       "return the correct slice sizes given length zero" in testCanonicalizeZero
-      "return the correct slice sizes along slice boundaries" in testCanonicalizeBoundary
-      "return the correct slice sizes greater than slice boundaries" in testCanonicalizeOverBoundary
+      "return the correct slice sizes when rows and columms just fit in 1 slice" in testCanonicalizeRowsAndColumnsJustFitsIn1Slice
+      "return the correct slice sizes when columms just fit in 1 slice" in testCanonicalizeColumnsJustFitsIn1Slice
+      "return the correct slice sizes when rows just fit in 1 slice" in testCanonicalizeRowsJustFitsIn1Slice
+      "return the correct slice sizes when rows boundaries hit" in testCanonicalizeRowsBoundaryHit
+      "return the correct slice sizes when columns boundaries hit" in testCanonicalizeColumnsBoundaryHit
+      "return the correct slice sizes along slice row boundaries" in testCanonicalizeRowBoundary
+      "return the correct slice sizes along slice column boundaries" in testCanonicalizeColumnBoundary
+      "return the correct slice sizes along slice row and column boundaries when column boundary hit first" in testCanonicalizeRowAndColumnBoundaryColumnFirst
+      "return the correct slice sizes along slice row and column boundaries when row boundary hit first" in testCanonicalizeRowAndColumnBoundaryRowFirst
+      "return the correct slice sizes when column boundary exceeded in 1 row" in testCanonicalizeColumnBoundaryExceededIn1Row
+      "return the correct slice sizes when column boundary exceeded in 1 row multiple times" in testCanonicalizeColumnBoundaryExceededIn1RowMultipleTimes
+      "return the correct slice sizes greater than slice row boundaries" in testCanonicalizeOverRowBoundary
       "return empty table when given empty table" in testCanonicalizeEmpty
       "remove slices of size zero" in testCanonicalizeEmptySlices
     }

@@ -80,11 +80,12 @@ final class ShiftedReadPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
                     case -\/(_) =>
                       lwfs.read(path) flatMap {
                         case Some(stream) =>
-                          val slices = stream.chunks.map { ch =>
-                            Slice.fromRValues(
-                              ch.toList.toStream.map(data =>
-                                RValue.fromJValueRaw(JValue.fromData(data))))
-                          }.translate(Lambda[FunctionK[Task, IO]](Effect[Task].toIO(_)))
+                          val slices: fs2.Stream[IO, Slice] = ???
+                          // val slices: fs2.Stream[IO, Slice] = stream.chunks.map { ch =>
+                          //   Slice.fromRValues(
+                          //     ch.toList.toVector.map(data =>
+                          //       RValue.fromJValueRaw(JValue.fromData(data))))
+                          // }.translate(Lambda[FunctionK[Task, IO]](Effect[Task].toIO(_)))
 
                           // TODO leaks resources
                           val resultIO = toStreamT(slices).map(_.unsafeValue) map { slicesT =>

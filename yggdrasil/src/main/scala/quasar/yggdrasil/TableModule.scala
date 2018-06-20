@@ -153,7 +153,7 @@ trait TableModule extends TransSpecModule {
     def constEmptyObject: Table
     def constEmptyArray: Table
 
-    def fromRValues(values: Stream[RValue], maxSliceSize: Option[Int] = None): Table
+    def fromRValues(values: Vector[RValue], maxSliceRows: Option[Int] = None): Table
 
     def merge(grouping: GroupingSpec)(body: (RValue, GroupId => IO[Table]) => IO[Table]): IO[Table]
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]
@@ -294,7 +294,7 @@ trait TableModule extends TransSpecModule {
 
     def take(count: Long): Table
 
-    def canonicalize(length: Int, maxLength0: Option[Int] = None): Table
+    def canonicalize(sliceRows: Int, maxSliceRows: Option[Int], maxSliceColumns: Int): Table
 
     def schemas: IO[Set[JType]]
 

@@ -36,8 +36,7 @@ import quasar.qscript.{
   LeftSide,
   OnUndefined,
   RightSide,
-  SrcHole,
-  RecFreeS
+  SrcHole
 }
 import quasar.qscript.RecFreeS._
 import quasar.qscript.rewrites.NormalizableT
@@ -90,7 +89,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
 
         val initM = reversed.head match {
           case -\/(QSU.LeftShift(_, struct, idStatus, onUndefined, repair, rot)) =>
-            val struct2 = struct >> RecFreeS.fromFree(fm)
+            val struct2 = struct >> fm.asRec
 
             val repair2 = repair flatMap {
               case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
@@ -557,7 +556,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           continue(fakeParent, tailL, Nil) { sym =>
             QSU.LeftShift[T, Symbol](
               sym,
-              RecFreeS.fromFree(structLAdj),
+              structLAdj.asRec,
               idStatusL,
               OnUndefined.Emit,
               repair,
@@ -607,7 +606,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
           continue(fakeParent, Nil, tailR) { sym =>
             QSU.LeftShift[T, Symbol](
               sym,
-              RecFreeS.fromFree(structRAdj),
+              structRAdj.asRec,
               idStatusR,
               OnUndefined.Emit,
               repair,

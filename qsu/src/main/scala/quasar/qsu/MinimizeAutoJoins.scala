@@ -115,7 +115,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       fms = branches.map( g =>
           /* Halt coalescing if we previously failed to coalesce this graph or
            if this graph was grouped, to ensure joining on group keys works */
-          MappableRegion[T](s => state.failed(s) || groupKeyOf.exist(_ === s)(state.auth.lookupDims(s)), g))
+          MappableRegion[T](s => groupKeyOf.exist(_ === s)(state.auth.lookupDims(s)), g))
 
       sources = fms.flatMap(_.toList).zipWithIndex
 
@@ -188,9 +188,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 case 1 => RightSide
               }
 
-              updateGraph[T, G](QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2)) map { back =>
-                (back :++ left :++ right).some
-              }
+              qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2)).some.point[G]
             }
             case left :: center :: right :: Nil => {
               val fm2: FreeMapA[JoinSide3] = fm map {
@@ -199,19 +197,17 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                 case 2 => RightSide3
               }
 
-              updateGraph[T, G](QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2)) map { back =>
-                (back :++ left :++ center :++ right).some
-              }
+              qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2)).some.point[G]
             }
             case _ => none[QSUGraph].point[G]
           }
       }
 
     case multiple =>
+
       for {
         resultM <- Minimizers.foldLeftM[G, Option[(QSUGraph, QSUGraph)]](None) {
-          case (Some(pair), _) =>
-            Option(pair).point[G]
+          case (Some(pair), _) => Option(pair).point[G]
 
           case (None, minimizer) =>
             if (minimizer.couldApplyTo(multiple)) {
@@ -246,7 +242,11 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
                     coalesceToMap[G](
                       fakeAutoJoin,
                       exCandidates,
-                      upperFM))
+                      upperFM)).filter {
+                    case AutoJoin2(_, _, _) => false
+                    case AutoJoin3(_, _, _, _) => false
+                    case _ => true
+                  }
 
                 (simplifiedSource, simplifiedFM) = singleSource match {
                   case Map(src, fm) => (src, fm)

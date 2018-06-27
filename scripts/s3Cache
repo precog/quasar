@@ -30,7 +30,7 @@ if [[ "$1" == "upload" ]]; then
 # Master build does not download anything at all
 elif [[ "$1" == "download" ]]; then
 
-  if [[ "$TRAVIS_PULL_REQUEST" == "true" ]]; then
+  if [[ "$TRAVIS_PULL_REQUEST" -gt "0" ]]; then
     echo "Found pull request build: downloading $TARGETS and $HOARDER from s3://quasar-build-cache/master ..."
     aws s3 --only-show-errors cp s3://quasar-build-cache/master/$TARGETS $TARGETS --recursive
     aws s3 --only-show-errors cp s3://quasar-build-cache/master/$HOARDER $HOARDER --recursive

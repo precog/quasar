@@ -11,9 +11,7 @@ TARGETS=".targets"
 HOARDER=".hoarder-cache"
 
 NUM=$TRAVIS_BUILD_NUMBER
-BRANCH=$TRAVIS_BRANCH
 ISPR=$TRAVIS_PULL_REQUEST
-
 
 TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
 
@@ -34,7 +32,7 @@ if [[ "$1" = "upload" ]]; then
 # Master build does not download anything at all
 elif [[ "$1" = "download" ]]; then
 
-  if [[ "$ISPR" = "true" -a "$TRAVIS_BRANCH" != "master" ]]; then
+  if [[ "$ISPR" = "true" && "$TRAVIS_BRANCH" != "master" ]]; then
     echo "downloading $TARGETS and $HOARDER from s3://quasar-build-cache/master ..."
     aws s3 --only-show-errors cp s3://quasar-build-cache/master/$TARGETS $TARGETS --recursive
     aws s3 --only-show-errors cp s3://quasar-build-cache/master/$HOARDER $HOARDER --recursive
@@ -45,7 +43,7 @@ elif [[ "$1" = "download" ]]; then
 # But master renames its branch to "master"
 elif [[ "$1" = "cleanup" ]]; then
 
-  if [[ "$TRAVIS_BRANCH" = "master" ]]
+  if [[ "$TRAVIS_BRANCH" = "master" ]]; then
     echo "replacing old master s3 cache with new one s3://quasar-build-cache/master ..."
     aws s3 --only-show-errors rm s3://quasar-build-cache/master --recursive
     aws s3 --only-show-errors mv s3://quasar-build-cache/$NUM s3://quasar-build-cache/master --recursive
@@ -64,7 +62,7 @@ elif [[ "$1" = "cacheCleanUp" ]]; then
   echo "cleaning up old s3 caches"
   while read -r buildNum;
   do
-    if (( $buildNum >= $OLDBUILDNUM ));
+    if ((buildNum >= OLDBUILDNUM ));
     then
       echo "cleaning up cache s3://quasar-build-cache/$buildNum ..."
       aws s3 --only-show-errors rm s3://quasar-build-cache/$OLDBUILDNUM --recursive

@@ -25,7 +25,7 @@ echo "Travis public IP is: $TRAVISIP"
 if [[ "$1" = "upload" ]]; then
   echo "uploading $TARGETS and $HOARDER to s3://quasar-build-cache/$NUM ..."
   aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$NUM/$TARGETS --recursive
-  aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$NUM/$HOARDER --recursive
+  #aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$NUM/$HOARDER --recursive
   echo "done uploading!"
 
 # A PR build always uses the master cache (the s3 cache directory named "master")
@@ -36,7 +36,7 @@ elif [[ "$1" = "download" ]]; then
 
     echo "Found pull request build: downloading $TARGETS and $HOARDER from s3://quasar-build-cache/master ..."
     aws s3 --only-show-errors cp s3://quasar-build-cache/master/$TARGETS $TARGETS --recursive
-    aws s3 --only-show-errors cp s3://quasar-build-cache/master/$HOARDER $HOARDER --recursive
+    #aws s3 --only-show-errors cp s3://quasar-build-cache/master/$HOARDER $HOARDER --recursive
     echo "done downloading!"
   
   fi
@@ -65,7 +65,7 @@ elif [[ "$1" = "cacheCleanUp" ]]; then
   echo "cleaning up old s3 caches"
   while read -r buildNum;
   do
-    if ((buildNum >= OLDBUILDNUM ));
+    if ((buildNum > OLDBUILDNUM ));
     then
       echo "cleaning up cache s3://quasar-build-cache/$buildNum ..."
       aws s3 --only-show-errors rm s3://quasar-build-cache/$OLDBUILDNUM --recursive

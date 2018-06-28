@@ -10,34 +10,62 @@ fi
 TARGETS=".targets"
 HOARDER=".hoarder-cache"
 NUM=$TRAVIS_BUILD_NUMBER
-TRAVISIP=$(curl -s checkip.dyndns.org | sed -e 's/.*Current IP Address: //' -e 's/<.*$//')
+BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-$TRAVIS_BRANCH}
+
+echo "BRANCH = $BRANCH"
+
+TRAVISIP="$(dig +short myip.opendns.com @resolver1.opendns.com)"
 
 export AWS_ACCESS_KEY_ID=$(openssl rsautl -inkey ./scripts/key.txt -decrypt < ./scripts/aws-access-key-id.bin)
 export AWS_SECRET_ACCESS_KEY=$(openssl rsautl -inkey ./scripts/key.txt -decrypt < ./scripts/aws-secret-access-key.bin)
 
 echo "Travis public IP is: $TRAVISIP"
 
+# A master or PR build always upload to s3 to a directory named after the build number
 if [[ "$1" = "upload" ]]; then
   echo "uploading $TARGETS and $HOARDER to s3://quasar-build-cache/$NUM ..."
   aws s3 --only-show-errors cp $TARGETS s3://quasar-build-cache/$NUM/$TARGETS --recursive
   aws s3 --only-show-errors cp $HOARDER s3://quasar-build-cache/$NUM/$HOARDER --recursive
   echo "done uploading!"
+
+# A PR build always uses the master cache (the s3 cache directory named "master")
+# Master build does not download anything at all
 elif [[ "$1" = "download" ]]; then
-  echo "downloading $TARGETS and $HOARDER from s3://quasar-build-cache/$NUM ..."
-  aws s3 --only-show-errors cp s3://quasar-build-cache/$NUM/$TARGETS $TARGETS --recursive
-  aws s3 --only-show-errors cp s3://quasar-build-cache/$NUM/$HOARDER $HOARDER --recursive
-  echo "done downloading!"
+
+  if [[ "$BRANCH" != "master" ]]; then
+
+    echo "Found pull request build: downloading $TARGETS and $HOARDER from s3://quasar-build-cache/master ..."
+    aws s3 --only-show-errors cp s3://quasar-build-cache/master/$TARGETS $TARGETS --recursive
+    aws s3 --only-show-errors cp s3://quasar-build-cache/master/$HOARDER $HOARDER --recursive
+    echo "done downloading!"
+  
+  fi
+
+# Both PR and Master branch always cleanup their S3 cache
+# But master renames its S3 cache directory to "master"
 elif [[ "$1" = "cleanup" ]]; then
+
+  if [[ "$BRANCH" = "master" ]]; then
+
+    echo "Found merge to master build: replacing old master s3 cache with new one s3://quasar-build-cache/master ..."
+    aws s3 --only-show-errors rm s3://quasar-build-cache/master --recursive
+    aws s3 --only-show-errors mv s3://quasar-build-cache/$NUM s3://quasar-build-cache/master --recursive
+    echo "done renaming s3 cache directory to master!"
+
+  fi
+
   echo "cleaning up s3://quasar-build-cache/$NUM ..."
   aws s3 --only-show-errors rm s3://quasar-build-cache/$NUM --recursive
   echo "done cleaning up!"
+
 elif [[ "$1" = "cacheCleanUp" ]]; then
+
   LIST=$(aws s3 ls s3://quasar-build-cache |  awk '{print $2}' | cut -d"/" -f1)
   OLDBUILDNUM=$((NUM + 50))
   echo "cleaning up old s3 caches"
   while read -r buildNum;
   do
-    if (( $buildNum >= $OLDBUILDNUM ));
+    if ((buildNum >= OLDBUILDNUM ));
     then
       echo "cleaning up cache s3://quasar-build-cache/$buildNum ..."
       aws s3 --only-show-errors rm s3://quasar-build-cache/$OLDBUILDNUM --recursive

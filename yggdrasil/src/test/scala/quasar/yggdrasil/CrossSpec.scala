@@ -40,7 +40,7 @@ trait CrossSpec extends TableModuleTestSupport with SpecificationLike with Scala
       lv <- l.data
       rv <- r.data
     } yield {
-      RValue.fromJValueRaw(JObject(JField("left", removeUndefined(lv.toJValueRaw)) :: JField("right", removeUndefined(rv.toJValueRaw)) :: Nil))
+      RValue.unsafeFromJValue(JObject(JField("left", removeUndefined(lv.toJValueRaw)) :: JField("right", removeUndefined(rv.toJValueRaw)) :: Nil))
     }
 
     val result = ltable.cross(rtable)(

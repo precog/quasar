@@ -277,7 +277,7 @@ trait BlockAlignSpec extends SpecificationLike with ScalaCheck {
       }]
     """)
 
-    val sample = SampleData(elements.toStream.map(RValue.fromJValueRaw), Some((3,List((JPath(".xb5hs2ckjajs0k44x"),CDouble), (JPath(".zzTqxfzwzacakwjqeGFcnhpkzd5akfobsg2nxump"),CEmptyArray), (JPath(".sp7hpv"),CEmptyObject)))))
+    val sample = SampleData(elements.toStream.map(RValue.unsafeFromJValue), Some((3,List((JPath(".xb5hs2ckjajs0k44x"),CDouble), (JPath(".zzTqxfzwzacakwjqeGFcnhpkzd5akfobsg2nxump"),CEmptyArray), (JPath(".sp7hpv"),CEmptyObject)))))
     testAlign(sample.sortBy(_ \ "key"))
   }
 

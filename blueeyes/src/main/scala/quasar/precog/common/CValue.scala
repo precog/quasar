@@ -176,7 +176,7 @@ object RValue extends RValueInstances {
   /**
    * This function is unsafe and should be deprecated! Always prefer `fromJValue`.
    */
-  def fromJValueRaw(jv: JValue): RValue = fromJValue(jv).get
+  def unsafeFromJValue(jv: JValue): RValue = fromJValue(jv).get
 
   def fromJValue(jv: JValue): Option[RValue] = jv match {
     case JObject(fields) if !fields.isEmpty =>

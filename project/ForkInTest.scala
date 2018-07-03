@@ -10,6 +10,8 @@ object ForkInTest extends AutoPlugin {
   }
 
   override def projectSettings = Seq(
-    fork := true,
-    javaOptions ++= autoImport.JvmOptsFromFile)
+    Test / fork := true,
+    Test / javaOptions ++= autoImport.JvmOptsFromFile,
+
+    Test / baseDirectory := file(file(".").getAbsolutePath))
 }

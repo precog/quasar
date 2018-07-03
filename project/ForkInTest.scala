@@ -9,7 +9,6 @@ object ForkInTest extends AutoPlugin {
     val JvmOptsFromFile = IO.read(file(".jvmopts")).split("\n").toSeq.map(_.trim)
   }
 
-
   override def projectSettings = Seq(
     fork := true,
     javaOptions ++= autoImport.JvmOptsFromFile)

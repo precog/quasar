@@ -82,7 +82,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
     val cschema = module.schema map { case (jpath, ctype) => ColumnRef(CPath(jpath), ctype) }
 
     val result = module.Table.constString(Set("/test")).load(Schema.mkType(cschema).get).flatMap(t => EitherT.rightT(t.toJson)).run.unsafeRunSync
-    result.map(_.toList) must_== \/.right(expected.toList.map(RValue.fromJValueRaw))
+    result.map(_.toList) must_== \/.right(expected.toList.map(RValue.unsafeFromJValueRaw))
   }
 
   def checkLoadDense = {
@@ -101,7 +101,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[1]
         }
-      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.unsafeFromJValueRaw),
       Some(
         (1 , List(JPath(".u") -> CBoolean, JPath(".md") -> CString, JPath(".l") -> CEmptyArray))
       )
@@ -121,7 +121,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[2,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.unsafeFromJValueRaw),
       Some(
         (2, List(JPath(".fa") -> CNull, JPath(".hW") -> CLong, JPath(".rzp") -> CEmptyObject))
       )
@@ -155,7 +155,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
            },
            "key":[2,1,1]
          }
-      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.unsafeFromJValueRaw),
       Some(
         (3, List(JPath(".f.bn[0]") -> CNull,
                  JPath(".f.wei") -> CLong,
@@ -189,7 +189,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[1,1]
         }
-      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.unsafeFromJValueRaw),
       Some(
         (2, List(JPath(".dV.d") -> CBoolean,
                  JPath(".dV.l") -> CBoolean,
@@ -293,7 +293,7 @@ trait BlockLoadSpec extends SpecificationLike with ScalaCheck {
           },
           "key":[9]
         }
-      ]""") --> classOf[JArray]).elements.toStream.map(RValue.fromJValueRaw),
+      ]""") --> classOf[JArray]).elements.toStream.map(RValue.unsafeFromJValueRaw),
       Some((1, List((JPath(".o8agyghfjxe") -> CEmptyArray),
                     (JPath(".fg[0]") -> CBoolean),
                     (JPath(".fg[1]") -> CNum),

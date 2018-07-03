@@ -112,7 +112,7 @@ final class FederatedShiftedReadPlanner[
 
   private def tableFromStream(s: Stream[IO, Data]): F[P.Table] = {
     val dataToRValue: Data => RValue =
-      d => RValue.fromJValueRaw(JValue.fromData(d))
+      d => RValue.unsafeFromJValueRaw(JValue.fromData(d))
 
     // TODO{fs2}: Chunkiness
     val sliceStream =

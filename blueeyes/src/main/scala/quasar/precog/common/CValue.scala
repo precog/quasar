@@ -91,11 +91,6 @@ object RValue extends RValueInstances {
   val rElements: Traversal[RValue, RValue] =
     rArray composeTraversal Each.each
 
-  val rUndefined: Prism[RValue, Unit] =
-    Prism.partial[RValue, Unit] {
-      case CUndefined => ()
-    } (_ => CUndefined)
-
   val rNull: Prism[RValue, Unit] =
     Prism.partial[RValue, Unit] {
       case CNull => ()
@@ -178,7 +173,15 @@ object RValue extends RValueInstances {
     case _              => None
   }
 
-  def fromJValueRaw(jv: JValue): RValue = {
+  /**
+   * This function is unsafe and should be deprecated! Always prefer `fromJValue`.
+   *
+   * NB: This function *does* serve a mildly useful purpose, which is converting from
+   * JValue to RValue without numeric fitting (note the use of toCValueRaw). Just
+   * the fact that it doesn't return Option[RValue] causes the unsafety. Ultimately,
+   * we should remove the unsafety from the function while keeping the raw semantics.
+   */
+  def unsafeFromJValueRaw(jv: JValue): RValue = {
     def loop(jv: JValue): Option[RValue] = jv match {
       case JObject(fields) if fields.nonEmpty =>
         val transformed: Map[String, RValue] = fields.flatMap({
@@ -193,7 +196,8 @@ object RValue extends RValueInstances {
       case other =>
         CType.toCValueRaw(other)
     }
-    loop(jv).getOrElse(CUndefined)
+
+    loop(jv).get
   }
 
   def fromJValue(jv: JValue): Option[RValue] = jv match {
@@ -343,7 +347,6 @@ sealed trait CType extends Serializable {
 
   @inline
   private[common] final def typeIndex: Int = this match {
-    case CUndefined      => 0
     case CBoolean        => 1
     case CString         => 2
     case CLong           => 3
@@ -397,7 +400,6 @@ object CType {
     case CLocalTime           => "LocalTime"
     case CLocalDate           => "LocalDate"
     case CInterval            => "Interval"
-    case CUndefined           => sys.error("CUndefined cannot be serialized")
   }
 
   val ArrayName = """Array[(.*)]""".r
@@ -822,13 +824,4 @@ case object CEmptyArray extends CNullType with CNullValue {
   def readResolve() = CEmptyArray
   def toJValue      = JArray(Nil)
   def toJValueRaw   = JArray(Nil)
-}
-
-//
-// Undefined
-//
-case object CUndefined extends CNullType with CNullValue {
-  def readResolve() = CUndefined
-  def toJValue      = JUndefined
-  def toJValueRaw   = JUndefined
 }

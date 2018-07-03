@@ -5,5 +5,12 @@ object ForkInTest extends AutoPlugin {
   override def requires = plugins.JvmPlugin
   override def trigger = allRequirements
 
-  override def projectSettings = Seq(fork := true)
+  object autoImport {
+    val JvmOptsFromFile = IO.read(file(".jvmopts")).split("\n").toSeq.map(_.trim)
+  }
+
+
+  override def projectSettings = Seq(
+    fork := true,
+    javaOptions ++= autoImport.JvmOptsFromFile)
 }

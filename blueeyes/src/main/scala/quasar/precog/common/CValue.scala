@@ -175,8 +175,30 @@ object RValue extends RValueInstances {
 
   /**
    * This function is unsafe and should be deprecated! Always prefer `fromJValue`.
+   *
+   * NB: This function *does* serve a mildly useful purpose, which is converting from
+   * JValue to RValue without numeric fitting (note the use of toCValueRaw). Just
+   * the fact that it doesn't return Option[RValue] causes the unsafety. Ultimately,
+   * we should remove the unsafety from the function while keeping the raw semantics.
    */
-  def unsafeFromJValue(jv: JValue): RValue = fromJValue(jv).get
+  def unsafeFromJValue(jv: JValue): RValue = {
+    def loop(jv: JValue): Option[RValue] = jv match {
+      case JObject(fields) if fields.nonEmpty =>
+        val transformed: Map[String, RValue] = fields.flatMap({
+          case (key, value) => loop(value).map(key -> _).toList
+        })(collection.breakOut)
+
+        Some(RObject(transformed))
+
+      case JArray(elements) if elements.nonEmpty =>
+        Some(RArray(elements.flatMap(loop(_).toList)))
+
+      case other =>
+        CType.toCValueRaw(other)
+    }
+
+    loop(jv).get
+  }
 
   def fromJValue(jv: JValue): Option[RValue] = jv match {
     case JObject(fields) if !fields.isEmpty =>

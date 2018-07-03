@@ -181,7 +181,7 @@ object RValue extends RValueInstances {
    * the fact that it doesn't return Option[RValue] causes the unsafety. Ultimately,
    * we should remove the unsafety from the function while keeping the raw semantics.
    */
-  def unsafeFromJValue(jv: JValue): RValue = {
+  def unsafeFromJValueRaw(jv: JValue): RValue = {
     def loop(jv: JValue): Option[RValue] = jv match {
       case JObject(fields) if fields.nonEmpty =>
         val transformed: Map[String, RValue] = fields.flatMap({

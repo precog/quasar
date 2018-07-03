@@ -123,7 +123,7 @@ trait CogroupSpec extends TableModuleTestSupport with SpecificationLike with Sca
     )
 
     val jsonResult = toJson(f(result))
-    jsonResult.unsafeRunSync must_== expected.map(RValue.unsafeFromJValue)
+    jsonResult.unsafeRunSync must_== expected.map(RValue.unsafeFromJValueRaw)
   }
 
   def testTrivialNoRecordCogroup(f: Table => Table = identity[Table]) = {

@@ -61,7 +61,7 @@ object SampleData extends SJValueGenerators with RCValueGenerators {
           // Sometimes the assembly process will generate overlapping values which will
           // cause RuntimeExceptions in JValue.unsafeInsert. It's easier to filter these
           // out here than prevent it from happening in the first place.
-          case (ids, jv) => try { Some(RValue.unsafeFromJValue(toRecord(ids, assemble(jv)))) } catch { case _ : RuntimeException => None }
+          case (ids, jv) => try { Some(RValue.unsafeFromJValueRaw(toRecord(ids, assemble(jv)))) } catch { case _ : RuntimeException => None }
         },
         Some((idCount, jschema)))
     })

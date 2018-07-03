@@ -1747,7 +1747,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
       {"key":[2,2,2],"value":{"dx":[8.342062585288287E+307]}}]
     """)
 
-    val sample = SampleData(elements.toStream.map(RValue.unsafeFromJValue), Some((3, Seq((NoJPath, CEmptyArray)))))
+    val sample = SampleData(elements.toStream.map(RValue.unsafeFromJValueRaw), Some((3, Seq((NoJPath, CEmptyArray)))))
 
     testIsType(sample)
   }
@@ -1850,7 +1850,7 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
         { "value":{ "lvf":-1, "vbeu":true, "dAc":0 }, "key":[4,3,4] }
       ]""")
 
-      val sample = SampleData(data.toStream.map(RValue.unsafeFromJValue), Some((3,List((JPath(".n"),CEmptyObject)))))
+      val sample = SampleData(data.toStream.map(RValue.unsafeFromJValueRaw), Some((3,List((JPath(".n"),CEmptyObject)))))
 
       testTyped(sample)
   }

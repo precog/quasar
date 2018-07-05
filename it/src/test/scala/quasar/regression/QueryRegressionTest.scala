@@ -71,7 +71,7 @@ abstract class QueryRegressionTest[S[_]](
     liftFT[S].compose(injectNT[Task, S])
 
   val TestDataRoot: RDir =
-    currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+    currentDir[Sandboxed] </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
 
   lazy val TestsRoot: RDir =
     TestsDir.fold(TestDataRoot)(TestDataRoot </> _)

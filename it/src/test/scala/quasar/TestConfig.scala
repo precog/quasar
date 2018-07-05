@@ -142,8 +142,8 @@ object TestConfig {
       case (testUri, setupUri) => (r.ref, testUri, setupUri)
     }))
 
-  val confFile: String = "it/testing.conf"
-  val defaultConfFile: String = "it/testing.conf.example"
+  val confFile: String = "testing.conf"
+  val defaultConfFile: String = "testing.conf.example"
 
   def confValue(name: String): OptionT[Task, String] = {
     val config = knobs.loadImmutable(

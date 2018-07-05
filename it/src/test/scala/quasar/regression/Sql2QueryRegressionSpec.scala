@@ -342,7 +342,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
 object Sql2QueryRegressionSpec {
   val TestDataRoot: RDir =
-    currentDir[Sandboxed] </> dir("it") </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
+    currentDir[Sandboxed] </> dir("src") </> dir("main") </> dir("resources") </> dir("tests")
 
   val TestsRoot: RDir =
     TestDataRoot

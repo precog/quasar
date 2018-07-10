@@ -21,9 +21,8 @@ import scalaz.{\/, NonEmptyList}
 
 /** @tparam I identity
   * @tparam D materialized table data
-  * @tparam S table schema
   */
-trait Tables[F[_], G[_], I, D, S] {
+trait Tables[F[_], G[_], I, D] {
   import TableError.{CreationError, ExistenceError, ModificationError, PrePreparationError}
 
   def allTables: F[G[(I, Table)]]
@@ -39,6 +38,4 @@ trait Tables[F[_], G[_], I, D, S] {
   def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
 
   def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[D]]
-
-  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[S]]
 }

@@ -25,6 +25,12 @@ import scalaz.syntax.bifunctor._
 final case class Variables(value: Map[VarName, VarValue]) {
   def lookup(name: VarName): Option[VarValue] =
     value.get(name)
+
+  def +(nv: (VarName, VarValue)): Variables =
+    Variables(value + nv)
+
+  def -(n: VarName): Variables =
+    Variables(value - n)
 }
 
 final case class VarName(value: String) {

@@ -35,7 +35,6 @@ import quasar.qscript._
 import quasar.qscript.rewrites.{Optimize, Unicoalesce, Unirewrite}
 
 import scala.Predef.implicitly
-import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream

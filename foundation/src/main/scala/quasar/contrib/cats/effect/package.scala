@@ -21,12 +21,11 @@ import cats.effect._
 package object effect {
 
   implicit class toOps[F[_], A](fa: F[A]) {
-    def to[G[_]](implicit F: Effect[F], G: Async[G], ec: scala.concurrent.ExecutionContext): G[A] =
+    def to[G[_]](implicit F: Effect[F], G: Async[G]): G[A] =
       Async[G].async { l =>
         Effect[F].runAsync(fa)(c =>
           IO(l(c))
         ).unsafeRunSync
       }
   }
-
 }

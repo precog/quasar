@@ -159,5 +159,5 @@ object MockTables {
 
   type TablesMockState[F[_]] = MonadState_[F, IMap[UUID, MockTable]]
 
-  def apply[F[_]: Monad: TablesMockState[?[_]]] = new MockTables[F]
+  def apply[F[_]: Monad: TablesMockState] = new MockTables[F]
 }

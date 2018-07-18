@@ -18,27 +18,20 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import quasar.contrib.scalaz.MonadState_
+import quasar.contrib.cats.stateT._
 import quasar.contrib.std.uuid._
 
 import java.util.UUID
 
 import cats.data.StateT
 import cats.effect.IO
-import scalaz.{~>, Id, IMap, Monad}, Id.Id
+import scalaz.{~>, Id, IMap}, Id.Id
 import scalaz.std.string._
 import shims._
 
 import MockTablesSpec.Store
 
 final class MockTablesSpec extends TablesSpec[StateT[IO, Store, ?], List, UUID, String, String] {
-
-  // TODO why doesn't this resolve if I put it anywhere but here
-  implicit def monadState[F[_]: Monad, S] =
-    new MonadState_[StateT[F, S, ?], S] {
-      def get = StateT.get
-      def put(s: S) = StateT.set(s)
-    }
 
   val tables: Tables[StateT[IO, Store, ?], List, UUID, String, String] =
     MockTables[StateT[IO, Store, ?]]

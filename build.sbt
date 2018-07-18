@@ -438,6 +438,7 @@ lazy val impl = project
 lazy val runp = (project in file("run"))
   .settings(name := "quasar-run")
   .dependsOn(
+    api % "compile->test", // for MockTables
     core,
     impl,
     mimir)

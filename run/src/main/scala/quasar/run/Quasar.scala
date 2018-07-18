@@ -16,10 +16,15 @@
 
 package quasar.run
 
+import slamdata.Predef.{List, String}
+
 import quasar.Data
 import quasar.api.{QueryEvaluator, ResourceDiscovery, ResourceName}
 import quasar.api.datasource.Datasources
+import quasar.api.table.{MockTables, Tables}
+import quasar.api.table.MockTables.MockTable
 import quasar.common.PhaseResultTell
+import quasar.contrib.cats.stateT._
 import quasar.contrib.fs2.stream._
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadError_
@@ -36,10 +41,12 @@ import quasar.run.implicits._
 import quasar.yggdrasil.vfs.ResourceError
 
 import java.nio.file.Path
+import java.util.UUID
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import cats.~>
+import cats.data.StateT
 import cats.effect.{ConcurrentEffect, IO, Timer}
 import cats.syntax.functor._
 import cats.syntax.flatMap._
@@ -53,6 +60,7 @@ import shims._
 
 final class Quasar[F[_], G[_]](
     val datasources: Datasources[F, Json],
+    val tables: Tables[StateT[F, IMap[UUID, MockTable], ?], List, UUID, String, String], // mock types
     val queryEvaluator: QueryEvaluator[F, Stream[G, ?], SqlQuery, Stream[G, Data]])
 
 object Quasar {
@@ -106,7 +114,9 @@ object Quasar {
 
       (mgmt, running) = mr
 
-      datasources = DefaultDatasources(configs, mgmt, mgmt)
+      datasources = DefaultDatasources[F, Json](configs, mgmt, mgmt)
+
+      tables = MockTables[StateT[F, IMap[UUID, MockTable], ?]]  // TODO replace with real implementation
 
       federation = MimirQueryFederation[Fix, F](precog)
 
@@ -121,6 +131,6 @@ object Quasar {
       queryEvaluator =
         Sql2QueryEvaluator(FederatingQueryEvaluator(federation, sources))
 
-    } yield new Quasar(datasources, queryEvaluator)
+    } yield new Quasar(datasources, tables, queryEvaluator)
   }
 }

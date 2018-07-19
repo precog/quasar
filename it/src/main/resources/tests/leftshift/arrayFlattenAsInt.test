@@ -1,9 +1,9 @@
 {
-  "name": "[qa_s09] array flatten simple with integer conversion",
+  "name": "[qa_s09] array flatten simple with invalid integer conversion",
 
   "backends": {
-    "lwc_local":      "pending",
-    "mimir":          "pending"
+    "mongodb_3_4_13":    "pending",
+    "mongodb_3_6":       "pending"
   },
   "data": "../arrayProcessingInts.data",
 
@@ -13,12 +13,5 @@
 
   "ignoredFields": ["_id"],
 
-  "expected": [
-    {"b": 1},
-    {"b": 2},
-    {"b": 3},
-    {"b": 4},
-    {"b": 5},
-    {"b": 6}
-  ]
+  "expected": []
 }

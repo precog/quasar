@@ -1,0 +1,29 @@
+{
+  "name": "[qa_s02] non-date conversions",
+
+  "backends": {
+    "mongodb_3_4_13":    "pending",
+    "mongodb_3_6":       "pending"
+  },
+
+  "data": "conversionsNonDate.data",
+
+  "query": "select num, boolean(str) as s2b, null(str) as s2n, decimal(str) as s2d, integer(str) as s2i, decimal(num) as invalidconv1, integer(dec) as invalidconv2 from `conversionsNonDate.data`",
+
+  "predicate": "exactly",
+  "ignoreResultOrder": true,
+
+  "ignoredFields": [],
+
+  "ignoreFieldOrder": true,
+
+  "expected": [
+    { "num": 0, "s2b": true },
+    { "num": 1, "s2b": false },
+    { "num": 2, "s2n": null },
+    { "num": 3 },
+    { "num": 4, "s2d": 0, "s2i": 0 },
+    { "num": 5, "s2d": 1.2 },
+    { "num": 6 }
+  ]
+}

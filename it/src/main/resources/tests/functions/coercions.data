@@ -1,2 +1,0 @@
-{"num": 4, "str": "true", "condition": true, "dec": 4.5, "nested": {"blah": "a"}}
-{"num": 0, "str": "false", "condition": false, "dec": 4.2, "nested": {"bloh": 2}}

@@ -26,7 +26,7 @@ object Dependencies {
   private val scoptVersion        = "3.5.0"
   private val shapelessVersion    = "2.3.2"
   private val simulacrumVersion   = "0.10.0"
-  private val specsVersion        = "4.1.0"
+  private val specsVersion        = "4.1.2"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
   private val fs2Version          = "0.10.5"

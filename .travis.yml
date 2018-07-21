@@ -4,9 +4,6 @@ jdk: oraclejdk8
 dist: trusty
 sudo: required
 
-services:
-  - docker
-
 stages:
   - name: clean
     if: NOT type = pull_request
@@ -69,8 +66,8 @@ jobs:
         - travis_wait 30 scripts/s3Cache download
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            "test -- failtrace" \
-            "exclusive:test -- failtrace"
+            "testOnly -- failtrace" \
+            "exclusive:testOnly -- failtrace"
 
     - stage: testjar
       env:

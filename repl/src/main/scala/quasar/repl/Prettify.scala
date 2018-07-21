@@ -17,7 +17,6 @@
 package quasar.repl
 
 import slamdata.Predef._
-import quasar._
 import quasar.common.data.Data
 import quasar.fp._
 import quasar.fp.ski._

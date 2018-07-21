@@ -4,14 +4,9 @@ jdk: oraclejdk8
 dist: trusty
 sudo: required
 
-services:
-  - docker
-
 stages:
   - name: clean
     if: NOT type = pull_request
-  - name: compile
-  - name: unit test
   - name: test
   - name: testjar
     if: type = pull_request
@@ -22,11 +17,6 @@ stages:
 
 # this all goes in the test stage
 env:
-  matrix:
-    - CONNECTOR=lwc_local
-    - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_4_13
-    - CONNECTOR=mongodb_3_6
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
@@ -49,36 +39,20 @@ before_script:
 script:
   - set -e
 
-  - travis_wait 30 scripts/s3Cache download
+  - travis_wait 30 scripts/s3Cache cleanup
 
-  # travis installs postgres by default this will stop and free up the psql port
-  # needed by the postgresql container
+  # Stop some running services
   - sudo /etc/init.d/postgresql stop
   - sudo /etc/init.d/mysql stop
   - sudo service memcached stop
 
-  - docker/scripts/setupContainers -u quasar_metastore
-  - docker/scripts/setupContainers -u quasar_$CONNECTOR
-  - docker ps
-
-  # populate the it/testing.conf file
-  - docker/scripts/assembleTestingConf -c quasar_metastore
-  - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
-  - cat it/testing.conf
-
-  - |-
-    SPECIFIC_DELEGATE=
-
-    case $CONNECTOR in
-      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- failtrace" ;;
-    esac
-
-  # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
   - |-
     ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-      it/sideEffectTestFSConfig \
-      "it/testOnly -- failtrace" \
-      "$SPECIFIC_DELEGATE"
+      checkHeaders \
+      "test -- failtrace" \
+      "exclusive:test -- failtrace"
+
+  - travis_wait 30 scripts/s3Cache upload
 
   - set +e
 
@@ -89,33 +63,6 @@ jobs:
       script:
         - travis_wait 30 ./scripts/s3Cache cacheCleanUp
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
-
-    - stage: compile
-      env:
-      script:
-        - set -e
-
-        - travis_wait 30 scripts/s3Cache cleanup
-
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            checkHeaders \
-            test:compile
-
-        - travis_wait 30 scripts/s3Cache upload
-
-        - set +e
-
-    # note that the "test" stage has special significance to Travis (it's the only matrix-able stage)
-    - stage: unit test
-      env:
-      script:
-        - travis_wait 30 scripts/s3Cache download
-        - |-
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            it/sideEffectTestFSConfig \
-            "testOnly -- xonly failtrace" \
-            "exclusive:testOnly -- xonly failtrace"
 
     - stage: testjar
       env:

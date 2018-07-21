@@ -4,9 +4,13 @@ jdk: oraclejdk8
 dist: trusty
 sudo: required
 
+services:
+  - docker
+
 stages:
   - name: clean
     if: NOT type = pull_request
+  - name: compile
   - name: test
   - name: testjar
     if: type = pull_request
@@ -35,27 +39,6 @@ before_script:
   - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
   - free && cat /proc/meminfo
 
-# this is also the test stage :eyeroll:
-script:
-  - set -e
-
-  - travis_wait 30 scripts/s3Cache cleanup
-
-  # Stop some running services
-  - sudo /etc/init.d/postgresql stop
-  - sudo /etc/init.d/mysql stop
-  - sudo service memcached stop
-
-  - |-
-    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-      checkHeaders \
-      "test -- failtrace" \
-      "exclusive:test -- failtrace"
-
-  - travis_wait 30 scripts/s3Cache upload
-
-  - set +e
-
 jobs:
   include:
     - stage: clean
@@ -63,6 +46,31 @@ jobs:
       script:
         - travis_wait 30 ./scripts/s3Cache cacheCleanUp
         - ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} clean
+
+    - stage: compile
+      env:
+      script:
+        - set -e
+
+        - travis_wait 30 scripts/s3Cache cleanup
+
+        - |-
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+            checkHeaders \
+            test:compile
+
+        - travis_wait 30 scripts/s3Cache upload
+
+        - set +e
+
+    - stage: test
+      env:
+      script:
+        - travis_wait 30 scripts/s3Cache download
+        - |-
+          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
+            "test -- failtrace" \
+            "exclusive:test -- failtrace"
 
     - stage: testjar
       env:

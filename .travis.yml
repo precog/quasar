@@ -4,14 +4,10 @@ jdk: oraclejdk8
 dist: trusty
 sudo: required
 
-services:
-  - docker
-
 stages:
   - name: clean
     if: NOT type = pull_request
   - name: compile
-  - name: unit test
   - name: test
   - name: testjar
     if: type = pull_request
@@ -22,11 +18,6 @@ stages:
 
 # this all goes in the test stage
 env:
-  matrix:
-    - CONNECTOR=lwc_local
-    - CONNECTOR=mimir
-    - CONNECTOR=mongodb_3_4_13
-    - CONNECTOR=mongodb_3_6
   global:
     - COURSIER_PROGRESS=0
     - SBT=./sbt
@@ -44,43 +35,6 @@ before_script:
   # confirm we are using travis' premium VMs
   - nproc 2>/dev/null && python -c 'import multiprocessing;print multiprocessing.cpu_count()'
   - free && cat /proc/meminfo
-
-# this is also the test stage :eyeroll:
-script:
-  - set -e
-
-  - travis_wait 30 scripts/s3Cache download
-
-  # travis installs postgres by default this will stop and free up the psql port
-  # needed by the postgresql container
-  - sudo /etc/init.d/postgresql stop
-  - sudo /etc/init.d/mysql stop
-  - sudo service memcached stop
-
-  - docker/scripts/setupContainers -u quasar_metastore
-  - docker/scripts/setupContainers -u quasar_$CONNECTOR
-  - docker ps
-
-  # populate the it/testing.conf file
-  - docker/scripts/assembleTestingConf -c quasar_metastore
-  - docker/scripts/assembleTestingConf -i quasar_$CONNECTOR
-  - cat it/testing.conf
-
-  - |-
-    SPECIFIC_DELEGATE=
-
-    case $CONNECTOR in
-      mongodb_*) SPECIFIC_DELEGATE="mongoIt/testOnly -- failtrace" ;;
-    esac
-
-  # then run the tests (note that this re-runs some tests; we can get rid of that once we have polyrepo)
-  - |-
-    ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-      it/sideEffectTestFSConfig \
-      "it/testOnly -- failtrace" \
-      "$SPECIFIC_DELEGATE"
-
-  - set +e
 
 jobs:
   include:
@@ -106,16 +60,14 @@ jobs:
 
         - set +e
 
-    # note that the "test" stage has special significance to Travis (it's the only matrix-able stage)
-    - stage: unit test
+    - stage: test
       env:
       script:
         - travis_wait 30 scripts/s3Cache download
         - |-
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++$TRAVIS_SCALA_VERSION \
-            it/sideEffectTestFSConfig \
-            "testOnly -- xonly failtrace" \
-            "exclusive:testOnly -- xonly failtrace"
+            "testOnly -- failtrace" \
+            "exclusive:testOnly -- failtrace"
 
     - stage: testjar
       env:

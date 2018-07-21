@@ -19,14 +19,12 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.Qspec
-import quasar.fs.Planner.PlannerError
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.qscript.construction
-import quasar.qscript.ReduceFuncs
+import quasar.qscript.{construction, PlannerError, ReduceFuncs}
 import quasar.qscript.MapFuncsCore.RecIntLit
 
 import matryoshka._

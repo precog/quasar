@@ -20,7 +20,7 @@ import quasar.api.datasource.DatasourceError.CreateError
 import quasar.contrib.scalaz.MonadError_
 import quasar.common.resource.ResourceError
 import quasar.compile.SemanticErrors
-import quasar.fs.Planner.PlannerError
+import quasar.qscript.PlannerError
 import quasar.yggdrasil.vfs.{ResourceError => MimirResourceError}
 
 import argonaut.Json

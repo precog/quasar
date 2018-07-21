@@ -17,15 +17,15 @@
 package quasar.impl.datasources
 
 import slamdata.Predef._
-import quasar.{ConditionMatchers, Data, Disposable, RenderTreeT}
+import quasar.{ConditionMatchers, Disposable, RenderTreeT}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
+import quasar.common.data.Data
 import quasar.common.resource._
 import quasar.connector.{Datasource, HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.contrib.scalaz.MonadError_
-import quasar.fs.Planner.{PlannerError, PlannerErrorME}
 import quasar.impl.DatasourceModule
-import quasar.qscript.QScriptEducated
+import quasar.qscript.{MonadPlannerErr, PlannerError, QScriptEducated}
 
 import java.lang.IllegalArgumentException
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -94,7 +94,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
 
     def heavyweightDatasource[
         T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-        F[_]: ConcurrentEffect: PlannerErrorME: Timer](
+        F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
         config: Json)
         : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]]] =
       mkDatasource[T[QScriptEducated[T, ?]], F](kind).right.pure[F]

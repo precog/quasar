@@ -18,12 +18,12 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.ejson.{EJson, Fixed}
-import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript.{
   Hole,
+  MonadPlannerErr,
   OnUndefined,
   RecFreeS,
   SrcHole,
@@ -51,7 +51,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
   private type AuthT[F[_], A] = StateT[F, QAuth, A]
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = AuthT[StateT[F, RevIdx, ?], A]
 
     for {
@@ -72,7 +72,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def expandShifts[
-    G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: PlannerErrorME: MonadState_[?[_], QAuth]
+    G[_]: Monad: NameGenerator: MonadState_[?[_], RevIdx]: MonadPlannerErr: MonadState_[?[_], QAuth]
     ]
       : PartialFunction[QSUGraph, G[QSUGraph]] = {
     case mls @ MultiLeftShift(source, shifts, _, repair) =>
@@ -138,7 +138,7 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
 object ExpandShifts {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
-      F[_]: Monad: NameGenerator: PlannerErrorME](
+      F[_]: Monad: NameGenerator: MonadPlannerErr](
       qgraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     new ExpandShifts[T].apply[F](qgraph)

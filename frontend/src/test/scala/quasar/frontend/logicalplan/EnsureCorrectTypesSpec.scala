@@ -17,8 +17,9 @@
 package quasar.frontend.logicalplan
 
 import slamdata.Predef._
-import quasar.{Data, Type}
+import quasar.Type
 import quasar.common.PhaseResultT
+import quasar.common.data.Data
 import quasar.contrib.pathy._
 import quasar.fp.ski.κ
 import quasar.std._, StdLib._, set._, structural._, relations._

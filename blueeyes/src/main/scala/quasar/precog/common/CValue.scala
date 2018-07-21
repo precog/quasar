@@ -17,8 +17,8 @@
 package quasar.precog
 package common
 
-import quasar.Data
 import quasar.blueeyes._, json._
+import quasar.common.data.Data
 import qdata.time.{DateTimeInterval, OffsetDate}
 
 import monocle.{Optional, Prism, Traversal}

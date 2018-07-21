@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.common.data.Data
 import quasar.contrib.matryoshka._
 import quasar.ejson.{
   DecodeEJson,

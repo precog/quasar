@@ -17,9 +17,10 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, Func, UnaryFunc, BinaryFunc, Type, Mapping}
+import quasar.{Func, UnaryFunc, BinaryFunc, Type, Mapping}
 import quasar.ArgumentError._
-import quasar.DataDateTimeExtractors._
+import quasar.common.data.Data
+import quasar.common.data.DataDateTimeExtractors._
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}

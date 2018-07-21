@@ -17,8 +17,8 @@
 package quasar.sql
 
 import slamdata.Predef._
+import quasar.common.PathError
 import quasar.fp._
-import quasar.fs._
 
 import matryoshka._
 import scalaz._, Scalaz._

@@ -18,12 +18,11 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.effect.NameGenerator
-import quasar.fs.Planner.PlannerErrorME
+import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp.symbolOrder
 import quasar.fp.ski.ι
-import quasar.qscript.{construction, Hole, HoleF, ReduceFunc, ReduceIndexF, SrcHole}
+import quasar.qscript.{construction, Hole, HoleF, MonadPlannerErr, ReduceFunc, ReduceIndexF, SrcHole}
 import ApplyProvenance.AuthenticatedQSU
 
 import matryoshka._
@@ -36,7 +35,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
   val qsu  = QScriptUniform.Optics[T]
   val func = construction.Func[T]
 
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T])
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
     type G[A] = StateT[StateT[F, RevIdx, ?], QAuth, A]
@@ -86,7 +85,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
   private val GroupedKey = "grouped"
   private val ReduceExprKey = "reduce_expr"
 
-  private def bucketsFor[F[_]: Monad: PlannerErrorME: MonadState_[?[_], QAuth]]
+  private def bucketsFor[F[_]: Monad: MonadPlannerErr: MonadState_[?[_], QAuth]]
       (vertex: Symbol)
       : F[(ISet[Symbol], List[FreeAccess[Hole]])] =
     for {
@@ -106,7 +105,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
       }
     } yield res.unfzip leftMap (_.foldMap(ι))
 
-  private def buildGraph[F[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MonadState_[?[_], QAuth]](
+  private def buildGraph[F[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MonadState_[?[_], QAuth]](
       node: QScriptUniform[Symbol])
       : F[QSUGraph] =
     for {
@@ -127,7 +126,7 @@ final class ReifyBuckets[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extend
 }
 
 object ReifyBuckets {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad: NameGenerator: PlannerErrorME]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad: NameGenerator: MonadPlannerErr]
       (aqsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("ReifyBuckets", new ReifyBuckets[T].apply[F](aqsu))

@@ -17,11 +17,10 @@
 package quasar.qsu
 
 import slamdata.Predef._
-import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.ejson.implicits._
 import quasar.contrib.iota.{copkEqual, copkShow, copkTraverse}
 import quasar.fp.{symbolOrder, symbolShow}
-import quasar.qscript.FreeMap
+import quasar.qscript.{FreeMap, MonadPlannerErr, PlannerError}, PlannerError.InternalError
 
 import matryoshka._
 import matryoshka.data.free._
@@ -57,16 +56,16 @@ final case class QAuth[T[_[_]]](
   def lookupDims(vertex: Symbol): Option[QDims[T]] =
     dims get vertex
 
-  def lookupDimsE[F[_]: Applicative: PlannerErrorME](vertex: Symbol): F[QDims[T]] =
-    lookupDims(vertex) getOrElseF PlannerErrorME[F].raiseError[QDims[T]] {
+  def lookupDimsE[F[_]: Applicative: MonadPlannerErr](vertex: Symbol): F[QDims[T]] =
+    lookupDims(vertex) getOrElseF MonadPlannerErr[F].raiseError[QDims[T]] {
       InternalError(s"Dimensions for $vertex not found.", None)
     }
 
   def lookupGroupKey(vertex: Symbol, idx: Int): Option[FreeMap[T]] =
     groupKeys get ((vertex, idx))
 
-  def lookupGroupKeyE[F[_]: Applicative: PlannerErrorME](vertex: Symbol, idx: Int): F[FreeMap[T]] =
-    lookupGroupKey(vertex, idx) getOrElseF PlannerErrorME[F].raiseError[FreeMap[T]] {
+  def lookupGroupKeyE[F[_]: Applicative: MonadPlannerErr](vertex: Symbol, idx: Int): F[FreeMap[T]] =
+    lookupGroupKey(vertex, idx) getOrElseF MonadPlannerErr[F].raiseError[FreeMap[T]] {
       InternalError(s"GroupKey[$idx] for $vertex not found.", None)
     }
 

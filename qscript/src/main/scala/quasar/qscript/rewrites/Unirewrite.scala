@@ -19,7 +19,6 @@ package quasar.qscript.rewrites
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 
 import matryoshka._
@@ -30,7 +29,7 @@ import iotaz.{CopK, TListK}
 import iotaz.TListK.:::
 
 sealed trait Unirewrite[T[_[_]], L <: TListK] {
-  def apply[F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]]
+  def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]]
 }
 
 private[qscript] trait UnirewriteLowPriorityImplicits {
@@ -45,7 +44,7 @@ private[qscript] trait UnirewriteLowPriorityImplicits {
       N: Normalizable[QScriptShiftRead[T, ?]],
       E: ExpandDirs.Aux[T, C0[L, ?], CopK[L, ?]]): Unirewrite[T, L] = new Unirewrite[T, L] {
 
-    def apply[F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F])
+    def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F])
         : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
       r.simplifyJoinOnShiftRead[QScriptRead[T, ?], QScriptShiftRead[T, ?], C0[L, ?]]
         .apply(qs)
@@ -67,10 +66,10 @@ object Unirewrite extends UnirewriteLowPriorityImplicits {
       C: Coalesce.Aux[T, CopK[L, ?], CopK[L, ?]],
       N: Normalizable[CopK[L, ?]]): Unirewrite[T, L] = new Unirewrite[T, L] {
 
-    def apply[F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] =
+    def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F]): T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] =
       r.shiftReadDir[QScriptRead[T, ?], CopK[L, ?]] andThen (_.point[F])
   }
 
-  def apply[T[_[_]], L <: TListK, F[_]: Monad: PlannerErrorME](r: Rewrite[T], lc: DiscoverPath.ListContents[F])(implicit U: Unirewrite[T, L]) =
+  def apply[T[_[_]], L <: TListK, F[_]: Monad: MonadPlannerErr](r: Rewrite[T], lc: DiscoverPath.ListContents[F])(implicit U: Unirewrite[T, L]) =
     U(r, lc)
 }

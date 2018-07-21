@@ -17,8 +17,8 @@
 package quasar.frontend.logicalplan
 
 import slamdata.Predef._
-import quasar.{Data, Func}
-import quasar.DataGenerators._
+import quasar.Func
+import quasar.common.data._, DataGenerators._
 import quasar.contrib.specs2.Spec
 import quasar.fp._
 import quasar.std

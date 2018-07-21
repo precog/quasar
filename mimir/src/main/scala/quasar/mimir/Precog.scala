@@ -39,7 +39,6 @@ import shims._
 
 import org.slf4s.Logging
 
-import scalaz.concurrent.Task
 import scalaz.syntax.apply._
 
 import java.io.File
@@ -53,7 +52,6 @@ final class Precog private (
     val actorSystem: ActorSystem,
     val vfs: SerialVFS[IO])
     extends VFSColumnarTableModule
-    with TablePagerModule
     with StdLibModule {
 
   object Library extends StdLib
@@ -103,13 +101,4 @@ object Precog extends Logging {
         case (vfs, sys) => new Precog(dataDir, sys, vfs)
       })
     } yield pcd
-
-  // utility function for running a Task in the background
-  def startTask(ta: Task[_], cb: => Unit): Task[Unit] =
-    Task.delay(ta.unsafePerformAsync(_.fold(
-      ex => {
-        log.error(s"exception in background task", ex)
-        cb
-      },
-      _ => ())))
 }

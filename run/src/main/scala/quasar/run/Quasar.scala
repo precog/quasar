@@ -16,10 +16,10 @@
 
 package quasar.run
 
-import quasar.Data
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.common.PhaseResultTell
+import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
 import quasar.contrib.std.uuid._
 import quasar.evaluate.FederatingQueryEvaluator

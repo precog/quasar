@@ -17,7 +17,8 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
+import quasar.{Func, Type, Mapping, UnaryFunc, BinaryFunc, TernaryFunc, GenericFunc}
+import quasar.common.data.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._

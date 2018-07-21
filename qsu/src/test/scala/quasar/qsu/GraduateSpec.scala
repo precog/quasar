@@ -18,7 +18,6 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.Qspec
-import quasar.fs.Planner.{InternalError, PlannerError}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.pathy.AFile
 import quasar.ejson.{EJson, Fixed}
@@ -31,6 +30,7 @@ import quasar.qscript.{
   IncludeId,
   JoinSide,
   OnUndefined,
+  PlannerError,
   ReduceFunc,
   ReduceFuncs,
   ReduceIndex,
@@ -40,6 +40,7 @@ import quasar.qscript.{
   Take,
   qScriptReadToQscriptTotal
 }
+import quasar.qscript.PlannerError.InternalError
 import quasar.qscript.MapFuncsCore.{IntLit, RecIntLit}
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
 import matryoshka.EqualT

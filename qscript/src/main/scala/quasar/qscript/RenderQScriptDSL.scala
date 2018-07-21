@@ -20,7 +20,8 @@ import matryoshka.data.Fix
 import slamdata.Predef.{Eq => _, _}
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
-import quasar.{Data, DSLTree, RenderDSL, Type, ejson}
+import quasar.{DSLTree, RenderDSL, Type, ejson}
+import quasar.common.data.Data
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.ejson.{EJson, ExtEJson, CommonEJson}
 import quasar.fp._

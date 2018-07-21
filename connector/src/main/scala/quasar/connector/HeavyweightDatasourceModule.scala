@@ -16,11 +16,11 @@
 
 package quasar.connector
 
-import quasar.{Data, Disposable, RenderTreeT}
+import quasar.{Disposable, RenderTreeT}
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
-import quasar.fs.Planner.PlannerErrorME
-import quasar.qscript.QScriptEducated
+import quasar.common.data.Data
+import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, Timer}
@@ -33,7 +33,7 @@ trait HeavyweightDatasourceModule {
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: ConcurrentEffect: PlannerErrorME: Timer](
+      F[_]: ConcurrentEffect: MonadPlannerErr: Timer](
       config: Json)
       : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], Stream[F, Data]]]]
 }

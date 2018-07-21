@@ -16,8 +16,8 @@
 
 package quasar.blueeyes.json
 
-import quasar.Data
 import quasar.blueeyes._
+import quasar.common.data.Data
 
 import scalaz._, Scalaz._
 

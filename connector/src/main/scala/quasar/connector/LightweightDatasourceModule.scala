@@ -16,9 +16,10 @@
 
 package quasar.connector
 
-import quasar.{Data, Disposable}
+import quasar.Disposable
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.common.data.Data
 import quasar.common.resource.{MonadResourceErr, ResourcePath}
 
 import argonaut.Json

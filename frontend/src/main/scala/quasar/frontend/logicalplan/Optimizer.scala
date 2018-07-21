@@ -19,8 +19,9 @@ package quasar.frontend.logicalplan
 import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
+import quasar.common.data.Data
+import quasar.common.effect.NameGenerator
 import quasar.contrib.shapeless._
-import quasar.effect.NameGenerator
 import quasar.fp._
 import quasar.fp.binder._
 import quasar.fp.ski._

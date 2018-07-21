@@ -19,13 +19,13 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.RenderTreeT
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.contrib.iota.copkTraverse
 import quasar.fp.symbolOrder
 import quasar.frontend.logicalplan.JoinDir
-import quasar.fs.Planner.{InternalError, PlannerErrorME}
+import quasar.qscript.{construction, JoinSide, LeftSide, MonadPlannerErr, RightSide}
+import quasar.qscript.PlannerError.InternalError
 import quasar.qscript.RecFreeS._
-import quasar.qscript.{construction, JoinSide, LeftSide, RightSide}
 
 import matryoshka.{BirecursiveT, ShowT}
 import scalaz.Tags.Disjunction
@@ -39,7 +39,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
   import QScriptUniform._
   import QSUGraph.Extractors
 
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](graph: QSUGraph)
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](graph: QSUGraph)
       : F[QSUGraph] = {
     type G[A] = StateT[F, RevIdx, A]
     graph.rewriteM[G](extract[G]).eval(graph.generateRevIndex)
@@ -51,7 +51,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
 
   private val func = construction.Func[T]
 
-  private def extract[F[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM]
+  private def extract[F[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM]
       : PartialFunction[QSUGraph, F[QSUGraph]] = {
 
     case graph @ Extractors.GroupBy(src, key) =>
@@ -86,13 +86,13 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
                 unifyJoin[F](graph0, left.root, lefts, LeftSide, JoinSideRef(lref), JoinSideRef(rref), max)("left_source", "left_target") {
                   case (newSrc, on, repair) => ThetaJoin(newSrc, right.root, on, jtype, repair)
                 }.getOrElseF(
-                  PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $lefts")))
+                  MonadPlannerErr[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $lefts")))
 
               case (None, Some(rights)) =>
                 unifyJoin[F](graph0, right.root, rights, RightSide, JoinSideRef(lref), JoinSideRef(rref), max)("right_source", "right_target") {
                   case (newSrc, on, repair) => ThetaJoin(left.root, newSrc, on, jtype, repair)
                 }.getOrElseF(
-                  PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $rights")))
+                  MonadPlannerErr[F].raiseError[QSUGraph](msg(s"Unable to unify targets: $rights")))
 
               case (Some(lefts), Some(rights)) => {
                 val leftUnify =
@@ -118,12 +118,12 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
                         val node = ThetaJoin(leftGraph.root, rightGraph.root, on, jtype, repair)
 
                         (graph0.overwriteAtRoot(node) :++ leftGraph :++ rightGraph).point[F]
-                      }, PlannerErrorME[F].raiseError[QSUGraph](msg(s"Unable to unify targets. Left: $lefts, Right: $rights")))
+                      }, MonadPlannerErr[F].raiseError[QSUGraph](msg(s"Unable to unify targets. Left: $lefts, Right: $rights")))
                   }
                 }.join
               }
               case _ =>
-                PlannerErrorME[F].raiseError[QSUGraph](
+                MonadPlannerErr[F].raiseError[QSUGraph](
                   InternalError(s"Invalid join condition, $cond, must be a mappable function of $left and $right.", None))
             }
           })
@@ -213,7 +213,7 @@ final class ExtractFreeMap[T[_[_]]: BirecursiveT: RenderTreeT: ShowT] private ()
 object ExtractFreeMap {
   def apply[
       T[_[_]]: BirecursiveT: RenderTreeT: ShowT,
-      F[_]: Monad: NameGenerator: PlannerErrorME]
+      F[_]: Monad: NameGenerator: MonadPlannerErr]
       (graph: QSUGraph[T])
       : F[QSUGraph[T]] =
     taggedInternalError("ExtractFreeMap", new ExtractFreeMap[T].apply[F](graph))

@@ -17,7 +17,8 @@
 package quasar.frontend.logicalplan
 
 import slamdata.Predef._
-import quasar.{Data, Func, TreeMatchers}
+import quasar.{Func, TreeMatchers}
+import quasar.common.data.Data
 import quasar.common.SortDir
 import quasar.std._, StdLib.structural._
 

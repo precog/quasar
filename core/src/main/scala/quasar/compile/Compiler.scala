@@ -18,7 +18,6 @@ package quasar.compile
 
 import slamdata.Predef.{Eq => _, _}
 import quasar.{
-  Data,
   Func,
   GenericFunc,
   HomomorphicFunction,
@@ -31,6 +30,7 @@ import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.contrib.shapeless._
 import quasar.common.{CIName, SortDir}
+import quasar.common.data.Data
 import quasar.compile.{SemanticAnalysis => SA}, SA._
 import quasar.compile.SemanticError._
 import quasar.fp._

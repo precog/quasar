@@ -17,8 +17,9 @@
 package quasar.compile
 
 import slamdata.Predef._
-import quasar.{Data, Type}
+import quasar.Type
 import quasar.common.{CIName, JoinType, SortDir}
+import quasar.common.data.Data
 import quasar.frontend.logicalplan.{JoinCondition, JoinDir, LogicalPlan => LP}
 import quasar.sql._
 import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._

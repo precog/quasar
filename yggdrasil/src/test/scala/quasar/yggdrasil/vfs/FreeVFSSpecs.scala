@@ -18,7 +18,6 @@ package quasar.yggdrasil.vfs
 
 import quasar.contrib.pathy.{ADir, RPath}
 import quasar.contrib.scalaz.catchable._
-import quasar.fs.MoveSemantics
 
 import cats.effect.IO
 

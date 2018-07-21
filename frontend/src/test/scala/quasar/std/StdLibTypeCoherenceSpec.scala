@@ -18,6 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
+import quasar.common.data.Data
 import quasar.fp.ski.κ
 
 import scala.Predef.locally
@@ -34,7 +35,7 @@ class StdLibTypeCoherenceSpec extends quasar.Qspec with quasar.TypeGenerators {
   def testInputCoherence[N <: Nat](func: GenericFunc[N])(input: Func.Input[Type, N]): Result = {
     func.tpe(input).toEither.right.map { o =>
       val unconst = o match {
-        case Type.Const(d) => d.dataType
+        case Type.Const(d) => Type.dataType(d)
         case _ => o
       }
       if (o == Type.Const(Data.NA)) {

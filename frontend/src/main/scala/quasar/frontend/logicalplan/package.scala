@@ -19,9 +19,10 @@ package quasar.frontend
 import slamdata.Predef._
 import quasar._
 import quasar.common.{phase, phaseM, JoinType, PhaseResultTell, SortDir}
+import quasar.common.data.Data
+import quasar.common.effect.NameGenerator
 import quasar.contrib.pathy.FPath
 import quasar.contrib.scalaz.MonadError_
-import quasar.effect.NameGenerator
 import quasar.time.TemporalPart
 
 import scala.Symbol

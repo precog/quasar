@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef.{Set => _, _}
+import quasar.common.data._
 import qdata.time.{DateTimeInterval, OffsetDate}
 import qdata.time.TimeGenerators._
 

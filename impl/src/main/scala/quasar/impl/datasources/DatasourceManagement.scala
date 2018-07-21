@@ -17,7 +17,7 @@
 package quasar.impl.datasources
 
 import slamdata.Predef.{Boolean, Exception, None, Option, Some, Unit}
-import quasar.{Condition, Data, Disposable, RenderTreeT}
+import quasar.{Condition, Disposable, RenderTreeT}
 import quasar.api.datasource.{DatasourceError, DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError.{
   CreateError,
@@ -25,14 +25,14 @@ import quasar.api.datasource.DatasourceError.{
   DiscoveryError,
   ExistentialError
 }
+import quasar.common.data.Data
 import quasar.common.resource.{MonadResourceErr, ResourceName, ResourcePath, ResourcePathType}
 import quasar.connector.Datasource
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.{κ, κ2}
-import quasar.fs.Planner.PlannerErrorME
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, FailedDatasource}
-import quasar.qscript.QScriptEducated
+import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import scala.concurrent.ExecutionContext
 
@@ -46,7 +46,7 @@ import shims._
 
 final class DatasourceManagement[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: ConcurrentEffect: MonadResourceErr: PlannerErrorME: Timer,
+    F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: Timer,
     I: Order] private (
     modules: DatasourceManagement.Modules,
     errors: Ref[F, IMap[I, Exception]],
@@ -158,7 +158,7 @@ object DatasourceManagement {
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: ConcurrentEffect: MonadResourceErr: PlannerErrorME: MonadError_[?[_], CreateError[Json]]: Timer,
+      F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: MonadError_[?[_], CreateError[Json]]: Timer,
       I: Order](
       modules: Modules,
       configured: IMap[I, DatasourceRef[Json]],
@@ -210,7 +210,7 @@ object DatasourceManagement {
 
   private def lazyDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: ConcurrentEffect: MonadResourceErr: PlannerErrorME: MonadError_[?[_], CreateError[Json]]: Timer](
+      F[_]: ConcurrentEffect: MonadPlannerErr: MonadResourceErr: MonadError_[?[_], CreateError[Json]]: Timer](
       module: DatasourceModule,
       ref: DatasourceRef[Json],
       pool: ExecutionContext,

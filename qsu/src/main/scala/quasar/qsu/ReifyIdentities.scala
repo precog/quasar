@@ -18,8 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.effect.NameGenerator
-import quasar.fs.Planner.PlannerErrorME
+import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
@@ -34,6 +33,7 @@ import quasar.qscript.{
   IdStatus,
   IncludeId,
   MFC,
+  MonadPlannerErr,
   ReduceFunc}
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
@@ -56,7 +56,7 @@ import scalaz.Scalaz._
 final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](aqsu: AuthenticatedQSU[T]): F[ResearchedQSU[T]] =
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[ResearchedQSU[T]] =
     reifyIdentities[F](gatherReferences(aqsu.graph), aqsu)
 
   ////
@@ -149,7 +149,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case other => References.noRefs
     })
 
-  private def reifyIdentities[F[_]: Monad: NameGenerator: PlannerErrorME](
+  private def reifyIdentities[F[_]: Monad: NameGenerator: MonadPlannerErr](
       refs: References,
       aqsu: AuthenticatedQSU[T])
       : F[ResearchedQSU[T]] = {
@@ -596,7 +596,7 @@ object ReifyIdentities {
       }
 }
 
-  def apply[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator: PlannerErrorME]
+  def apply[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator: MonadPlannerErr]
       (aqsu: AuthenticatedQSU[T])
       : F[ResearchedQSU[T]] =
     new ReifyIdentities[T].apply[F](aqsu)

@@ -17,7 +17,8 @@
 package quasar.datagen
 
 import slamdata.Predef.{Option, String}
-import quasar.{Data, DataGenerators, DataCodec}
+import quasar.common.data.{Data, DataGenerators}
+import quasar.frontend.data.DataCodec
 import quasar.ejson._
 
 import fs2.{Pure, Stream}

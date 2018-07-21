@@ -22,7 +22,6 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.fs.Planner, Planner.PlannerError
 import quasar.qscript.{
   construction,
   ExcludeId,
@@ -31,6 +30,7 @@ import quasar.qscript.{
   LeftSide,
   MapFuncsCore,
   OnUndefined,
+  PlannerError,
   ReduceFuncs,
   ReduceIndex,
   RightSide,

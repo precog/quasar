@@ -17,7 +17,7 @@
 package quasar.frontend.logicalplan
 
 import slamdata.Predef._
-import quasar.Data
+import quasar.common.data.Data
 import quasar.std.StdLib._
 
 import matryoshka._

@@ -16,7 +16,9 @@
 
 package quasar.qsu
 
-import quasar.{Data, Qspec, Type}
+import slamdata.Predef._
+import quasar.{Qspec, Type}
+import quasar.common.data.Data
 import quasar.ejson.{EJson, Fixed}
 import quasar.qscript.{
   Hole,
@@ -25,7 +27,6 @@ import quasar.qscript.{
   Take
 }
 import quasar.qsu.{QScriptUniform => QSU}
-import slamdata.Predef._
 
 import matryoshka.data.Fix
 import org.specs2.matcher.Matcher

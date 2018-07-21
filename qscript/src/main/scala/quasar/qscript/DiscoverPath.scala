@@ -17,14 +17,13 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.fs.Planner.NoFilesFound
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
-import quasar.fs._
 import quasar.qscript.MapFuncsCore._
+import quasar.qscript.PlannerError.NoFilesFound
 
 import matryoshka._
 import matryoshka.data._
@@ -43,7 +42,7 @@ trait DiscoverPath[IN[_]] {
   type IT[F[_]]
   type OUT[A]
 
-  def discoverPath[M[_]: Monad: MonadFsErr](g: DiscoverPath.ListContents[M])
+  def discoverPath[M[_]: Monad: MonadPlannerErr](g: DiscoverPath.ListContents[M])
       : AlgebraM[M, IN, List[ADir] \&/ IT[OUT]]
 }
 
@@ -67,7 +66,7 @@ object DiscoverPath extends DiscoverPathInstances {
   def apply[T[_[_]], IN[_], OUT[_]](implicit ev: DiscoverPath.Aux[T, IN, OUT]) =
     ev
 
-  def unionAll[T[_[_]]: BirecursiveT, M[_]: Monad: MonadFsErr, OUT[a] <: ACopK[a] : Functor]
+  def unionAll[T[_[_]]: BirecursiveT, M[_]: Monad: MonadPlannerErr, OUT[a] <: ACopK[a] : Functor]
     (g: ListContents[M])
     (implicit
       RD:  Const[Read[ADir], ?] :<<: OUT,
@@ -96,7 +95,7 @@ abstract class DiscoverPathInstances {
       type IT[F[_]] = T[F]
       type OUT[A] = F[A]
 
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
+      def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) =
         κ(-\&/[List[ADir], T[OUT]](List(rootDir)).point[M])
     }
 
@@ -159,7 +158,7 @@ abstract class DiscoverPathInstances {
         new DiscoverPath[CopK[F ::: TNilK, ?]] {
           type IT[X[_]] = T[X]
           type OUT[A] = H[A]
-          override def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+          override def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) = {
             case I(fa) => F.discoverPath(g).apply(fa)
           }
         }
@@ -177,7 +176,7 @@ abstract class DiscoverPathInstances {
         new DiscoverPath[CopK[F ::: LL, ?]] {
           type IT[X[_]] = T[X]
           type OUT[A] = H[A]
-          override def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+          override def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) = {
             case I(fa) => F.discoverPath(g).apply(fa)
             case other => LL.materialize(offset + 1).discoverPath(g).apply(other.asInstanceOf[CopK[LL, List[ADir] \&/ IT[OUT]]])
           }
@@ -242,15 +241,15 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       case h :: t => NonEmptyList.nel(h, t.toIList).some
     }
 
-  def unionAll[M[_]: Monad: MonadFsErr](g: ListContents[M]): List[ADir] \&/ T[O] => M[T[O]] =
+  def unionAll[M[_]: Monad: MonadPlannerErr](g: ListContents[M]): List[ADir] \&/ T[O] => M[T[O]] =
     _.fold(
       ds => unionDirs(ds).fold[M[T[O]]](
-        MonadFsErr[M].raiseError(FileSystemError.qscriptPlanningFailed(NoFilesFound(ds))))(
+        MonadPlannerErr[M].raiseError(NoFilesFound(ds)))(
         union(_).point[M]),
       _.point[M],
       (ds, qs) => unionDirs(ds).fold(qs)(d => union(qs <:: d)).point[M])
 
-  private def convertBranch[M[_]: Monad: MonadFsErr]
+  private def convertBranch[M[_]: Monad: MonadPlannerErr]
     (src: List[ADir] \&/ T[O], branch: FreeQS)
     (f: ListContents[M])
       : M[FreeQS] =
@@ -260,16 +259,16 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
         DiscoverPathTotal.discoverPath(f))) >>=
       (DiscoverPathTTotal.unionAll[M](f).apply(_) ∘ (_.cata(Free.roll[QScriptTotal, Hole])))
 
-  private def convertBranchingOp[M[_]: Monad: MonadFsErr]
+  private def convertBranchingOp[M[_]: Monad: MonadPlannerErr]
     (src: List[ADir] \&/ T[O], lb: FreeQS, rb: FreeQS, f: ListContents[M])
     (op: (T[O], FreeQS, FreeQS) => O[T[O]])
       : M[List[ADir] \&/ T[O]] =
     (convertBranch[M](src, lb)(f) ⊛ convertBranch[M](src, rb)(f))((l, r) =>
       \&/-(op(QC.inj(Unreferenced[T, T[O]]()).embed, l, r).embed))
 
-  def fileType[M[_]: Monad: MonadFsErr](listContents: ListContents[M]):
+  def fileType[M[_]: Monad: MonadPlannerErr](listContents: ListContents[M]):
       (ADir, String) => OptionT[M, ADir \/ AFile] =
-    (dir, name) => OptionT(MonadFsErr[M].handleError(listContents(dir).map(_.some))(κ(none.point[M]))) >>=
+    (dir, name) => OptionT(MonadPlannerErr[M].handleError(listContents(dir).map(_.some))(κ(none.point[M]))) >>=
       (cont => OptionT((cont.find(_.fold(_.value ≟ name, _.value ≟ name)) ∘
         (_.bimap(dir </> dir1(_), dir </> file1(_)))).point[M]))
 
@@ -280,7 +279,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
-      def handleDirs[M[_]: Monad: MonadFsErr](
+      def handleDirs[M[_]: Monad: MonadPlannerErr](
         g: ListContents[M],
         dirs: List[ADir],
         key: String)
@@ -306,7 +305,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       def rebucket(out: T[OUT], value: FreeMap, key: String) =
         PB.inj(BucketKey(out, value, StrLit(key))).embed
 
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) = {
         // FIXME: `value` must be `HoleF`.
         case BucketKey(src, value, StrLit(key)) =>
           src.fold(
@@ -326,7 +325,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) = {
         case Union(src, lb, rb) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             QC.inj(Union(s, l, r)))
@@ -345,7 +344,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) = {
         case ThetaJoin(src, lb, rb, on, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             TJ.inj(ThetaJoin(s, l, r, on, jType, combine)))
@@ -358,7 +357,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) = {
+      def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) = {
         case EquiJoin(src, lb, rb, k, jType, combine) if !src.isThat =>
           convertBranchingOp(src, lb, rb, g)((s, l, r) =>
             EJ.inj(EquiJoin(s, l, r, k, jType, combine)))
@@ -371,7 +370,7 @@ private[qscript] final class DiscoverPathT[T[_[_]]: BirecursiveT, O[a] <: ACopK[
       type IT[F[_]] = T[F]
       type OUT[A] = O[A]
 
-      def discoverPath[M[_]: Monad: MonadFsErr](g: ListContents[M]) =
+      def discoverPath[M[_]: Monad: MonadPlannerErr](g: ListContents[M]) =
         _.traverse(unionAll[M](g)) ∘ (in => \&/-(IN.inj(in).embed))
     }
 }

@@ -17,14 +17,15 @@
 package quasar.qscript
 
 import slamdata.Predef._
-import quasar.{Data, NullaryFunc, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
+import quasar.{NullaryFunc, UnaryFunc, BinaryFunc, TernaryFunc, Mapping}
 import quasar.fp._
+import quasar.common.data.Data
 import quasar.contrib.iota._
+import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp.ski.κ
 import quasar.fp.tree.{UnaryArg, BinaryArg, TernaryArg}
 import quasar.frontend.{logicalplan => lp}, lp.{LogicalPlan => LP, LogicalPlanR}
-import quasar.ejson.EJson
-import quasar.ejson.implicits._
 import quasar.std._
 
 import scala.sys

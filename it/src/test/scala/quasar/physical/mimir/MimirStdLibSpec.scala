@@ -18,7 +18,7 @@ package quasar.mimir
 
 import slamdata.Predef._
 
-import quasar.Data
+import quasar.common.data.Data
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
 import quasar.contrib.iota.copkTraverse

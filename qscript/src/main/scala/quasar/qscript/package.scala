@@ -17,10 +17,11 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.contrib.pathy.{ADir, AFile}
-import quasar.fp._
 import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
+import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.scalaz.MonadError_
+import quasar.fp._
 
 import matryoshka._
 import matryoshka.data._
@@ -56,6 +57,9 @@ import iotaz.TListK.:::
 //     irrelevant here, and autojoin_d has been replaced with a lower-level join
 //     operation that doesn’t include the cross portion.
 package object qscript {
+
+  type MonadPlannerErr[F[_]] = MonadError_[F, PlannerError]
+  def MonadPlannerErr[F[_]](implicit ev: MonadPlannerErr[F]): MonadPlannerErr[F] = ev
 
   /** This type is _only_ used for join branch-like structures. It’s an
     * unfortunate consequence of not having mutually-recursive data structures.

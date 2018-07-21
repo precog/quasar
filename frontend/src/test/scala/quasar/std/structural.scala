@@ -18,6 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
+import quasar.common.data._
 
 import scala.Predef.$conforms
 

@@ -17,7 +17,7 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.Data
+import quasar.common.data.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import qdata.time.DateTimeInterval
 

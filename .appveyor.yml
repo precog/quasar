@@ -31,5 +31,4 @@ build_script:
   - cmd: .\sbt ++"2.12.4" test:compile
 
 test_script:
-  - cmd: 'echo mimir = "C:\\Users\\appveyor\\AppData\\Local\\precog" > it\testing.conf'
-  - cmd: '.\sbt ++"2.12.4" it/sideEffectTestFSConfig "testOnly -- xonly" "exclusive:testOnly -- xonly"'
+  - cmd: '.\sbt ++"2.12.4" "testOnly -- xonly" "exclusive:testOnly -- xonly"'

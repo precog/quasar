@@ -18,6 +18,8 @@ package quasar
 
 import slamdata.Predef._
 import quasar.common.PrimaryType
+import quasar.common.data.Data
+import quasar.frontend.data.DataCodec
 import quasar.fp._
 import quasar.fp.ski._
 
@@ -72,7 +74,7 @@ sealed abstract class Type extends Product with Serializable { self =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def objectType: Option[Type] = this match {
-    case Const(value) => value.dataType.objectType
+    case Const(value) => dataType(value).objectType
     case Obj(value, uk) =>
       Some((uk.toList ++ value.toList.map(_._2)).concatenate(TypeOrMonoid))
     case x @ Coproduct(_, _) =>
@@ -82,7 +84,7 @@ sealed abstract class Type extends Product with Serializable { self =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def objectLike: Boolean = this match {
-    case Const(value)        => value.dataType.objectLike
+    case Const(value)        => dataType(value).objectLike
     case Obj(_, _)           => true
     case x @ Coproduct(_, _) => x.flatten.toList.forall(_.objectLike)
     case _                   => false
@@ -90,7 +92,7 @@ sealed abstract class Type extends Product with Serializable { self =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayType: Option[Type] = this match {
-    case Const(value) => value.dataType.arrayType
+    case Const(value) => dataType(value).arrayType
     case Arr(value) => Some(value.concatenate(TypeOrMonoid))
     case FlexArr(_, _, value) => Some(value)
     case x @ Coproduct(_, _) =>
@@ -100,7 +102,7 @@ sealed abstract class Type extends Product with Serializable { self =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   final def arrayLike: Boolean = this match {
-    case Const(value)        => value.dataType.arrayLike
+    case Const(value)        => dataType(value).arrayLike
     case Arr(_)              => true
     case FlexArr(_, _, _)    => true
     case x @ Coproduct(_, _) => x.flatten.toList.forall(_.arrayLike)
@@ -188,7 +190,7 @@ sealed abstract class Type extends Product with Serializable { self =>
   }
 
   def widenConst: Type = this match {
-    case Type.Const(d) => d.dataType
+    case Type.Const(d) => dataType(d)
     case t => t
   }
 
@@ -312,6 +314,26 @@ object Type extends TypeInstances {
     case common.Map  => AnyObject
   }
 
+  val dataType: Data => Type = {
+    case Data.Null => Null
+    case Data.Str(_) => Str
+    case Data.Bool(_) => Bool
+    case Data.Dec(_) => Dec
+    case Data.Int(_) => Int
+    case Data.Obj(v) => Obj(v.mapValues(Const(_)), None)
+    case Data.Arr(v) => Arr(v.map(Const(_)))
+    case Data.OffsetDateTime(_) => OffsetDateTime
+    case Data.OffsetTime(_) => OffsetTime
+    case Data.OffsetDate(_) => OffsetDate
+    case Data.LocalDateTime(_) => LocalDateTime
+    case Data.LocalTime(_) => LocalTime
+    case Data.LocalDate(_) => LocalDate
+    case Data.Interval(_) => Interval
+    case Data.Binary(_) => Binary
+    case Data.Id(_) => Id
+    case Data.NA => Bottom
+  }
+
   private def fail0[A](expected: Type, actual: Type, message: Option[String])
       : UnificationResult[A] =
     Validation.failure(NonEmptyList(UnificationError(expected, actual, message)))
@@ -343,7 +365,7 @@ object Type extends TypeInstances {
   def lub(left: Type, right: Type): Type = (left, right) match {
     case _ if left contains right   => left
     case _ if right contains left   => right
-    case (Const(l), Const(r))       => lub(l.dataType, r.dataType)
+    case (Const(l), Const(r))       => lub(dataType(l), dataType(r))
     case (Obj(v1, u1), Obj(v2, u2)) =>
       Obj(
         v1.unionWith(v2)(lub),
@@ -355,7 +377,7 @@ object Type extends TypeInstances {
   def constructiveLub(left: Type, right: Type): Type = (left, right) match {
     case _ if left contains right   => left
     case _ if right contains left   => right
-    case (Const(l), Const(r))       => lub(l.dataType, r.dataType)
+    case (Const(l), Const(r))       => lub(dataType(l), dataType(r))
     case _                          => left ⨿ right
   }
 
@@ -410,7 +432,7 @@ object Type extends TypeInstances {
       case (superType @ Coproduct(_, _), subType) =>
         typecheckCP(superType.flatten.toVector, subType)
 
-      case (superType, Const(subType)) => typecheck(superType, subType.dataType)
+      case (superType, Const(subType)) => typecheck(superType, dataType(subType))
 
       case _ => fail(superType, subType)
     }
@@ -418,7 +440,7 @@ object Type extends TypeInstances {
   def children(v: Type): List[Type] = v match {
     case Top => Nil
     case Bottom => Nil
-    case Const(value) => value.dataType :: Nil
+    case Const(value) => dataType(value) :: Nil
     case Null => Nil
     case Str => Nil
     case Int => Nil
@@ -456,8 +478,8 @@ object Type extends TypeInstances {
     def loop(v: Type): F[Type] = v match {
       case Const(value) =>
          for {
-          newType  <- f(value.dataType)
-          newType2 <- if (newType ≠ value.dataType) Monad[F].point(newType)
+          newType  <- f(dataType(value))
+          newType2 <- if (newType ≠ dataType(value)) Monad[F].point(newType)
                       else f(v)
         } yield newType2
 

@@ -16,11 +16,12 @@
 
 package quasar.mimir.evaluate
 
-import quasar.{Data, RenderTreeT}
+import quasar.RenderTreeT
+import quasar.common.data.Data
 import quasar.contrib.cats.effect.liftio._
 import quasar.evaluate.{FederatedQuery, QueryFederation}
-import quasar.fs.Planner.PlannerErrorME
 import quasar.mimir._, MimirCake._
+import quasar.qscript.MonadPlannerErr
 
 import cats.effect.{IO, LiftIO}
 import fs2.Stream
@@ -32,7 +33,7 @@ import shims._
 
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: LiftIO: Monad: PlannerErrorME] private (
+    F[_]: LiftIO: Monad: MonadPlannerErr] private (
     P: Cake)
     extends QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, Data]] {
 
@@ -57,7 +58,7 @@ final class MimirQueryFederation[
 object MimirQueryFederation {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: LiftIO: Monad: PlannerErrorME](
+      F[_]: LiftIO: Monad: MonadPlannerErr](
       P: Cake)
       : QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, Data]] =
     new MimirQueryFederation[T, F](P)

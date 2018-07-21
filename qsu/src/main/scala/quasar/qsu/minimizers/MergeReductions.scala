@@ -17,9 +17,8 @@
 package quasar.qsu
 package minimizers
 
-import quasar.fs.Planner, Planner.PlannerErrorME
+import quasar.common.effect.NameGenerator
 import quasar.contrib.matryoshka._
-import quasar.effect.NameGenerator
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
@@ -27,6 +26,7 @@ import quasar.fp.ski.κ
 import quasar.qscript.{
   construction,
   Hole,
+  MonadPlannerErr,
   ReduceIndex
 }
 import quasar.qscript.RecFreeS._
@@ -52,7 +52,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case qgraph @ QSReduce(src, buckets, reducers, repair) =>
@@ -75,7 +75,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       source: QSUGraph,
       candidates: List[QSUGraph],

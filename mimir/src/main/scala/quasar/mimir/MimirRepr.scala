@@ -16,10 +16,8 @@
 
 package quasar.mimir
 
-import quasar.contrib.scalaz._
 import quasar.mimir.MimirCake.{Cake, SortState}
-
-import scalaz._, Scalaz._
+import scalaz._
 
 trait MimirRepr {
   type P <: Cake
@@ -75,25 +73,6 @@ object MimirRepr {
       val table: P.Table = table0
       val lastSort: Option[SortState[P0.trans.TransSpec1]] = lastSort0
     }
-
-  def meld[F[_]: Monad, FS <: LightweightFileSystem](
-      fn: DepFn1[Cake, λ[`P <: Cake` => F[P#Table]]])(
-      implicit F: MonadReader_[F, (Cake, FS)])
-      : F[MimirRepr] =
-    F.ask.flatMap {
-      case (cake, _) =>
-        meldCake[ReaderT[F, Cake, ?]](
-          new DepFn1[Cake, λ[`P <: Cake` => ReaderT[F, Cake, P#Table]]] {
-            def apply(P: Cake): ReaderT[F, Cake, P.Table] =
-              fn(P).liftM[ReaderT[?[_], Cake, ?]]
-          }).run(cake)
-    }
-
-  def meldCake[F[_]: Monad](
-      fn: DepFn1[Cake, λ[`P <: Cake` => F[P#Table]]])(
-      implicit F: MonadReader_[F, Cake])
-      : F[MimirRepr] =
-    F.ask.flatMap(cake => fn(cake).map(table => MimirRepr(cake)(table)))
 
   // witness that all cakes have a singleton type for P
   def single[P0 <: Cake](src: MimirRepr.Aux[P0]): MimirRepr.Aux[src.P.type] =

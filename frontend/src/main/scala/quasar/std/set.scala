@@ -19,6 +19,7 @@ package quasar.std
 import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
+import quasar.common.data.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import scala.collection.immutable.NumericRange

@@ -18,7 +18,6 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.fs.Planner.{PlannerErrorME, InternalError}
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
 import quasar.ejson.EJson
@@ -26,7 +25,15 @@ import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.ι
-import quasar.qscript.{construction, ExcludeId, IdOnly, IdStatus, OnUndefined}
+import quasar.qscript.{
+  construction,
+  ExcludeId,
+  IdOnly,
+  IdStatus,
+  OnUndefined,
+  MonadPlannerErr,
+  PlannerError
+}
 
 import matryoshka._
 import matryoshka.implicits._
@@ -52,7 +59,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   val func = construction.Func[T]
   val recFunc = construction.RecFunc[T]
 
-  def apply[F[_]: Monad: PlannerErrorME](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
+  def apply[F[_]: Monad: MonadPlannerErr](graph: QSUGraph): F[AuthenticatedQSU[T]] = {
     type X[A] = StateT[F, QAuth, A]
 
     val authGraph = graph.rewriteM[X] {
@@ -76,13 +83,13 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
     }
   }
 
-  def computeProvenance[F[_]: Monad: PlannerErrorME: QAuthS](g: QSUGraph): F[QDims] = {
+  def computeProvenance[F[_]: Monad: MonadPlannerErr: QAuthS](g: QSUGraph): F[QDims] = {
     def flattened =
       s"${g.root} @ ${g.unfold.map(_.root).shows}"
 
     def unexpectedError: F[QDims] =
-      PlannerErrorME[F].raiseError(
-        InternalError(s"Encountered unexpected $flattened.", None))
+      MonadPlannerErr[F].raiseError(
+        PlannerError.InternalError(s"Encountered unexpected $flattened.", None))
 
     g.unfold match {
       case AutoJoin2(left, right, _) =>
@@ -200,7 +207,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
   ////
 
-  private def compute1[F[_]: Monad: PlannerErrorME: QAuthS]
+  private def compute1[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, src: QSUGraph)
       (f: QDims => QDims)
       : F[QDims] =
@@ -209,7 +216,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       QAuthS.modify(_.addDims(g.root, gdims)) as gdims
     }
 
-  private def compute2[F[_]: Monad: PlannerErrorME: QAuthS]
+  private def compute2[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, l: QSUGraph, r: QSUGraph)
       (f: (QDims, QDims) => QDims)
       : F[QDims] =
@@ -217,7 +224,7 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
       QAuthS.modify(_.addDims(g.root, ds)) as ds
     }
 
-  private def compute3[F[_]: Monad: PlannerErrorME: QAuthS]
+  private def compute3[F[_]: Monad: MonadPlannerErr: QAuthS]
       (g: QSUGraph, l: QSUGraph, c: QSUGraph, r: QSUGraph)
       (f: (QDims, QDims, QDims) => QDims)
       : F[QDims] =
@@ -228,11 +235,11 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   private def dimsFor[F[_]: Functor: QAuthS](g: QSUGraph): V[F, QDims] =
     QAuthS[F].gets(_ lookupDims g.root toSuccessNel g.root)
 
-  private def handleMissingDims[F[_]: Monad: PlannerErrorME, A](v: V[F, A]): F[A] =
+  private def handleMissingDims[F[_]: Monad: MonadPlannerErr, A](v: V[F, A]): F[A] =
     (v: F[ValidationNel[Symbol, A]]).flatMap { v0 =>
       v0.map(_.point[F]) valueOr { syms =>
-        PlannerErrorME[F].raiseError[A](
-          InternalError(s"Dependent dimensions not found: ${syms.show}.", None))
+        MonadPlannerErr[F].raiseError[A](
+          PlannerError.InternalError(s"Dependent dimensions not found: ${syms.show}.", None))
       }
     }
 
@@ -248,14 +255,14 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 object ApplyProvenance {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
-      F[_]: Monad: PlannerErrorME]
+      F[_]: Monad: MonadPlannerErr]
       (graph: QSUGraph[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("ApplyProvenance", new ApplyProvenance[T].apply[F](graph))
 
   def computeProvenance[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
-      F[_]: Monad: PlannerErrorME: MonadState_[?[_], QAuth[T]]]
+      F[_]: Monad: MonadPlannerErr: MonadState_[?[_], QAuth[T]]]
       (graph: QSUGraph[T])
       : F[QDims[T]] =
     new ApplyProvenance[T].computeProvenance[F](graph)

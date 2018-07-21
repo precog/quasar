@@ -18,7 +18,8 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._
-import quasar.DataDateTimeExtractors._
+import quasar.common.data.{Data, DataDateTimeExtractors}
+import quasar.common.data.DataDateTimeExtractors._
 import quasar.ArgumentError._
 import quasar.fp.ski._
 import quasar.time._

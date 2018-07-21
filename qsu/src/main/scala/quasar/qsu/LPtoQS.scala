@@ -18,9 +18,9 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.RenderTreeT
-import quasar.fs.Planner.PlannerErrorME
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
+import quasar.qscript.MonadPlannerErr
 
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
 import scalaz.{Applicative, Cord, Functor, Kleisli => K, Monad, Show}
@@ -30,7 +30,7 @@ import scalaz.syntax.show._
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends QSUTTypes[T] {
   import LPtoQS.MapSyntax
 
-  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](lp: T[LogicalPlan])
+  def apply[F[_]: Monad: MonadPlannerErr: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val agraph =

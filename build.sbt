@@ -64,49 +64,6 @@ val targetSettings = Seq(
   }
 )
 
-lazy val backendRewrittenRunSettings = Seq(
-  run := {
-    val delegate = streams.value.log
-    val args = complete.DefaultParsers.spaceDelimited("<arg>").parsed
-
-    delegate.info("Computing classpaths of dependent backends...")
-
-    val parentCp = (fullClasspath in connector in Compile).value.files
-    val productionBackends = isolatedBackends.value map {
-      case (name, childCp) =>
-        val classpathStr =
-          createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(",")
-
-        "--backend:" + name + "=" + classpathStr
-    }
-
-    val lwcCp = (fullClasspath in mimir in Test).value.files
-    val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(",")
-    val testBackends = List("--backend:quasar.mimir.LightweightTester$=" + lwcClasspath)
-
-    val backends = productionBackends ++ testBackends
-
-    val main = (mainClass in Compile).value.getOrElse(sys.error("unspecified main class; huzzah huzzah huzzah"))
-    val r = runner.value
-
-    val prefix = s"Running ${main}"
-
-    val filtered = new Logger {
-      def log(level: Level.Value, _message: => String): Unit = {
-        lazy val message = _message
-
-        if (level == Level.Info && message.startsWith(prefix))
-          delegate.info(prefix + "...")
-        else
-          delegate.log(level, message)
-      }
-      def success(message: => String): Unit = delegate.success(message)
-      def trace(t: => Throwable): Unit = delegate.trace(t)
-    }
-
-    r.run(main, (fullClasspath in Compile).value.files, args ++ backends, filtered)
-  })
-
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
 concurrentRestrictions in Global := {
@@ -174,23 +131,9 @@ lazy val excludeTypelevelScalaLibrary =
 lazy val publishTestsSettings = Seq(
   publishArtifact in (Test, packageBin) := true)
 
-def isolatedBackendSettings(classnames: String*) = Seq(
-  isolatedBackends in Global ++=
-    classnames.map(_ -> (fullClasspath in Compile).value.files),
-
-  packageOptions in (Compile, packageBin) +=
-    Package.ManifestAttributes("Backend-Module" -> classnames.mkString(" ")))
-
 lazy val isCIBuild               = settingKey[Boolean]("True when building in any automated environment (e.g. Travis)")
 lazy val isIsolatedEnv           = settingKey[Boolean]("True if running in an isolated environment")
 lazy val exclusiveTestTag        = settingKey[String]("Tag for exclusive execution tests")
-
-lazy val isolatedBackends =
-  taskKey[Seq[(String, Seq[File])]]("Global-only setting which contains all of the classpath-isolated backends")
-
-isolatedBackends in Global := Seq()
-
-lazy val sideEffectTestFSConfig = taskKey[Unit]("Rewrite the JVM environment to contain the filesystem classpath information for integration tests")
 
 def createBackendEntry(childPath: Seq[File], parentPath: Seq[File]): Seq[File] =
   (childPath.toSet -- parentPath.toSet).toSeq
@@ -205,11 +148,10 @@ lazy val root = project.in(file("."))
     blueeyes,
     common, connector, core,
     datagen,
-    effect, ejson,
-    foundation, frontend, fs,
-    impl, interface, it,
-    js,
-    mimir, mongodb, mongoIt,
+    ejson,
+    foundation, frontend,
+    impl, it,
+    mimir,
     niflheim,
     precog,
     qscript, qsu,
@@ -259,31 +201,15 @@ lazy val ejson = project
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val effect = project
-  .settings(name := "quasar-effect-internal")
-  .dependsOn(foundation % BothScopes)
-  .settings(libraryDependencies ++= Dependencies.effect)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** Somewhat Quasar- and MongoDB-specific JavaScript implementations.
-  */
-lazy val js = project
-  .settings(name := "quasar-js-internal")
-  .dependsOn(foundation % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Quasar components shared by both frontend and connector. This includes
   * things like data models, types, etc.
   */
 lazy val common = project
   .settings(name := "quasar-common-internal")
-  .dependsOn(foundation % BothScopes)
+  .dependsOn(
+    foundation % BothScopes,
+    ejson)
+  .settings(libraryDependencies ++= Dependencies.common)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -296,9 +222,7 @@ lazy val frontend = project
   .settings(name := "quasar-frontend-internal")
   .dependsOn(
     common % BothScopes,
-    effect,
-    ejson % BothScopes,
-    js)
+    ejson % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
@@ -339,20 +263,11 @@ lazy val sql = project
     libraryDependencies ++= Dependencies.sql)
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val fs = project
-  .settings(name := "quasar-fs-internal")
-  .dependsOn(frontend % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(publishTestsSettings)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
 lazy val qscript = project
   .settings(name := "quasar-qscript-internal")
   .dependsOn(
-    fs,
-    frontend % "test->test")
+    foundation % BothScopes,
+    frontend % BothScopes)
   .settings(commonSettings)
   .settings(targetSettings)
   .settings(excludeTypelevelScalaLibrary)
@@ -382,50 +297,12 @@ lazy val core = project
   .dependsOn(
     api     % BothScopes,
     qscript % BothScopes,
-    sql     % BothScopes,
-    fs      % "test->test",
-    effect  % "test->test")
+    sql     % BothScopes)
   .settings(commonSettings)
   .settings(publishTestsSettings)
   .settings(targetSettings)
   .settings(
     libraryDependencies ++= Dependencies.core)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** Implementation of the MongoDB connector.
-  */
-lazy val mongodb = project
-  .settings(name := "quasar-mongodb-internal")
-  .dependsOn(
-    fs        % "test->test",
-    connector % BothScopes,
-    js        % BothScopes,
-    core      % BothScopes)
-  .settings(commonSettings)
-  .settings(targetSettings)
-  .settings(
-    libraryDependencies ++= Dependencies.mongodb,
-    wartremoverWarnings in (Compile, compile) --= Seq(
-      Wart.AsInstanceOf,
-      Wart.Equals,
-      Wart.Overloading))
-  .settings(isolatedBackendSettings("quasar.physical.mongodb.MongoDb$"))
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-/** Types and operations needed by applications that embed Quasar.
-  */
-lazy val interface = project
-  .settings(name := "quasar-interface-internal")
-  .dependsOn(
-    core % BothScopes,
-    mimir,
-    sst)
-  .settings(commonSettings)
-  .settings(publishTestsSettings)
-  .settings(targetSettings)
-  .settings(libraryDependencies ++= Dependencies.interface)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -458,10 +335,13 @@ lazy val runp = (project in file("run"))
   */
 lazy val repl = project
   .settings(name := "quasar-repl")
-  .dependsOn(api, interface, runp)
+  .dependsOn(
+    frontend % BothScopes,
+    api,
+    runp)
   .settings(commonSettings)
   .settings(targetSettings)
-  .settings(backendRewrittenRunSettings)
+  .settings(libraryDependencies ++= Dependencies.repl)
   .settings(
     mainClass in Compile := Some("quasar.repl.Main"),
     fork in run := true,
@@ -477,7 +357,6 @@ lazy val it = project
   .configs(ExclusiveTests)
   .dependsOn(
     runp,
-    interface % BothScopes,
     qscript % "test->test")
   .settings(commonSettings)
   .settings(publishTestsSettings)
@@ -488,51 +367,6 @@ lazy val it = project
   .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
   .settings(parallelExecution in Test := false)
   .settings(logBuffered in Test := false)
-  .settings(
-    sideEffectTestFSConfig := {
-      val LoadCfgProp = "slamdata.internal.fs-load-cfg"
-
-      val parentCp = (fullClasspath in connector in Compile).value.files
-      val productionBackends = isolatedBackends.value map {
-        case (name, childCp) =>
-          val classpathStr =
-            createBackendEntry(childCp, parentCp).map(_.getAbsolutePath).mkString(":")
-
-          name + "=" + classpathStr
-      }
-
-      val lwcCp = (fullClasspath in mimir in Test).value.files
-      val lwcClasspath = createBackendEntry(lwcCp, parentCp).map(_.getAbsolutePath).mkString(":")
-      val testBackends = List("quasar.mimir.LightweightTester$=" + lwcClasspath)
-
-      val backends = productionBackends ++ testBackends
-
-      if (java.lang.System.getProperty(LoadCfgProp, "").isEmpty) {
-        // we aren't forking tests, so we just set the property in the current JVM
-        java.lang.System.setProperty(LoadCfgProp, backends.mkString(";"))
-      }
-
-      ()
-    },
-
-    test := Def.taskDyn {
-      val _ = sideEffectTestFSConfig.value
-
-      test in Test
-    }.value)
-  .settings(excludeTypelevelScalaLibrary)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val mongoIt = project
-  .configs(ExclusiveTests)
-  .dependsOn(it % BothScopes, mongodb)
-  .settings(commonSettings)
-  .settings(noPublishSettings)
-  .settings(targetSettings)
-  // Configure various test tasks to run exclusively in the `ExclusiveTests` config.
-  .settings(inConfig(ExclusiveTests)(Defaults.testTasks): _*)
-  .settings(inConfig(ExclusiveTests)(exclusiveTasks(test, testOnly, testQuick)): _*)
-  .settings(parallelExecution in Test := false)
   .settings(excludeTypelevelScalaLibrary)
   .enablePlugins(AutomateHeaderPlugin)
 
@@ -617,7 +451,6 @@ lazy val mimir = project
     impl % BothScopes,
     core,
     connector)
-  .settings(libraryDependencies ++= Dependencies.mimir)
   .settings(headerLicenseSettings)
   .settings(publishSettings)
   .settings(assemblySettings)

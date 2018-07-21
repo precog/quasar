@@ -20,17 +20,16 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.{
   ejson,
   BinaryFunc,
-  Data,
   Mapping,
   NullaryFunc,
   Reduction,
   TernaryFunc,
   UnaryFunc
 }
-import quasar.fs.Planner.{NonRepresentableData, PlannerError, PlannerErrorME}
+import quasar.common.data.Data
+import quasar.common.effect.NameGenerator
 import quasar.contrib.pathy.mkAbsolute
 import quasar.contrib.scalaz.MonadState_
-import quasar.effect.NameGenerator
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.contrib.iota._
@@ -47,6 +46,8 @@ import quasar.qscript.{
   MapFunc,
   MapFuncsCore,
   MapFuncsDerived,
+  MonadPlannerErr,
+  PlannerError,
   ReduceFunc,
   RightSide,
   RightSide3,
@@ -54,6 +55,7 @@ import quasar.qscript.{
   SrcHole,
   Take
 }
+import quasar.qscript.PlannerError.NonRepresentableData
 import quasar.qsu.{QScriptUniform => QSU}
 
 import iotaz.CopK
@@ -79,7 +81,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
   private val ID = CopK.Inject[MapFuncDerived, MapFunc]
 
   def apply[
-      F[_]: Monad: PlannerErrorME: NameGenerator](
+      F[_]: Monad: MonadPlannerErr: NameGenerator](
       plan: T[lp.LogicalPlan]): F[QSUGraph] =
     cataWithLetM[StateT[StateT[F, RevIdx, ?], LetS, ?]](
       plan,
@@ -108,7 +110,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
   def readLPƒ[
-      G[_]: Monad: PlannerErrorME: NameGenerator](
+      G[_]: Monad: MonadPlannerErr: NameGenerator](
       implicit
         MS: MonadState_[G, RevIdx],
         LetS: MonadState_[G, LetS])
@@ -135,7 +137,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
         },
         { ejson: T[EJson] => IC(MapFuncsCore.Constant(ejson)).right })
 
-      PlannerErrorME[G]
+      MonadPlannerErr[G]
         .unattempt(back.point[G])
         .flatMap(nullary[G])
 
@@ -306,7 +308,7 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 object ReadLP {
   def apply[
       T[_[_]]: BirecursiveT,
-      F[_]: Monad: PlannerErrorME: NameGenerator]
+      F[_]: Monad: MonadPlannerErr: NameGenerator]
       (plan: T[lp.LogicalPlan])
       : F[QSUGraph[T]] =
     taggedInternalError("ReadLP", new ReadLP[T].apply[F](plan))

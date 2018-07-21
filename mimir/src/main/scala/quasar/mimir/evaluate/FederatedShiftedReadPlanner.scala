@@ -18,15 +18,14 @@ package quasar.mimir.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.Data
+import quasar.common.data.Data
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.MonadTell_
 import quasar.evaluate.{Source => EvalSource}
-import quasar.fs.Planner.{InternalError, PlannerErrorME}
 import quasar.mimir._, MimirCake._
 import quasar.precog.common.RValue
-import quasar.qscript._
+import quasar.qscript._, PlannerError.InternalError
 import quasar.yggdrasil.TransSpecModule
 
 import cats.effect.{IO, LiftIO}
@@ -37,7 +36,7 @@ import scalaz._, Scalaz._
 
 final class FederatedShiftedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
-    F[_]: LiftIO: Monad: PlannerErrorME: MonadTell_[?[_], List[IO[Unit]]]](
+    F[_]: LiftIO: Monad: MonadPlannerErr: MonadTell_[?[_], List[IO[Unit]]]](
     val P: Cake) {
 
   type Assocs = Associates[T, IO]
@@ -47,7 +46,7 @@ final class FederatedShiftedReadPlanner[
     case Const(ShiftedRead(file, status)) =>
       Kleisli.ask[F, Assocs].map(_(file)) andThenK { maybeSource =>
         for {
-          source <- PlannerErrorME[F].unattempt_(
+          source <- MonadPlannerErr[F].unattempt_(
             maybeSource \/> InternalError.fromMsg(s"No source for '${posixCodec.printPath(file)}'."))
 
           tbl <- sourceTable(source)

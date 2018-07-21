@@ -16,7 +16,7 @@
 
 package quasar.mimir.evaluate
 
-import quasar.Data
+import quasar.common.data.Data
 import quasar.common.resource.ResourcePath
 import quasar.qscript.QScriptEducated
 

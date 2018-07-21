@@ -1,9 +1,0 @@
-#postgresql_metastore = "{\"host\":\"localhost\",\"port\":5432,\"database\":\"metastore_test\",\"userName\":\"postgres\",\"password\":\"postgres\"}"
-#mongodb_3_4_13       = "mongodb://<host>:<port>"
-#mimir                = "<path_to_folder>"
-#
-#NB: It is required that you include both `lwc_local` and `lwc_local_insert`.
-#    If you don't, the `lwc_local` tests will run against data in nihdb instead of data
-#    streaming in through the lightweight connector.
-#lwc_local            = "{\"mimirDataDir\": \"<path_to_folder>\"}"
-#lwc_local_insert     = "{}"

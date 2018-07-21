@@ -17,6 +17,7 @@
 package quasar.std
 
 import quasar._
+import quasar.common.data.Data
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
 import matryoshka._

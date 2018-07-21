@@ -22,7 +22,6 @@ import quasar.contrib.iota.:<<:
 import quasar.contrib.pathy._
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.fs.Planner.PlannerErrorME
 import quasar.qscript._
 import quasar.qscript.rewrites._
 
@@ -35,7 +34,7 @@ import scalaz.syntax.monad._
 /** Provides for evaluating QScript to a result. */
 abstract class QScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: Monad: PlannerErrorME,
+    F[_]: Monad: MonadPlannerErr,
     R] {
 
   /** QScript used by this evaluator. */

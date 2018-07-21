@@ -16,13 +16,14 @@
 
 package quasar.mimir
 
-import quasar.Data
-import quasar.qscript.{MapFuncCore, MapFuncsCore}
+import quasar.common.data.Data
+import quasar.contrib.iota.copkTraverse
 import quasar.precog.common._
+import quasar.qscript.{MapFuncCore, MapFuncsCore}
 import quasar.yggdrasil.bytecode._
+
 import matryoshka.{AlgebraM, RecursiveT}
 import matryoshka.implicits._
-import quasar.contrib.iota.copkTraverse
 
 import scalaz.Applicative
 import scalaz.syntax.applicative._

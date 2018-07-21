@@ -9,17 +9,13 @@ object Dependencies {
   private val algebraVersion      = "0.7.0"
   private val argonautVersion     = "6.2.2"
   private val disciplineVersion   = "0.7.2"
-  private val doobieVersion       = "0.4.4"
   private val jawnVersion         = "0.11.1"
-  private val jacksonVersion      = "2.4.4"
   private val matryoshkaVersion   = "0.18.3"
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
-  private val raptureVersion      = "2.0.0-M9"
   private val refinedVersion      = "0.8.3"
   private val scodecBitsVersion   = "1.1.2"
   private val scodecScalazVersion = "1.4.1a"
-  private val http4sVersion       = "0.18.13"
   private val scalacheckVersion   = "1.13.4"
   private val scalazVersion       = "7.2.23"
   private val scalazStreamVersion = "0.8.6a"
@@ -73,11 +69,14 @@ object Dependencies {
     "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test
   )
 
+  def common = Seq(
+    "com.slamdata" %% "qdata-core" % qdataVersion,
+    "com.slamdata" %% "qdata-core" % qdataVersion % "test->test" classifier "tests",
+    "com.slamdata" %% "qdata-time" % qdataVersion % "test->test" classifier "tests"
+  )
+
   def frontend = Seq(
     "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-    "com.slamdata"               %% "qdata-core"    % qdataVersion,
-    "com.slamdata"               %% "qdata-core"    % qdataVersion % "test->test" classifier "tests",
-    "com.slamdata"               %% "qdata-time"    % qdataVersion % "test->test" classifier "tests",
     "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test
   )
 
@@ -96,17 +95,8 @@ object Dependencies {
   )
 
   def core = Seq(
-    "org.tpolecat"               %% "doobie-core"               % doobieVersion,
-    "org.tpolecat"               %% "doobie-hikari"             % doobieVersion,
-    "org.tpolecat"               %% "doobie-postgres"           % doobieVersion,
-    "org.http4s"                 %% "http4s-core"               % http4sVersion,
     "com.github.julien-truffaut" %% "monocle-macro"             % monocleVersion,
-    "com.github.tototoshi"       %% "scala-csv"                 % "1.3.4",
-    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion,
-    // Removing this will not cause any compile time errors, but will cause a runtime error once
-    // Quasar attempts to connect to an h2 database to use as a metastore
-    "com.h2database"              % "h2"                        % "1.4.196",
-    "org.tpolecat"               %% "doobie-specs2"             % doobieVersion % Test
+    "com.slamdata"               %% "pathy-argonaut"            % pathyVersion
   )
 
   def impl = Seq(
@@ -115,23 +105,10 @@ object Dependencies {
     "org.spire-math" %% "jawn-argonaut" % jawnVersion
   )
 
-  def interface = Seq(
-    "com.github.scopt" %% "scopt" % scoptVersion,
-    "org.jboss.aesh"    % "aesh"  % "0.66.17",
+  def repl = Seq(
+    "com.github.tototoshi" %% "scala-csv" % "1.3.4",
     "org.jline" % "jline" % "3.8.0"
   )
-
-  def mongodb = {
-    val nettyVersion = "4.1.21.Final"
-
-    Seq(
-      "org.mongodb" % "mongodb-driver-async" %   "3.6.3",
-      // These are optional dependencies of the mongo asynchronous driver.
-      // They are needed to connect to mongodb vis SSL which we do under certain configurations
-      "io.netty"    % "netty-buffer"         % nettyVersion,
-      "io.netty"    % "netty-handler"        % nettyVersion
-    )
-  }
 
   def precog = Seq(
     "org.slf4s"            %% "slf4s-api"       % slf4sVersion,
@@ -152,10 +129,6 @@ object Dependencies {
 
   def yggdrasil = Seq(
     "com.codecommit" %% "smock" % "0.4.0-specs2-4.0.2" % "test"
-  )
-
-  def mimir = Seq(
-    "io.chrisdavenport" %% "scalaz-task-effect" % "0.1.0"
   )
 
   def niflheim = Seq(

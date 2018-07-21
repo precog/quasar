@@ -16,7 +16,6 @@
 
 package quasar.mimir
 
-import quasar.contrib.scalaz._
 import quasar.contrib.iota.copkTraverse
 import quasar.fp.ski.κ
 import quasar.qscript._
@@ -30,18 +29,10 @@ import matryoshka.data._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import scalaz.Leibniz.===
-import scalaz.concurrent.Task
 
 object MimirCake {
 
   type Cake = Precog with Singleton
-
-  type CakeMT[F[_], A] = Kleisli[F, (Cake, LightweightFileSystem), A]
-  type CakeM[A] = CakeMT[Task, A]
-
-  def cake[F[_]](implicit F: MonadReader_[F, (Cake, LightweightFileSystem)])
-      : F[(Cake, LightweightFileSystem)] =
-    F.ask
 
   // EquiJoin results are sorted by both keys at the same time, so we need to keep track of both
   final case class SortOrdering[TS1](sortKeys: Set[TS1], sortOrder: DesiredSortOrder, unique: Boolean) {

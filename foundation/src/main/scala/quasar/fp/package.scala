@@ -133,7 +133,6 @@ package object fp
     extends ListMapInstances
     with PartialFunctionOps
     with JsonOps
-    with ProcessOps
     with DebugOps {
 
   import ski._

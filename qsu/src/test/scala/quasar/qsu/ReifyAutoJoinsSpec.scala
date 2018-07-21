@@ -22,9 +22,8 @@ import quasar.{Qspec, TreeMatchers}
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.qscript.{construction, MapFuncsCore}
+import quasar.qscript.{construction, MapFuncsCore, PlannerError}
 import quasar.qscript.provenance.JoinKeys
-import quasar.fs.Planner.PlannerError
 
 import matryoshka.data.Fix
 import matryoshka.data.freeEqual

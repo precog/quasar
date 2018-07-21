@@ -18,8 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.fs.Planner, Planner.PlannerErrorME
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.ejson.implicits._
 import quasar.qscript.{
   construction,
@@ -27,6 +26,7 @@ import quasar.qscript.{
   JoinSide,
   LeftSide3,
   LeftSideF,
+  MonadPlannerErr,
   RightSide3,
   RightSideF}
 import quasar.qscript.provenance.JoinKeys
@@ -40,7 +40,7 @@ import scalaz.Scalaz._
 final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSUTTypes[T] {
   import QSUGraph.Extractors._
 
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](qsu: AuthenticatedQSU[T])
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] = {
 
     qsu.graph.rewriteM(reifyAutoJoins[F](qsu.auth)).run map {
@@ -59,7 +59,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
   private type QSU[A] = QScriptUniform[A]
   private type DimsT[F[_], A] = WriterT[F, List[(Symbol, QDims)], A]
 
-  private def reifyAutoJoins[F[_]: Monad: NameGenerator: PlannerErrorME](auth: QAuth)
+  private def reifyAutoJoins[F[_]: Monad: NameGenerator: MonadPlannerErr](auth: QAuth)
       : PartialFunction[QSUGraph, DimsT[F, QSUGraph]] = {
 
     case g @ AutoJoin2(left, right, combiner) =>
@@ -127,7 +127,7 @@ final class ReifyAutoJoins[T[_[_]]: BirecursiveT: EqualT] private () extends QSU
 object ReifyAutoJoins {
   def apply[
       T[_[_]]: BirecursiveT: EqualT,
-      F[_]: Monad: NameGenerator: PlannerErrorME]
+      F[_]: Monad: NameGenerator: MonadPlannerErr]
       (qsu: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("ReifyAutoJoins", new ReifyAutoJoins[T].apply[F](qsu))

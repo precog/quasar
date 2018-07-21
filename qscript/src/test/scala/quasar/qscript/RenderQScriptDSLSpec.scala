@@ -47,8 +47,9 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
   // nor is kind-projector. go figure.
   val prefix =
     """
-      |import quasar.{Data, Type}
+      |import quasar.Type
       |import quasar.common.{JoinType, SortDir}
+      |import quasar.common.data.Data
       |import quasar.time.TemporalPart
       |import quasar.qscript._
       |import quasar.ejson.{EJson, Fixed}

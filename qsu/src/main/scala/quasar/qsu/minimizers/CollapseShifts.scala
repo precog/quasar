@@ -19,14 +19,13 @@ package minimizers
 
 import slamdata.Predef._
 import quasar.RenderTreeT
+import quasar.common.effect.NameGenerator
 import quasar.contrib.matryoshka._
-import quasar.effect.NameGenerator
 import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
-import quasar.fs.Planner, Planner.PlannerErrorME
 import quasar.qscript.{
   construction,
   Hole,
@@ -34,6 +33,7 @@ import quasar.qscript.{
   IdStatus,
   JoinSide,
   LeftSide,
+  MonadPlannerErr,
   OnUndefined,
   RightSide,
   SrcHole
@@ -78,7 +78,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
     candidates exists { case ConsecutiveUnbounded(_, _) => true; case _ => false }
 
   def extract[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case ConsecutiveUnbounded(src, shifts) =>
@@ -192,7 +192,7 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
    */
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[
-      G[_]: Monad: NameGenerator: PlannerErrorME: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
       qgraph: QSUGraph,
       src: QSUGraph,
       candidates: List[QSUGraph],

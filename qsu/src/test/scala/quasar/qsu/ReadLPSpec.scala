@@ -18,8 +18,8 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.{Data, DataGenerators, Type, Qspec}
-import quasar.fs.Planner.PlannerError
+import quasar.{Type, Qspec}
+import quasar.common.data.{Data, DataGenerators}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
 import quasar.frontend.logicalplan.{JoinCondition, LogicalPlan, LogicalPlanHelpers}
@@ -30,6 +30,7 @@ import quasar.qscript.{
   LeftSide3,
   MapFuncsCore,
   MapFuncsDerived,
+  PlannerError,
   ReduceFuncs,
   RightSide,
   RightSide3,

@@ -16,8 +16,8 @@
 
 package quasar.yggdrasil.table
 
-import quasar.DataCodec
 import quasar.blueeyes._, json._
+import quasar.frontend.data.DataCodec
 import quasar.precog._
 import quasar.precog.common._
 import quasar.precog.util._

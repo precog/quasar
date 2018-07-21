@@ -18,8 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.effect.NameGenerator
-import quasar.fs.Planner.{InternalError, PlannerErrorME}
+import quasar.common.effect.NameGenerator
 import quasar.common.JoinType
 import quasar.contrib.pathy.AFile
 import quasar.contrib.scalaz.MonadReader_
@@ -39,6 +38,7 @@ import quasar.qscript.{
   LeftShift,
   JoinSide,
   Map,
+  MonadPlannerErr,
   QCE,
   QScriptEducated,
   Read,
@@ -53,6 +53,7 @@ import quasar.qscript.{
   Union,
   Unreferenced
 }
+import quasar.qscript.PlannerError.InternalError
 import quasar.qscript.provenance.JoinKey
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.QSUGraph.QSUPattern
@@ -69,7 +70,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
   type QSE[A] = QScriptEducated[A]
 
-  def apply[F[_]: Monad: PlannerErrorME: NameGenerator](rqsu: ResearchedQSU[T]): F[T[QSE]] = {
+  def apply[F[_]: Monad: MonadPlannerErr: NameGenerator](rqsu: ResearchedQSU[T]): F[T[QSE]] = {
     type G[A] = ReaderT[F, References, A]
 
     val grad = graduateƒ[G, QSE](None)(NaturalTransformation.refl[QSE])
@@ -89,7 +90,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 
   private val func = construction.Func[T]
 
-  private def mergeSources[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR](
+  private def mergeSources[F[_]: Monad: MonadPlannerErr: NameGenerator: RefsR](
       left: QSUGraph,
       right: QSUGraph): F[SrcMerge[QSUGraph, FreeQS]] = {
 
@@ -155,7 +156,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
     }
   }
 
-  private def educate[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR]
+  private def educate[F[_]: Monad: MonadPlannerErr: NameGenerator: RefsR]
     (pattern: QSUPattern[T, QSUGraph])
       : F[QSE[QSUGraph]] = pattern match {
     case QSUPattern(name, qsu) =>
@@ -267,12 +268,12 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
           }
 
         case qsu =>
-          PlannerErrorME[F].raiseError(
+          MonadPlannerErr[F].raiseError(
             InternalError(s"Found an unexpected LP-ish $qsu.", None)) // TODO use Show to print
       }
   }
 
-  private def graduateƒ[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR, G[_]](
+  private def graduateƒ[F[_]: Monad: MonadPlannerErr: NameGenerator: RefsR, G[_]](
     halt: Option[(Symbol, F[G[QSUGraph]])])(
     lift: QSE ~> G)
       : CoalgebraM[F, G, QSUGraph] = graph => {
@@ -292,7 +293,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
     }
   }
 
-  private def graduateCoEnv[F[_]: Monad: PlannerErrorME: NameGenerator: RefsR]
+  private def graduateCoEnv[F[_]: Monad: MonadPlannerErr: NameGenerator: RefsR]
     (hole: Option[Symbol], graph: QSUGraph)
       : F[FreeQS] = {
     type CoEnvTotal[A] = CoEnv[Hole, QScriptTotal, A]
@@ -311,7 +312,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
 object Graduate {
   def apply[
       T[_[_]]: BirecursiveT: ShowT,
-      F[_]: Monad: PlannerErrorME: NameGenerator]
+      F[_]: Monad: MonadPlannerErr: NameGenerator]
       (rqsu: ResearchedQSU[T])
       : F[T[QScriptEducated[T, ?]]] =
     taggedInternalError("Graduate", new Graduate[T].apply[F](rqsu))

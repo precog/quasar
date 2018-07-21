@@ -16,22 +16,23 @@
 
 package quasar.regression
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
 
-import quasar.{Data, DataCodec}
-import quasar.DataGenerators.dataArbitrary
+import quasar.common.data.Data
+import quasar.common.data.DataGenerators.dataArbitrary
 import quasar.fp._
+import quasar.frontend.data.DataCodec
 
 import scala.Predef.$conforms
 
 import argonaut._, Argonaut._
+import cats.effect.IO
+import fs2.Stream
 import org.scalacheck.Prop
 import org.specs2.execute._
 import org.specs2.matcher._
 import org.scalacheck.Arbitrary, Arbitrary._
 import scalaz.{Failure => _, Success => _, _}
-import scalaz.concurrent.Task
-import scalaz.stream._
 
 class PredicateSpec extends quasar.Qspec {
   import Predicate._
@@ -46,20 +47,20 @@ class PredicateSpec extends quasar.Qspec {
   }
 
   def shuffle[CC[X] <: scala.collection.TraversableOnce[X], A](as: CC[A])
-      (implicit bf: scala.collection.generic.CanBuildFrom[CC[A], A, CC[A]]): Task[CC[A]] =
-    Task.delay { scala.util.Random.shuffle(as) }
+      (implicit bf: scala.collection.generic.CanBuildFrom[CC[A], A, CC[A]]): IO[CC[A]] =
+    IO(scala.util.Random.shuffle(as))
 
-  def partial(results: List[Json]): Process[Task, Json] =
-    Process.emitAll(results) ++ Process.eval(Task.fail(new RuntimeException()))
+  def partial(results: List[Json]): Stream[IO, Json] =
+    Stream.emits(results) ++ Stream.eval(IO.raiseError(new RuntimeException()))
 
   def run(p: Predicate, expected: List[Json], result: List[Json], fieldOrder: OrderSignificance, resultOrder: OrderSignificance): Result =
-    p(expected, Process.emitAll(result): Process[Task, Json], fieldOrder, resultOrder).unsafePerformSync
+    p(expected, Stream.emits(result): Stream[IO, Json], fieldOrder, resultOrder).unsafeRunSync
 
   def shuffledFields(
     json: List[Json], pred: Predicate, fieldOrder: OrderSignificance, resultOrder: OrderSignificance, matcher: Matcher[Result]
   ): Prop = {
     val pairs = json.zipWithIndex.map { case (js, x) => x.toString -> js}
-    val shuffledPairs = shuffle(pairs).unsafePerformSync
+    val shuffledPairs = shuffle(pairs).unsafeRunSync
 
     pairs != shuffledPairs ==> {
       val result = List(Json(pairs: _*))
@@ -79,7 +80,7 @@ class PredicateSpec extends quasar.Qspec {
 
     "match shuffled result with no dupes" >> prop { (a: List[Json]) =>
       val expected = a.distinct
-      val shuffled = shuffle(expected).unsafePerformSync
+      val shuffled = shuffle(expected).unsafeRunSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
@@ -102,14 +103,14 @@ class PredicateSpec extends quasar.Qspec {
 
     "fail if the process fails" >> prop { (a: List[Json], b: List[Json], c: List[Json]) =>
       val expected = (a ++ b).distinct
-      val partialResult = shuffle(a ++ c).unsafePerformSync
+      val partialResult = shuffle(a ++ c).unsafeRunSync
 
-      pred(expected, partial(partialResult), OrderPreserved, OrderIgnored).unsafePerformSyncAttempt.toOption must beNone
+      pred(expected, partial(partialResult), OrderPreserved, OrderIgnored).attempt.unsafeRunSync.toOption must beNone
     }
 
     "match with any additional (no dupes)" >> prop { (a: List[Json], b: List[Json]) =>
       val expected = a.distinct
-      val result = shuffle(a ++ b).unsafePerformSync
+      val result = shuffle(a ++ b).unsafeRunSync
 
       b.nonEmpty ==> {
         run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
@@ -121,7 +122,7 @@ class PredicateSpec extends quasar.Qspec {
       val result0 = a.distinct
 
       expected != result0 ==> {
-        val result = shuffle(result0).unsafePerformSync
+        val result = shuffle(result0).unsafeRunSync
 
         run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
           case Failure(msg, _, _, _) => msg must contain("unmatched expected values")
@@ -140,7 +141,7 @@ class PredicateSpec extends quasar.Qspec {
 
     "match shuffled result with no dupes" >> prop { (a: List[Json]) =>
       val expected = a.distinct
-      val shuffled = shuffle(expected).unsafePerformSync
+      val shuffled = shuffle(expected).unsafeRunSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }
@@ -166,9 +167,9 @@ class PredicateSpec extends quasar.Qspec {
       val result0 = a.distinct
 
       expected != result0 ==> {
-        val partialResult = shuffle(result0).unsafePerformSync
+        val partialResult = shuffle(result0).unsafeRunSync
 
-        pred(expected, partial(partialResult), OrderPreserved, OrderIgnored).unsafePerformSyncAttempt.toOption must beNone
+        pred(expected, partial(partialResult), OrderPreserved, OrderIgnored).attempt.unsafeRunSync.toOption must beNone
       }
     }
 
@@ -177,7 +178,7 @@ class PredicateSpec extends quasar.Qspec {
       val result0 = (a ++ b).distinct
 
       expected != result0 ==> {
-        val result = shuffle(result0).unsafePerformSync
+        val result = shuffle(result0).unsafeRunSync
 
         run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
           case Failure(msg, _, _, _) => msg must contain("unexpected value")
@@ -190,7 +191,7 @@ class PredicateSpec extends quasar.Qspec {
       val result0 = a.distinct
 
       expected != result0 ==> {
-        val result = shuffle(a.distinct).unsafePerformSync
+        val result = shuffle(a.distinct).unsafeRunSync
 
         run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike {
           case Failure(msg, _, _, _) => msg must contain("unmatched expected values")
@@ -207,7 +208,7 @@ class PredicateSpec extends quasar.Qspec {
     }
 
     "reject shuffled result" >> prop { (expected: List[Json]) =>
-      val shuffled = shuffle(expected).unsafePerformSync
+      val shuffled = shuffle(expected).unsafeRunSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled, OrderPreserved, OrderPreserved) must beLike { case Failure(_, _, _, _) => ok }
@@ -225,7 +226,7 @@ class PredicateSpec extends quasar.Qspec {
       val expected = a ++ b
       val partialResult = a
 
-      pred(expected, partial(partialResult), OrderPreserved, OrderPreserved).unsafePerformSyncAttempt.toOption must beNone
+      pred(expected, partial(partialResult), OrderPreserved, OrderPreserved).attempt.unsafeRunSync.toOption must beNone
     }
 
     "reject with any additional" >> prop { (a: List[Json], b: List[Json], c: List[Json]) =>
@@ -263,7 +264,7 @@ class PredicateSpec extends quasar.Qspec {
     }
 
     "reject shuffled result" >> prop { (expected: List[Json]) =>
-      val shuffled = shuffle(expected).unsafePerformSync
+      val shuffled = shuffle(expected).unsafeRunSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled, OrderPreserved, OrderPreserved) must beLike { case Failure(msg, _, _, _) => msg must contain("does not match") }
@@ -281,7 +282,7 @@ class PredicateSpec extends quasar.Qspec {
       val expected = a ++ b
       val partialResult = partial(a)
 
-      pred(expected, partialResult, OrderPreserved, OrderPreserved).unsafePerformSyncAttempt.toOption must beNone
+      pred(expected, partialResult, OrderPreserved, OrderPreserved).attempt.unsafeRunSync.toOption must beNone
     }
 
     "match with any following" >> prop { (a: List[Json], b: List[Json]) =>
@@ -310,7 +311,7 @@ class PredicateSpec extends quasar.Qspec {
 
     "reject shuffled result with no dupes" >> prop { (a: List[Json]) =>
       val expected = a.distinct
-      val shuffled = shuffle(expected).unsafePerformSync
+      val shuffled = shuffle(expected).unsafeRunSync
 
       shuffled != expected ==> {
         run(pred, expected, shuffled, OrderPreserved, OrderIgnored) must beLike { case Failure(msg, _, _, _) => msg must contain("prohibited values") }
@@ -326,14 +327,14 @@ class PredicateSpec extends quasar.Qspec {
 
     "fail if the process fails" >> prop { (result: List[Json], expected: List[Json]) =>
       (result.toSet intersect expected.toSet).isEmpty ==> {
-        pred(expected, partial(result), OrderPreserved, OrderIgnored).unsafePerformSyncAttempt.toOption must beNone
+        pred(expected, partial(result), OrderPreserved, OrderIgnored).attempt.unsafeRunSync.toOption must beNone
       }
     }.set(maxSize = 10)
 
     "reject any subset" >> prop { (a: List[Json], b: List[Json], c: List[Json]) =>
       b.nonEmpty ==> {
-        val expected = shuffle(b ++ c).unsafePerformSync
-        val result = shuffle(a ++ b).unsafePerformSync
+        val expected = shuffle(b ++ c).unsafeRunSync
+        val result = shuffle(a ++ b).unsafeRunSync
 
         run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Failure(_, _, _, _) => ok }
       }
@@ -341,7 +342,7 @@ class PredicateSpec extends quasar.Qspec {
 
     "match any disjoint values" >> prop { (result: List[Json], expected: List[Json]) =>
       (result.toSet intersect expected.toSet).isEmpty ==> {
-        val values: Process[Task, Json] = Process.emitAll(result)
+        val values: Stream[IO, Json] = Stream.emits(result)
 
         if (expected.nonEmpty)
           run(pred, expected, result, OrderPreserved, OrderIgnored) must beLike { case Success(_, _) => ok }

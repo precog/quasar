@@ -21,8 +21,8 @@ import quasar._
 import quasar.api.datasource._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
+import quasar.common.data.Data
 import quasar.contrib.argonaut._
-import quasar.contrib.cats.effect._
 import quasar.contrib.fs2.convert
 import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
@@ -31,7 +31,7 @@ import quasar.contrib.scalaz.{MonadError_, MonadTell_}
 import quasar.ejson
 import quasar.ejson.Common.{Optics => CO}
 import quasar.fp._
-import quasar.fs.FileSystemType
+import quasar.frontend.data.DataCodec
 import quasar.impl.datasource.local.LocalType
 import quasar.impl.external.ExternalConfig
 import quasar.run.{Quasar, QuasarError, SqlQuery}
@@ -51,13 +51,11 @@ import cats.effect.{Effect, IO, Sync, Timer}
 import eu.timepit.refined.auto._
 import fs2.{io, text, Stream}
 import fs2.async.Promise
-import _root_.io.chrisdavenport.scalaz.task._
 import matryoshka._
 import org.specs2.execute
 import org.specs2.specification.core.Fragment
 import pathy.Path, Path._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 // import shims._ causes compilation to not terminate in any reasonable amount of time.
 import shims.{monadErrorToScalaz, monadToScalaz}
 
@@ -104,35 +102,30 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   } yield (q, i)
 
-  val lwcLocalConfigs =
-    TestConfig.fileSystemConfigs(FileSystemType("lwc_local")).to[IO]
-
   ////
 
   val buildSuite =
-    lwcLocalConfigs.map(_.isEmpty).ifM(
-      IO(suiteName >> skipped("to run, enable the 'lwc_local' test configuration.")),
-      for {
-        tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
-        sdown <- Promise.empty[IO, Unit]
+    for {
+      tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
+      sdown <- Promise.empty[IO, Unit]
 
-        tests <- regressionTests[IO](TestsRoot, TestDataRoot)
+      tests <- regressionTests[IO](TestsRoot, TestDataRoot)
 
-        _ <- Q.evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
-        t <- tdef.get
-        (q, i) = t
+      _ <- Q.evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
+      t <- tdef.get
+      (q, i) = t
 
-        f = (squery: UUID => SqlQuery) =>
-          Stream.force(q.queryEvaluator.evaluate(squery(i)))
-      } yield {
-        suiteName >> {
-          tests.toList foreach { case (loc, test) =>
-            regressionExample(loc, test, BackendName("lwc_local"), f)
-          }
-
-          step(sdown.complete(()).unsafeRunSync())
+      f = (squery: UUID => SqlQuery) =>
+        Stream.force(q.queryEvaluator.evaluate(squery(i)))
+    } yield {
+      suiteName >> {
+        tests.toList foreach { case (loc, test) =>
+          regressionExample(loc, test, BackendName("lwc_local"), f)
         }
-      })
+
+        step(sdown.complete(()).unsafeRunSync())
+      }
+    }
 
   buildSuite.unsafeRunSync()
 
@@ -153,8 +146,8 @@ final class Sql2QueryRegressionSpec extends Qspec {
           test.data.nonEmpty.fold(DataDir(id) </> fileParent(loc), rootDir))
 
       verifyResults(test.expected, results(query), backendName)
-        .timed(2.minutes)
-        .unsafePerformSync
+        .unsafeRunTimed(2.minutes)
+        .getOrElse(execute.StandardResults.failure("Timed out."))
     }
 
     s"${test.name} [${posixCodec.printPath(loc)}]" >> {
@@ -169,11 +162,11 @@ final class Sql2QueryRegressionSpec extends Qspec {
   }
 
   /** Verify the given results according to the provided expectation. */
-  def verifyResults(
+  def verifyResults[F[_]: Sync](
       exp: ExpectedResult,
-      act: Stream[IO, Data],
+      act: Stream[F, Data],
       backendName: BackendName)
-      : Task[execute.Result] = {
+      : F[execute.Result] = {
 
     /** This helps us get identical results on different connectors, even though
       * they have different precisions for their floating point values.
@@ -209,15 +202,15 @@ final class Sql2QueryRegressionSpec extends Qspec {
             OrderIgnored
         } | OrderPreserved
 
-    val actProcess =
-      convert.toProcess(act)
-        // TODO{fs2}: Chunkiness
-        .map(normalizeJson <<< deleteFields <<< (_.asJson))
-        .translate(λ[IO ~> Task](_.to[Task]))
+    // TODO{fs2}: Chunkiness
+    val actNormal =
+      act.mapChunks(
+        _.map(normalizeJson <<< deleteFields <<< (_.asJson))
+          .toSegment)
 
     exp.predicate(
       exp.rows,
-      actProcess,
+      actNormal,
       fieldOrderSignificance,
       resultOrderSignificance)
   }

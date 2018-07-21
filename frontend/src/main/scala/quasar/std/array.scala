@@ -16,8 +16,9 @@
 
 package quasar.std
 
-import quasar.{Data, Type, Func, BinaryFunc, Mapping}
+import quasar.{Type, Func, BinaryFunc, Mapping}
 import quasar.ArgumentError._
+import quasar.common.data.Data
 
 import scalaz._, Validation.{success, failureNel}
 import shapeless._

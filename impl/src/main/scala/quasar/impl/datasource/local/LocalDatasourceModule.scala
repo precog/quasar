@@ -16,8 +16,9 @@
 
 package quasar.impl.datasource.local
 
-import quasar.{Data, Disposable}
+import quasar.Disposable
 import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
+import quasar.common.data.Data
 import quasar.common.resource.{MonadResourceErr, ResourcePath}
 import quasar.connector.{Datasource, LightweightDatasourceModule}
 

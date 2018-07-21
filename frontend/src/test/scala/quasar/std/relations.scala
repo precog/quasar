@@ -16,21 +16,20 @@
 
 package quasar.std
 
-import quasar.Func
 import slamdata.Predef._
-import quasar.TypeGenerators
+import quasar.{Func, Type, TypeGenerators}
+import quasar.common.data.Data
 
 import org.scalacheck.{Arbitrary, Gen, Prop}, Arbitrary.arbitrary
 import scalaz.Validation, Validation.FlatMap._
 
 class RelationsSpec extends quasar.Qspec with TypeGenerators {
   import RelationsLib._
-  import quasar.Type
-  import quasar.Type.Const
-  import quasar.Data.Bool
-  import quasar.Data.Dec
-  import quasar.Data.Int
-  import quasar.Data.Str
+  import Type.Const
+  import Data.Bool
+  import Data.Dec
+  import Data.Int
+  import Data.Str
 
   val comparisonOps = Gen.oneOf(Eq, Neq, Lt, Lte, Gt, Gte)
 

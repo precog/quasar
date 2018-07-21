@@ -16,7 +16,8 @@
 
 package quasar.qsu
 
-import quasar.{ejson, Data, Qspec}
+import quasar.{ejson, Qspec}
+import quasar.common.data.Data
 import quasar.qscript.{Hole, LeftSide, MapFuncsCore, MFC, RightSide, SrcHole}
 import slamdata.Predef._
 

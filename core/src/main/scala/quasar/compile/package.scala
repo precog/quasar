@@ -18,6 +18,7 @@ package quasar
 
 import slamdata.Predef._
 import quasar.common.{phase, phaseM, PhaseResultTell}
+import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
 import quasar.contrib.scalaz.MonadError_
 import quasar.fp._

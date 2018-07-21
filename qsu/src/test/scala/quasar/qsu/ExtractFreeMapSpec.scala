@@ -25,9 +25,8 @@ import quasar.ejson.implicits._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.fs.Planner.PlannerError
 import quasar.qscript.construction
-import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, RightSide}
+import quasar.qscript.{MapFuncsCore, JoinSide, LeftSide, PlannerError, RightSide}
 import quasar.{Qspec, TreeMatchers}
 
 import matryoshka._

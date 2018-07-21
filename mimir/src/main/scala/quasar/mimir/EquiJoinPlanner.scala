@@ -27,7 +27,7 @@ import quasar.qscript._
 
 import quasar.yggdrasil.TableModule.SortAscending
 
-import cats.effect.IO
+import cats.effect.LiftIO
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
@@ -38,8 +38,9 @@ import org.slf4s.Logging
 
 import scalaz._, Scalaz._
 
-final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    liftF: IO ~> F) extends Logging {
+final class EquiJoinPlanner[
+    T[_[_]]: BirecursiveT: EqualT: ShowT,
+    F[_]: LiftIO: Monad] extends Logging {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -99,13 +100,15 @@ final class EquiJoinPlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
             log.trace("EQUIJOIN: not a full-cross; sorting and cogrouping")
 
             for {
-              lsorted <- liftF[MimirRepr.Aux[leftRepr.P.type]](
-                sortT[leftRepr.P.type](MimirRepr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey)))
+              lsorted <-
+                sortT[leftRepr.P.type](MimirRepr.single[leftRepr.P](leftRepr))(leftRepr.table, leftRepr.mergeTS1(transLKey))
                 .map(r => src.unsafeMergeTable(r.table))
+                .to[F]
 
-              rsorted <- liftF[MimirRepr.Aux[rightRepr.P.type]](
-                sortT[rightRepr.P.type](MimirRepr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey)))
+              rsorted <-
+                sortT[rightRepr.P.type](MimirRepr.single[rightRepr.P](rightRepr))(rightRepr.table, rightRepr.mergeTS1(transRKey))
                 .map(r => src.unsafeMergeTable(r.table))
+                .to[F]
 
               transLeft <- tpe match {
                 case JoinType.LeftOuter | JoinType.FullOuter =>

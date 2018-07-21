@@ -16,7 +16,8 @@
 
 package quasar.regression
 
-import slamdata.Predef._
+import slamdata.Predef.{Stream => _, _}
+import quasar.CatsSpecs2Instances
 import quasar.RenderTree.ops._
 import quasar.contrib.argonaut._
 import quasar.fp._
@@ -25,26 +26,29 @@ import scala.None
 import scala.Predef.$conforms
 
 import argonaut._, Argonaut._
+import cats.effect.Sync
+import fs2.Stream
 import matryoshka._
 import org.specs2.execute._
 import org.specs2.matcher._
 import scalaz.{Failure => _, _}, Scalaz._
-import scalaz.stream._
-import quasar.ScalazSpecs2Instances
+import shims._
 
 sealed abstract class Predicate {
-  def apply[F[_]: Catchable: Monad](
+  def apply[F[_]: Sync](
     expected: List[Json],
-    actual: Process[F, Json],
+    actual: Stream[F, Json],
     fieldOrder: OrderSignificance,
     resultOrder: OrderSignificance
   ): F[Result]
 }
 
-object Predicate extends ScalazSpecs2Instances {
+object Predicate extends CatsSpecs2Instances {
   import MustMatchers._
   import StandardResults._
   import DecodeResult.{ok => jok, fail => jfail}
+
+  implicit val resultMonoid = Result.ResultMonoid
 
   def doesntMatch[S <: Option[Json]](actual: Json, expected: Json): String = {
     val diff = actual.render.diff(expected.render).shows
@@ -72,27 +76,28 @@ object Predicate extends ScalazSpecs2Instances {
 
   /** Must contain ALL the elements. */
   final case object AtLeast extends Predicate {
-    def apply[F[_]: Catchable: Monad](
+    def apply[F[_]: Sync](
       expected0: List[Json],
-      actual0: Process[F, Json],
+      actual0: Stream[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
     ): F[Result] = resultOrder match {
       case OrderPreserved =>
         // FIXME: This case is the same as `Exactly`, but shouldn’t be.
-        val actual   = actual0.map(Some(_))
-        val expected = Process.emitAll(expected0).map(Some(_))
+        val actual   = actual0.noneTerminate
+        val expected = Stream.emits(expected0).noneTerminate
 
-        (actual tee expected)(tee.zipAll(None, None))
+        actual.zip(expected)
           .flatMap {
             case (a, e) if jsonMatches(a, e) =>
-              Process.halt
+              Stream.empty
             case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
-              Process.halt
+              Stream.empty
             case (a, e) =>
-              Process.emit(a must matchJson(e) : Result)
+              Stream.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .compile.foldMonoid
+
       case OrderIgnored =>
         actual0.scan((expected0.toSet, Set.empty[Json])) {
           case ((expected, wrongOrder), e) =>
@@ -105,40 +110,41 @@ object Predicate extends ScalazSpecs2Instances {
                 (expected, wrongOrder)
             }
         }
-          .runLast
-          .map {
-            case Some((exp, wrongOrder)) =>
-              (exp aka "unmatched expected values" must beEmpty) and
-                (wrongOrder aka "matched but field order differs" must beEmpty)
-                .unless(fieldOrder ≟ OrderIgnored): Result
-            case None =>
-              failure
-          }
+        .compile.last
+        .map {
+          case Some((exp, wrongOrder)) =>
+            (exp aka "unmatched expected values" must beEmpty) and
+              (wrongOrder aka "matched but field order differs" must beEmpty)
+              .unless(fieldOrder ≟ OrderIgnored): Result
+          case None =>
+            failure
+        }
     }
   }
 
   /** Must ALL and ONLY the elements. */
   final case object Exactly extends Predicate {
-    def apply[F[_]: Catchable: Monad](
+    def apply[F[_]: Sync](
       expected0: List[Json],
-      actual0: Process[F, Json],
+      actual0: Stream[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
     ): F[Result] = resultOrder match {
       case OrderPreserved =>
-        val actual   = actual0.map(Some(_))
-        val expected = Process.emitAll(expected0).map(Some(_))
+        val actual   = actual0.noneTerminate
+        val expected = Stream.emits(expected0).noneTerminate
 
-        (actual tee expected)(tee.zipAll(None, None))
+        actual.zip(expected)
           .flatMap {
             case (a, e) if jsonMatches(a, e) =>
-              Process.halt
+              Stream.empty
             case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
-              Process.halt
+              Stream.empty
             case (a, e) =>
-              Process.emit(a must matchJson(e) : Result)
+              Stream.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .compile.foldMonoid
+
       case OrderIgnored =>
         actual0.scan((expected0, List.empty[Json], Option.empty[Json])) {
           case ((expected, wrongOrder, extra), e) =>
@@ -151,16 +157,16 @@ object Predicate extends ScalazSpecs2Instances {
                 (deleteAt(k, expected), wrongOrder :+ e, extra)
             }
         }
-          .runLast
-          .map {
-            case Some((exp, wrongOrder, extra)) =>
-              (extra must beNone.setMessage("unexpected value " + ~extra.map(_.toString))) and
-                (wrongOrder aka "matched but field order differs" must beEmpty)
-                .unless(fieldOrder ≟ OrderIgnored) and
-                (exp aka "unmatched expected values" must beEmpty): Result
-            case None =>
-              failure
-          }
+        .compile.last
+        .map {
+          case Some((exp, wrongOrder, extra)) =>
+            (extra must beNone.setMessage("unexpected value " + ~extra.map(_.toString))) and
+              (wrongOrder aka "matched but field order differs" must beEmpty)
+              .unless(fieldOrder ≟ OrderIgnored) and
+              (exp aka "unmatched expected values" must beEmpty): Result
+          case None =>
+            failure
+        }
     }
 
     // Removes the element at `idx` from `as`.
@@ -172,28 +178,29 @@ object Predicate extends ScalazSpecs2Instances {
 
   /** Must START WITH the elements, in order. */
   final case object Initial extends Predicate {
-    def apply[F[_]: Catchable: Monad](
+    def apply[F[_]: Sync](
       expected0: List[Json],
-      actual0: Process[F, Json],
+      actual0: Stream[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
     ): F[Result] = resultOrder match {
       case OrderPreserved =>
-        val actual   = actual0.map(Some(_))
-        val expected = Process.emitAll(expected0).map(Some(_))
+        val actual   = actual0.noneTerminate
+        val expected = Stream.emits(expected0).noneTerminate
 
-        (actual tee expected)(tee.zipAll(None, None))
+        actual.zip(expected)
           .flatMap {
             case (a, None) =>
-              Process.halt
+              Stream.empty
             case (a, e) if (jsonMatches(a, e)) =>
-              Process.halt
+              Stream.empty
             case (a, e) if (a == e && fieldOrder ≟ OrderIgnored) =>
-              Process.halt
+              Stream.empty
             case (a, e) =>
-              Process.emit(a must matchJson(e) : Result)
+              Stream.emit(a must matchJson(e) : Result)
           }
-          .runLog.map(_.foldMap()(Result.ResultMonoid))
+          .compile.foldMonoid
+
       case OrderIgnored =>
         AtLeast(expected0, actual0, fieldOrder, resultOrder)
     }
@@ -201,16 +208,16 @@ object Predicate extends ScalazSpecs2Instances {
 
   /** Must NOT contain ANY of the elements. */
   final case object DoesNotContain extends Predicate {
-    def apply[F[_]: Catchable: Monad](
+    def apply[F[_]: Sync](
       expected0: List[Json],
-      actual: Process[F, Json],
+      actual: Stream[F, Json],
       fieldOrder: OrderSignificance,
       resultOrder: OrderSignificance
     ): F[Result] = {
       val expected = expected0.toSet
 
       if (expected.isEmpty)
-        actual.drain.run.as(failure)
+        actual.compile.drain.as(failure)
       else
         actual.scan(expected) { case (exp, e) =>
           // NB: want to ignore field-order here
@@ -219,7 +226,8 @@ object Predicate extends ScalazSpecs2Instances {
         .dropWhile(_.size ≟ expected.size)
         .take(1)
         .map(unseen => expected.filterNot(unseen contains _) aka "prohibited values" must beEmpty : Result)
-        .runLastOr(success)
+        .compile.last
+        .map(_ getOrElse success)
     }
   }
 

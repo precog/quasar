@@ -18,15 +18,15 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.{Data, Qspec, RenderTree, Type}, RenderTree.ops._
-import quasar.fs.Planner.PlannerError
+import quasar.{Qspec, RenderTree, Type}, RenderTree.ops._
+import quasar.common.data.Data
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
-import quasar.qscript.{qScriptReadToQscriptTotal, ExcludeId, HoleF, LeftShift, OnUndefined, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
+import quasar.qscript.{qScriptReadToQscriptTotal, ExcludeId, HoleF, LeftShift, OnUndefined, PlannerError, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK

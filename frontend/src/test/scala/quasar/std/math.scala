@@ -18,7 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 
-import quasar.{ArgumentError, Func, Type, TypeGenerators}, Type.Const
+import quasar.{ArgumentError, Func, Type, TypeGenerators}, Type.{dataType, Const}
 import quasar.frontend.logicalplan._
 import qdata.time.DateTimeInterval
 
@@ -32,7 +32,7 @@ import shapeless._
 
 class MathSpec extends quasar.Qspec with TypeGenerators {
   import MathLib._
-  import quasar.Data._
+  import quasar.common.data.Data._
 
   val lpf = new LogicalPlanR[Fix[LogicalPlan]]
 
@@ -208,14 +208,14 @@ class MathSpec extends quasar.Qspec with TypeGenerators {
 
     def permute(f: quasar.Func.Input[Type, nat._2] => ValidationNel[ArgumentError, Type], t1: Const, t2: Const)(exp1: Const, exp2: Type) = {
       f(Func.Input2(t1, t2)) should beSuccess(exp1)
-      f(Func.Input2(t1, t2.value.dataType)) should beSuccess(exp2)
-      f(Func.Input2(t1.value.dataType, t2)) should beSuccess(exp2)
-      f(Func.Input2(t1.value.dataType, t2.value.dataType)) should beSuccess(exp2)
+      f(Func.Input2(t1, dataType(t2.value))) should beSuccess(exp2)
+      f(Func.Input2(dataType(t1.value), t2)) should beSuccess(exp2)
+      f(Func.Input2(dataType(t1.value), dataType(t2.value))) should beSuccess(exp2)
 
       f(Func.Input2(t2, t1)) should beSuccess(exp1)
-      f(Func.Input2(t2.value.dataType, t1)) should beSuccess(exp2)
-      f(Func.Input2(t2, t1.value.dataType)) should beSuccess(exp2)
-      f(Func.Input2(t2.value.dataType, t1.value.dataType)) should beSuccess(exp2)
+      f(Func.Input2(dataType(t2.value), t1)) should beSuccess(exp2)
+      f(Func.Input2(t2, dataType(t1.value))) should beSuccess(exp2)
+      f(Func.Input2(dataType(t2.value), dataType(t1.value))) should beSuccess(exp2)
     }
 
     "add with const and non-const Ints" in {

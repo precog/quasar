@@ -17,9 +17,10 @@
 package quasar.std
 
 import slamdata.Predef._
-import quasar.{Data, GenericFunc}
+import quasar.GenericFunc
 import quasar.RenderTree.ops._
 import quasar.common.PhaseResultT
+import quasar.common.data.Data
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 import quasar.std.StdLib._

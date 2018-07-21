@@ -24,7 +24,6 @@ import quasar.contrib.scalaz.bitraverse._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
-import quasar.fs.MonadFsErr
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore._
@@ -594,7 +593,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     * `f` takes QScript representing a _potential_ path to a file, converts
     * [[Root]] and its children to path, with the operations post-file remaining.
     */
-  def pathify[M[_]: Monad: MonadFsErr, IN[_]: Traverse, OUT[a] <: ACopK[a]: Traverse]
+  def pathify[M[_]: Monad: MonadPlannerErr, IN[_]: Traverse, OUT[a] <: ACopK[a]: Traverse]
     (g: DiscoverPath.ListContents[M])
     (implicit
       FS: DiscoverPath.Aux[T, IN, OUT],

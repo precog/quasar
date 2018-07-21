@@ -16,40 +16,10 @@
 
 package quasar
 
-import slamdata.Predef.{Long, Map}
-import quasar.contrib.pathy.ADir
-import quasar.effect._
-import quasar.fp.TaskRef
-import quasar.fp.free, free._
-import quasar.fs.{QueryFile, BackendEffect}
+import slamdata.Predef.Map
 
-import scalaz.{Failure => _, _}
-import scalaz.concurrent._
-import scalaz.syntax.apply._
+import scalaz.NonEmptyList
 
 package object regression {
-  import quasar.fs.mount.hierarchical.MountedResultH
-
   type Directives = Map[BackendName, NonEmptyList[TestDirective]]
-
-  type BackendEffectIO[A] = Coproduct[Task, BackendEffect, A]
-
-  type HfsIO0[A] = Coproduct[MountedResultH, Task, A]
-  type HfsIO[A]  = Coproduct[MonotonicSeq, HfsIO0, A]
-
-  val interpretHfsIO: Task[HfsIO ~> Task] = {
-    import QueryFile.ResultHandle
-    import quasar.fs.mount.hierarchical._
-
-    def handlesTask(
-      ref: TaskRef[Map[ResultHandle, (ADir, ResultHandle)]]
-    ): MountedResultH ~> Task =
-      KeyValueStore.impl.fromTaskRef(ref)
-
-    def monoSeqTask(ref: TaskRef[Long]): MonotonicSeq ~> Task =
-      MonotonicSeq.fromTaskRef(ref)
-
-    (TaskRef(Map.empty[ResultHandle, (ADir, ResultHandle)]) |@| TaskRef(0L))(
-      (handles, ct) => monoSeqTask(ct) :+: handlesTask(handles) :+: NaturalTransformation.refl)
-  }
 }

@@ -20,7 +20,7 @@ import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.common.resource.ResourceError
 import quasar.compile.SemanticErrors
-import quasar.fs.Planner.PlannerError
+import quasar.qscript.PlannerError
 import quasar.sql.ParsingError
 import quasar.yggdrasil.vfs.{ResourceError => MimirResourceError}
 

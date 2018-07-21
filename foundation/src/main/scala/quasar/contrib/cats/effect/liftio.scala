@@ -17,7 +17,7 @@
 package quasar.contrib.cats.effect
 
 import cats.effect.{IO, LiftIO}
-import scalaz.{EitherT, Monad, Monoid, StateT, WriterT}
+import scalaz.{EitherT, Monad, Monoid, ReaderT, StateT, WriterT}
 import scalaz.syntax.either._
 
 trait LiftIOScalazInstances {
@@ -25,6 +25,12 @@ trait LiftIOScalazInstances {
     new LiftIO[EitherT[F, E, ?]] {
       def liftIO[A](ioa: IO[A]): EitherT[F, E, A] =
         EitherT(ioa.map(_.right[E]).to[F])
+    }
+
+  implicit def scalazReaderTLiftIO[F[_]: LiftIO, R]: LiftIO[ReaderT[F, R, ?]] =
+    new LiftIO[ReaderT[F, R, ?]] {
+      def liftIO[A](ioa: IO[A]): ReaderT[F, R, A] =
+        ReaderT(_ => ioa.to[F])
     }
 
   implicit def scalazStateTLiftIO[F[_]: LiftIO: Monad, S]: LiftIO[StateT[F, S, ?]] =

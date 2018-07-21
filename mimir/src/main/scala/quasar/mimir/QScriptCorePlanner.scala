@@ -33,21 +33,18 @@ import quasar.yggdrasil.bytecode.{JArrayFixedT, JType}
 
 import scala.collection.immutable.{Map => ScalaMap}
 
-import cats.effect.IO
-import io.chrisdavenport.scalaz.task._
+import cats.effect.{IO, LiftIO}
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import matryoshka.data._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 import shims.monadToScalaz
 
-final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad](
-    liftFCake: ReaderT[Task, Cake, ?] ~> F) {
-
-  val liftF: IO ~> F =
-    λ[IO ~> F](io => liftFCake(io.to[Task].liftM[ReaderT[?[_], Cake, ?]]))
+final class QScriptCorePlanner[
+    T[_[_]]: BirecursiveT: EqualT: ShowT,
+    F[_]: LiftIO: Monad](
+    val P: Cake) {
 
   def mapFuncPlanner[G[_]: Monad] = MapFuncPlanner[T, G, MapFunc[T, ?]]
 
@@ -78,10 +75,10 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
       for {
         bucketTrans <- interpretMapFunc[T, F](src.P, mapFuncPlanner[F])(bucket)
 
-        distinctedUnforced <- liftF.apply(sortT[src.P.type](MimirRepr.single[src.P](src))(
+        distinctedUnforced <- sortT[src.P.type](MimirRepr.single[src.P](src))(
           src.table,
           bucketTrans,
-          unique = true))
+          unique = true).to[F]
 
         distincted = src.unsafeMerge(distinctedUnforced)
 
@@ -202,16 +199,16 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
           }
 
           if (buckets.isEmpty) {
-            liftF(reduceAll(false)(src.table))
+            reduceAll(false)(src.table).to[F]
           } else {
             for {
               bucketTranses <- buckets.traverse(interpretMapFunc[T, F](src.P, mapFuncPlanner[F]))
               bucketTrans = combineTransSpecs(src.P)(bucketTranses)
 
-              prepared <- liftF(sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans))
+              prepared <- sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans).to[F]
                 .map(r => src.unsafeMergeTable(r.table))
 
-              table <- liftF(prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)))
+              table <- prepared.partitionMerge(bucketTrans, keepKey = true)(reduceAll(true)).to[F]
             } yield table
           }
         }
@@ -311,12 +308,12 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             sortedTable <- {
               if (sortNeeded) {
                 if (buckets.isEmpty) {
-                  liftF(sortAll(src.table))
+                  sortAll(src.table).to[F]
                 } else {
                   for {
-                    prepared <- liftF(sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans))
+                    prepared <- sortT[src.P.type](MimirRepr.single[src.P](src))(src.table, bucketTrans).to[F]
                       .map(r => src.unsafeMergeTable(r.table))
-                    table <- liftF(prepared.partitionMerge(bucketTrans)(sortAll))
+                    table <- prepared.partitionMerge(bucketTrans)(sortAll).to[F]
                   } yield table
                 }
               } else {
@@ -371,17 +368,13 @@ final class QScriptCorePlanner[T[_[_]]: BirecursiveT: EqualT: ShowT, F[_]: Monad
             MimirRepr(fromRepr.P)(back)
           }
 
-          liftF.apply(result)
+          result.to[F]
         }
       } yield back
 
     // FIXME look for Map(Unreferenced, Constant) and return constant table
     case qscript.Unreferenced() =>
-      liftFCake(MimirRepr.meldCake[ReaderT[Task, Cake, ?]](
-        new DepFn1[Cake, λ[`P <: Cake` => ReaderT[Task, Cake, P#Table]]] {
-          def apply(P: Cake): ReaderT[Task, Cake, P.Table] =
-            P.Table.constLong(Set(0)).point[ReaderT[Task, Cake, ?]]
-        }))
+      (MimirRepr(P)(P.Table.constLong(Set(0))): MimirRepr).point[F]
   }
 
   ////////

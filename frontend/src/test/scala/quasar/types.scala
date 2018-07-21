@@ -18,6 +18,8 @@ package quasar
 
 import scala.Predef.$conforms
 import slamdata.Predef._
+import quasar.common.data._
+import quasar.frontend.data.DataCodec
 import quasar.fp._
 import quasar.fp.ski._
 

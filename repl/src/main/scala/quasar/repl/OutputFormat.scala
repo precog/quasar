@@ -16,9 +16,7 @@
 
 package quasar.repl
 
-import slamdata.Predef._
-
-import scalaz._, Scalaz._
+import slamdata.Predef.{Option, Some, String}
 
 sealed abstract class OutputFormat
 object OutputFormat {
@@ -27,11 +25,11 @@ object OutputFormat {
   case object Readable extends OutputFormat
   case object Csv extends OutputFormat
 
-  def fromString(str: String): Option[OutputFormat] = str.toLowerCase match {
-    case "table"    => Table.some
-    case "precise"  => Precise.some
-    case "readable" => Readable.some
-    case "csv"      => Csv.some
-    case _          => none
-  }
+  def fromString(str: String): Option[OutputFormat] =
+    Some(str.toLowerCase) collect {
+      case "table"    => Table
+      case "precise"  => Precise
+      case "readable" => Readable
+      case "csv"      => Csv
+    }
 }

@@ -17,7 +17,7 @@
 package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
 import quasar.contrib.scalaz.MonadState_
@@ -25,7 +25,6 @@ import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.fs.Planner, Planner.PlannerErrorME
 import quasar.qscript.{
   construction,
   Center,
@@ -33,6 +32,7 @@ import quasar.qscript.{
   JoinSide3,
   LeftSide,
   LeftSide3,
+  MonadPlannerErr,
   RightSide,
   RightSide3,
   SrcHole
@@ -66,7 +66,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   private val N = new NormalizableT[T]
 
-  def apply[F[_]: Monad: NameGenerator: PlannerErrorME](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](agraph: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] = {
     type G[A] = StateT[StateT[F, RevIdx, ?], MinimizationState[T], A]
 
     val back = agraph.graph corewriteM {
@@ -97,7 +97,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   // the Ints are indices into branches
   private def coalesceToMap[
-      G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, ?[_]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, ?[_]]: MonadPlannerErr](
       qgraph: QSUGraph,
       branches: List[QSUGraph],
       combiner: FreeMapA[Int]): G[Option[QSUGraph]] = {
@@ -157,7 +157,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def coalesceRoots[
-      G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, ?[_]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM: MinStateM[T, ?[_]]: MonadPlannerErr](
       qgraph: QSUGraph,
       fm: => FreeMapA[Int],
       candidates: List[QSUGraph]): G[Option[QSUGraph]] = candidates match {
@@ -325,14 +325,14 @@ object MinimizeAutoJoins {
 
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Monad: NameGenerator: PlannerErrorME]
+      F[_]: Monad: NameGenerator: MonadPlannerErr]
       (agraph: AuthenticatedQSU[T])
       : F[AuthenticatedQSU[T]] =
     taggedInternalError("MinimizeAutoJoins", new MinimizeAutoJoins[T].apply[F](agraph))
 
   def updateGraph[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
-      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: MonadPlannerErr](
       pat: QScriptUniform[T, Symbol]): G[QSUGraph[T]] = {
 
     for {
@@ -343,7 +343,7 @@ object MinimizeAutoJoins {
 
   def updateProvenance[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
-      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: PlannerErrorME](
+      G[_]: Monad: NameGenerator: RevIdxM[T, ?[_]]: MinStateM[T, ?[_]]: MonadPlannerErr](
       qgraph: QSUGraph[T]): G[Unit] = {
 
     for {

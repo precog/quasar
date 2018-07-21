@@ -19,6 +19,7 @@ package quasar.std
 import slamdata.Predef._
 import quasar._
 import quasar.ArgumentError._
+import quasar.common.data.Data
 import quasar.fp._
 import quasar.fp.ski._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
@@ -363,7 +364,7 @@ trait StringLib extends Library {
           failureNel(
             typeError(UnificationError(
               Type.Syntaxed,
-              other.dataType,
+              Type.dataType(other),
               "can not convert aggregate types to String".some)))
       }).map(s => Type.Const(Data.Str(s)))
       case Sized(_) => success(Type.Str)

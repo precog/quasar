@@ -19,8 +19,9 @@ package quasar.std
 import slamdata.Predef._, BigDecimal.RoundingMode
 
 import qdata.time.{DateTimeInterval, OffsetDate => QOffsetDate, TimeGenerators}
-import quasar.{Data, Qspec, Type}
-import quasar.DataGenerators.{dataArbitrary => _, _}
+import quasar.{Qspec, Type}, Type.dataType
+import quasar.common.data.Data
+import quasar.common.data.DataGenerators.{dataArbitrary => _, _}
 import quasar.frontend.logicalplan._
 import quasar.pkg.tests._
 import quasar.time.{
@@ -2579,9 +2580,9 @@ abstract class StdLibSpec extends Qspec {
 
         "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provided they are not both Numeric (Int | Dec)
-          (x.dataType != y.dataType &&
-            !((Type.Numeric contains x.dataType) &&
-              (Type.Numeric contains y.dataType))) ==>
+          (dataType(x) != dataType(y) &&
+            !((Type.Numeric contains dataType(x)) &&
+              (Type.Numeric contains dataType(y)))) ==>
             commute(Eq(_, _).embed, x, y, Data.Bool(false))
         }
       }
@@ -2633,9 +2634,9 @@ abstract class StdLibSpec extends Qspec {
 
         "any values with different types" >> prop { (x: Data, y: Data) =>
           // ...provided they are not both Numeric (Int | Dec)
-          (x.dataType != y.dataType &&
-            !((Type.Numeric contains x.dataType) &&
-              (Type.Numeric contains y.dataType))) ==>
+          (dataType(x) != dataType(y) &&
+            !((Type.Numeric contains dataType(x)) &&
+              (Type.Numeric contains dataType(y)))) ==>
             commute(Neq(_, _).embed, x, y, Data.Bool(true))
         }
       }

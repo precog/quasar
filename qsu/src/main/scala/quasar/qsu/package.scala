@@ -17,12 +17,11 @@
 package quasar
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.effect.NameGenerator
-import quasar.fs.Planner.{InternalError, PlannerErrorME}
+import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.fp._
-import quasar.qscript._
+import quasar.qscript._, PlannerError.InternalError
 import quasar.qscript.provenance.Dimensions
 import quasar.qsu.QScriptUniform.ShiftTarget
 
@@ -66,8 +65,8 @@ package object qsu {
   def printMultiline[F[_]: Traverse, K: Show, V: Show](fkv: F[(K, V)]): String =
     fkv map { case (k, v) => s"  ${k.shows} -> ${v.shows}" } intercalate "\n"
 
-  def taggedInternalError[F[_]: PlannerErrorME, A](tag: String, fa: F[A]): F[A] =
-    PlannerErrorME[F].handleError(fa)(e => PlannerErrorME[F].raiseError(e match {
+  def taggedInternalError[F[_]: MonadPlannerErr, A](tag: String, fa: F[A]): F[A] =
+    MonadPlannerErr[F].handleError(fa)(e => MonadPlannerErr[F].raiseError(e match {
       case InternalError(msg, cause) => InternalError(s"[$tag] $msg", cause)
       case other => other
     }))

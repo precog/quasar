@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.Datasources
 import quasar.build.BuildInfo
+import quasar.common.data.Data
 import quasar.run.SqlQuery
 
 import java.io.File

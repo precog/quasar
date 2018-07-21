@@ -17,7 +17,7 @@
 package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
-import quasar.effect.NameGenerator
+import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
@@ -388,7 +388,7 @@ object QSUGraph extends QSUGraphInstances {
    * This object contains extraction helpers in terms of QSU nodes.
    */
   object Extractors {
-    import quasar.Data
+    import quasar.common.data.Data
     import quasar.qscript.{
       FreeMap,
       Hole,

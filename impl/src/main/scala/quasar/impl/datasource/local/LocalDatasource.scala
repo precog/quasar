@@ -17,14 +17,14 @@
 package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, Seq => _, _}
-import quasar.Data
-import quasar.DataCodec.Precise
 import quasar.api.datasource.DatasourceType
 import quasar.common.resource._, ResourceError._
+import quasar.common.data.Data
 import quasar.connector.Datasource
 import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
 import quasar.contrib.scalaz.MonadError_
+import quasar.frontend.data.DataCodec.Precise
 import quasar.fp.ski.ι
 
 import java.nio.file.{Files, Path => JPath}

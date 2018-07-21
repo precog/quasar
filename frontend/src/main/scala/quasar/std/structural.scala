@@ -18,6 +18,7 @@ package quasar.std
 
 import slamdata.Predef._
 import quasar._, ArgumentError._
+import quasar.common.data.Data
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP, _}
 
@@ -90,8 +91,8 @@ trait StructuralLib extends Library {
           else if (map2.isEmpty) map1
           else                   map1 ++ map2)))
 
-      case Sized(Const(o1 @ Data.Obj(_)), o2) => MapConcat.tpe(Func.Input2(o1.dataType, o2))
-      case Sized(o1, Const(o2 @ Data.Obj(_))) => MapConcat.tpe(Func.Input2(o1, o2.dataType))
+      case Sized(Const(o1 @ Data.Obj(_)), o2) => MapConcat.tpe(Func.Input2(Type.dataType(o1), o2))
+      case Sized(o1, Const(o2 @ Data.Obj(_))) => MapConcat.tpe(Func.Input2(o1, Type.dataType(o2)))
 
       case Sized(Obj(map1, uk1), Obj(map2, None))      => success(Obj(map1 ++ map2, uk1))
       case Sized(Obj(map1, uk1), Obj(map2, Some(uk2))) =>
@@ -117,8 +118,8 @@ trait StructuralLib extends Library {
       case Sized(a1, Const(Data.Arr(els2))) if els2.isEmpty    => success(a1)
       case Sized(Arr(els1), Arr(els2))                         => success(Arr(els1 ++ els2))
 
-      case Sized(Const(a1 @ Data.Arr(_)), a2) => ArrayConcat.tpe(Func.Input2(a1.dataType, a2))
-      case Sized(a1, Const(a2 @ Data.Arr(_))) => ArrayConcat.tpe(Func.Input2(a1, a2.dataType))
+      case Sized(Const(a1 @ Data.Arr(_)), a2) => ArrayConcat.tpe(Func.Input2(Type.dataType(a1), a2))
+      case Sized(a1, Const(a2 @ Data.Arr(_))) => ArrayConcat.tpe(Func.Input2(a1, Type.dataType(a2)))
 
       case Sized(a1, FlexArr(min2, max2, elem2)) =>
         (a1.arrayMinLength |@| a1.arrayType)((min1, typ1) =>

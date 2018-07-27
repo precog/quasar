@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz._
-import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.EJson
 import quasar.qscript.{
   Hole,
   MonadPlannerErr,
@@ -43,7 +43,6 @@ import StateT.stateTMonadState
 
 final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
   val func = construction.Func[T]
-  val json = Fixed[T[EJson]]
   val hole: Hole = SrcHole
 
   private val prov = new QProv[T]
@@ -109,15 +108,12 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
                   identityCondition =
                   if (rotationsCompatible(rotationAbove, newRotation))
                     func.Cond(
-                      func.Or(
-                        func.Eq(
-                          AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](shiftAbove.root), _)),
-                          AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](newShift.root), _))),
-                        func.IfUndefined(
-                          AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](newShift.root), _)),
-                          func.Constant(json.bool(true)))),
+                      func.Eq(
+                        AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](shiftAbove.root), _)),
+                        AccessLeftTarget[T](Access.id(IdAccess.identity[T[EJson]](newShift.root), _))),
                       repair,
-                      func.Undefined)
+                      func.Undefined
+                    )
                   else repair
                   newShiftNewRepairPat =
                     newShiftPat.copy(repair = identityCondition)

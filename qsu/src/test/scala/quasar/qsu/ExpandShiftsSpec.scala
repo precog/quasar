@@ -18,7 +18,7 @@ package quasar.qsu
 
 import quasar.{Qspec, TreeMatchers}
 import quasar.contrib.matryoshka._
-import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, ExcludeId, OnUndefined, PlannerError, SrcHole}
@@ -44,7 +44,6 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
-  val json = Fixed[Fix[EJson]]
   val recFunc = construction.RecFunc[Fix]
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
@@ -123,13 +122,9 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         )
         outerRepair must beTreeEqual(
           func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
-              func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
-                func.Constant(json.bool(true)))),
+            func.Eq(
+              AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
+              AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
             func.StaticMapS(
                 "original" ->
                   func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "original"),
@@ -278,13 +273,9 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         )
         innerRepair must beTreeEqual(
           func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
-              func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
-                func.Constant(json.bool(true)))),
+            func.Eq(
+              AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh0), _)),
+              AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "original"),
@@ -294,13 +285,9 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             func.Undefined))
         outerRepair must beTreeEqual(
           func.Cond(
-            func.Or(
-              func.Eq(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh2), _))),
-              func.IfUndefined(
-                AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh2), _)),
-                func.Constant(json.bool(true)))),
+            func.Eq(
+              AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh1), _)),
+              AccessLeftTarget[Fix](Access.id(IdAccess.identity[Fix[EJson]]('esh2), _))),
             func.StaticMapS(
               "original" ->
                 func.ProjectKeyS(AccessLeftTarget[Fix](Access.valueHole(_)), "original"),

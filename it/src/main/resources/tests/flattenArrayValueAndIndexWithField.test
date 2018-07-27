@@ -1,8 +1,8 @@
 {
     "name": "field and flattened array value and index",
     "backends": {
-        "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local":         "pendingIgnoreFieldOrder",
+        "mimir":             "pendingIgnoreFieldOrder"
     },
     "data": "flattenable.data",
     "query": "select a, b[*], b[*:] as i from `flattenable.data`",

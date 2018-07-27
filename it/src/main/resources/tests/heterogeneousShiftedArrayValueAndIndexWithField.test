@@ -1,8 +1,8 @@
 {
     "name": "field and shifted array value and index on heterogenous",
     "backends": {
-        "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
     "data": "heterogeneous.data",
     "query": "select a, b[_] as v, b[_:] as i from `heterogeneous.data`",

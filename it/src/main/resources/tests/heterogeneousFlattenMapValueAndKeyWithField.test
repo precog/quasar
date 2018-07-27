@@ -1,8 +1,8 @@
 {
     "name": "field and flattened map value and key on heterogeneous",
     "backends": {
-        "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
     "data": "heterogeneous.data",
     "query": "select a, b{*}, b{*:} as k from `heterogeneous.data`",

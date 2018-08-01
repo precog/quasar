@@ -7,8 +7,7 @@
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [
-      { "k1": "midArr" },
-      { "k1": "midObj", "k2": "botArr", "v2": [13, 14, 15] },
-      { "k1": "midObj", "k2": "botObj", "v2": {"a": "m", "b": "n", "c": "o"} }
+      { "k1": "midObj", "k2": "botArr", "v2": [13, 14, 15] }
+    , { "k1": "midObj", "k2": "botObj", "v2": {"a": "m", "b": "n", "c": "o"} }
     ]
 }

@@ -1,8 +1,8 @@
 {
     "name": "field and shifted map value and key on heterogeneous",
     "backends": {
-        "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir": "pendingIgnoreFieldOrder"
     },
     "data": "heterogeneous.data",
     "query": "select a, b{_} as v, b{_:} as k from `heterogeneous.data`",

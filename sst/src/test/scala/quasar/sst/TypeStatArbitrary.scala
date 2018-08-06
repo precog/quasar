@@ -16,12 +16,11 @@
 
 package quasar.sst
 
-import slamdata.Predef.{Byte => SByte, Char => SChar, _}
+import slamdata.Predef.{Char => SChar, _}
 import quasar.fp.numeric.{SampleStats, SampleStatsArbitrary}
 import quasar.pkg.tests._
 
 import scalaz._
-import scalaz.std.anyVal._
 import scalaz.std.math.bigInt._
 import scalaz.std.math.bigDecimal._
 import scalaz.std.option._
@@ -42,7 +41,6 @@ trait TypeStatArbitrary {
       genBool[A],
       genColl[A],
       arbitrary[A] map (count[A](_)),
-      (arbitrary[A] |@| genRange[SByte])((a, r) => byte(a, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[SChar])((s, r) => char(s, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[BigInt])((s, r) => int[A](s, r._1, r._2)),
       (arbitrary[SampleStats[A]] |@| genRange[BigDecimal])((s, r) => dec[A](s, r._1, r._2)))

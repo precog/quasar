@@ -116,17 +116,12 @@ class DataCodecSpecs extends quasar.Qspec {
           beSome("[ 0, 1, 2 ]")
       }
 
-      "encode binary" in {
-        DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must
-          beSome(s"""{ "$BinaryKey": "TE1OTw==" }""")
-      }
-
       "encode NA" in {
         DataCodec.render(Data.NA) must beNone
       }
     }
 
-    // NB. We don't use `RepresentableData` because it does not generate ID and Binary which
+    // NB. We don't use `RepresentableData` because it does not generate ID which
     // we want to test here
     "round-trip" >> prop { data: Data =>
       DataCodec.representable(data, codec) ==> {
@@ -285,14 +280,6 @@ class DataCodecSpecs extends quasar.Qspec {
         DataCodec.render(Data.Arr(List(Data.Int(0), Data.Int(1), Data.Int(2)))) must beSome("[ 0, 1, 2 ]")
       }
 
-      "encode binary" in {
-        DataCodec.render(Data.Binary.fromArray(Array[Byte](76, 77, 78, 79))) must beSome("\"TE1OTw==\"")
-      }
-
-      "encode empty binary" in {
-        DataCodec.render(Data.Binary.fromArray(Array[Byte]())) must beSome("\"\"")
-      }
-
       "encode NA" in {
         DataCodec.render(Data.NA) must beNone
       }
@@ -334,11 +321,6 @@ class DataCodecSpecs extends quasar.Qspec {
 
       "re-parse very large Int value as Dec" in {
         roundTrip(Data.Int(LargeInt)) must beSome(Data.Dec(new java.math.BigDecimal(LargeInt.underlying)).right[DataEncodingError])
-      }
-
-      "re-parse Binary as Str" in {
-        val binary = Data.Binary.fromArray(Array[Byte](0, 1, 2, 3))
-        roundTrip(binary) must beSome(Data.Str("AAECAw==").right[DataEncodingError])
       }
     }
   }

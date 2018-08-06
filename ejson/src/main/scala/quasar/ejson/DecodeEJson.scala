@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Int => SInt, Char => SChar, Byte => SByte, _}
+import slamdata.Predef.{Int => SInt, Char => SChar, _}
 import quasar.RenderedTree
 import quasar.contrib.argonaut._
 import quasar.ejson.implicits._
@@ -122,12 +122,6 @@ sealed abstract class DecodeEJsonInstances extends DecodeEJsonInstances0 {
 
   implicit val shortDecodeEJson: DecodeEJson[Short] =
     bigIntDecodeEJson.reinterpret("Short", bi => bi.isValidShort option bi.shortValue)
-
-  implicit val byteDecodeEJson: DecodeEJson[SByte] =
-    new DecodeEJson[SByte] {
-      def decode[J](j: J)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): Decoded[SByte] =
-        Decoded.attempt(j, Fixed[J].byte.getOption(j) \/> "Byte")
-    }
 
   implicit val charDecodeEJson: DecodeEJson[SChar] =
     new DecodeEJson[SChar] {

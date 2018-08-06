@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Byte => SByte, Char => SChar, Int => _, Map => _, _}
+import slamdata.Predef.{Char => SChar, Int => _, Map => _, _}
 import quasar.fp.PrismNT
 
 import monocle.Prism
@@ -37,9 +37,6 @@ object optics {
 
   def bool[A]: Prism[EJson[A], Boolean] =
     com composePrism CO.bool
-
-  def byte[A]: Prism[EJson[A], SByte] =
-    ext composePrism EO.byte
 
   def char[A]: Prism[EJson[A], SChar] =
     ext composePrism EO.char

@@ -27,7 +27,6 @@ sealed abstract class PrimaryType
 // NB: These are defined in order of their total ordering
 final case object Null extends PrimaryType
 final case object Bool extends PrimaryType
-final case object Byte extends PrimaryType
 final case object Char extends PrimaryType
 final case object Int extends PrimaryType
 final case object Dec extends PrimaryType
@@ -38,7 +37,6 @@ object PrimaryType {
   def name = Prism[String, PrimaryType] {
     case "null"      => Null.some
     case "boolean"   => Bool.some
-    case "byte"      => Byte.some
     case "character" => Char.some
     case "integer"   => Int.some
     case "decimal"   => Dec.some
@@ -48,7 +46,6 @@ object PrimaryType {
   } {
     case Null => "null"
     case Bool => "boolean"
-    case Byte => "byte"
     case Char => "character"
     case Int  => "integer"
     case Dec  => "decimal"

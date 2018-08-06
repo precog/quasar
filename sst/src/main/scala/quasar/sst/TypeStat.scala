@@ -16,7 +16,7 @@
 
 package quasar.sst
 
-import slamdata.Predef.{Byte => SByte, Char => SChar, _}
+import slamdata.Predef.{Char => SChar, _}
 import quasar.{ejson => ejs}, ejs.{CommonEJson => C, Decoded, DecodeEJson, EJson, ExtEJson => E, EncodeEJson}
 import quasar.ejson.implicits._
 import quasar.fp.numeric.SampleStats
@@ -38,7 +38,6 @@ sealed abstract class TypeStat[A] {
   /** The number of observations. */
   def size(implicit A: AdditiveSemigroup[A]): A = this match {
     case  Bool(t, f   )       => A.plus(t, f)
-    case  Byte(c, _, _)       => c
     case  Char(s, _, _)       => s.size
     case   Int(s, _, _)       => s.size
     case   Dec(s, _, _)       => s.size
@@ -52,7 +51,6 @@ sealed abstract class TypeStat[A] {
   def + (other: TypeStat[A])(implicit O: Order[A], F: Field[A]): TypeStat[A] =
     (this, other) match {
       case (Bool(t1, f1        ), Bool(t2, f2        )) => bool(t1 + t2, f1 + f2)
-      case (Byte(c1, min1, max1), Byte(c2, min2, max2)) => byte(c1 + c2, mn(min1, min2), mx(max1, max2))
       case (Char(s1, min1, max1), Char(s2, min2, max2)) => char(s1 + s2, mn(min1, min2), mx(max1, max2))
       case ( Int(s1, min1, max1),  Int(s2, min2, max2)) =>  int(s1 + s2, mn(min1, min2), mx(max1, max2))
       case ( Dec(s1, min1, max1),  Dec(s2, min2, max2)) =>  dec(s1 + s2, mn(min1, min2), mx(max1, max2))
@@ -67,7 +65,6 @@ sealed abstract class TypeStat[A] {
 
 object TypeStat extends TypeStatInstances {
   final case class  Bool[A](trues: A, falses: A)                                     extends TypeStat[A]
-  final case class  Byte[A](cnt: A, min: SByte, max: SByte)                          extends TypeStat[A]
   final case class  Char[A](stats: SampleStats[A], min: SChar, max: SChar)           extends TypeStat[A]
   final case class   Int[A](stats: SampleStats[A], min: BigInt, max: BigInt)         extends TypeStat[A]
   final case class   Dec[A](stats: SampleStats[A], min: BigDecimal, max: BigDecimal) extends TypeStat[A]
@@ -77,10 +74,6 @@ object TypeStat extends TypeStatInstances {
   def bool[A] = Prism.partial[TypeStat[A], (A, A)] {
     case Bool(t, f) => (t, f)
   } ((Bool[A](_, _)).tupled)
-
-  def byte[A] = Prism.partial[TypeStat[A], (A, SByte, SByte)] {
-    case Byte(n, min, max) => (n, min, max)
-  } ((Byte[A](_, _, _)).tupled)
 
   def char[A] = Prism.partial[TypeStat[A], (SampleStats[A], SChar, SChar)] {
     case Char(ss, min, max) => (ss, min, max)
@@ -110,7 +103,6 @@ object TypeStat extends TypeStatInstances {
   ): TypeStat[A] = j.project match {
     case C(   ejs.Null())  => count(cnt)
     case C(   ejs.Bool(b)) => bool(b.fold(cnt, M.zero), b.fold(M.zero, cnt))
-    case E(   ejs.Byte(b)) => byte(cnt, b, b)
     case E(   ejs.Char(c)) => char(SampleStats.freq(cnt, A fromInt c.toInt), c, c)
     case C(    ejs.Str(s)) => coll(cnt, some(A fromInt s.length), some(A fromInt s.length))
     case E(    ejs.Int(i)) => int(SampleStats.freq(cnt, A fromBigInt     i), i, i)
@@ -179,9 +171,6 @@ sealed abstract class TypeStatInstances {
             case Kind.Boolean =>
               (j.decodedKeyS[A](TrueKey) |@| j.decodedKeyS[A](FalseKey))(TypeStat.bool(_, _))
 
-            case Kind.Byte =>
-              minmax[SByte](j) map (TypeStat.byte(_))
-
             case Kind.Char =>
               dist[SChar](j) map (TypeStat.char(_))
 
@@ -220,7 +209,6 @@ sealed abstract class TypeStatInstances {
   implicit def equal[A: Equal]: Equal[TypeStat[A]] =
     Equal.equal((a, b) => (a, b) match {
       case ( Bool(x1, x2    ),  Bool(y1, y2    )) => x1 ≟ y1 && x2 ≟ y2
-      case ( Byte(x1, x2, x3),  Byte(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case ( Char(x1, x2, x3),  Char(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case (  Int(x1, x2, x3),   Int(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
       case (  Dec(x1, x2, x3),   Dec(y1, y2, y3)) => x1 ≟ y1 && x2 ≟ y2 && x3 ≟ y3
@@ -233,7 +221,6 @@ sealed abstract class TypeStatInstances {
   implicit def show[A: Show: Equal: Field: NRoot]: Show[TypeStat[A]] =
     Show.shows {
       case  Bool(t, f       )             => s"Bool(${t.shows}, ${f.shows})"
-      case  Byte(c, min, max)             => s"Byte(${c.shows}, ${min.shows}, ${max.shows})"
       case  Char(s, min, max)             => s"Char(${s.shows}, ${min.shows}, ${max.shows})"
       case   Int(s, min, max)             => s"Int(${s.shows}, ${min.shows}, ${max.shows})"
       case   Dec(s, min, max)             => s"Dec(${s.shows}, ${min.shows}, ${max.shows})"
@@ -265,7 +252,6 @@ sealed abstract class TypeStatInstances {
 
   private object Kind {
     val Boolean = "boolean"
-    val Byte = "byte"
     val Char = "char"
     val Coll = "collection"
     val Count = "count"
@@ -330,9 +316,6 @@ sealed abstract class TypeStatInstances {
           Kind.Boolean
         , TrueKey  -> t.asEJson[J]
         , FalseKey -> f.asEJson[J])
-
-      case Byte(c, mn, mx) =>
-        minmax(Kind.Byte, c, mn, mx)
 
       case Char(s, mn, mx) =>
         dist(Kind.Char, s, mn, mx)

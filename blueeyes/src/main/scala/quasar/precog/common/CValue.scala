@@ -302,7 +302,6 @@ object RValue extends RValueInstances {
     case Data.LocalDate(v) => CLocalDate(v).some
     case Data.LocalTime(v) => CLocalTime(v).some
     case Data.Interval(k) => CInterval(k).some
-    case Data.Binary(k) => CArray[Long](k.map(l => l.toLong).toArray).some
     case Data.NA => None
   }
 

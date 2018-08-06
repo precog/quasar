@@ -49,7 +49,6 @@ object QDataData extends QData[Data] {
     case Data.LocalDate(_) => QLocalDate
     case Data.LocalTime(_) => QLocalTime
     case Data.Interval(_) => QInterval
-    case Data.Binary(_) => error(s"Unable to represent `Data.Binary`.")
     case Data.NA => error(s"Unable to represent `Data.NA`.")
     case Data.Obj(_) => QObject
     case Data.Arr(_) => QArray

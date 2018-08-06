@@ -41,7 +41,6 @@ object JsonCodec {
     *
     *    Meta -> { ∃value: ..., ∃meta: ...}
     *    Map  -> { ∃map: [{∃key: ..., ∃value: ...}, ...] }
-    *    Byte -> { ∃byte: 42 }
     *    Char -> { ∃char: "x" }
     *    Int  -> { ∃int: 2345 }
     *
@@ -61,9 +60,6 @@ object JsonCodec {
 
     case ExtEJson(Meta(v, m)) =>
       MetaObj(v, m).embed
-
-    case ExtEJson(Byte(b)) =>
-      SingletonObj(ByteK, CommonJson(C.dec[J](BigDecimal(b.toInt))).embed).embed
 
     case ExtEJson(Char(c)) =>
       SingletonObj(CharK, OneChar[J](c).embed).embed
@@ -97,12 +93,6 @@ object JsonCodec {
       case MetaObj(v, m) =>
         ExtEJson(Meta(v, m)).right
 
-      case SingletonObj(`ByteK`, v) =>
-        extractC(C.dec[J], v.project)
-          .filter(_.isValidByte)
-          .map(d => optics.byte[J](d.toByte))
-          .toRightDisjunction(DecodingFailed("expected a byte", v))
-
       case SingletonObj(`CharK`, v) =>
         some(v.project)
           .collect { case OneChar(c) => optics.char[J](c) }
@@ -129,14 +119,13 @@ object JsonCodec {
 
   /** Constants used in the Json encoding. */
   val Sigil   = '∃'
-  val ByteK   = sigild("byte")
   val CharK   = sigild("char")
   val IntK    = sigild("int")
   val KeyK    = sigild("key")
   val MetaK   = sigild("meta")
   val MapK    = sigild("map")
   val ValueK  = sigild("value")
-  val ExtKeys = ISet.fromList(List(ByteK, CharK, IntK, KeyK, MetaK, MapK, ValueK))
+  val ExtKeys = ISet.fromList(List(CharK, IntK, KeyK, MetaK, MapK, ValueK))
 
   ////
 

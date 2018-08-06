@@ -16,7 +16,6 @@
 
 package quasar
 
-import slamdata.Predef._
 import quasar.common.data.Data
 import quasar.contrib.matryoshka._
 import quasar.ejson.{
@@ -105,30 +104,13 @@ package object sst {
       type T = Fix[TypeF[J, ?]]
 
       val unfoldStructural: Coalgebra[StructuralType.ST[J, ?], T] =
-        t => preserveConstBinary[J, T]
-          .lift(t.project)
-          .getOrElse(StructuralType.fromTypeƒ[J, T].apply(t))
+        t => StructuralType.fromTypeƒ[J, T].apply(t)
 
       StructuralType(
         TypeF.const[J, T](ejson).embed.hylo(
           StructuralType.attributeSTƒ(TypeStat.fromTypeFƒ(count)),
           unfoldStructural))
     }
-
-    // Allows use of the size metadata during compression.
-    private def preserveConstBinary[J, A](
-      implicit J: Recursive.Aux[J, EJson]
-    ): PartialFunction[TypeF[J, A], StructuralType.ST[J, A]] = {
-      case tf @ TypeF.Const(Embed(EncodedBinarySize(_))) => StructuralType.TypeST(tf)
-    }
-  }
-
-  object EncodedBinarySize {
-    def unapply[J](ejs: EJson[J])(implicit J: Recursive.Aux[J, EJson]): Option[BigInt] =
-      ejs match {
-        case E(Meta(Embed(C(Str(_))), Embed(SizedType(TypeTag.Binary, size)))) => some(size)
-        case _                                                                 => none
-      }
   }
 
   /** Returns the `PrimaryTag` for the given EJson value. */

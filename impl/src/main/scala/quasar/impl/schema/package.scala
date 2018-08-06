@@ -46,7 +46,6 @@ package object schema {
     val thresholding: ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] = {
       val independent =
         orOriginal(applyTransforms(
-          compression.z85EncodedBinary[J, A],
           compression.limitStrings[J, A](config.stringMaxLength)))
 
       compression.limitArrays[J, A](config.arrayMaxLength)

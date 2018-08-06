@@ -202,7 +202,6 @@ object dist {
   private def leafDist[J](implicit J: Corecursive.Aux[J, EJson]): Dist[J] =
     Dist.mix(
       Dist[Boolean] map (EJson.bool(_)),
-      Dist[Byte] map (EJson.byte(_)),
       Dist[Char] map (EJson.char(_)),
       Dist.bigdecimal(BigIntMaxBytes, BigDecimalMaxScale) map (EJson.dec(_)),
       Dist.bigint(BigIntMaxBytes) map (EJson.int(_)),
@@ -243,9 +242,6 @@ object dist {
           ((ts / total).toDouble, Dist.constant(true)),
           ((fs / total).toDouble, Dist.constant(false))
         ) map (EJson.bool(_))
-
-      case TypeStat.Byte(_, bn, bx) =>
-        Dist.intrange(bn.toInt, bx.toInt) map (i => EJson.byte(i.toByte))
 
       case TypeStat.Char(ss, cn, cx) =>
         gaussian(ss)

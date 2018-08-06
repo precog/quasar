@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Int => SInt, Char => SChar, Byte => SByte, _}
+import slamdata.Predef.{Int => SInt, Char => SChar, _}
 import quasar.contrib.argonaut._
 import quasar.contrib.iota.copkTraverse
 
@@ -65,12 +65,6 @@ sealed abstract class EncodeEJsonInstances extends EncodeEJsonInstances0 {
 
   implicit val shortEncodeEJson: EncodeEJson[Short] =
     intEncodeEJson.contramap(_.toInt)
-
-  implicit val byteEncodeEJson: EncodeEJson[SByte] =
-    new EncodeEJson[SByte] {
-      def encode[J](b: SByte)(implicit JC: Corecursive.Aux[J, EJson], JR: Recursive.Aux[J, EJson]): J =
-        Fixed[J].byte(b)
-    }
 
   implicit val charEncodeEJson: EncodeEJson[SChar] =
     new EncodeEJson[SChar] {

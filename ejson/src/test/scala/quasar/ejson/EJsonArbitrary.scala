@@ -50,7 +50,6 @@ trait EJsonArbitrary {
     new PatternArbitrary[Extension] {
       def leafGenerators[A] =
         uniformly(
-          genByte   ^^ Byte[A],
           genChar   ^^ Char[A],
           genBigInt ^^ Int[A])
 

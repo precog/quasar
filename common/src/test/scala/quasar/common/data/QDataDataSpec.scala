@@ -29,7 +29,6 @@ object QDataDataSpec extends Qspec with DataGenerators {
   // we don't need to adjust for this case because Equal[Data] compares them as equal
   def adjustExpected(data: Data): Option[Data] = data match {
     case Data.NA => None // not supported by qdata
-    case Data.Binary(_) => None // not supported by qdata
     case d => Some(d)
   }
 

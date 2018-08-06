@@ -107,8 +107,7 @@ object DataGenerators extends DataGenerators {
       TimeGenerators.genOffsetTime ^^ Data.OffsetTime,
       TimeGenerators.genLocalDateTime ^^ Data.LocalDateTime,
       TimeGenerators.genLocalDate ^^ Data.LocalDate,
-      TimeGenerators.genLocalTime ^^ Data.LocalTime,
-      arrayOf(genByte) ^^ Data.Binary.fromArray)
+      TimeGenerators.genLocalTime ^^ Data.LocalTime)
 
   def genKey = Gen.alphaChar ^^ (_.toString)
 

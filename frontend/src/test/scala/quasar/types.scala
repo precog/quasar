@@ -609,12 +609,12 @@ class TypesSpec extends Qspec with ValidationMatchers {
     val exIndexed = Arr(List(Int))
 
     val examples =
-      List(Top, Bottom, Null, Str, Int, Dec, Bool, Binary,
+      List(Top, Bottom, Null, Str, Int, Dec, Bool,
         OffsetDateTime, Type.OffsetDate, OffsetTime,
         LocalDateTime, LocalDate, LocalTime, Interval,
-          Const(Data.Int(0)),
-          Int ⨯ Str, Int ⨿ Str,
-          exField, exNamed, exConstObj, exElem, exIndexed)
+        Const(Data.Int(0)),
+        Int ⨯ Str, Int ⨿ Str,
+        exField, exNamed, exConstObj, exElem, exIndexed)
 
     "only fields and objects are objectLike" in {
       examples.filter(_.objectLike) should_== List(exField, exNamed, exConstObj)
@@ -727,7 +727,6 @@ class TypesSpec extends Qspec with ValidationMatchers {
       (typJson(Int)       must_= jString("Int"))       and
       (typJson(Dec)       must_= jString("Dec"))       and
       (typJson(Bool)      must_= jString("Bool"))      and
-      (typJson(Binary)    must_= jString("Binary"))    and
       (typJson(LocalDateTime)   must_= jString("LocalDateTime")) and
       (typJson(LocalDate)       must_= jString("LocalDate")) and
       (typJson(LocalTime)       must_= jString("LocalTime")) and

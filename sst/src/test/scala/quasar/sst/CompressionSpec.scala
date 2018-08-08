@@ -361,20 +361,20 @@ final class CompressionSpec extends quasar.Qspec
 
   "narrowUnion" >> {
     "reduces the largest group of values having the same primary type" >> prop {
-      (ss: ISet[String], c1: Char, c2: Char, c3: Char, d1: BigDecimal) =>
+      (ss: ISet[Char], c1: String, c2: String, c3: String, d1: BigDecimal) =>
       ((ss.size > 3) && (ISet.fromFoldable(IList(c1, c2, c3)).size ≟ 3)) ==> {
 
-      val strs = ss.toIList.map(s => SST.fromEJson(Real(1), J.str(s)))
-      val chars = IList(c1, c2, c3).map(c => SST.fromEJson(Real(1), J.char(c)))
+      val chars = ss.toIList.map(s => SST.fromEJson(Real(1), J.char(s)))
+      val strs = IList(c1, c2, c3).map(c => SST.fromEJson(Real(1), J.str(c)))
       val dec = SST.fromEJson(Real(1), J.dec(d1))
 
-      val compStr = envT(
-        strs.foldMap1Opt(_.copoint) | TypeStat.count(Real(0)),
-        TypeST(TypeF.simple[J, S](SimpleType.Str))
+      val compChar = envT(
+        chars.foldMap1Opt(_.copoint) | TypeStat.count(Real(0)),
+        TypeST(TypeF.simple[J, S](SimpleType.Char))
       ).embed
 
-      val union0 = NonEmptyList.nel(dec, chars ::: strs).suml1
-      val union1 = envT(union0.copoint, TypeST(TypeF.union[J, S](compStr, dec, chars))).embed
+      val union0 = NonEmptyList.nel(dec, strs ::: chars).suml1
+      val union1 = envT(union0.copoint, TypeST(TypeF.union[J, S](compChar, dec, strs))).embed
 
       attemptCompression(union0, compression.narrowUnion(3L)) must_= union1
     }}

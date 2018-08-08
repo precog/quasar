@@ -352,7 +352,6 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
       json.arr(List(json.nul(), json.nul())),
       json.map(List((json.nul(), json.nul()))),
       json.bool(true),
-      json.byte(1.toByte),
       json.char('c'),
       json.dec(1.1),
       json.int(1),
@@ -378,4 +377,3 @@ class RenderQScriptDSLSpec extends quasar.Qspec with QScriptHelpers {
   }
 
 }
-

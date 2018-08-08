@@ -123,7 +123,6 @@ object RenderQScriptDSL {
             case ejson.Meta(value, meta) => ("meta", fa(base, value).right :: fa(base, meta).right :: Nil)
             case ejson.Map(value)        => ("map",
               DSLTree("", "List", (value.map(t => DSLTree("", "", t.umap(fa(base, _).right).toIndexedSeq.toList.some).right).some)).right :: Nil)
-            case ejson.Byte(value)       => ("byte", value.toString.left :: Nil)
             case ejson.Char(value)       => ("char", ("'" + value.toString + "'").left :: Nil)
             case ejson.Int(value)        => ("int", value.toString.left :: Nil)
           }
@@ -157,7 +156,6 @@ object RenderQScriptDSL {
 
   def showData(data: Data): String = data match {
     case Data.Arr(a) => a.map(showData).mkString("Data.Arr(List(", ", ", "))")
-    case Data.Binary(b) => b.mkString("Data.Binary(scalaz.ImmutableArray.fromArray(Array[Byte](", ", ", ")))")
     case Data.Bool(b) => "Data.Bool(" + b.shows + ")"
     case Data.LocalDateTime(d) => "Data.LocalDateTime(java.time.LocalDateTime.parse(\"" + d.toString + "\"))"
     case Data.LocalDate(d) => "Data.LocalDate(java.time.LocalDate.parse(\"" + d.toString + "\"))"

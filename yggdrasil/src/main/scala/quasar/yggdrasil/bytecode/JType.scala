@@ -86,7 +86,7 @@ object JType {
     tpe match {
       case Type.Null => JNullT
       case Type.Str => JTextT
-      case Type.Int | Type.Dec | Type.Binary => JNumberT
+      case Type.Int | Type.Dec => JNumberT
       case Type.Bool => JBooleanT
       case Type.OffsetDateTime => JOffsetDateTimeT | JTextT
       case Type.OffsetTime => JOffsetTimeT | JTextT

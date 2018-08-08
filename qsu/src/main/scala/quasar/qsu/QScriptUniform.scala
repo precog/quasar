@@ -771,9 +771,6 @@ object QScriptUniform {
     val cbool: Prism[T[QSU], Boolean] =
       constant composePrism J.bool
 
-    val cbyte: Prism[T[QSU], Byte] =
-      constant composePrism J.byte
-
     val cchar: Prism[T[QSU], Char] =
       constant composePrism J.char
 

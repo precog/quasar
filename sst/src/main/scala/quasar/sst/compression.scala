@@ -23,8 +23,6 @@ import quasar.fp.numeric._
 import quasar.contrib.iota.copkTraverse
 import quasar.tpe._
 
-import scala.Byte
-
 import matryoshka.{project => _, _}
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
@@ -229,30 +227,12 @@ object compression {
     }
   }
 
-  /** Replace encoded binary strings with `byte[]`. */
-  def z85EncodedBinary[J, A](
-      implicit
-      A : Field[A],
-      JR: Recursive.Aux[J, EJson])
-      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
-    _.some collect {
-      case EnvT((ts, TypeST(TypeF.Const(Embed(EncodedBinarySize(n)))))) =>
-        val (cnt, len) = (ts.size, some(A.fromBigInt(n)))
-        envT(TypeStat.coll(cnt, len, len), TypeST(byteArr(cnt)))
-    }
-
   ////
 
   private type NelOpt[A] = NonEmptyList[Option[A]]
   private implicit val foldableNelOpt: Foldable[NelOpt] = Foldable[NonEmptyList].compose[Option]
 
   private val emptyTags: IMap[PrimaryTag, Int] = IMap.empty
-
-  private def byteArr[J, A](cnt: A): TypeF[J, SST[J, A]] =
-    TypeF.arr[J, SST[J, A]](envT(
-      TypeStat.byte(cnt, Byte.MinValue, Byte.MaxValue),
-      TypeST(TypeF.simple[J, SST[J, A]](SimpleType.Byte))
-    ).embed.right)
 
   private def compressMap[J: Order, A: Order: Field: ConvertableTo](
       m: J ==>> SST[J, A])(

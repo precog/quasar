@@ -231,9 +231,6 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
 
     "verify renderJson (precise) round tripping" in {
       def removal(data: Data): Option[Data] = data match {
-        case Data.Binary(_) =>
-          None
-
         case Data.NA =>
           None
 

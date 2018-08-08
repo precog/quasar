@@ -28,8 +28,6 @@ import quasar.fp.numeric.SampleStats
 import quasar.sst._
 import quasar.tpe._
 
-import scala.Byte
-
 import eu.timepit.refined.auto._
 import fs2.Stream
 import matryoshka.data.Fix
@@ -114,38 +112,6 @@ final class ExtractSstSpec extends quasar.Qspec {
       ), None))).embed
 
     verify(config.copy(stringMaxLength = 5L), input, expected)
-  }
-
-  "compress encoded binary strings" >> {
-    val b1 = ImmutableArray.fromArray("".getBytes)
-    val l1 = Real(b1.length)
-    val b2 = ImmutableArray.fromArray("abcdef".getBytes)
-    val l2 = Real(b2.length)
-
-    val input = List(
-      _obj(ListMap("foo" -> _binary(b1))),
-      _obj(ListMap("bar" -> _binary(b2)))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.coll(Real(1), l1.some, l1.some),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.byte(Real(1), Byte.MinValue, Byte.MaxValue),
-            TypeST(TypeF.simple[J, S](SimpleType.Byte))
-          ).embed.right))).embed,
-
-        J.str("bar") -> envT(
-          TypeStat.coll(Real(1), l2.some, l2.some),
-          TypeST(TypeF.arr[J, S](envT(
-            TypeStat.byte(Real(1), Byte.MinValue, Byte.MaxValue),
-            TypeST(TypeF.simple[J, S](SimpleType.Byte))
-          ).embed.right))).embed
-      ), None))).embed
-
-    verify(config, input, expected)
   }
 
   "coalesce map keys until <= max size" >> {

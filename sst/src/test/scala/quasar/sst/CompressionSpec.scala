@@ -20,7 +20,7 @@ import slamdata.Predef._
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka._
 import quasar.contrib.matryoshka.arbitrary._
-import quasar.ejson, ejson.{EJsonArbitrary, TypeTag, z85}
+import quasar.ejson, ejson.{EJsonArbitrary, TypeTag}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
@@ -28,7 +28,6 @@ import quasar.fp.numeric.{Natural, Positive}
 import quasar.tpe._
 
 import scala.Predef.$conforms
-import scala.Byte
 
 import eu.timepit.refined.auto._
 import matryoshka.{project => _, _}
@@ -39,7 +38,6 @@ import org.scalacheck._, Arbitrary.arbitrary
 import org.specs2.scalacheck._
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalazArbitrary._
-import scodec.bits.ByteVector
 import spire.math.Real
 
 final class CompressionSpec extends quasar.Qspec
@@ -67,7 +65,6 @@ final class CompressionSpec extends quasar.Qspec
       arbitrary[Boolean] map (b => J.bool(b)),
       arbitrary[String] map (s => J.str(s)),
       arbitrary[BigDecimal] map (d => J.dec(d)),
-      arbitrary[Byte] map (b => J.byte(b)),
       arbitrary[Char] map (c => J.char(c)),
       arbitrary[BigInt] map (i => J.int(i))
     ) map (LeafEjs(_)))
@@ -87,19 +84,19 @@ final class CompressionSpec extends quasar.Qspec
   "coalesceKeys" >> {
     def test(kind: String, f: Char => J): Unit = {
       s"compresses largest group of keys having same primary ${kind}" >> prop {
-        (cs: ISet[Char], n: BigInt, b: Byte, unk0: Option[(LeafEjs, LeafEjs)]) => (cs.size > 1) ==> {
+        (cs: ISet[Char], n: BigInt, s: String, unk0: Option[(LeafEjs, LeafEjs)]) => (cs.size > 1) ==> {
 
         val chars = cs.toIList map f
         val int = J.int(n)
-        val byte = J.byte(b)
+        val str = J.str(s)
         val nul = SST.fromEJson(Real(1), J.nul())
-        val m0 = IMap.fromFoldable((int :: byte :: chars) strengthR nul)
+        val m0 = IMap.fromFoldable((int :: str :: chars) strengthR nul)
         val unk  = unk0.map(_.umap(_.toSst))
         val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
 
         val uval = SST.fromEJson(Real(cs.size), J.nul())
         val ukey = chars.foldMap1Opt(c => SST.fromEJson(Real(1), c))
-        val m1   = IMap.fromFoldable(IList(byte, int) strengthR nul)
+        val m1   = IMap.fromFoldable(IList(str, int) strengthR nul)
         val unk1 = ukey.strengthR(uval) |+| unk
         val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
 
@@ -107,7 +104,7 @@ final class CompressionSpec extends quasar.Qspec
       }}
 
       s"compresses largest group of keys having same primary ${kind}, with retention" >> prop {
-        (c1: Char, c2: Char, n: BigInt, b: Byte, unk0: Option[(LeafEjs, LeafEjs)]) => (c1 =/= c2) ==> {
+        (c1: Char, c2: Char, n: BigInt, s: String, unk0: Option[(LeafEjs, LeafEjs)]) => (c1 =/= c2) ==> {
 
         val fc1 = f(c1)
         val sc1 = SST.fromEJson(Real(5), J.nul())
@@ -118,14 +115,14 @@ final class CompressionSpec extends quasar.Qspec
         val chars = IList((fc1, sc1), (fc2, sc2))
 
         val int = J.int(n)
-        val byte = J.byte(b)
+        val str = J.str(s)
         val nul = SST.fromEJson(Real(1), J.nul())
-        val m0 = IMap.fromFoldable((int, nul) :: (byte, nul) :: chars)
+        val m0 = IMap.fromFoldable((int, nul) :: (str, nul) :: chars)
         val unk  = unk0.map(_.umap(_.toSst))
         val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
 
         val ukey = SST.fromEJson(Real(3), fc2)
-        val m1   = IMap.fromFoldable((fc1, sc1) :: IList(byte, int).strengthR(nul))
+        val m1   = IMap.fromFoldable((fc1, sc1) :: IList(str, int).strengthR(nul))
         val unk1 = unk |+| Some((ukey, sc2))
         val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
 
@@ -364,20 +361,20 @@ final class CompressionSpec extends quasar.Qspec
 
   "narrowUnion" >> {
     "reduces the largest group of values having the same primary type" >> prop {
-      (bs: ISet[Byte], c1: Char, c2: Char, c3: Char, d1: BigDecimal) =>
-      ((bs.size > 3) && (ISet.fromFoldable(IList(c1, c2, c3)).size ≟ 3)) ==> {
+      (ss: ISet[Char], c1: String, c2: String, c3: String, d1: BigDecimal) =>
+      ((ss.size > 3) && (ISet.fromFoldable(IList(c1, c2, c3)).size ≟ 3)) ==> {
 
-      val bytes = bs.toIList.map(b => SST.fromEJson(Real(1), J.byte(b)))
-      val chars = IList(c1, c2, c3).map(c => SST.fromEJson(Real(1), J.char(c)))
+      val chars = ss.toIList.map(s => SST.fromEJson(Real(1), J.char(s)))
+      val strs = IList(c1, c2, c3).map(c => SST.fromEJson(Real(1), J.str(c)))
       val dec = SST.fromEJson(Real(1), J.dec(d1))
 
-      val compByte = envT(
-        bytes.foldMap1Opt(_.copoint) | TypeStat.count(Real(0)),
-        TypeST(TypeF.simple[J, S](SimpleType.Byte))
+      val compChar = envT(
+        chars.foldMap1Opt(_.copoint) | TypeStat.count(Real(0)),
+        TypeST(TypeF.simple[J, S](SimpleType.Char))
       ).embed
 
-      val union0 = NonEmptyList.nel(dec, chars ::: bytes).suml1
-      val union1 = envT(union0.copoint, TypeST(TypeF.union[J, S](compByte, dec, chars))).embed
+      val union0 = NonEmptyList.nel(dec, strs ::: chars).suml1
+      val union1 = envT(union0.copoint, TypeST(TypeF.union[J, S](compChar, dec, strs))).embed
 
       attemptCompression(union0, compression.narrowUnion(3L)) must_= union1
     }}
@@ -391,23 +388,6 @@ final class CompressionSpec extends quasar.Qspec
         l => attemptCompression(union, compression.narrowUnion(l)),
         union
       ) must_= union
-    }
-  }
-
-  "z85EncodedBinary" >> {
-    "compresses all encoded binary strings" >> prop { bs: Vector[Byte] =>
-      val bytes   = ByteVector(bs)
-      val encoded = z85.encode(bytes)
-      val ejs     = J.meta(J.str(encoded), J.sizedTpe(TypeTag.Binary, BigInt(bytes.size)))
-      val sst     = SST.fromEJson(Real(1), ejs)
-
-      val bstat   = TypeStat.byte(Real(1), Byte.MinValue, Byte.MaxValue)
-      val byte    = envT(bstat, TypeST(TypeF.simple[J, S](SimpleType.Byte))).embed
-      val rsize   = Real(bytes.size).some
-      val coll    = TypeStat.coll(Real(1), rsize, rsize)
-      val barr    = envT(coll, TypeST(TypeF.arr[J, S](byte.right))).embed
-
-      attemptCompression(sst, compression.z85EncodedBinary) must_= barr
     }
   }
 }

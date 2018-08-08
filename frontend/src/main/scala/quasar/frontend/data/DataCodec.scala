@@ -73,7 +73,6 @@ object DataCodec {
     val OffsetDateKey = "$offsetdate"
     val OffsetTimeKey = "$offsettime"
     val IntervalKey = "$interval"
-    val BinaryKey = "$binary"
     val ObjKey = "$obj"
   }
 
@@ -142,8 +141,6 @@ object DataCodec {
         case Interval(value) =>
           Json.obj(IntervalKey -> jString(value.toString)).some
 
-        case bin @ Binary(_) => Json.obj(BinaryKey -> jString(bin.base64)).some
-
         case NA => None
       }
     }
@@ -177,9 +174,6 @@ object DataCodec {
             case (`LocalDateKey`, value) :: Nil      => unpack(value.string, "string value for $localdate")(parseLocalDate(_).leftMap(err => ParseError(err.message)))
             case (`IntervalKey`, value) :: Nil       => unpack(value.string, "string value for $interval")(parseInterval(_).leftMap(err => ParseError(err.message)))
             case (`ObjKey`, value) :: Nil            => unpack(value.obj,    "object value for $obj")(decodeObj)
-            case (`BinaryKey`, value) :: Nil         => unpack(value.string, "string value for $binary") { str =>
-              \/.fromTryCatchNonFatal(Data.Binary.fromArray(new sun.misc.BASE64Decoder().decodeBuffer(str))).leftMap(_ => UnexpectedValueError("BASE64-encoded data", json))
-            }
             case _ => obj.fields.find(_.startsWith("$")).fold(decodeObj(obj))(κ(-\/(UnescapedKeyError(json))))
           }
         })
@@ -210,9 +204,7 @@ object DataCodec {
         case LocalDate(value)       => jString(value.toString).some
         case Interval(value)        => jString(value.toString).some
 
-        case bin @ Binary(_)  => jString(bin.base64).some
-
-        case NA               => None
+        case NA => None
       }
     }
 
@@ -251,7 +243,6 @@ object DataCodec {
   // other types (e.g. `Data.Str("12:34")`, which becomes `Data.Time`).
   @SuppressWarnings(Array("org.wartremover.warts.Equals","org.wartremover.warts.Recursion"))
   def representable(data: Data, codec: DataCodec): Boolean = data match {
-    case Data.Binary(_) if codec == Readable => false
     case Data.NA => false
     case Data.Int(x) => x.isValidLong
     case Data.Arr(list) => list.forall(representable(_, codec))

@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Byte => SByte, Char => SChar, Int => _, Map => _, _}
+import slamdata.Predef.{Char => SChar, Int => _, Map => _, _}
 import quasar.contrib.matryoshka.{project, totally}
 import quasar.contrib.iota.copkTraverse
 
@@ -62,9 +62,6 @@ object EJson {
 
   def bool[T](b: Boolean)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromCommon(Bool(b))
-
-  def byte[T](b: SByte)(implicit T: Corecursive.Aux[T, EJson]): T =
-    fromExt(Byte(b))
 
   def char[T](c: SChar)(implicit T: Corecursive.Aux[T, EJson]): T =
     fromExt(Char(c))

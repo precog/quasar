@@ -77,11 +77,11 @@ final class GenerateSpec extends quasar.Qspec {
 
     "weighted selection from a union" >> {
       val x = sstL(TypeStat.char(SampleStats.freq(0.0, 'a'.toDouble), 'a', 'a'), SimpleType.Char)
-      val y = sstL(TypeStat.byte(100.0, 7.toByte, 7.toByte), SimpleType.Char)
+      val y = sstL(TypeStat.int(SampleStats.freq(100.0, BigInt(7).toDouble), BigInt(7), BigInt(7)), SimpleType.Int)
       val z = sstL(TypeStat.bool(0.0, 0.0), SimpleType.Bool)
       val u = sst(TypeStat.count(100.0), TypeF.union(x, y, IList(z)))
 
-      valuesShould(u)(_ ≟ J.byte(7.toByte))
+      valuesShould(u)(_ ≟ J.int(BigInt(7)))
     }
 
     "array" >> {
@@ -216,15 +216,6 @@ final class GenerateSpec extends quasar.Qspec {
       val t = sstL(TypeStat.bool(100.0, 0.0), SimpleType.Bool)
       val f = sstL(TypeStat.bool(0.0, 10.0), SimpleType.Bool)
       valuesShould(t ⊹ f)(J.bool.nonEmpty)
-    }
-
-    "byte within range" >> {
-      val bsst =
-        NonEmptyList(3, 4, 5, 6, 7, 8, 9, 10, 11) foldMap1 { i =>
-          sstL(tsJ1(J.byte(i.toByte)), SimpleType.Byte)
-        }
-
-      valuesShould(bsst)(J.byte.exist(b => (b >= 3.toByte) && (b <= 17.toByte)))
     }
 
     "char within range" >> {

@@ -28,8 +28,6 @@ import quasar.fp.numeric.SampleStats
 import quasar.sst._
 import quasar.tpe._
 
-import scala.Byte
-
 import eu.timepit.refined.auto._
 import fs2.Stream
 import matryoshka.data.Fix

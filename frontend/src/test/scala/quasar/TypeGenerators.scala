@@ -27,7 +27,6 @@ import scala.Predef.implicitly
 import org.scalacheck._
 import org.scalacheck.Gen._
 
-import scalaz.ImmutableArray
 import scalaz.scalacheck.ScalaCheckBinding._
 import scalaz.syntax.traverse._
 import scalaz.std.list._

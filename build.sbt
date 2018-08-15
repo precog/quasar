@@ -45,6 +45,20 @@ lazy val buildSettings = Seq(
 
   console := { (console in Test).value },
 
+  Global / testFrameworks := {
+    if (isTravisBuild.value)
+      Seq(TestFramework("quasar.specs2.TravisSpecs2Runner"))
+    else
+      (Global / testFrameworks).value
+  },
+
+  Test / parallelExecution := {
+    if (isTravisBuild.value)
+      false
+    else
+      (Test / parallelExecution).value
+  },
+
   /*
    * This plugin fixes a number of problematic cases in the for-comprehension
    * desugaring. Notably, it eliminates a non-tail-recursive case which causes

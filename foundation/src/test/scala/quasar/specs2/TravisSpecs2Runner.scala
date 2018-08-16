@@ -36,9 +36,10 @@ private[specs2] trait TravisRunnerInjection extends BaseSbtRunner {
   override def newTask(aTaskDef: TaskDef): Task = {
     new SbtTask(aTaskDef, env, loader) {
       override def execute(handler: EventHandler, loggers: Array[Logger]) = {
-        System.err.println(s"travis_fold:start:specs2-${aTaskDef.fullyQualifiedName}")
+        val simpleName = aTaskDef.fullyQualifiedName.split("\\.").toList.last
+        System.err.println(s"travis_fold:start:$simpleName")
         val back = super.execute(handler, loggers)
-        System.err.println(s"travis_fold:end:specs2-${aTaskDef.fullyQualifiedName}")
+        System.err.println(s"travis_fold:end:$simpleName")
         back
       }
     }

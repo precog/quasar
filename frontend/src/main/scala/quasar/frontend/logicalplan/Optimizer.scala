@@ -331,25 +331,25 @@ final class Optimizer[T: Equal]
   val optimize: T => T =
     NonEmptyList[T => T](
       // Eliminate extraneous constants, etc.:
-      simplify,
+      simplify(_),
 
       // NB: must precede normalizeLets to eliminate possibility of shadowing:
-      lpr.normalizeTempNames,
+      lpr.normalizeTempNames(_),
 
       // NB: must precede rewriteCrossJoins to normalize Filter/Join shapes:
-      lpr.normalizeLets,
+      lpr.normalizeLets(_),
 
       // Now for the big one:
-      boundParaS(_)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
+      (t: T) => boundParaS(t)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
-      simplify,
+      simplify(_),
 
       // Final pass to normalize the resulting plans for better matching in tests:
-      lpr.normalizeLets,
+      lpr.normalizeLets(_),
 
       // This time, fix the names last so they will read naturally:
-      lpr.normalizeTempNames
+      lpr.normalizeTempNames(_)
 
     ).foldLeft1(_ >>> _)
 
@@ -361,19 +361,19 @@ final class Optimizer[T: Equal]
   val rewriteJoins: T => T =
     NonEmptyList[T => T](
       // Eliminate extraneous constants, etc.:
-      simplify,
+      simplify(_),
 
       // NB: must precede normalizeLets to eliminate possibility of shadowing:
-      lpr.normalizeTempNames,
+      lpr.normalizeTempNames(_),
 
       // Now for the big one:
-      boundParaS(_)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
+      (t: T) => boundParaS(t)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
-      simplify,
+      simplify(_),
 
       // This time, fix the names last so they will read naturally:
-      lpr.normalizeTempNames
+      lpr.normalizeTempNames(_)
 
     ).foldLeft1(_ >>> _)
 

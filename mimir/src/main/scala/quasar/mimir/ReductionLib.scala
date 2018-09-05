@@ -19,6 +19,7 @@ package quasar.mimir
 import quasar.precog.common._
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
+import quasar.yggdrasil.util.RangeUtil
 
 import scala.collection.mutable
 

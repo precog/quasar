@@ -1,21 +1,21 @@
 {
     "name": "basic analytic query",
     "backends": {
-        "lwc_local":         "ignoreFieldOrder",
-        "mimir":             "ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "../zips.data",
     "query": "SELECT state, COUNT(*) AS count, SUM(pop) AS sum, AVG(pop) AS avg, MIN(pop) AS min, MAX(pop) AS max FROM `../zips.data` WHERE pop > 10000 GROUP BY state ORDER BY max DESC, state OFFSET 1 LIMIT 10",
     "predicate": "exactly",
     "expected": [
-        { "state": "NY", "count": 489, "sum": 14914135, "avg": 30499.25357873, "min": 10008, "max": 111396 },
-        { "state": "CA", "count": 849, "sum": 27845412, "avg": 32797.89399293,  "min": 10009, "max": 99568 },
-        { "state": "MI", "count": 269, "sum":  7262672, "avg": 26998.78066914,  "min": 10057, "max": 84712 },
-        { "state": "PA", "count": 365, "sum":  8664634, "avg": 23738.72328767, "min": 10021, "max": 80454 },
-        { "state": "TX", "count": 571, "sum": 13803255, "avg": 24173.82661996, "min": 10019, "max": 79463 },
-        { "state": "MD", "count": 140, "sum":  4001087, "avg": 28579.19285714, "min": 10228, "max": 76002 },
-        { "state": "FL", "count": 472, "sum": 11136926, "avg": 23595.18220338,  "min": 10004, "max": 73194 },
-        { "state": "WV", "count":  36, "sum":   766999, "avg": 21305.52777777, "min": 10091, "max": 70185 },
-        { "state": "NJ", "count": 280, "sum":  6520399, "avg": 23287.13928571, "min": 10088, "max": 69646 },
-        { "state": "NC", "count": 209, "sum":  4854625, "avg": 23227.87081339,  "min": 10049, "max": 69179 }]
+        { "state": "NY", "count": 489, "sum": 14914135, "avg": 30499.25357873210633946830265848671, "min": 10008, "max": 111396 },
+        { "state": "CA", "count": 849, "sum": 27845412, "avg": 32797.89399293286219081272084805654, "min": 10009, "max":  99568 },
+        { "state": "MI", "count": 269, "sum":  7262672, "avg": 26998.78066914498141263940520446097, "min": 10057, "max":  84712 },
+        { "state": "PA", "count": 365, "sum":  8664634, "avg": 23738.72328767123287671232876712329, "min": 10021, "max":  80454 },
+        { "state": "TX", "count": 571, "sum": 13803255, "avg": 24173.82661996497373029772329246935, "min": 10019, "max":  79463 },
+        { "state": "MD", "count": 140, "sum":  4001087, "avg": 28579.19285714285714285714285714286, "min": 10228, "max":  76002 },
+        { "state": "FL", "count": 472, "sum": 11136926, "avg": 23595.18220338983050847457627118644, "min": 10004, "max":  73194 },
+        { "state": "WV", "count":  36, "sum":   766999, "avg": 21305.52777777777777777777777777778, "min": 10091, "max":  70185 },
+        { "state": "NJ", "count": 280, "sum":  6520399, "avg": 23287.13928571428571428571428571429, "min": 10088, "max":  69646 },
+        { "state": "NC", "count": 209, "sum":  4854625, "avg": 23227.87081339712918660287081339713, "min": 10049, "max":  69179 }]
 }

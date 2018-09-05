@@ -533,6 +533,11 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
       "perform an array swap" in checkArraySwap
       "replace defined rows with a constant" in checkConst
 
+      "perform a ToNumber transformation resulting in longs" in testToNumberLongs
+      "perform a ToNumber transformation resulting in doubles" in testToNumberDoubles
+      "perform a ToNumber transformation resulting in big decimals" in testToNumberBigDecimals
+      "perform a ToNumber transformation resulting in a mix of longs, doubles and big decimals" in testToNumberMix
+
       //"check cond" in checkCond.pendingUntilFixed // FIXME qz-3775
     }
 

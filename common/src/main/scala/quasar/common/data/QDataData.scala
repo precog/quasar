@@ -40,7 +40,7 @@ object QDataData extends QData[Data] {
     case Data.Null => QNull
     case Data.Str(_) => QString
     case Data.Bool(_) => QBoolean
-    case Data.Dec(v) => if (v.isExactDouble) QDouble else QReal
+    case Data.Dec(v) => if (v.isDecimalDouble) QDouble else QReal
     case Data.Int(v) => if (v.isValidLong) QLong else QReal
     case Data.OffsetDateTime(_) => QOffsetDateTime
     case Data.OffsetDate(_) => QOffsetDate

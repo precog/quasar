@@ -2242,6 +2242,107 @@ trait TransformSpec extends TableModuleTestSupport with SpecificationLike with S
     }.set(minTestsOk =  200)
   }
 
+  def testToNumberLongs = {
+    val maxStr = "9223372036854775807"
+    val minStr = "-9223372036854775808"
+    val JArray(data) = JParser.parseUnsafe(s"""[
+      "1",
+      "42",
+      "0",
+      "$maxStr",
+      "$minStr",
+      "",
+      "s",
+      1
+    ]""")
+    val sample = SampleData(data.toStream)
+    val table = fromSample(sample)
+
+    val results = toJson(table.transform {
+      ToNumber(Leaf(Source))
+    })
+
+    results.getJValues must_== Stream(JNum(1), JNum(42), JNum(0), JNum(Long.MaxValue), JNum(Long.MinValue))
+    results.getJValues.map(_.toString) must_== Stream("1", "42", "0", maxStr, minStr)
+    results.getJValues.map(_.getClass).distinct must_== Stream(classOf[JNumLong])
+  }
+
+  def testToNumberDoubles = {
+    val maxStr = "1.7976931348623157E308"
+    val minStr = "-1.7976931348623157E308"
+    val minPosStr = "4.9E-324"
+    val JArray(data) = JParser.parseUnsafe(s"""[
+      "1.25",
+      "42.5",
+      "4.3",
+      "1.00001",
+      "$maxStr",
+      "$minStr",
+      "$minPosStr",
+      "",
+      "s",
+      1
+    ]""")
+    val sample = SampleData(data.toStream)
+    val table = fromSample(sample)
+
+    val results = toJson(table.transform {
+      ToNumber(Leaf(Source))
+    })
+
+    results.getJValues must_== Stream(JNum(1.25), JNum(42.5), JNum(4.3), JNum(1.00001), JNum(Double.MaxValue), JNum(Double.MinValue), JNum(Double.MinPositiveValue))
+    results.getJValues.map(_.toString) must_== Stream("1.25", "42.5", "4.3", "1.00001", maxStr, minStr, minPosStr)
+    results.getJValues.map(_.getClass).distinct must_== Stream(classOf[JNumDouble])
+  }
+
+  def testToNumberBigDecimals = {
+    val n1 = "1.234567890123456789E+12345"
+    val n2 = "1E-400"
+    val n3 = "9223372036854775808"
+    val JArray(data) = JParser.parseUnsafe(s"""[
+      "$n1",
+      "$n2",
+      "$n3",
+      "",
+      "s",
+      1
+    ]""")
+    val sample = SampleData(data.toStream)
+    val table = fromSample(sample)
+
+    val results = toJson(table.transform {
+      ToNumber(Leaf(Source))
+    })
+
+    results.getJValues must_== Stream(JNum(BigDecimal(n1)), JNum(BigDecimal(n2)), JNum(BigDecimal(n3)))
+    results.getJValues.map(_.toString) must_== Stream(n1, n2, n3)
+    results.getJValues.map(_.getClass).distinct must_== Stream(classOf[JNumBigDec])
+  }
+
+  def testToNumberMix = {
+    val n1 = "1.234567890123456789E+12345"
+    val n2 = "-1.7976931348623157E308"
+    val n3 = "9223372036854775807"
+    val JArray(data) = JParser.parseUnsafe(s"""[
+      "$n1",
+      "$n2",
+      "$n3",
+      "",
+      "s",
+      1
+    ]""")
+    val sample = SampleData(data.toStream)
+    val table = fromSample(sample)
+
+    val results = toJson(table.transform {
+      ToNumber(Leaf(Source))
+    })
+
+    results.getJValues must_== Stream(JNum(BigDecimal(n1)), JNum(Double.MinValue), JNum(Long.MaxValue))
+    results.getJValues.map(_.toString) must_== Stream(n1, n2, n3)
+    results.getJValues.map(_.getClass).distinct must_== Stream(classOf[JNumBigDec], classOf[JNumDouble], classOf[JNumLong])
+  }
+
   def expectedResult(data: Stream[JValue], included: Map[JPath, Set[CType]]): Stream[JValue] = {
     data map { jv =>
       val filtered = jv.flattenWithPath filter {

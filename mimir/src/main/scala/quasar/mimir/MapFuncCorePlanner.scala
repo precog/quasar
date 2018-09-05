@@ -210,6 +210,8 @@ final class MapFuncCorePlanner[T[_[_]]: RecursiveT, F[_]: Applicative]
         readInteger.spec[A](a1).point[F]
       case MapFuncsCore.Decimal(a1) =>
         readDecimal.spec[A](a1).point[F]
+      case MapFuncsCore.Number(a1) =>
+        (ToNumber(a1): TransSpec[A]).point[F]
       case MapFuncsCore.Null(a1) =>
         readNull.spec[A](a1).point[F]
       case MapFuncsCore.ToString(a1) =>

@@ -522,6 +522,7 @@ object MapFuncCore {
         case Bool(a1) => f(a1) ∘ (Bool(_))
         case Integer(a1) => f(a1) ∘ (Integer(_))
         case Decimal(a1) => f(a1) ∘ (Decimal(_))
+        case Number(a1) => f(a1) ∘ (Number(_))
         case Null(a1) => f(a1) ∘ (Null(_))
         case ToString(a1) => f(a1) ∘ (ToString(_))
         case MakeArray(a1) => f(a1) ∘ (MakeArray(_))
@@ -623,6 +624,7 @@ object MapFuncCore {
         case (Bool(a1), Bool(b1)) => in.equal(a1, b1)
         case (Integer(a1), Integer(b1)) => in.equal(a1, b1)
         case (Decimal(a1), Decimal(b1)) => in.equal(a1, b1)
+        case (Number(a1), Number(b1)) => in.equal(a1, b1)
         case (Null(a1), Null(b1)) => in.equal(a1, b1)
         case (ToString(a1), ToString(b1)) => in.equal(a1, b1)
         case (MakeArray(a1), MakeArray(b1)) => in.equal(a1, b1)
@@ -728,6 +730,7 @@ object MapFuncCore {
           case Bool(a1) => shz("Bool", a1)
           case Integer(a1) => shz("Integer", a1)
           case Decimal(a1) => shz("Decimal", a1)
+          case Number(a1) => shz("Number", a1)
           case Null(a1) => shz("Null", a1)
           case ToString(a1) => shz("ToString", a1)
           case MakeArray(a1) => shz("MakeArray", a1)
@@ -842,6 +845,7 @@ object MapFuncCore {
           case Bool(a1) => nAry("Bool", a1)
           case Integer(a1) => nAry("Integer", a1)
           case Decimal(a1) => nAry("Decimal", a1)
+          case Number(a1) => nAry("Number", a1)
           case Null(a1) => nAry("Null", a1)
           case ToString(a1) => nAry("ToString", a1)
           case MakeArray(a1) => nAry("MakeArray", a1)
@@ -1002,6 +1006,7 @@ object MapFuncsCore {
   @Lenses final case class Bool[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Integer[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Decimal[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Number[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Null[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToString[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class Split[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]

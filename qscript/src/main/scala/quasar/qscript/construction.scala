@@ -141,6 +141,8 @@ object construction {
       rollCore(MapFuncsCore.Integer(a1))
     def Decimal[A](a1: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.Decimal(a1))
+    def Number[A](a1: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
+      rollCore(MapFuncsCore.Number(a1))
     def Null[A](a1: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.Null(a1))
     def ToString[A](a1: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
@@ -361,6 +363,8 @@ object construction {
       rollCore(MapFuncsCore.Integer(a1))
     def Decimal[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Decimal(a1))
+    def Number[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.Number(a1))
     def Null[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =
       rollCore(MapFuncsCore.Null(a1))
     def ToString[A](a1: FreeMapA[T, A]): FreeMapA[T, A] =

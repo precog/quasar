@@ -133,6 +133,8 @@ trait TransSpecModule {
 
     case class Cond[+A <: SourceType](pred: TransSpec[A], left: TransSpec[A], right: TransSpec[A]) extends TransSpec[A]
 
+    case class ToNumber[+A <: SourceType](source: TransSpec[A]) extends TransSpec[A]
+
     type TransSpec1 = TransSpec[Source1]
 
     object TransSpec {
@@ -216,6 +218,7 @@ trait TransSpecModule {
           case trans.Range(upper, lower) => trans.Range(mapSources(upper)(f), mapSources(lower)(f))
 
           case trans.Cond(pred, left, right) => trans.Cond(mapSources(pred)(f), mapSources(left)(f), mapSources(right)(f))
+          case trans.ToNumber(source) => trans.ToNumber(mapSources(source)(f))
         }
       }
 
@@ -269,6 +272,7 @@ trait TransSpecModule {
         case trans.Range(upper, lower)                 => trans.Range(deepMap(upper)(f), deepMap(lower)(f))
 
         case trans.Cond(pred, left, right) => trans.Cond(deepMap(pred)(f), deepMap(left)(f), deepMap(right)(f))
+        case trans.ToNumber(source) => trans.ToNumber(deepMap(source)(f))
       }
 
       // reduce the TransSpec to a "normal form", in which nested *Concats are flattened into
@@ -388,6 +392,7 @@ trait TransSpecModule {
             case Map2(s, f, fun)         => Map2(normalize(s, undef), normalize(f, undef), fun)
             case MapN(s, fun)            => MapN(normalize(s, undef), fun)
             case ArraySwap(s, i)         => ArraySwap(normalize(s, undef), i)
+            case ToNumber(s)             => ToNumber(normalize(s, undef))
             case _                       => ts
           }
         }
@@ -465,6 +470,7 @@ trait TransSpecModule {
           case Typed(s, _)               => paths(s) + r
           case TypedSubsumes(s, _)       => paths(s) + r
           case WrapObjectDynamic(f, s)   => paths(f) ++ paths(s) + r
+          case ToNumber(s)               => paths(s) + r
           case Leaf(`rootSource`)        => Set(r)
           case Leaf(_)                   => sys.error("impossible")
         }

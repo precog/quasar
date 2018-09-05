@@ -122,6 +122,11 @@ trait StringLib extends Library {
     "Converts strings containing decimals into decimal values. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
     noSimplification)
 
+  val Number = UnaryFunc(
+    Mapping,
+    "Converts strings containing a number into a number. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",
+    noSimplification)
+
   val Null = UnaryFunc(
     Mapping,
     "Converts strings containing “null” into the null value. This is a partial function – arguments that don’t satisfy the constraint have undefined results.",

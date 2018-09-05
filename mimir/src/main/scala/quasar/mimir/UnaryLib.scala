@@ -85,13 +85,16 @@ trait UnaryLibModule extends ColumnarTableLibModule {
       object Trunc extends Op1F1 {
         val tpe = UnaryOperationType(JNumberT, JNumberT)
         def f1: CF1 = CF1P {
-          case c: DoubleColumn => new DoubleFrom.D(c, doubleIsDefined, { d =>
-            val result = math.round(d)
-            // the JVM uses half-up rounding semantics by default
-            if ((d >= 0 && result > d) || (d < 0 && result < d)) math.floor(d) else result
-          })
-          case c: LongColumn   => new LongFrom.L(c, n => true, x => x)
-          case c: NumColumn    => new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.DOWN))
+          case c: DoubleColumn =>
+            new DoubleFrom.D(c, doubleIsDefined, { d =>
+              d - (d % 1.0)
+            })
+
+          case c: LongColumn =>
+            new LongFrom.L(c, n => true, x => x)
+
+          case c: NumColumn =>
+            new NumFrom.N(c, n => true, _.setScale(0, RoundingMode.DOWN))
         }
 
         def spec[A <: SourceType]: TransSpec[A] => TransSpec[A] = { transSpec =>

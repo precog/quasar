@@ -11,7 +11,7 @@
   "ignoreFieldOrder": true,
 
   "expected": [
-    {"0": 6, "diff": 1,"mult": 4, "div": 2, "neg": -4},
-    {"0": 50, "diff": 4,"mult": 129, "div": 2.333333333333, "neg": -43}
+    {"0": 6, "diff": 1, "mult": 4, "div": 2, "neg": -4},
+    {"0": 50, "diff": 4, "mult": 129, "div": 2.3333333333333335, "neg": -43}
   ]
 }

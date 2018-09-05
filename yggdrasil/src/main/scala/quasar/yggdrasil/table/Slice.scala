@@ -27,7 +27,7 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 import quasar.yggdrasil._
 import quasar.yggdrasil.TransSpecModule._
 import quasar.yggdrasil.bytecode._
-import quasar.yggdrasil.util.CPathUtils
+import quasar.yggdrasil.util.{CPathUtils, RangeUtil}
 
 import scalaz._, Scalaz._, Ordering._
 import shims._
@@ -488,6 +488,45 @@ abstract class Slice { source =>
     }
 
     Slice (size, columns)
+  }
+
+  def toNumber = {
+    val size = source.size
+    val columns = source.columns.get(ColumnRef(CPath.Identity, CString)) match {
+      case Some(c: StrColumn) =>
+        val lc = ArrayLongColumn.empty(size)
+        val dc = ArrayDoubleColumn.empty(size)
+        val nc = ArrayNumColumn.empty(size)
+
+        RangeUtil.loopDefined(0 to size, c){ i =>
+          val s = c(i)
+          try {
+            val l = java.lang.Long.parseLong(s)
+            lc.update(i, l)
+          } catch {
+            case _: NumberFormatException =>
+              try {
+                val n = BigDecimal(s)
+                if (n.isDecimalDouble) {
+                  dc.update(i, n.doubleValue)
+                } else {
+                  nc.update(i, n)
+                }
+              } catch {
+                case _: NumberFormatException => // don't set anything
+              }
+          }
+        }
+        Map[ColumnRef, BitsetColumn](
+          ColumnRef(CPath.Identity, CLong) -> lc,
+          ColumnRef(CPath.Identity, CDouble) -> dc,
+          ColumnRef(CPath.Identity, CNum) -> nc).foldLeft(Map.empty[ColumnRef, Column])
+        { case (acc, (cref, col)) =>
+            if (col.definedAt.size > 0) acc + (cref -> col.asInstanceOf[Column])
+            else acc }
+      case _ => Map.empty[ColumnRef, Column]
+    }
+    Slice(size, columns)
   }
 
   def arraySwap(index: Int) = {

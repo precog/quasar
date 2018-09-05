@@ -113,7 +113,7 @@ object RenderQScriptDSL {
       }
     }
   }
-  
+
   def ejsonRenderQScriptDSLDelay: Delay[RenderQScriptDSL, EJson] = new Delay[RenderQScriptDSL, EJson] {
     def apply[A](fa: RenderQScriptDSL[A]): RenderQScriptDSL[EJson[A]] = {
       (base: String, a: EJson[A]) =>
@@ -231,6 +231,7 @@ object RenderQScriptDSL {
               case Bool(a1) => ("Bool", (fa(base, a1).right :: Nil).some)
               case Integer(a1) => ("Integer", (fa(base, a1).right :: Nil).some)
               case Decimal(a1) => ("Decimal", (fa(base, a1).right :: Nil).some)
+              case Number(a1) => ("Number", (fa(base, a1).right :: Nil).some)
               case Null(a1) => ("Null", (fa(base, a1).right :: Nil).some)
               case ToString(a1) => ("ToString", (fa(base, a1).right :: Nil).some)
               case MakeArray(a1) => ("MakeArray", (fa(base, a1).right :: Nil).some)

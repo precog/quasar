@@ -80,6 +80,7 @@ object MapFunc {
     case string.Boolean => a => MFC(C.Bool(a))
     case string.Integer => a => MFC(C.Integer(a))
     case string.Decimal => a => MFC(C.Decimal(a))
+    case string.Number => a => MFC(C.Number(a))
     case string.Null => a => MFC(C.Null(a))
     case string.ToString => a => MFC(C.ToString(a))
     case structural.MakeArray => a => MFC(C.MakeArray(a))

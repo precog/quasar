@@ -213,6 +213,7 @@ trait GenericFuncInstances {
       case string.Boolean                 => "Boolean"
       case string.Integer                 => "Integer"
       case string.Decimal                 => "Decimal"
+      case string.Number                  => "Number"
       case string.Null                    => "Null"
       case string.ToString                => "ToString"
       case structural.MakeMap             => "MakeMap"

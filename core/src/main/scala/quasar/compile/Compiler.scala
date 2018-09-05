@@ -259,6 +259,7 @@ final class Compiler[M[_], T: Equal]
       CIName("boolean")                 -> string.Boolean,
       CIName("integer")                 -> string.Integer,
       CIName("decimal")                 -> string.Decimal,
+      CIName("number")                  -> string.Number,
       CIName("null")                    -> string.Null,
       CIName("to_string")               -> string.ToString,
       CIName("make_map")                -> structural.MakeMap,

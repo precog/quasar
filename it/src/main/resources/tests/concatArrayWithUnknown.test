@@ -1,8 +1,8 @@
 {
     "name": "concat array with unknown structure",
     "backends": {
-        "mimir": "ignoreFieldOrder",
-        "lwc_local": "ignoreFieldOrder"
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
     },
     "data": "largeZips.data",
     "query": "select city, state, loc || [ pop ] as lp from `largeZips.data`",

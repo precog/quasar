@@ -9,10 +9,10 @@
                 GROUP BY state, gender
                 ORDER BY COUNT(*) DESC, state ASC)",
     "predicate": "initial",
-    "expected": [{ "measure": 1.238095238095, "category": "NE" },
-                 { "measure": 1.238095238095, "category": "AL" },
-                 { "measure": 1.238095238095, "category": "MS" },
-                 { "measure": 1.238095238095, "category": "NY" },
-                 { "measure": 1.238095238095, "category": "AR" },
-                 { "measure": 1.238095238095, "category": "AZ" }]
+    "expected": [{ "measure": 1.238095238095238095238095238095238, "category": "NE" },
+                 { "measure": 1.238095238095238095238095238095238, "category": "AL" },
+                 { "measure": 1.238095238095238095238095238095238, "category": "MS" },
+                 { "measure": 1.238095238095238095238095238095238, "category": "NY" },
+                 { "measure": 1.238095238095238095238095238095238, "category": "AR" },
+                 { "measure": 1.238095238095238095238095238095238, "category": "AZ" }]
 }

@@ -21,6 +21,7 @@ import quasar.precog.common._
 import quasar.std.StringLib
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.table._
+import quasar.yggdrasil.util.RangeUtil
 
 import scalaz.syntax.semigroup._
 import scalaz.std.list._

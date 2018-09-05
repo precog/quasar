@@ -321,32 +321,34 @@ abstract class StdLibSpec extends Qspec {
         "false" >> {
           unary(Boolean(_).embed, Data.Str("false"), Data.Bool(false))
         }
-
-        // TODO: how to express "should execute and may produce any result"
       }
 
       "Integer" >> {
         "any BigInt in the domain" >> prop { (x: BigInt) =>
           unary(Integer(_).embed, Data.Str(x.toString), Data.Int(x))
         }
-
-        // TODO: how to express "should execute and may produce any result"
       }
 
       "Decimal" >> {
         "any BigDecimal in the domain" >> prop { (x: BigDecimal) =>
           unary(Decimal(_).embed, Data.Str(x.toString), Data.Dec(x))
         }
+      }
 
-        // TODO: how to express "should execute and may produce any result"
+      "Number" >> {
+        "any BigInt in the domain" >> prop { (x: BigInt) =>
+          unary(Number(_).embed, Data.Str(x.toString), Data.Int(x))
+        }
+
+        "any BigDecimal in the domain" >> prop { (x: BigDecimal) =>
+          unary(Number(_).embed, Data.Str(x.toString), Data.Dec(x))
+        }
       }
 
       "Null" >> {
         "null" >> {
           unary(Null(_).embed, Data.Str("null"), Data.Null)
         }
-
-        // TODO: how to express "should execute and may produce any result"
       }
 
       "ToString" >> {
@@ -2098,6 +2100,11 @@ abstract class StdLibSpec extends Qspec {
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Negate(_).embed, Data.Dec(x), Data.Dec(-x))
         }
+
+        "any Double" >> prop { (x: Double) =>
+          val bd = BigDecimal(x)
+          unary(Negate(_).embed, Data.Dec(bd), Data.Dec(-bd))
+        }
       }
 
       "Abs" >> {
@@ -2107,6 +2114,11 @@ abstract class StdLibSpec extends Qspec {
 
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Abs(_).embed, Data.Dec(x), Data.Dec(x.abs))
+        }
+
+        "any Double" >> prop { (x: Double) =>
+          val bd = BigDecimal(x)
+          unary(Abs(_).embed, Data.Dec(bd), Data.Dec(bd.abs))
         }
       }
 
@@ -2118,6 +2130,15 @@ abstract class StdLibSpec extends Qspec {
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Trunc(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.DOWN)))
         }
+
+        "any Double" >> prop { (x: Double) =>
+          val bd = BigDecimal(x)
+          unary(Trunc(_).embed, Data.Dec(bd), Data.Dec(bd.setScale(0, RoundingMode.DOWN)))
+        }
+
+        "-1.9" >> {
+          unary(Trunc(_).embed, Data.Dec(BigDecimal(-1.9)), Data.Dec(BigDecimal(-1)))
+        }
       }
 
       "Ceil" >> {
@@ -2128,6 +2149,11 @@ abstract class StdLibSpec extends Qspec {
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Ceil(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.CEILING)))
         }
+
+        "any Double" >> prop { (x: Double) =>
+          val bd = BigDecimal(x)
+          unary(Ceil(_).embed, Data.Dec(bd), Data.Dec(bd.setScale(0, RoundingMode.CEILING)))
+        }
       }
 
       "Floor" >> {
@@ -2137,6 +2163,11 @@ abstract class StdLibSpec extends Qspec {
 
         "any Dec" >> prop { (x: BigDecimal) =>
           unary(Floor(_).embed, Data.Dec(x), Data.Dec(x.setScale(0, RoundingMode.FLOOR)))
+        }
+
+        "any Double" >> prop { (x: Double) =>
+          val bd = BigDecimal(x)
+          unary(Floor(_).embed, Data.Dec(bd), Data.Dec(bd.setScale(0, RoundingMode.FLOOR)))
         }
       }
 

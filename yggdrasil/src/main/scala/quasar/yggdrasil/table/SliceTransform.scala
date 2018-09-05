@@ -819,6 +819,11 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
               })
           }
         }
+
+        case ToNumber(source) =>
+          composeSliceTransform2(source) map {
+            _ toNumber
+          }
       }
 
       result

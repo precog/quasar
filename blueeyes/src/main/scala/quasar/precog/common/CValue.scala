@@ -285,7 +285,7 @@ object RValue extends RValueInstances {
     case Data.Dec(k) =>
       val back = if (k.isValidLong)
         CLong(k.toLong)
-      else if (k.isExactDouble)
+      else if (k.isDecimalDouble)
         CDouble(k.toDouble)
       else
         CNum(k)

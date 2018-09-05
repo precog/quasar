@@ -22,14 +22,10 @@ import quasar.api.datasource._
 import quasar.build.BuildInfo
 import quasar.common.PhaseResults
 import quasar.common.data.Data
-import quasar.contrib.argonaut._
 import quasar.contrib.fs2.convert
-import quasar.contrib.iota._
 import quasar.contrib.nio.{file => contribFile}
 import quasar.contrib.pathy._
 import quasar.contrib.scalaz.{MonadError_, MonadTell_}
-import quasar.ejson
-import quasar.ejson.Common.{Optics => CO}
 import quasar.fp._
 import quasar.frontend.data.DataCodec
 import quasar.impl.datasource.local.LocalType
@@ -173,15 +169,6 @@ final class Sql2QueryRegressionSpec extends Qspec {
       backendName: BackendName)
       : F[execute.Result] = {
 
-    /** This helps us get identical results on different connectors, even though
-      * they have different precisions for their floating point values.
-      */
-    val reducePrecision =
-      λ[EndoK[ejson.Common]](CO.dec.modify(_.round(TestContext))(_))
-
-    val normalizeJson: Json => Json =
-      j => Recursive[Json, ejson.Json].transCata(j)(liftFFCopK(reducePrecision[Json]))
-
     val deleteFields: Json => Json =
       _.withObject(exp.ignoredFields.foldLeft(_)(_ - _))
 
@@ -210,7 +197,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
     // TODO{fs2}: Chunkiness
     val actNormal =
       act.mapChunks(
-        _.map(normalizeJson <<< deleteFields <<< (_.asJson))
+        _.map(deleteFields <<< (_.asJson))
           .toSegment)
 
     exp.predicate(

@@ -1,0 +1,26 @@
+{
+    "name": "string to number conversion",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir": "ignoreFieldOrder"
+    },
+    "data": "numbers.data",
+    "query": "select nr, number(val2) from `numbers.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+        { "nr": 1, "1": 1.23456E789 },
+        { "nr": 2, "1": 2.2  },
+        { "nr": 3, "1": 1 },
+        { "nr": 4, "1": 0 },
+        { "nr": 5, "1": 9223372036854775807 },
+        { "nr": 6, "1": 9223372036854775808 },
+        { "nr": 7, "1": 1.7976931348623157E308 },
+        { "nr": 8, "1": -1.7976931348623157E308 },
+        { "nr": 9, "1": 4.9E-324 },
+        { "nr": 10, "1": 1E-400 },
+        { "nr": 11 },
+        { "nr": 12 },
+        { "nr": 13 }
+    ]
+}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.mimir
+package quasar.yggdrasil.util
 
 import quasar.yggdrasil.table._
 

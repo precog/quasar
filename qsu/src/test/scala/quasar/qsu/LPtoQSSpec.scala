@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef._
 
 import quasar.{Qspec, RenderTree}, RenderTree.ops._
+import quasar.common.PhaseResults
 import quasar.common.data.Data
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
@@ -41,11 +42,11 @@ import org.specs2.matcher.MatchersImplicits._
 import pathy.Path
 import Path.{Sandboxed, file}
 
-import scalaz.{-\/, EitherT, Equal, Free, Need, StateT, \/-}
+import scalaz.{\/-, -\/, EitherT, Equal, Free, Need, StateT, WriterT}
 import scalaz.syntax.show._
 
 object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
-  type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
+  type F[A] = WriterT[EitherT[StateT[Need, Long, ?], PlannerError, ?], PhaseResults, A]
 
   val qsu = LPtoQS[Fix]
 
@@ -158,7 +159,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
     compileToMatch(Equal[Fix[QScriptEducated]].equal(_, qs))
 
   def compileToMatch(pred: Fix[QScriptEducated] => Boolean): Matcher[Fix[LogicalPlan]] = { lp: Fix[LogicalPlan] =>
-    val result = qsu[F](lp).run.eval(0L).value
+    val result = qsu[F](lp).run.map(_._2).run.eval(0L).value
 
     result match {
       case -\/(errs) =>

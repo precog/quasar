@@ -18,6 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.{RenderTreeT, RenderTree}, RenderTree.ops._
+import quasar.common.{PhaseResult, PhaseResultTell}
 import quasar.common.effect.NameGenerator
 import quasar.frontend.logicalplan.LogicalPlan
 import quasar.qscript.MonadPlannerErr
@@ -25,6 +26,7 @@ import quasar.qscript.MonadPlannerErr
 import matryoshka.{delayShow, showTShow, BirecursiveT, EqualT, ShowT}
 import org.slf4s.Logging
 import scalaz.{Cord, Functor, Kleisli => K, Monad, Show}
+import scalaz.syntax.functor._
 import scalaz.syntax.show._
 
 final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
@@ -33,40 +35,42 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   import LPtoQS.MapSyntax
 
-  def apply[F[_]: Monad: MonadPlannerErr: NameGenerator](lp: T[LogicalPlan])
+  def apply[F[_]: Monad: MonadPlannerErr: PhaseResultTell: NameGenerator](lp: T[LogicalPlan])
       : F[T[QScriptEducated]] = {
 
     val agraph =
       ApplyProvenance.AuthenticatedQSU.graph[T]
 
     val lpToQs =
-      K(ReadLP[T, F])                        >-
+      K(ReadLP[T, F])                        >==>
       debug("ReadLP")                        >==>
-      RewriteGroupByArrays[T, F]             >-
+      RewriteGroupByArrays[T, F]             >==>
       debug("RewriteGroupByArrays")          >-
-      EliminateUnary[T]                      >-
+      EliminateUnary[T]                      >==>
       debug("EliminateUnary")                >==>
-      InlineNullary[T, F]                    >-
+      InlineNullary[T, F]                    >==>
       debug("InlineNullary")                 >-
-      CoalesceUnaryMappable[T]               >-
+      CoalesceUnaryMappable[T]               >==>
       debug("CoalesceUnaryMappable")         >-
-      RecognizeDistinct[T]                   >-
+      RecognizeDistinct[T]                   >==>
       debug("RecognizeDistinct")             >==>
-      ExtractFreeMap[T, F]                   >-
+      ExtractFreeMap[T, F]                   >==>
       debug("ExtractFreeMap")                >==>
-      ApplyProvenance[T, F]                  >-
-      debug("ApplyProv")                     >==>
-      ReifyBuckets[T, F]                     >-
+      PruneSymmetricDimEdits[T, F]           >==>
+      debug("PruneSymmetricDimEdits")        >==>
+      ApplyProvenance[T, F]                  >==>
+      debug("ApplyProvenance")               >==>
+      ReifyBuckets[T, F]                     >==>
       debug("ReifyBuckets")                  >==>
-      MinimizeAutoJoins[T, F]                >-
+      MinimizeAutoJoins[T, F]                >==>
       debug("MinimizeAutoJoins")             >==>
-      ReifyAutoJoins[T, F]                   >-
+      ReifyAutoJoins[T, F]                   >==>
       debug("ReifyAutoJoins")                >==>
-      ExpandShifts[T, F]                     >-
+      ExpandShifts[T, F]                     >==>
       debug("ExpandShifts")                  >-
-      agraph.modify(ResolveOwnIdentities[T]) >-
+      agraph.modify(ResolveOwnIdentities[T]) >==>
       debug("ResolveOwnIdentities")          >==>
-      ReifyIdentities[T, F]                  >-
+      ReifyIdentities[T, F]                  >==>
       debug("ReifyIdentities")               >==>
       Graduate[T, F]
 
@@ -75,8 +79,10 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     lpToQs(lp)
   }
 
-  private def debug[A: Show](name: String): A => A =
-    a => { log.debug((Cord(name + "\n") ++ a.show).shows); a }
+  private def debug[F[_]: Functor: PhaseResultTell, A: Show](name: String): A => F[A] = { a =>
+    log.debug((Cord(name + "\n") ++ a.show).shows)
+    PhaseResultTell[F].tell(Vector(PhaseResult.detail(s"QSU ($name)", a.shows))).as(a)
+  }
 }
 
 object LPtoQS {

@@ -1,0 +1,22 @@
+{
+    "name": "shift real-giraffe",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
+    },
+    "data": "real-giraffe.data",
+    "query": "select (SELECT * FROM (SELECT t{_}.testField FROM `real-giraffe.data` AS t) AS t2 WHERE type_of(t2) = \"string\") AS testField, (SELECT kv{_} FROM `real-giraffe.data` AS kv) AS S",
+    "predicate": "exactly",
+    "expected": [
+        {"S":"X"},
+        {"S":{"S":{"rId":"2fe76790","to":["ethan@example.com"]},"testField":"A","dateTime":1.5186105391494202E12},"testField":"A"},
+        {"S":"X"},
+        {"S":{"S":{"rId":"8e820358","to":["jacques@example.com"]},"testField":"B","dateTime":1.5186105540837378E12},"testField":"B"},
+        {"S":"X"},
+        {"S":{"S":{"rId":"28642fbe","to":["deshawn@example.com"]},"testField":"C","dateTime":1.5186107220758232E12},"testField":"C"},
+        {"S":"X"},
+        {"S":{"MAS":{"rId":"08a42ad4","sId":"661929ef"},"testField":"D","dateTime":1.5186104938691462E12},"testField":"D"},
+        {"S":"X"},
+        {"S":{"MAS":{"rId":"0b609f84","sId":"c12c935b"},"testField":"E","dateTime":1.5186106534871868E12},"testField":"E"}
+    ]
+}

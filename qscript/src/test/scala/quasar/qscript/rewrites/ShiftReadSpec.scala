@@ -50,7 +50,7 @@ class ShiftReadSpec extends quasar.Qspec with QScriptHelpers with TreeMatchers {
       newQScript must
         beTreeEqual(
           qstdsl.fix.Map(
-            qstdsl.fix.ShiftedRead[AFile](sampleFile, ExcludeId),
+            qstdsl.fix.ShiftedRead[AFile](sampleFile, IncludeId),
             qstdsl.recFunc.ProjectIndexI(qstdsl.recFunc.Hole, 1)))
     }
 

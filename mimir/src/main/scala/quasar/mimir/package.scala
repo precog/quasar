@@ -18,42 +18,20 @@ package quasar
 
 import quasar.common.data.Data
 import quasar.contrib.fs2.convert
-import quasar.contrib.iota.SubInject
-import quasar.contrib.pathy.AFile
-import quasar.fp.Injectable
-import quasar.qscript._
 import quasar.precog.common.{CUndefined, RValue}
 import quasar.yggdrasil.table.Slice
 
 import cats.effect.IO
 import fs2.{Chunk, Stream}
-import iotaz.TListK.:::
-import iotaz.{TNilK, CopK}
-import scalaz.{Const, Functor, StreamT}
+import scalaz.{Functor, StreamT}
 import shims._
 
 package object mimir {
-  type MimirQScriptCP[T[_[_]]] =
-    QScriptCore[T, ?]            :::
-    EquiJoin[T, ?]               :::
-    Const[ShiftedRead[AFile], ?] :::
-    TNilK
 
-  implicit def qScriptToQScriptTotal[T[_[_]]]: Injectable[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]] =
-    SubInject[CopK[MimirQScriptCP[T], ?], QScriptTotal[T, ?]]
-
-  implicit def qScriptCoreToQScript[T[_[_]]]: Injectable[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]] =
-    Injectable.inject[QScriptCore[T, ?], CopK[MimirQScriptCP[T], ?]]
-
-  implicit def equiJoinToQScript[T[_[_]]]: Injectable[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]] =
-    Injectable.inject[EquiJoin[T, ?], CopK[MimirQScriptCP[T], ?]]
-
-  implicit def shiftedReadToQScript[T[_[_]]]: Injectable[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]] =
-    Injectable.inject[Const[ShiftedRead[AFile], ?], CopK[MimirQScriptCP[T], ?]]
-
-  def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
+  private def slicesToStream[F[_]: Functor](slices: StreamT[F, Slice]): Stream[F, RValue] =
     convert.fromChunkedStreamT(slices.map(s => Chunk.indexedSeq(SliceIndexedSeq(s))))
 
+  // used in integration tests and the REPL
   def tableToData(repr: MimirRepr): Stream[IO, Data] =
     slicesToStream(repr.table.slices)
       // TODO{fs2}: Chunkiness

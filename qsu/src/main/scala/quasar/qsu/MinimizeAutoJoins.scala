@@ -56,6 +56,7 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
 
   private val Minimizers = List(
     minimizers.MergeReductions[T],
+    minimizers.FilterToCond[T],
     minimizers.CollapseShifts[T])
 
   private val func = construction.Func[T]
@@ -133,27 +134,6 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     } yield back
   }
 
-  // attempt to extend by seeing through constructs like filter (mostly just filter)
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  private def expandSecondOrder(fm: FreeMapA[Int], candidates: List[QSUGraph]): Option[(FreeMapA[Int], List[QSUGraph])] = {
-    val (fm2, candidates2, changed) = candidates.zipWithIndex.foldRight((fm, List[QSUGraph](), false)) {
-      case ((QSFilter(source, predicate), i), (fm, candidates, _)) =>
-        val fm2 = fm flatMap { i2 =>
-          if (i2 === i)
-            func.Cond(predicate.linearize as i, i.point[FreeMapA], func.Undefined[Int])
-          else
-            i2.point[FreeMapA]
-        }
-
-        (fm2, source :: candidates, true)
-
-      case ((node, _), (fm, candidates, changed)) =>
-        (fm, node :: candidates, changed)
-    }
-
-    changed.option((fm2, candidates2))
-  }
-
   // attempts to reduce the set of candidates to a single Map node, given a FreeMap[Int]
   // the Int indexes into the final number of distinct roots
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
@@ -177,42 +157,34 @@ final class MinimizeAutoJoins[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       updateProvenance[T, G](singleG) as some(singleG)
 
     case multiple if Minimizers.all(m => !m.couldApplyTo(multiple)) =>
-      expandSecondOrder(fm, multiple) match {
-        case Some((fm2, candidates2)) =>
-          // we need to re-expand and re-minimize, and we might end up doing additional second-order expansions
-          coalesceToMap[G](qgraph, candidates2, fm2)
-
-        case None =>
-          multiple match {
-            case left :: right :: Nil => {
-              val fm2: JoinFunc = fm map {
-                case 0 => LeftSide
-                case 1 => RightSide
-              }
-
-              val aj2 = qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2))
-
-              updateProvenance[T, G](aj2) as some(aj2)
-            }
-
-            case left :: center :: right :: Nil => {
-              val fm2: FreeMapA[JoinSide3] = fm map {
-                case 0 => LeftSide3
-                case 1 => Center
-                case 2 => RightSide3
-              }
-
-              val aj3 = qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2))
-
-              updateProvenance[T, G](aj3) as some(aj3)
-            }
-
-            case _ => none[QSUGraph].point[G]
+      multiple match {
+        case left :: right :: Nil => {
+          val fm2: JoinFunc = fm map {
+            case 0 => LeftSide
+            case 1 => RightSide
           }
+
+          val aj2 = qgraph.overwriteAtRoot(QSU.AutoJoin2[T, Symbol](left.root, right.root, fm2))
+
+          updateProvenance[T, G](aj2) as some(aj2)
+        }
+
+        case left :: center :: right :: Nil => {
+          val fm2: FreeMapA[JoinSide3] = fm map {
+            case 0 => LeftSide3
+            case 1 => Center
+            case 2 => RightSide3
+          }
+
+          val aj3 = qgraph.overwriteAtRoot(QSU.AutoJoin3[T, Symbol](left.root, center.root, right.root, fm2))
+
+          updateProvenance[T, G](aj3) as some(aj3)
+        }
+
+        case _ => none[QSUGraph].point[G]
       }
 
     case multiple =>
-
       for {
         resultM <- Minimizers.foldLeftM[G, Option[(QSUGraph, QSUGraph)]](None) {
           case (Some(pair), _) => Option(pair).point[G]

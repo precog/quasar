@@ -61,7 +61,6 @@ object Unirewrite extends UnirewriteLowPriorityImplicits {
       T: Traverse[CopK[L, ?]],
       QC: QScriptCore[T, ?] :<<: CopK[L, ?],
       TJ: ThetaJoin[T, ?] :<<: CopK[L, ?],
-      GI: Injectable[CopK[L, ?], QScriptTotal[T, ?]],
       S: ShiftReadDir.Aux[T, QScriptRead[T, ?], CopK[L, ?]],
       C: Coalesce.Aux[T, CopK[L, ?], CopK[L, ?]],
       N: Normalizable[CopK[L, ?]]): Unirewrite[T, L] = new Unirewrite[T, L] {

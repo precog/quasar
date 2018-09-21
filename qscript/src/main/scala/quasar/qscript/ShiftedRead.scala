@@ -16,15 +16,16 @@
 
 package quasar.qscript
 
-import slamdata.Predef._
+import slamdata.Predef.List
 import quasar.RenderTree
 import quasar.contrib.pathy.APath
-import quasar.fp._
 
-import matryoshka._
 import monocle.macros.Lenses
-import pathy.Path._
-import scalaz._, Scalaz._
+import pathy.Path.posixCodec
+import scalaz.{Equal, Show}
+import scalaz.std.tuple._
+import scalaz.syntax.show._
+import scalaz.syntax.std.option._
 
 /** Similar to [[Read]], but returns a dataset with an entry for each record. If
   * `idStatus` is [[IncludeId]], then it returns a two-element array for each
@@ -34,8 +35,11 @@ import scalaz._, Scalaz._
 @Lenses final case class ShiftedRead[A](path: A, idStatus: IdStatus)
 
 object ShiftedRead {
-  implicit def equal[A: Equal]: Equal[ShiftedRead[A]] = Equal.equalBy(_.path)
+  implicit def equal[A: Equal]: Equal[ShiftedRead[A]] =
+    Equal.equalBy((sr => (sr.path, sr.idStatus)))
+
   implicit def show[A <: APath]: Show[ShiftedRead[A]] = RenderTree.toShow
+
   implicit def renderTree[A <: APath]: RenderTree[ShiftedRead[A]] =
     RenderTree.simple(List("ShiftedRead"), r => {
       (posixCodec.printPath(r.path) + ", " + r.idStatus.shows).some

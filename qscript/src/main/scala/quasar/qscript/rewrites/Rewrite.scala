@@ -20,7 +20,6 @@ import slamdata.Predef.{Map => _, _}
 import quasar.RenderTreeT
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
-import quasar.contrib.scalaz.bitraverse._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski._
@@ -28,7 +27,6 @@ import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
-import iotaz.CopK
 
 import scala.collection.immutable.{Map => ScalaMap}
 
@@ -69,7 +67,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               TJ: ThetaJoin :<<: G,
               SD: Const[ShiftedRead[ADir], ?] :<<: G,
               SF: Const[ShiftedRead[AFile], ?] :<<: G,
-              GI: Injectable[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               C: Coalesce.Aux[T, G, G],
               N: Normalizable[G])
@@ -87,7 +84,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     QC: QScriptCore :<<: G,
     TJ: ThetaJoin :<<: G,
     SD: Const[ShiftedRead[ADir], ?] :<<: G,
-    GI: Injectable[G, QScriptTotal],
     S: ShiftReadDir.Aux[T, F, G],
     C: Coalesce.Aux[T, G, G],
     N: Normalizable[G]
@@ -103,7 +99,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
               TJ: ThetaJoin :<<: G,
               SD: Const[ShiftedRead[ADir], ?] :<<: G,
               SF: Const[ShiftedRead[AFile], ?] :<<: G,
-              GI: Injectable[G, QScriptTotal],
               S: ShiftRead.Aux[T, F, G],
               J: SimplifyJoin.Aux[T, G, H],
               C: Coalesce.Aux[T, G, G],
@@ -122,259 +117,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     case Filter(Embed(src), RecBoolLit(true)) => some(src)
     case Map(Embed(src), mf) if mf ≟ HoleR    => some(src)
     case _                                    => none
-  }
-
-  type Remap[A] = JoinFunc => Option[FreeMapA[A]]
-  type Combine[F[_], A, B] = FreeMapA[A] => Option[F[B]]
-
-  class BranchUnification[F[_], A, B] private (val remap: Remap[A], val combine: Combine[F, A, B])
-
-  object BranchUnification {
-    def apply[F[_], A, B](remap: Remap[A])(combine: Combine[F, A, B]): BranchUnification[F, A, B] =
-      new BranchUnification[F, A, B](remap, combine)
-  }
-
-  def NoneBranch[F[_], A, B] =
-    BranchUnification[F, A, B]((_: JoinFunc) => None)((_: FreeMapA[A]) => None)
-
-  def unifySimpleBranchesJoinSide[F[a] <: ACopK[a], A]
-    (src: A, left: FreeQS, right: FreeQS)
-    (rebase: FreeQS => A => Option[A])
-    (implicit
-      QC: QScriptCore :<<: F,
-      FI: Injectable[F, QScriptTotal])
-      : BranchUnification[F, JoinSide, A] = {
-
-    // Unify (Map, LeftShift)
-    def unifyMapRightSideShift(
-      struct: RecFreeMap,
-      status: IdStatus,
-      shiftType: ShiftType,
-      onUndefined: OnUndefined,
-      repair: JoinFunc,
-      shiftSrc: RecFreeMap,
-      mapFn: FreeMap
-    ): BranchUnification[F, JoinSide, A] =
-      BranchUnification { jf =>
-        (jf >>= {
-          case LeftSide => mapFn >> LeftSideF  // references `src`
-          case RightSide  => repair >>= {
-            case LeftSide  => shiftSrc.linearize >> LeftSideF
-            case RightSide => RightSideF
-          }
-        }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
-
-    // Unify (LeftShift, Map)
-    def unifyMapLeftSideShift(
-      struct: RecFreeMap,
-      status: IdStatus,
-      shiftType: ShiftType,
-      onUndefined: OnUndefined,
-      repair: JoinFunc,
-      shiftSrc: RecFreeMap,
-      mapFn: FreeMap
-    ): BranchUnification[F, JoinSide, A] =
-      BranchUnification { jf =>
-        (jf >>= {
-          case LeftSide  => repair >>= {
-            case LeftSide  => shiftSrc.linearize >> LeftSideF
-            case RightSide => RightSideF
-          }
-          case RightSide => mapFn >> LeftSideF  // references `src`
-        }).some
-      } (func => QC.inj(LeftShift(src, struct >> shiftSrc, status, shiftType, onUndefined, func)).some)
-
-    (left.resumeTwice, right.resumeTwice) match {
-      // left side is the data while the right side shifts the same data
-      case (\/-(SrcHole), -\/(r)) => FI.project(r) >>= QC.prj.apply match {
-        case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
-          lshiftSrc match {
-            case \/-(SrcHole) =>
-              unifyMapRightSideShift(struct, status, shiftType, undef, repair, HoleR, HoleF)
-
-            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
-              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapRightSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
-
-              case _ => NoneBranch[F, JoinSide, A]
-            }
-          }
-        case _ => NoneBranch
-      }
-
-      // right side is the data while the left side shifts the same data
-      case (-\/(l), \/-(SrcHole)) => FI.project(l) >>= QC.prj.apply match {
-        case Some(LeftShift(lshiftSrc, struct, status, shiftType, undef, repair)) =>
-          lshiftSrc match {
-            case \/-(SrcHole) =>
-              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleR, HoleF)
-
-            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
-              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, HoleF)
-
-              case _ => NoneBranch[F, JoinSide, A]
-            }
-          }
-        case _ => NoneBranch
-      }
-
-      case (-\/(l), -\/(r)) => (l, r).uTraverse(m => FI.project(m) >>= QC.prj.apply) collect {
-        // left side maps over the data while the right side shifts the same data
-        case (Map(\/-(SrcHole), mapFn), LeftShift(lshiftSrc, struct, status, stpe, undef, repair)) =>
-          lshiftSrc match {
-            case \/-(SrcHole) =>
-              unifyMapRightSideShift(struct, status, stpe, undef, repair, HoleR, mapFn.linearize)
-
-            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
-              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapRightSideShift(struct, status, stpe, undef, repair, srcFn, mapFn.linearize)
-
-              case _ => NoneBranch[F, JoinSide, A]
-            }
-          }
-
-        // right side maps over the data while the left side shifts the same data
-        case (LeftShift(lshiftSrc, struct, status, shiftType, undef, repair), Map(\/-(SrcHole), mapFn)) =>
-          lshiftSrc match {
-            case \/-(SrcHole) =>
-              unifyMapLeftSideShift(struct, status, shiftType, undef, repair, HoleR, mapFn.linearize)
-
-            case -\/(values) => FI.project(values) >>= QC.prj.apply match {
-              case Some(Map(mapSrc, srcFn)) if mapSrc ≟ HoleQS =>
-                unifyMapLeftSideShift(struct, status, shiftType, undef, repair, srcFn, mapFn.linearize)
-
-              case _ => NoneBranch[F, JoinSide, A]
-            }
-          }
-      } getOrElse NoneBranch
-
-      case _ => NoneBranch
-    }
-  }
-
-  def unifySimpleBranchesHole[F[a] <: ACopK[a], A]
-    (src: A, left: FreeQS, right: FreeQS)
-    (rebase: FreeQS => A => Option[A])
-    (implicit
-      QC: QScriptCore :<<: F,
-      FI: Injectable[F, QScriptTotal])
-      : BranchUnification[F, Hole, A] = {
-    val UnrefedSrc: QScriptTotal[FreeQS] =
-      CopK.Inject[QScriptCore, QScriptTotal] inj Unreferenced[T, FreeQS]()
-
-    (left.resumeTwice, right.resumeTwice) match {
-      case (-\/(m1), -\/(m2)) =>
-        (FI.project(m1) >>= QC.prj.apply, FI.project(m2) >>= QC.prj.apply) match {
-          // both sides only map over the same data
-          case (Some(Map(\/-(SrcHole), mf1)), Some(Map(\/-(SrcHole), mf2))) =>
-            BranchUnification { jf =>
-              (jf >>= {
-                case LeftSide  => mf1.linearize
-                case RightSide => mf2.linearize
-              }).some
-            } (func => QC.inj(Map(src, func.asRec)).some)
-          // neither side references the src
-          case (Some(Map(-\/(src1), mf1)), Some(Map(-\/(src2), mf2)))
-              if src1 ≟ UnrefedSrc && src2 ≟ UnrefedSrc =>
-            BranchUnification { jf =>
-              (jf >>= {
-                case LeftSide  => mf1.linearize
-                case RightSide => mf2.linearize
-              }).some
-            } (func => QC.inj(Map(src, func.asRec)).some)
-          // only the right side references the source
-          case (Some(Map(-\/(src1), mf1)), _) if src1 ≟ UnrefedSrc =>
-            BranchUnification { jf =>
-              (jf >>= {
-                case LeftSide  => mf1.linearize
-                case RightSide => HoleF
-              }).some
-            } (func => rebase(right)(src).map(tf => QC.inj(Map(tf, func.asRec))))
-          case (Some(Unreferenced()), _) =>
-            BranchUnification { jf =>
-              jf.traverseM[Option, Hole] {
-                case LeftSide  => None
-                case RightSide => HoleF.some
-              }
-            } (func => rebase(right)(src).map(tf => QC.inj(Map(tf, func.asRec))))
-          // only the left side references the source
-          case (_, Some(Map(-\/(src2), mf2))) if src2 ≟ UnrefedSrc =>
-            BranchUnification { jf =>
-              (jf >>= {
-                case LeftSide  => HoleF
-                case RightSide => mf2.linearize
-              }).some
-            } (func => rebase(left)(src).map(tf => QC.inj(Map(tf, func.asRec))))
-          case (_, Some(Unreferenced())) =>
-            BranchUnification { jf =>
-              jf.traverseM[Option, Hole] {
-                case LeftSide  => HoleF.some
-                case RightSide => None
-              }
-            } (func => rebase(left)(src).map(tf => QC.inj(Map(tf, func.asRec))))
-          case (_, _) => NoneBranch
-        }
-      // one side maps over the src while the other passes the src untouched
-      case (-\/(m1), \/-(SrcHole)) => (FI.project(m1) >>= QC.prj.apply) match {
-        case Some(Map(\/-(SrcHole), mf1)) =>
-          BranchUnification { jf =>
-            (jf >>= {
-              case LeftSide  => mf1.linearize
-              case RightSide => HoleF
-            }).some
-          } (func => QC.inj(Map(src, func.asRec)).some)
-        case Some(Unreferenced()) =>
-          BranchUnification { jf =>
-            jf.traverseM[Option, Hole] {
-              case LeftSide  => None
-              case RightSide => HoleF.some
-            }
-          } (func => QC.inj(Map(src, func.asRec)).some)
-        case _ => NoneBranch
-      }
-      // the other side maps over the src while the one passes the src untouched
-      case (\/-(SrcHole), -\/(m2)) => (FI.project(m2) >>= QC.prj.apply) match {
-        case Some(Map(\/-(SrcHole), mf2)) =>
-          BranchUnification { jf: JoinFunc =>
-            (jf >>= {
-              case LeftSide  => HoleF
-              case RightSide => mf2.linearize
-            }).some
-          } (func => QC.inj(Map(src, func.asRec)).some)
-        case Some(Unreferenced()) =>
-          BranchUnification { jf =>
-            jf.traverseM[Option, Hole] {
-              case LeftSide  => HoleF.some
-              case RightSide => None
-            }
-          } (func => QC.inj(Map(src, func.asRec)).some)
-        case _ => NoneBranch
-      }
-      // both sides are the src
-      case (\/-(SrcHole), \/-(SrcHole)) =>
-        BranchUnification(
-          jf => (jf.as(SrcHole): FreeMap).some)(
-          func => QC.inj(Map(src, func.asRec)).some)
-      case (_, _) => NoneBranch
-    }
-  }
-
-  def unifySimpleBranches[F[a] <: ACopK[a], A]
-    (src: A, left: FreeQS, right: FreeQS, func: JoinFunc)
-    (rebase: FreeQS => A => Option[A])
-    (implicit
-      QC: QScriptCore :<<: F,
-      FI: Injectable[F, QScriptTotal])
-      : Option[F[A]] = {
-    val branchHole: BranchUnification[F, Hole, A] =
-      unifySimpleBranchesHole(src, left, right)(rebase)(QC, FI)
-    val branchSide: BranchUnification[F, JoinSide, A] =
-      unifySimpleBranchesJoinSide(src, left, right)(rebase)(QC, FI)
-
-    branchHole.remap(func).flatMap(branchHole.combine) orElse
-      branchSide.remap(func).flatMap(branchSide.combine)
   }
 
   def compactLeftShift[F[_]: Functor]
@@ -473,8 +215,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C: Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             QC: QScriptCore :<<: F):
       F[T[G]] => G[T[G]] = {
 
     val qcPrism = PrismNT.injectCopK[QScriptCore, F] compose prism
@@ -496,8 +237,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     prism: PrismNT[G, F],
     normalizeJoins: F[T[G]] => Option[G[T[G]]])(
     implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             QC: QScriptCore :<<: F):
       F[A] => G[A] =
     fa => applyNormalizations[F, G](prism, normalizeJoins)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
@@ -507,8 +247,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             EJ: EquiJoin :<<: F):
       F[A] => G[A] = {
 
     val normEJ: G[T[G]] => Option[G[T[G]]] =
@@ -520,27 +259,23 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def normalizeEJ[F[a] <: ACopK[a]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             EJ: EquiJoin :<<: F):
       F[T[F]] => F[T[F]] =
     normalizeEJBijection[F, F, T[F]](bijectionId)(idPrism)
 
   def normalizeEJCoEnv[F[a] <: ACopK[a]: Functor: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             EJ: EquiJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             EJ: EquiJoin :<<: F):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
     normalizeEJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 
   private def normalizeTJBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
     bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F],
-    rebase: FreeQS => T[G] => Option[T[G]])(
+    prism: PrismNT[G, F])(
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             TJ: ThetaJoin :<<: F):
       F[A] => G[A] = {
 
     val normTJ = applyTransforms(
@@ -552,16 +287,14 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
   def normalizeTJ[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             TJ: ThetaJoin :<<: F):
       F[T[F]] => F[T[F]] =
-    normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism, rebaseT)
+    normalizeTJBijection[F, F, T[F]](bijectionId)(idPrism)
 
   def normalizeTJCoEnv[F[a] <: ACopK[a]: Traverse: Normalizable](
     implicit C:  Coalesce.Aux[T, F, F],
              QC: QScriptCore :<<: F,
-             TJ: ThetaJoin :<<: F,
-             FI: Injectable[F, QScriptTotal]):
+             TJ: ThetaJoin :<<: F):
       F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism, rebaseTCo)
+    normalizeTJBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
 }

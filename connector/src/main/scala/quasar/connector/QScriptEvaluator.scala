@@ -18,15 +18,14 @@ package quasar.connector
 
 import slamdata.Predef.Set
 import quasar.RenderTreeT
-import quasar.contrib.iota.:<<:
 import quasar.contrib.pathy._
-import quasar.fp._
 import quasar.fp.ski.κ
 import quasar.qscript._
 import quasar.qscript.rewrites._
 
 import iotaz.{CopK, TListK}
 import matryoshka.{BirecursiveT, EqualT, ShowT}
+import matryoshka.implicits._
 import scalaz.{Functor, Monad}
 import scalaz.syntax.monad._
 
@@ -44,8 +43,6 @@ abstract class QScriptEvaluator[
   type Repr
 
   def QSMFunctor: Functor[QSM]
-  def QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM
-  def QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]]
   def UnirewriteT: Unirewrite[T, QS[T]]
 
   /** Returns the result of executing the `Repr`. */
@@ -54,17 +51,19 @@ abstract class QScriptEvaluator[
   /** Returns the executable representation of the given optimized QScript. */
   def plan(cp: T[QSM]): F[Repr]
 
+  /** Rewrites the qscript to prepare for optimal evaluation. */
+  def optimize: QSM[T[QSM]] => QSM[T[QSM]]
+
   ////
 
   def evaluate(qsr: T[QScriptEducated[T, ?]]): F[R] =
     for {
       shifted <- Unirewrite[T, QS[T], F](new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
-      repr <- plan(shifted)
+      optimized = shifted.transCata[T[QSM]](optimize)
+      repr <- plan(optimized)
       result <- execute(repr)
     } yield result
 
   private final implicit def _QSMFunctor: Functor[QSM] = QSMFunctor
-  private final implicit def _QSMFromQScriptCore: QScriptCore[T, ?] :<<: QSM = QSMFromQScriptCore
-  private final implicit def _QSMToQScriptTotal: Injectable[QSM, QScriptTotal[T, ?]] = QSMToQScriptTotal
   private final implicit def _UnirewriteT: Unirewrite[T, QS[T]] = UnirewriteT
 }

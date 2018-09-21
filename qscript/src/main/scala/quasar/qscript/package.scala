@@ -25,7 +25,6 @@ import quasar.fp._
 
 import matryoshka._
 import matryoshka.data._
-import matryoshka.implicits._
 import matryoshka.patterns._
 import scalaz._, Scalaz._
 import iotaz.{CopK, TNilK}
@@ -101,13 +100,6 @@ package object qscript {
       CopK.Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
   }
 
-  /** QScript that has not gone through Read conversion. */
-  type QScript[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[DeadEnd, ?] ::: TNilK, A]
-
-  implicit def qScriptToQscriptTotal[T[_[_]]]
-      : Injectable[QScript[T, ?], QScriptTotal[T, ?]] = SubInject[QScript[T, ?], QScriptTotal[T, ?]]
-
   /** QScript that has gone through Read conversion.
     *
     * NB: Once QScriptTotal goes away, this could become parametric in the path type.
@@ -181,27 +173,8 @@ package object qscript {
 
   def rebase[M[_]: Bind, A](in: M[A], key: M[A]): M[A] = in >> key
 
-  def rebaseT[T[_[_]]: BirecursiveT, F[_]: Traverse](
-    target: FreeQS[T])(
-    src: T[F])(
-    implicit FI: Injectable[F, QScriptTotal[T, ?]]):
-      Option[T[F]] =
-    target.as(src.transAna[T[QScriptTotal[T, ?]]](FI.inject)).cata(recover(_.embed)).transAnaM(FI project _)
-
-  def rebaseTCo[T[_[_]]: BirecursiveT, F[_]: Traverse]
-    (target: FreeQS[T])
-    (srcCo: T[CoEnv[Hole, F, ?]])
-    (implicit FI: Injectable[F, QScriptTotal[T, ?]])
-      : Option[T[CoEnv[Hole, F, ?]]] =
-    // TODO: with the right instances & types everywhere, this should look like
-    //       target.transAnaM(_.htraverse(FI project _)) ∘ (_ >> srcCo)
-    target.cataM[Option, T[CoEnv[Hole, F, ?]]](
-      CoEnv.htraverse(λ[QScriptTotal[T, ?] ~> (Option ∘ F)#λ](FI.project(_))).apply(_) ∘ (_.embed)) ∘
-      (targ => (targ.convertTo[Free[F, Hole]] >> srcCo.convertTo[Free[F, Hole]]).convertTo[T[CoEnv[Hole, F, ?]]])
-
   /** A variant of `repeatedly` that works with `Inject` instances. */
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def injectRepeatedly[F [_], G[a] <: ACopK[a], A](op: F[A] => Option[G[A]])(implicit F: F :<<: G): F[A] => G[A] =
     fa => op(fa).fold(F.inj(fa))(ga => F.prj(ga).fold(ga)(injectRepeatedly(op)))
-
 }

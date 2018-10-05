@@ -20,6 +20,8 @@ package common
 import scalaz.syntax.semigroup._
 import scalaz.syntax.order._
 
+import com.rklaehn.radixtree.Hash
+
 case class ColumnRef(selector: CPath, ctype: CType)
 
 object ColumnRef {
@@ -32,4 +34,9 @@ object ColumnRef {
   }
 
   implicit val ordering: scala.math.Ordering[ColumnRef] = order.toScalaOrdering
+
+  implicit val hashColumnRef: Hash[ColumnRef] = new Hash[ColumnRef] {
+    def eqv(x: ColumnRef, y: ColumnRef): Boolean = scalaz.Equal[ColumnRef].equal(x, y)
+    def hash(a: ColumnRef): Int = a.hashCode
+  }
 }

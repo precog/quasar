@@ -21,6 +21,7 @@ import quasar.blueeyes._
 import quasar.blueeyes.json._
 import quasar.precog.common._
 import quasar.precog.util._
+import quasar.yggdrasil.table.ctrie._
 
 import cats.effect.IO
 import scalaz._
@@ -46,7 +47,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
 
     val (prefix, suffix) = sampleData.splitAt(sliceSize)
     val slice = {
-      val (columns, size) = buildColArrays(prefix.toStream, Map.empty[ColumnRef, ArrayColumn[_]], 0)
+      val (columns, size) = buildColArrays(prefix.toStream, CTrie.empty[ArrayColumn[_]], 0)
       Slice(size, columns)
     }
 
@@ -106,7 +107,7 @@ trait ColumnarTableModuleTestSupport extends ColumnarTableModule with TableModul
             }
           }
 
-          (a2, Map(ColumnRef(CPath.Identity, CNum) -> ArrayNumColumn(mask, arr)))
+          (a2, CTrie(ColumnRef(CPath.Identity, CNum) -> ArrayNumColumn(mask, arr)))
         }
       })
 

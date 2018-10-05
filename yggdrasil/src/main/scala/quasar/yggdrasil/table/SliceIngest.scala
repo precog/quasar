@@ -18,6 +18,7 @@ package quasar.yggdrasil.table
 
 import quasar.precog.common._
 import quasar.yggdrasil.Config
+import quasar.yggdrasil.table.ctrie._
 
 import java.math.MathContext
 import scala.annotation.tailrec
@@ -156,7 +157,7 @@ private[table] object SliceIngest {
       (Slice.empty, ChunkSliced.empty)
     } else {
       val size = Math.min(maxRows, startingSize)
-      inner(values, 0, false, Map.empty, size)
+      inner(values, 0, false, CTrie.empty[ArrayColumn[_]], size)
     }
   }
 

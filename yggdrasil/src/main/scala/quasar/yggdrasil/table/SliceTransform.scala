@@ -23,6 +23,7 @@ import quasar.precog.BitSet
 import quasar.precog.common._
 import quasar.precog.util._
 import quasar.yggdrasil.bytecode.{ JBooleanT, JObjectUnfixedT, JArrayUnfixedT }
+import quasar.yggdrasil.table.ctrie._
 
 import java.util.Arrays
 import scala.collection.mutable
@@ -500,7 +501,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                     rec(i + 1, as, ds, newAccum)
                   case _ => accum
                 }
-              rec(0, arrs, defineds, Map.empty)
+              rec(0, arrs, defineds, CTrie.empty)
             }
             val arrays = arraysBuildr.result()
             val bitsets = bitsetsBuildr.result()
@@ -585,7 +586,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                   sl.size,
                   {
                     if (sl.columns.isEmpty || sr.columns.isEmpty) {
-                      Map.empty[ColumnRef, Column]
+                      CTrie.empty
                     } else if (isDisjoint(sl, sr)) {
                       // If we know sl & sr are disjoint, which is often the
                       // case for queries where objects are constructed
@@ -648,7 +649,7 @@ trait SliceTransforms extends TableModule with ColumnarTableTypes with ObjectCon
                   sl.size,
                   {
                     if (sl.columns.isEmpty || sr.columns.isEmpty) {
-                      Map.empty[ColumnRef, Column]
+                      CTrie.empty
                     } else {
                       val (leftArrayBits, leftEmptyBits)   = buildFilters(sl.columns, sl.size, filterArrays, filterEmptyArrays)
                       val (rightArrayBits, rightEmptyBits) = buildFilters(sr.columns, sr.size, filterArrays, filterEmptyArrays)
@@ -1390,8 +1391,8 @@ trait ObjectConcatHelpers extends ConcatHelpers {
     (filterFields(leftColumns), filterFields(rightColumns))
 
   def buildEmptyObjects(emptyBits: BitSet) = {
-    if (emptyBits.isEmpty) Map.empty[ColumnRef, Column]
-    else Map(ColumnRef(CPath.Identity, CEmptyObject) -> EmptyObjectColumn(emptyBits))
+    if (emptyBits.isEmpty) CTrie.emptyCol
+    else CTrie(ColumnRef(CPath.Identity, CEmptyObject) -> EmptyObjectColumn(emptyBits))
   }
 
   def buildNonemptyObjects(

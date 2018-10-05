@@ -1,6 +1,8 @@
 {
     "name": "flatten a single field as a map",
     "backends": {
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
     "data": "nested_foo.data",
     "query": "select * from `nested_foo.data` where foo{*} = 15",

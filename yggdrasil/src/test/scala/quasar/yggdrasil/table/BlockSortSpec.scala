@@ -213,11 +213,13 @@ trait BlockSortSpec extends SpecificationLike with ScalaCheck {
 
   // Simple test of sorting on heterogeneous data
   def heterogeneousSortSample2 = {
+    // a fairly minimized version to reproduce this error:
+    // [error]     ! heterogeneous sort keys case 2
+    // [error]      java.lang.IndexOutOfBoundsException: 2 (ListKey.scala:37)
     val sampleData = SampleData(
       (JParser.parseUnsafe("""[
-        {"key":[1,4,3],"value":{"b0":["",{"alxk":-1},-5.170005125478374E+307],"y":{"pvbT":[-1458654748381439976,{}]}}},
-        {"key":[1,4,4],"value":{"y":false,"qvd":[],"aden":{}}},
-        {"key":[3,3,3],"value":{"b0":["gxy",{"alxk":-1},6.614267528783459E+307],"y":{"pvbT":[1,{}]}}}
+        {"key":[1],"value":{"b0":[],"y":{"pvbT":{}}}},
+        {"key":[2],"value":{"y":false}}
       ]""") --> classOf[JArray]).elements.toStream.flatMap(RValue.fromJValue),
       None)
 

@@ -21,6 +21,7 @@ import quasar.blueeyes._, json._
 import quasar.common.data.Data
 import qdata.time.{DateTimeInterval, OffsetDate}
 
+import com.rklaehn.radixtree.Hash
 import monocle.{Optional, Prism, Traversal}
 import monocle.function.{At, Each, Index}
 import qdata.{QDataDecode, QDataEncode}
@@ -614,6 +615,11 @@ object CType {
   implicit val CTypeOrder: scalaz.Order[CType] = Order order {
     case (CArrayType(t1), CArrayType(t2)) => (t1: CType) ?|? t2
     case (x, y)                           => x.typeIndex ?|? y.typeIndex
+  }
+
+  implicit val hashCType: Hash[CType] = new Hash[CType] {
+    def eqv(x: CType, y: CType): Boolean = scalaz.Equal[CType].equal(x, y)
+    def hash(a: CType): Int = a.hashCode
   }
 }
 

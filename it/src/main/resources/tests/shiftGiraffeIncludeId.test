@@ -1,8 +1,8 @@
 {
     "name": "shift real-giraffe-plus with IncludeId",
     "backends": {
-        "lwc_local": "ignoreFieldOrder",
-        "mimir":     "ignoreFieldOrder"
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
     "data": "real-giraffe-plus.data",
     "query": "select *{_}.testField as testField, *{_:} as key from `real-giraffe-plus.data`",

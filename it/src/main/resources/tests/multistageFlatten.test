@@ -2,6 +2,8 @@
     "name": "multi-flatten with fields at various depths",
 
     "backends": {
+        "lwc_local": "pendingIgnoreFieldOrder",
+        "mimir":     "pendingIgnoreFieldOrder"
     },
 
     "data": "nested_foo.data",

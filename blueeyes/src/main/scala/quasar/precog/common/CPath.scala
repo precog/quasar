@@ -18,7 +18,9 @@ package quasar.precog.common
 
 import quasar.blueeyes._, json._
 
+import com.rklaehn.radixtree.Hash
 import scalaz.Ordering._
+import scalaz.Show
 import scalaz.syntax.std.boolean._
 
 sealed trait CPath { self =>
@@ -159,6 +161,13 @@ object CPathNode {
   }
 
   implicit val CPathNodeOrdering = CPathNodeOrder.toScalaOrdering
+
+  implicit val hashCPathNode: Hash[CPathNode] = new Hash[CPathNode] {
+    def eqv(x: CPathNode, y: CPathNode): Boolean = scalaz.Equal[CPathNode].equal(x, y)
+    def hash(a: CPathNode): Int = a.hashCode
+  }
+
+  implicit def showCPathNode: Show[CPathNode] = Show.showFromToString[CPathNode]
 }
 
 sealed case class CPathField(name: String) extends CPathNode {
@@ -290,4 +299,10 @@ object CPath {
   }
 
   implicit val CPathOrdering: Ordering[CPath] = CPathOrder.toScalaOrdering
+
+  implicit val hashCPath: Hash[CPath] = new Hash[CPath] {
+    def eqv(x: CPath, y: CPath): Boolean = scalaz.Equal[CPath].equal(x, y)
+    def hash(a: CPath): Int = a.hashCode
+  }
+
 }

@@ -26,6 +26,7 @@ import quasar.precog.util.RawBitSet
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
 import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
+import quasar.yggdrasil.table.ctrie._
 
 import qdata.QDataDecode
 import qdata.time.{DateTimeInterval, OffsetDate}
@@ -264,7 +265,7 @@ trait ColumnarTableModule
 
     def constDouble(v: Set[Double]): Table = {
       val column = ArrayDoubleColumn(v.toArray)
-      Table(Slice(v.size, Map(ColumnRef(CPath.Identity, CDouble) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
+      Table(Slice(v.size, CTrie(ColumnRef(CPath.Identity, CDouble) -> column)) :: StreamT.empty[IO, Slice], ExactSize(v.size))
     }
 
     def constDecimal(v: Set[BigDecimal]): Table = {
@@ -851,7 +852,7 @@ trait ColumnarTableModule
                       // Comparator also returns EQ if both are undefined
                       // However we don't want to treat these as EQ because that
                       // would *multiply* left rows with right rows.
-                      // We want to *sum* them instead. We can accomplish by 
+                      // We want to *sum* them instead. We can accomplish by
                       // treating 2 undefineds as if they were LT
                       case EQ if lkey.isDefinedAt(lpos) =>
                         ibufs.advanceBoth(lpos, rpos)
@@ -1371,7 +1372,7 @@ trait ColumnarTableModule
           indicesCol.map(col => ColumnRef(pathNode, CLong) -> col).toList
 
         // merge them together to produce the heterogeneous output
-        Map(fassigned ++ iassigned: _*)
+        CTrie(fassigned ++ iassigned: _*)
       }
 
       def leftShiftFocused(

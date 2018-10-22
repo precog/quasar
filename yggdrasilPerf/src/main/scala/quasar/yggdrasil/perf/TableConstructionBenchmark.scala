@@ -84,7 +84,7 @@ class TableConstructionBenchmark {
 
   def createAndConsumeTable(data: fs2.Stream[IO, Byte], bh: Blackhole): IO[Unit] = {
     def parseWithJawn: fs2.Stream[IO, RValue] = {
-      implicit val facade = qdata.json.QDataFacade.qdata[RValue]
+      implicit val facade = qdata.json.QDataFacade[RValue](isPrecise = false)
       val parser = jawn.AsyncParser[RValue](jawn.AsyncParser.ValueStream)
 
       val absorption =

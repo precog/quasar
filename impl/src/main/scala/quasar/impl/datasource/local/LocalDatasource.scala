@@ -36,7 +36,7 @@ import jawn.Facade
 import jawnfs2._
 import pathy.Path
 import qdata.QDataEncode
-import qdata.json.QDataPreciseFacade
+import qdata.json.QDataFacade
 import scalaz.{\/, Scalaz}, Scalaz._
 import shims._
 
@@ -60,7 +60,7 @@ final class LocalDatasource[F[_]: Timer] private (
 
   def evaluator[R: QDataEncode]: QueryEvaluator[F, ResourcePath, Stream[F, R]] =
     new QueryEvaluator[F, ResourcePath, Stream[F, R]] {
-      implicit val facade: Facade[R] = QDataPreciseFacade.qdataPrecise
+      implicit val facade: Facade[R] = QDataFacade[R](isPrecise = true)
 
       def evaluate(path: ResourcePath): F[Stream[F, R]] =
         for {

@@ -42,7 +42,7 @@ object RValueParseInstructionSpec
     stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))
 
   protected def ldjson(str: String): JsonStream = {
-    implicit val facade: Facade[RValue] = QDataFacade.qdata[RValue]
+    implicit val facade: Facade[RValue] = QDataFacade[RValue](isPrecise = false)
 
     val parser: AsyncParser[RValue] =
       AsyncParser[RValue](AsyncParser.ValueStream)

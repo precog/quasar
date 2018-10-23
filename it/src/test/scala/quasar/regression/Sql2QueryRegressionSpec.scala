@@ -61,7 +61,7 @@ import shims.{monadErrorToScalaz, monadToScalaz}
 abstract class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
 
-  val optimizeQScript: Boolean
+  lazy val optimizeQScript: Boolean = null.asInstanceOf[Boolean]
 
   implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
     MonadTell_.ignore[IO, PhaseResults]
@@ -126,7 +126,7 @@ abstract class Sql2QueryRegressionSpec extends Qspec {
           q.queryEvaluator.evaluate(squery(i)).map(_.map(mimir.tableToData))
         }).flatMap(s => s)
     } yield {
-      suiteName >> {
+      (suiteName + " (optimized: " + optimizeQScript.toString + ")") >> {
         tests.toList foreach { case (loc, test) =>
           regressionExample(loc, test, BackendName("lwc_local"), f)
         }
@@ -281,9 +281,9 @@ object Sql2QueryRegressionSpec {
 }
 
 object Sql2QueryOptimizedRegressionSpec extends Sql2QueryRegressionSpec {
-  val optimizeQScript: Boolean = true
+  override lazy val optimizeQScript: Boolean = true
 }
 
 object Sql2QueryUnoptimizedRegressionSpec extends Sql2QueryRegressionSpec {
-  val optimizeQScript: Boolean = false
+  override lazy val optimizeQScript: Boolean = false
 }

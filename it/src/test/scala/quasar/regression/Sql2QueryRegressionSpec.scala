@@ -58,8 +58,10 @@ import scalaz._, Scalaz._
 // import shims._ causes compilation to not terminate in any reasonable amount of time.
 import shims.{monadErrorToScalaz, monadToScalaz}
 
-final class Sql2QueryRegressionSpec extends Qspec {
+abstract class Sql2QueryRegressionSpec extends Qspec {
   import Sql2QueryRegressionSpec._
+
+  val optimizeQScript: Boolean
 
   implicit val ignorePhaseResults: MonadTell_[IO, PhaseResults] =
     MonadTell_.ignore[IO, PhaseResults]
@@ -76,7 +78,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
   /** A name to identify the suite in test output. */
   val suiteName: String = "SQL^2 Regression Queries"
 
-  def Q(testsDir: JPath) = for {
+  def RunQuasar(testsDir: JPath): Stream[IO, (Quasar[IO], UUID)] = for {
     tmpPath <-
       Stream.bracket(IO(Files.createTempDirectory("quasar-test-")))(
         Stream.emit(_),
@@ -86,7 +88,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
     evalCfg = SstEvalConfig(1L, 1L, 1L)
 
-    q <- Quasar[IO](precog, ExternalConfig.Empty, SstEvalConfig.single)
+    q <- Quasar[IO](precog, optimizeQScript, ExternalConfig.Empty, SstEvalConfig.single)
 
     localCfg =
       ("rootDir" := testsDir.toString) ->:
@@ -107,7 +109,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
 
   ////
 
-  val buildSuite =
+  val buildSuite: IO[Fragment] =
     for {
       tdef <- Promise.empty[IO, (Quasar[IO], UUID)]
       sdown <- Promise.empty[IO, Unit]
@@ -115,7 +117,7 @@ final class Sql2QueryRegressionSpec extends Qspec {
       testsDir <- IO(TestsRoot(Paths.get("")).toAbsolutePath)
       tests <- regressionTests[IO](testsDir)
 
-      _ <- Q(testsDir).evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
+      _ <- RunQuasar(testsDir).evalMap(t => tdef.complete(t) *> sdown.get).compile.drain.start
       t <- tdef.get
       (q, i) = t
 
@@ -276,4 +278,12 @@ object Sql2QueryRegressionSpec {
 
   implicit val dataEncodeJson: EncodeJson[Data] =
     EncodeJson(DataCodec.Precise.encode(_).getOrElse(jString("Undefined")))
+}
+
+object Sql2QueryOptimizedRegressionSpec extends Sql2QueryRegressionSpec {
+  val optimizeQScript: Boolean = true
+}
+
+object Sql2QueryUnoptimizedRegressionSpec extends Sql2QueryRegressionSpec {
+  val optimizeQScript: Boolean = false
 }

@@ -16,7 +16,7 @@
 
 package quasar.run
 
-import slamdata.Predef.{Array, Double, SuppressWarnings}
+import slamdata.Predef.{Array, Boolean, Double, SuppressWarnings}
 
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
@@ -84,6 +84,7 @@ object Quasar {
     */
   def apply[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer](
       precog: Precog,
+      optimizedQScript: Boolean,
       extConfig: ExternalConfig,
       sstEvalConfig: SstEvalConfig)(
       implicit ec: ExecutionContext)
@@ -134,7 +135,7 @@ object Quasar {
       datasources = DefaultDatasources[F, UUID, Json, SstConfig[Fix[EJson], Double]](
         freshUUID, datasourceRefs, mgmt, mgmt)
 
-      federation = MimirQueryFederation[Fix, F](precog)
+      federation = MimirQueryFederation[Fix, F](precog, optimizedQScript)
 
       pTableStore = MimirPTableStore[F](precog, PreparationLocation)
 

@@ -36,14 +36,14 @@ import scala.concurrent.ExecutionContext
 final class MimirQueryFederation[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell] private (
-    P: Cake)(
+    P: Cake, optimizeQScript: Boolean)(
     implicit ec: ExecutionContext)
     extends QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] {
 
   type FinalizersT[X[_], A] = WriterT[X, List[IO[Unit]], A]
 
   private val qscriptEvaluator =
-    MimirQScriptEvaluator[T, FinalizersT[F, ?]](P)
+    MimirQScriptEvaluator[T, FinalizersT[F, ?]](P, optimizeQScript)
 
   def evaluateFederated(q: FederatedQuery[T, QueryAssociate[T, IO]]): F[Stream[IO, MimirRepr]] = {
     val finalize: ((List[IO[Unit]], MimirRepr)) => Stream[IO, MimirRepr] = {
@@ -62,8 +62,8 @@ object MimirQueryFederation {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: PhaseResultTell](
-      P: Cake)(
+      P: Cake, optimizeQScript: Boolean)(
       implicit ec: ExecutionContext)
       : QueryFederation[T, F, QueryAssociate[T, IO], Stream[IO, MimirRepr]] =
-    new MimirQueryFederation[T, F](P)
+    new MimirQueryFederation[T, F](P, optimizeQScript)
 }

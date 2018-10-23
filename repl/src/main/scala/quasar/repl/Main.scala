@@ -61,7 +61,7 @@ object Main extends StreamApp[PhaseResultCatsT[IO, ?]] {
       (dataPath, pluginPath) <- paths[F]
       precog <- Precog.stream(dataPath.toFile).translate(λ[FunctionK[IO, F]](_.to[F]))
       evalCfg = SstEvalConfig(1000L, 2L, 250L)
-      q <- Quasar[F](precog, ExternalConfig.PluginDirectory(pluginPath), evalCfg)
+      q <- Quasar[F](precog, true, ExternalConfig.PluginDirectory(pluginPath), evalCfg)
     } yield q
 
   def repl[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](

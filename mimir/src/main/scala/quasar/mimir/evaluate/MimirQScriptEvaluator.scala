@@ -49,7 +49,7 @@ import shims._
 final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell] private (
-    cake: Cake)(
+    cake: Cake, optimizeQScript: Boolean)(
     implicit ec: ExecutionContext)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
 
@@ -79,7 +79,10 @@ final class MimirQScriptEvaluator[
     implicitly[Unirewrite[T, QSRewrite[T]]]
 
   def optimize: QSMRewrite[T[QSM]] => QSM[T[QSM]] =
-    Optimize[T, QSM, QSMRewrite, AFile]
+    if (optimizeQScript)
+      Optimize[T, QSM, QSMRewrite, AFile]
+    else
+      QSMRewriteToQSM.inject(_)  // no-op
 
   def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
     _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
@@ -110,14 +113,14 @@ final class MimirQScriptEvaluator[
     }
 
     def planQSM(in: QSM[Repr]): M[Repr] = {
-      val QScriptCore = CopK.Inject[QScriptCore[T, ?],            QSM]
-      val EquiJoin    = CopK.Inject[EquiJoin[T, ?],               QSM]
+      val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
+      val EquiJoin = CopK.Inject[EquiJoin[T, ?], QSM]
       val ShiftedRead = CopK.Inject[Const[ShiftedRead[AFile], ?], QSM]
       val InterpretedRead = CopK.Inject[Const[InterpretedRead[AFile], ?], QSM]
 
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
-        case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
+        case EquiJoin(value) => equiJoinPlanner.plan(planQST)(value)
         case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
         case InterpretedRead(value) => shiftedReadPlanner.plan(ec)(value.right)
       }
@@ -131,8 +134,8 @@ object MimirQScriptEvaluator {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell](
-      cake: Cake)(
+      cake: Cake, optimizedQScript: Boolean)(
       implicit ec: ExecutionContext)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
-    new MimirQScriptEvaluator[T, F](cake)
+    new MimirQScriptEvaluator[T, F](cake, optimizedQScript)
 }

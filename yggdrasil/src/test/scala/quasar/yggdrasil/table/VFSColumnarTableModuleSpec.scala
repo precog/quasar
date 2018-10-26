@@ -21,20 +21,21 @@ import quasar.contrib.cats.effect._
 import quasar.contrib.pathy.AFile
 import quasar.precog.common.CLong
 import quasar.niflheim.NIHDB
-import quasar.yggdrasil.vfs.{Blob, SerialVFS, Version}
-
+import quasar.yggdrasil.vfs.{Blob, contextShiftForS, SerialVFS, Version}
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
-
 import cats.effect.IO
 import org.specs2.mutable.Specification
 import pathy.Path.{file, rootDir}
 import scalaz.{-\/, StreamT, \/-}
 import shims._
+
+
 
 object VFSColumnarTableModuleSpec
     extends Specification

@@ -34,7 +34,6 @@ package object mimir {
   // used in integration tests and the REPL
   def tableToData(repr: MimirRepr): Stream[IO, Data] =
     slicesToStream(repr.table.slices)
-      // TODO{fs2}: Chunkiness
-      .mapSegments(s =>
-        s.filter(_ != CUndefined).map(RValue.toData).force.toChunk.toSegment)
+      .mapChunks(c =>
+        c.filter(_ != CUndefined).map(RValue.toData))
 }

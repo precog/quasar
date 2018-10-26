@@ -43,6 +43,8 @@ private[table] final class PivotPlate[A](
   private var pivoted = false
   private var pivotedTwice = false
 
+  private var scalarSkip = false
+
   // we can't trust nextIndex.head because it only considers post-shift data
   private var focusedArrayIndex = 0
 
@@ -79,7 +81,7 @@ private[table] final class PivotPlate[A](
       Signal.Continue
     } else if (atFocus() && (structure eq ObjectStruct)) {
       pivoted = true
-      pivotedTwice = true   // because we don't unnest. it's a bit weird
+      scalarSkip = true
       Signal.Continue
     } else {
       super.map()
@@ -91,7 +93,7 @@ private[table] final class PivotPlate[A](
       Signal.Continue
     } else if (atFocus() && (structure eq ArrayStruct)) {
       pivoted = true
-      pivotedTwice = true   // because we don't unnest. it's a bit weird
+      scalarSkip = true
       Signal.Continue
     } else {
       super.arr()
@@ -227,9 +229,7 @@ private[table] final class PivotPlate[A](
   }
 
   override def finishRow(): Unit = {
-    if (!pivoted) {
-      super.finishRow()
-    } else if (pivotedTwice) {
+    if (pivotedTwice) {
       @tailrec
       def unnestAll(cursor: List[CPathNode]): Unit = cursor match {
         case _ :: tail =>
@@ -241,10 +241,13 @@ private[table] final class PivotPlate[A](
       }
 
       unnestAll(cursor)
+    } else if (!scalarSkip) {
+      super.finishRow()
     }
 
     pivoted = false
     pivotedTwice = false
+    scalarSkip = false
 
     focusedArrayIndex = 0
   }

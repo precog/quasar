@@ -30,7 +30,7 @@ import java.nio.file.{Files, Path => JPath}
 
 import scala.concurrent.ExecutionContext
 
-import cats.effect.{Effect, Timer}
+import cats.effect.{ContextShift, Effect, Timer}
 import fs2.{io, Stream}
 import jawn.Facade
 import jawnfs2._
@@ -49,14 +49,12 @@ import shims._
   * @param root the scope of this datasource, all paths will be considered relative to this one.
   * @param readChunkSizeBytes the number of bytes per chunk to use when reading files.
   */
-final class LocalDatasource[F[_]: Timer] private (
+final class LocalDatasource[F[_]: ContextShift: Timer] private (
     root: JPath,
     readChunkSizeBytes: Int,
-    pool: ExecutionContext)(
+    blockingPool: ExecutionContext)(
     implicit F: Effect[F], RE: MonadResourceErr[F])
     extends LightweightDatasource[F, Stream[F, ?]] {
-
-  implicit val ec: ExecutionContext = pool
 
   def evaluator[R: QDataEncode]: QueryEvaluator[F, ResourcePath, Stream[F, R]] =
     new QueryEvaluator[F, ResourcePath, Stream[F, R]] {
@@ -72,7 +70,7 @@ final class LocalDatasource[F[_]: Timer] private (
           isFile <- F.delay(Files.isRegularFile(jp))
           _ <- isFile.unlessM(RE.raiseError(notAResource(path)))
         } yield {
-          io.file.readAllAsync[F](jp, readChunkSizeBytes)
+          io.file.readAll[F](jp, blockingPool, readChunkSizeBytes)
             .chunks
             .map(_.toByteBuffer)
             .parseJsonStream[R]
@@ -118,10 +116,10 @@ final class LocalDatasource[F[_]: Timer] private (
 }
 
 object LocalDatasource {
-  def apply[F[_]: Effect: MonadResourceErr: Timer](
+  def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       root: JPath,
       readChunkSizeBytes: Int,
-      pool: ExecutionContext)
+      blockingPool: ExecutionContext)
       : Datasource[F, Stream[F, ?], ResourcePath] =
-    new LocalDatasource[F](root, readChunkSizeBytes, pool)
+    new LocalDatasource[F](root, readChunkSizeBytes, blockingPool)
 }

@@ -22,9 +22,7 @@ import quasar.ejson.EJson
 import quasar.contrib.iota.copkTraverse
 import quasar.sst._
 
-import scala.concurrent.ExecutionContext
-
-import cats.effect.Effect
+import cats.effect.Concurrent
 import fs2.{Chunk, Pipe}
 import matryoshka._
 import matryoshka.implicits._
@@ -44,15 +42,14 @@ package object schema {
     progressiveSst0[F, J, A](config)(f => _.map(f))
 
   /** Merges input chunks, in parallel, into increasingly accurate SSTs. */
-  def progressiveSstAsync[F[_]: Effect, J: Order, A: ConvertableTo: Field: Order](
+  def progressiveSstAsync[F[_]: Concurrent, J: Order, A: ConvertableTo: Field: Order](
       config: SstConfig[J, A],
       paralellism: Int)(
       implicit
-      ec: ExecutionContext,
       JC: Corecursive.Aux[J, EJson],
       JR: Recursive.Aux[J, EJson])
       : Pipe[F, Chunk[SST[J, A]], SST[J, A]] =
-    progressiveSst0[F, J, A](config)(f => _.mapAsyncUnordered(paralellism)(c => Effect[F].delay(f(c))))
+    progressiveSst0[F, J, A](config)(f => _.mapAsyncUnordered(paralellism)(c => Concurrent[F].delay(f(c))))
 
   ////
 

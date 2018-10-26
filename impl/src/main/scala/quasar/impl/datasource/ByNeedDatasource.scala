@@ -16,34 +16,27 @@
 
 package quasar.impl.datasource
 
-import slamdata.Predef.{Boolean, None, Option, Some, Throwable, Unit}
+import slamdata.Predef._
 import quasar.Disposable
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.Duration
-
-import cats.MonadError
-import cats.effect.Effect
+import cats.effect.Async
+import cats.effect.concurrent.MVar
 import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import fs2.Scheduler
-import fs2.async
-import fs2.async.mutable
 import qdata.QDataEncode
 
 import ByNeedDatasource.NeedState
 
 final class ByNeedDatasource[F[_], G[_], Q] private (
     datasourceType: DatasourceType,
-    mvar: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]],
-    scheduler: Scheduler)(
-    implicit F: MonadError[F, Throwable])
+    mvar: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]])(
+    implicit F: Async[F])
     extends Datasource[F, G, Q] {
 
   def evaluator[R: QDataEncode]: QueryEvaluator[F, Q, G[R]] =
@@ -65,7 +58,7 @@ final class ByNeedDatasource[F[_], G[_], Q] private (
 
   private def getDatasource: F[Datasource[F, G, Q]] =
     for {
-      needState <- mvar.peek1
+      needState <- mvar.read
 
       ds <- needState match {
         case NeedState.Uninitialized(init) =>
@@ -77,19 +70,19 @@ final class ByNeedDatasource[F[_], G[_], Q] private (
     } yield ds
 
   private def initAndGet: F[Datasource[F, G, Q]] =
-    mvar.timedDequeue1(Duration.Zero, scheduler) flatMap {
+    mvar.tryTake.flatMap {
       case Some(s @ NeedState.Uninitialized(init)) =>
         val doInit = for {
           ds <- init
-          _  <- mvar.enqueue1(NeedState.Initialized(ds))
+          _  <- mvar.put(NeedState.Initialized(ds))
         } yield ds.unsafeValue
 
         F.handleErrorWith(doInit) { e =>
-          mvar.enqueue1(s) *> F.raiseError(e)
+          mvar.put(s) *> F.raiseError(e)
         }
 
       case Some(s @ NeedState.Initialized(ds)) =>
-        mvar.enqueue1(s).as(ds.unsafeValue)
+        mvar.put(s).as(ds.unsafeValue)
 
       case None =>
         getDatasource
@@ -104,22 +97,19 @@ object ByNeedDatasource {
     final case class Initialized[F[_], A](a: A) extends NeedState[F, A]
   }
 
-  def apply[F[_]: Effect, G[_], Q](
+  def apply[F[_]: Async, G[_], Q](
       kind: DatasourceType,
-      init: F[Disposable[F, Datasource[F, G, Q]]],
-      scheduler: Scheduler)(
-      implicit ec: ExecutionContext)
+      init: F[Disposable[F, Datasource[F, G, Q]]])
       : F[Disposable[F, Datasource[F, G, Q]]] = {
 
-    def dispose(q: mutable.Queue[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]]): F[Unit] =
-      q.dequeue1 flatMap {
+    def dispose(m: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]]): F[Unit] =
+      m.take flatMap {
         case NeedState.Initialized(ds) => ds.dispose
         case _ => ().pure[F]
       }
 
-    for {
-      mvar <- async.boundedQueue[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]](1)
-      _    <- mvar.enqueue1(NeedState.Uninitialized(init))
-    } yield Disposable(new ByNeedDatasource(kind, mvar, scheduler), dispose(mvar))
+    MVar.uncancelableOf[F, NeedState[F, Disposable[F, Datasource[F, G, Q]]]](
+      NeedState.Uninitialized(init))
+      .map(mv => Disposable(new ByNeedDatasource(kind, mv), dispose(mv)))
   }
 }

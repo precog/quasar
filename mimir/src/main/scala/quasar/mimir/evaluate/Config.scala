@@ -14,15 +14,19 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.mimir.evaluate
 
-import slamdata.Predef.{RuntimeException, String}
+import slamdata.Predef.Option
+import quasar.contrib.pathy.AFile
+import quasar.impl.evaluate.Source
 
-import fs2.{RaiseThrowable, Stream}
+import scalaz.Kleisli
 
-package object datagen {
-  /** A stream that is failed with the given reason. */
-  def failedStream[F[_]: RaiseThrowable, A](reason: String): Stream[F, A] = {
-    Stream.raiseError[F](new RuntimeException(reason)).covaryOutput[A]
-  }
+object Config {
+  type Associates[T[_[_]], F[_]] = AFile => Option[Source[QueryAssociate[T, F]]]
+  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, EvaluatorConfig[T, G], A]
+
+  final case class EvaluatorConfig[T[_[_]], F[_]](
+    associates: Associates[T, F],
+    pushdown: Pushdown)
 }

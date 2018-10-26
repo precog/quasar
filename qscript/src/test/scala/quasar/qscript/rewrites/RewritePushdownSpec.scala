@@ -21,7 +21,7 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.{ParseType, Qspec}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Mask, Pivot, Wrap}
-import quasar.common.{CPath, CPathField}
+import quasar.common.{CPath, CPathField, CPathIndex}
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
@@ -36,7 +36,7 @@ import pathy.Path._
 import scalaz.Const
 import scalaz.std.option._
 
-object OptimizeSpec extends Qspec {
+object RewritePushdownSpec extends Qspec {
 
   type QSBase =
     QScriptCore[Fix, ?]          :::
@@ -67,18 +67,23 @@ object OptimizeSpec extends Qspec {
 
   val ejs = Fixed[Fix[EJson]]
 
-  val optimize = new Optimize[Fix]
+  val pushdown = new RewritePushdown[Fix]
 
   "path-finding" >> {
 
     "find the path of Hole" >> {
-      optimize.findPath(funcE.Hole) must equal(
+      pushdown.findPath(funcE.Hole) must equal(
         Some(CPath.Identity))
     }
 
     "find the path of a single object projection" >> {
-      optimize.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
+      pushdown.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
         Some(CPath(CPathField("xyz"))))
+    }
+
+    "find the path of a single array projection" >> {
+      pushdown.findPath(funcE.ProjectIndexI(funcE.Hole, 7)) must equal(
+        Some(CPath(CPathIndex(7))))
     }
 
     "find the path of a triple object projection" >> {
@@ -91,15 +96,43 @@ object OptimizeSpec extends Qspec {
             "bbb"),
           "ccc")
 
-      optimize.findPath(fm) must equal(
+      pushdown.findPath(fm) must equal(
         Some(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"))))
+    }
+
+    "find the path of a triple array projection" >> {
+      val fm =
+        funcE.ProjectIndexI(
+          funcE.ProjectIndexI(
+            funcE.ProjectIndexI(
+              funcE.Hole,
+              2),
+            6),
+          0)
+
+      pushdown.findPath(fm) must equal(
+        Some(CPath(CPathIndex(2), CPathIndex(6), CPathIndex(0))))
+    }
+
+    "find the path of an array projection and object projection" >> {
+      val fm =
+        funcE.ProjectKeyS(
+          funcE.ProjectIndexI(
+            funcE.ProjectKeyS(
+              funcE.Hole,
+              "aaa"),
+            42),
+          "ccc")
+
+      pushdown.findPath(fm) must equal(
+        Some(CPath(CPathField("aaa"), CPathIndex(42), CPathField("ccc"))))
     }
 
     "fail find the path of an object projection with a non-string key" >> {
       val fm =
         funcE.ProjectKey(funcE.Hole, funcE.Constant(ejs.bool(true)))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail find the path of an object projection with a dynamic key" >> {
@@ -108,7 +141,16 @@ object OptimizeSpec extends Qspec {
           funcE.Hole,
           funcE.ToString(funcE.ProjectKeyS(funcE.Hole, "foobar")))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
+    }
+
+    "fail find the path of an array projection with a dynamic key" >> {
+      val fm =
+        funcE.ProjectIndex(
+          funcE.Hole,
+          funcE.Integer(funcE.ProjectIndexI(funcE.Hole, 42)))
+
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail find the path of an object projection with a dynamic key that is itself a projection" >> {
@@ -117,7 +159,16 @@ object OptimizeSpec extends Qspec {
           funcE.Hole,
           funcE.ProjectKeyS(funcE.Hole, "foobar"))
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
+    }
+
+    "fail find the path of an array projection with a dynamic key that is itself a projection" >> {
+      val fm =
+        funcE.ProjectIndex(
+          funcE.Hole,
+          funcE.ProjectIndexI(funcE.Hole, 42))
+
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail to find the path of non-projection" >> {
@@ -128,20 +179,7 @@ object OptimizeSpec extends Qspec {
             funcE.ProjectKeyS(funcE.Hole, "aaa")),
           "ccc")
 
-      optimize.findPath(fm) must equal(None)
-    }
-
-    "fail to find the path of an array projection" >> {
-      val fm =
-        funcE.ProjectKeyS(
-          funcE.ProjectIndexI(
-            funcE.ProjectKeyS(
-              funcE.Hole,
-              "aaa"),
-            42),
-          "ccc")
-
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
 
     "fail to find the path of a projection whose source is not Hole" >> {
@@ -154,14 +192,14 @@ object OptimizeSpec extends Qspec {
             "bbb"),
           "ccc")
 
-      optimize.findPath(fm) must equal(None)
+      pushdown.findPath(fm) must equal(None)
     }
   }
 
   "InterpretedRead rewrite" >> {
 
     val rewriteLeftShiftFunc: QSExtra[Fix[QSExtra]] => QSExtra[Fix[QSExtra]] =
-      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](optimize.rewriteLeftShift[QSExtra, AFile])
+      liftFG[QScriptCore[Fix, ?], QSExtra, Fix[QSExtra]](pushdown.rewriteLeftShift[QSExtra, AFile])
 
     def rewriteLeftShift(expr: Fix[QSExtra]): Fix[QSExtra] =
       expr.transCata[Fix[QSExtra]](rewriteLeftShiftFunc)
@@ -273,7 +311,7 @@ object OptimizeSpec extends Qspec {
       rewriteLeftShift(initial) must equal(expected)
     }
 
-    "rewrite when the shift source is a single projection" >> {
+    "rewrite when the shift source is a single object projection" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
@@ -310,7 +348,7 @@ object OptimizeSpec extends Qspec {
       rewriteLeftShift(initial) must equal(expected)
     }
 
-    "rewrite when the shift source is three projections" >> {
+    "rewrite when the shift source is three object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
@@ -352,24 +390,8 @@ object OptimizeSpec extends Qspec {
       rewriteLeftShift(initial) must equal(expected)
     }
 
-    "not rewrite when the shift struct is a (nonsensical) constant" >> {
-      val initial: Fix[QSExtra] =
-        fixE.LeftShift(
-          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
-          recFuncE.Constant(ejs.str("string!")), // constant string
-          IncludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          funcE.ConcatMaps(
-            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
-            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
-
-      rewriteLeftShift(initial) must equal(initial)
-    }
-
-    // we can support projection through arrays in the future.
     // 🦖  rawr!
-    "not rewrite when the shift struct contains static array and object projections" >> {
+    "rewrite when the shift struct contains static array and object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
           fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
@@ -386,7 +408,71 @@ object OptimizeSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      rewriteLeftShift(initial) must equal(initial)
+        val expected: Fix[QSExtra] =
+          fixE.Map(
+            fixE.InterpretedRead[AFile](
+              rootDir </> file("foo"),
+              List(
+                Mask(SMap((CPath(CPathField("aaa"), CPathIndex(42), CPathField("ccc")), Set(ParseType.Object)))),
+                Wrap(CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc")), ShiftedKey),
+                Pivot(CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+            recFuncE.ConcatMaps(
+              recFuncE.MakeMapS("k1",
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), 0), "ccc"),
+                    ShiftedKey),
+                  0)),
+              recFuncE.MakeMapS("v1",
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, "aaa"), 0), "ccc"),
+                    ShiftedKey),
+                  1))))
+
+      rewriteLeftShift(initial) must equal(expected)
+    }
+
+    "rewrite when the shift struct contains two static array projections" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          recFuncE.ProjectKeyS(
+            recFuncE.ProjectIndexI( // shift source contains an array projection
+              recFuncE.ProjectIndexI(recFunc.Hole,
+                17),
+              42),
+            "ccc"),
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.ConcatMaps(
+            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
+            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
+
+        val expected: Fix[QSExtra] =
+          fixE.Map(
+            fixE.InterpretedRead[AFile](
+              rootDir </> file("foo"),
+              List(
+                Mask(SMap((CPath(CPathIndex(17), CPathIndex(42), CPathField("ccc")), Set(ParseType.Object)))),
+                Wrap(CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc")), ShiftedKey),
+                Pivot(CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+            recFuncE.ConcatMaps(
+              recFuncE.MakeMapS("k1",
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectIndexI(recFuncE.Hole, 0), 0), "ccc"),
+                    ShiftedKey),
+                  0)),
+              recFuncE.MakeMapS("v1",
+                recFuncE.ProjectIndexI(
+                  recFuncE.ProjectKeyS(
+                    recFuncE.ProjectKeyS(recFuncE.ProjectIndexI(recFuncE.ProjectIndexI(recFuncE.Hole, 0), 0), "ccc"),
+                    ShiftedKey),
+                  1))))
+
+      rewriteLeftShift(initial) must equal(expected)
     }
 
     // we will need to allow certain static mapfuncs as structs in the future.
@@ -450,12 +536,27 @@ object OptimizeSpec extends Qspec {
 
       rewriteLeftShift(initial) must equal(initial)
     }
+
+    "not rewrite when the shift struct is a (nonsensical) constant" >> {
+      val initial: Fix[QSExtra] =
+        fixE.LeftShift(
+          fixE.ShiftedRead[AFile](rootDir </> file("foo"), ExcludeId),
+          recFuncE.Constant(ejs.str("string!")), // constant string
+          IncludeId,
+          ShiftType.Map,
+          OnUndefined.Omit,
+          funcE.ConcatMaps(
+            funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
+            funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
+
+      rewriteLeftShift(initial) must equal(initial)
+    }
   }
 
   "no-op Map rewrite" >> {
 
     val elideNoopMapFunc: QS[Fix[QS]] => QS[Fix[QS]] =
-      liftFG[QScriptCore[Fix, ?], QS, Fix[QS]](optimize.elideNoopMap[QS])
+      liftFG[QScriptCore[Fix, ?], QS, Fix[QS]](pushdown.elideNoopMap[QS])
 
     def elideNoopMap(expr: Fix[QS]): Fix[QS] =
       expr.transCata[Fix[QS]](elideNoopMapFunc)

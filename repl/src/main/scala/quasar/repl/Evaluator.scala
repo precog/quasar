@@ -49,13 +49,13 @@ import scala.util.control.NonFatal
 import argonaut.{Json, JsonParser, JsonScalaz}, JsonScalaz._
 import cats.arrow.FunctionK
 import cats.effect._
+import cats.effect.concurrent.Ref
 import eu.timepit.refined.refineV
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.scalaz._
-import fs2.{Stream, StreamApp}, StreamApp.ExitCode
-import fs2.async.Ref
+import fs2.Stream
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import pathy.Path._
@@ -63,7 +63,7 @@ import scalaz._, Scalaz._
 import shims.{eqToScalaz => _, orderToScalaz => _, _}
 import spire.std.double._
 
-final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
+final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
     stateRef: Ref[F, ReplState],
     q: Quasar[F])(
     implicit ec: ExecutionContext) {
@@ -131,7 +131,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         liftS1(helpMsg)
 
       case Debug(level) =>
-        stateRef.modify(_.copy(debugLevel = level)) *>
+        stateRef.update(_.copy(debugLevel = level)) *>
           liftS1(s"Set debug level: $level")
 
       case SummaryCount(rows) =>
@@ -140,7 +140,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           else refineV[Positive](rows).fold(κ(None), p => Some(Some(p)))
         count match {
           case None => liftS1("Rows must be a positive integer or 0 to indicate no limit")
-          case Some(c) => stateRef.modify(_.copy(summaryCount = c)) *>
+          case Some(c) => stateRef.update(_.copy(summaryCount = c)) *>
             liftS1 {
               val r = c.map(_.toString).getOrElse("unlimited")
               s"Set rows to show in result: $r"
@@ -148,28 +148,32 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
         }
 
       case Format(fmt) =>
-        stateRef.modify(_.copy(format = fmt)) *>
+        stateRef.update(_.copy(format = fmt)) *>
           liftS1(s"Set output format: $fmt")
 
       case Mode(mode) =>
-        stateRef.modify(_.copy(mode = mode)) *>
+        stateRef.update(_.copy(mode = mode)) *>
           liftS1(s"Set output mode: $mode")
 
       case SetPhaseFormat(fmt) =>
-        stateRef.modify(_.copy(phaseFormat = fmt)) *>
+        stateRef.update(_.copy(phaseFormat = fmt)) *>
           liftS1(s"Set phase format: $fmt")
 
       case SetTimingFormat(fmt) =>
-        stateRef.modify(_.copy(timingFormat = fmt)) *>
+        stateRef.update(_.copy(timingFormat = fmt)) *>
           liftS1(s"Set timing format: $fmt")
 
       case SetVar(n, v) =>
-        stateRef.modify(state => state.copy(variables = state.variables + (n -> v))) *>
+        stateRef.update(state => state.copy(variables = state.variables + (n -> v))) *>
           liftS1(s"Set variable ${n.value} = ${v.value}")
 
       case UnsetVar(n) =>
-        stateRef.modify(state => state.copy(variables = state.variables - n)) *>
+        stateRef.update(state => state.copy(variables = state.variables - n)) *>
           liftS1(s"Unset variable ${n.value}")
+
+      case SetPushdown(pd) =>
+        q.pushdown.set(pd) *>
+          liftS1(s"Set pushdown: $pd")
 
       case ListVars =>
         stateRef.get.map(_.variables.value).map(
@@ -285,7 +289,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
           cwd <- stateRef.get.map(_.cwd)
           dir = newPath(cwd, path)
           _ <- ensureValidDir(dir)
-          _ <- stateRef.modify(_.copy(cwd = dir))
+          _ <- stateRef.update(_.copy(cwd = dir))
         } yield Stream.emit(s"cwd is now ${printPath(dir)}")
 
       case Ls(path: Option[ReplPath]) =>
@@ -364,7 +368,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
     private def doSupportedTypes: F[ISet[DatasourceType]] =
       q.datasources.supportedDatasourceTypes >>!
-        (types => stateRef.modify(_.copy(supportedTypes = types.some)))
+        (types => stateRef.update(_.copy(supportedTypes = types.some)))
 
     private def ensureNormal[E: Show](c: Condition[E]): F[Unit] =
       c match {
@@ -538,7 +542,7 @@ final class Evaluator[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResu
 
     private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
       s.through(pipe.charBufferToByte(StandardCharsets.UTF_8))
-        .through(fs2.io.file.writeAllAsync(path))
+        .through(fs2.io.file.writeAll(path, ec))
         .compile.drain
 }
 
@@ -547,7 +551,7 @@ object Evaluator {
 
   final class EvalError(msg: String) extends java.lang.RuntimeException(msg)
 
-  def apply[F[_]: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
+  def apply[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       stateRef: Ref[F, ReplState],
       quasar: Quasar[F])(
       implicit ec: ExecutionContext)
@@ -580,6 +584,7 @@ object Evaluator {
       |  set format = table | precise | readable | csv | homogeneouscsv
       |  set mode = console | file
       |  set summaryCount = [rows]
+      |  set pushdown = true | false
       |  set [var] = [value]
       |  unset [var]
       |  env

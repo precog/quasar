@@ -21,25 +21,23 @@ import quasar.EffectfulQSpec
 import quasar.contrib.nio.file.deleteRecursively
 import quasar.contrib.scalaz.MonadError_
 import quasar.precog.common.{CDouble, CLong, CString, RObject}
-import quasar.yggdrasil.vfs.ResourceError
-
-import cats.effect.IO
-
-import monocle.Prism
-
-import pathy.Path.{dir, rootDir}
-
-import scalaz.std.option._
-import scalaz.syntax.traverse._
-
-import shims._
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Random
+import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
+import scala.util.Random
+
+import cats.effect.IO
+import monocle.Prism
+import pathy.Path.{dir, rootDir}
+import scalaz.std.option._
+import scalaz.syntax.traverse._
+import shims._
 
 object MimirPTableStoreSpec extends EffectfulQSpec[IO] {
+
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   implicit val ioMonadResourceError: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](Prism.partial[Throwable, ResourceError] {
@@ -49,7 +47,7 @@ object MimirPTableStoreSpec extends EffectfulQSpec[IO] {
   lazy val P = {
     val init = for {
       tmpDir <- IO(Files.createTempDirectory("mimir-ptable-store-spec-"))
-      precog <- Precog(tmpDir.toFile)
+      precog <- Precog(tmpDir.toFile, blockingPool)
       result = precog.onDispose(deleteRecursively[IO](tmpDir))
     } yield result
 

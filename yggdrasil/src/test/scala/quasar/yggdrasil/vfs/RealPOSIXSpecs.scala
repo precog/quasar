@@ -18,31 +18,31 @@ package quasar.yggdrasil.vfs
 
 import quasar.precog.util.IOUtils
 
-import cats.arrow.FunctionK
-import cats.effect.IO
-
-import fs2.Stream
-
-import org.specs2.mutable._
-
-import pathy.Path
-
-import scalaz.{~>, NaturalTransformation}
-
-import shims._
-
-import scodec.bits.ByteVector
-
 import java.nio.file.Files
 import java.io.{File, FileInputStream, FileOutputStream}
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.global
 
+import cats.arrow.FunctionK
+import cats.effect.IO
+import fs2.Stream
 import iotaz.CopK
+import org.specs2.mutable._
+import pathy.Path
+import scalaz.{NaturalTransformation, ~>}
+import scodec.bits.ByteVector
+import shims._
 
 object RealPOSIXSpecs extends Specification {
   import POSIXOp._
 
+  implicit val ec = global
+  implicit val cs = IO.contextShift(global)
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+
   def ioPOSIX(root: File): IO[POSIXOp ~> IO] =
-    RealPOSIX[IO](root)
+    RealPOSIX[IO](root, blockingPool)
 
   "real posix interpreter" should {
     "mkdir on root if non-existent" in {

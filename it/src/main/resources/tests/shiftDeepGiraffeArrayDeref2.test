@@ -1,0 +1,28 @@
+{
+    "name": "shift deep-giraffe-array with static array projection at index 2",
+    "backends": {
+        "lwc_local": "ignoreFieldOrder",
+        "mimir":     "ignoreFieldOrder"
+    },
+    "data": "deep-giraffe-array.data2",
+    "query": "select first.second[2]{_}.rId as rId, first.second[2]{_:} as key from `deep-giraffe-array2.data`",
+    "predicate": "exactly",
+    "ignoreResultOrder": true,
+    "expected": [
+      {"rId":"2fe76790","key":"S"},
+      {"key":"dateTime"},
+      {"key":"testField"},
+      {"rId":"8e820358","key":"S"},
+      {"key":"dateTime"},
+      {"key":"testField"},
+      {"rId":"28642fbe","key":"S"},
+      {"key":"dateTime"},
+      {"key":"testField"},
+      {"rId":"08a42ad4","key":"MAS"},
+      {"key":"dateTime"},
+      {"key":"testField"},
+      {"rId":"0b609f84","key":"MAS"},
+      {"key":"dateTime"},
+      {"key":"testField"}
+    ]
+}

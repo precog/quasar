@@ -36,6 +36,9 @@ import scalaz._, Scalaz._
 import shims._
 
 object LeftShiftBenchmark {
+
+  implicit val cs = IO.contextShift(global)
+
   val P = new TestColumnarTableModule {}
 
   def arrays(arraySize: Int): Int => Option[RValue] =

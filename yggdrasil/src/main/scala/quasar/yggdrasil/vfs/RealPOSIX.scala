@@ -19,25 +19,23 @@ package quasar.yggdrasil.vfs
 import quasar.contrib.pathy.APath
 import quasar.precog.util.IOUtils
 
-import cats.effect.Sync
+import cats.effect.{ContextShift, Sync}
 import fs2.{Chunk, Stream}
 import fs2.io.file.{readAll, writeAll}
-
 import pathy.Path
-
-import scalaz.{~>, -\/, \/-, Scalaz}, Scalaz._
+import scalaz.{-\/, Scalaz, \/-, ~>}
+import Scalaz._
 import shims._
-
 import scodec.bits.ByteVector
-
 import java.io.{File, IOException}
 import java.nio.file.{Files, StandardCopyOption}
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 
 object RealPOSIX {
   import POSIXOp._
 
-  def apply[F[_]](root: File)(implicit F: Sync[F]): F[POSIXOp ~> F] = {
+  def apply[F[_]](root: File, blockingPool: ExecutionContext)(implicit F: Sync[F], cs: ContextShift[POSIXWithIO]): F[POSIXOp ~> F] = {
     def canonicalize(path: APath): File =
       new File(root, Path.posixCodec.printPath(path))
 
@@ -50,7 +48,7 @@ object RealPOSIX {
           val ptarget = canonicalize(target).toPath()
 
           val stream =
-            readAll[POSIXWithIO](ptarget, 4096).chunks.map(c => ByteVector(c.toArray))
+            readAll[POSIXWithIO](ptarget, blockingPool, 4096).chunks.map(c => ByteVector(c.toArray))
 
           F.pure(stream)
 
@@ -60,7 +58,7 @@ object RealPOSIX {
           val cmap: Stream[POSIXWithIO, ByteVector] => Stream[POSIXWithIO, Byte] =
             _.map(_.toArray).map(Chunk.bytes).flatMap(Stream.chunk(_).covary[POSIXWithIO])
 
-          val sink = writeAll[POSIXWithIO](ptarget).compose(cmap)
+          val sink = writeAll[POSIXWithIO](ptarget, blockingPool).compose(cmap)
           F.pure(sink)
 
         case Ls(target) =>

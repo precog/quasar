@@ -22,22 +22,29 @@ import quasar.api.resource.ResourcePath
 import quasar.connector.{Datasource, LightweightDatasourceModule, MonadResourceErr}
 
 import java.nio.file.Paths
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 
 import argonaut.Json
-import cats.effect.{ConcurrentEffect, Timer}
+import cats.effect._
 import fs2.Stream
-import scalaz.{\/, EitherT}
+import scalaz.{EitherT, \/}
 import scalaz.syntax.applicative._
 import shims._
 
 object LocalDatasourceModule extends LightweightDatasourceModule {
 
+  // FIXME this is side effecting
+  private lazy val blockingPool: ExecutionContext =
+    ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+
   val kind: DatasourceType = LocalType
 
   def sanitizeConfig(config: Json): Json = config
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: MonadResourceErr: Timer](config: Json)
+  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+      config: Json)(
+      implicit ec: ExecutionContext)
       : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], ResourcePath]]] = {
 
     val F = ConcurrentEffect[F]
@@ -53,7 +60,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule {
         EitherT.fromEither(F.attempt(F.delay(Paths.get(lc.rootDir))))
           .leftMap[InitializationError[Json]](
             t => MalformedConfiguration(kind, config, "Invalid path: " + t.getMessage))
-    } yield LocalDatasource[F](root, lc.readChunkSizeBytes, global).point[Disposable[F, ?]]
+    } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool).point[Disposable[F, ?]]
 
     ds.run
   }

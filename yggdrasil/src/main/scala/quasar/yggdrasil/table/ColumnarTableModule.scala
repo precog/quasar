@@ -24,30 +24,28 @@ import quasar.contrib.fs2.convert
 import quasar.contrib.std.errorImpossible
 import quasar.precog.BitSet
 import quasar.precog.common._
-import quasar.precog.util.RawBitSet
+import quasar.precog.util.{IOUtils, RawBitSet}
 import quasar.yggdrasil.bytecode._
 import quasar.yggdrasil.util._
-import quasar.yggdrasil.table.cf.util.{ Remap, Empty }
+import quasar.yggdrasil.table.cf.util.{Empty, Remap}
 
 import qdata.QDataDecode
 import qdata.time.{DateTimeInterval, OffsetDate}
 
-import cats.effect.{IO, LiftIO}
-
 import TransSpecModule._
-import org.slf4j.Logger
-import org.slf4s.Logging
-import quasar.precog.util.IOUtils
-import scalaz._, Scalaz._, Ordering._
-import shims._
 
 import java.io.File
 import java.nio.CharBuffer
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
-
 import scala.annotation.tailrec
 import scala.collection.immutable.Set
 import scala.concurrent.ExecutionContext
+
+import cats.effect.{ContextShift, IO, LiftIO}
+import org.slf4j.Logger
+import org.slf4s.Logging
+import scalaz._, Scalaz._, Ordering._
+import shims._
 
 trait ColumnarTableTypes {
   type Reducer[α] = CReducer[α]
@@ -373,7 +371,9 @@ trait ColumnarTableModule
         bytes: fs2.Stream[IO, Byte],
         instructions: List[ParseInstruction],
         precise: Boolean = false)(
-        implicit ec: ExecutionContext)
+        implicit
+        cs: ContextShift[IO],
+        ec: ExecutionContext)
         : M[Table] = {
 
       import fs2.{Chunk, Stream}
@@ -423,8 +423,9 @@ trait ColumnarTableModule
 
     def fromQDataStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO, A: QDataDecode](
         values: fs2.Stream[IO, A])(
-        implicit ec: ExecutionContext)
+        implicit cs: ContextShift[IO], ec: ExecutionContext)
         : M[Table] = {
+
       val sliceStream = Slice.allFromQData(values)
 
       for {

@@ -23,20 +23,20 @@ import quasar.ejson.{optics => eoptics, EJson}
 import quasar.frontend.data.DataCodec
 
 import argonaut.{Json, Parse}
-import fs2.{Pipe, Stream}
+import fs2.{Pipe, RaiseThrowable, Stream}
 import matryoshka.{Corecursive, Recursive}
 import matryoshka.implicits._
 import scalaz.syntax.show._
 
 object codec {
   /** Decodes EJson from JSON-encoded precise Data. */
-  def ejsonDecodePreciseData[F[_], J](implicit J: Corecursive.Aux[J, EJson]): Pipe[F, String, J] =
-    _.flatMap(Parse.parseWith(_, Stream.emit, failedStream))
-      .flatMap(js => DataCodec.Precise.decode(js).fold(e => failedStream(e.message), Stream.emit))
+  def ejsonDecodePreciseData[F[_]: RaiseThrowable, J](implicit J: Corecursive.Aux[J, EJson]): Pipe[F, String, J] =
+    _.flatMap(Parse.parseWith(_, Stream.emit, failedStream[F, Json]))
+      .flatMap(js => DataCodec.Precise.decode(js).fold(e => failedStream[F, Data](e.message), Stream.emit))
       .map(_.ana[J](Data.toEJson[EJson] andThen (_.run getOrElse eoptics.nul[Data]())))
 
   /** Encodes EJson as JSON-encoded precise Data. */
-  def ejsonEncodePreciseData[F[_], J](implicit J: Recursive.Aux[J, EJson]): Pipe[F, J, String] =
+  def ejsonEncodePreciseData[F[_]: RaiseThrowable, J](implicit J: Recursive.Aux[J, EJson]): Pipe[F, J, String] =
     _.map(_.cata(Data.fromEJson))
       .flatMap(d =>
         DataCodec.Precise.encode(d)

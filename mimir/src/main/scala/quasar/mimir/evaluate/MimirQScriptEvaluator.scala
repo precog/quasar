@@ -28,14 +28,15 @@ import quasar.fp.numeric._
 import quasar.mimir
 import quasar.mimir.MimirRepr
 import quasar.mimir.MimirCake._
+import quasar.mimir.evaluate.Config.{AssociatesT, EvaluatorConfig}
 import quasar.qscript._
-import quasar.qscript.rewrites.{Optimize, Unirewrite}
-import quasar.yggdrasil.MonadFinalizers
+import quasar.qscript.rewrites.{RewritePushdown, Unirewrite}
+import quasar.yggdrasil.{Config => YggConfig, MonadFinalizers}
 
 import scala.Predef.implicitly
 import scala.concurrent.ExecutionContext
 
-import cats.effect.{IO, LiftIO}
+import cats.effect.{ContextShift, IO, LiftIO}
 import iotaz.CopK
 import iotaz.TListK.:::
 import iotaz.TNilK
@@ -50,10 +51,10 @@ final class MimirQScriptEvaluator[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell] private (
     cake: Cake)(
-    implicit ec: ExecutionContext)
+    implicit cs: ContextShift[IO], ec: ExecutionContext)
     extends QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] {
 
-  type MT[X[_], A] = Kleisli[X, Associates[T, IO], A]
+  type MT[X[_], A] = AssociatesT[T, X, IO, A]
   type M[A] = MT[F, A]
 
   type QSRewrite[U[_[_]]] =
@@ -78,14 +79,20 @@ final class MimirQScriptEvaluator[
   def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
     implicitly[Unirewrite[T, QSRewrite[T]]]
 
-  def optimize: QSMRewrite[T[QSM]] => QSM[T[QSM]] =
-    Optimize[T, QSM, QSMRewrite, AFile]
+  def rewritePushdown: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
+    Kleisli.ask[F, EvaluatorConfig[T, IO]] map {
+      _.pushdown match {
+        case Pushdown.EnablePushdown => RewritePushdown[T, QSM, QSMRewrite, AFile]
+        case Pushdown.DisablePushdown => QSMRewriteToQSM.inject(_)  // no-op
+      }
+    }
 
   def toTotal: T[QSM] => T[QScriptTotal[T, ?]] =
     _.cata[T[QScriptTotal[T, ?]]](SubInject[CopK[QS[T], ?], QScriptTotal[T, ?]].inject(_).embed)
 
   def execute(repr: Repr): M[Repr] =
-    repr.map(_.materialized).asInstanceOf[Repr].point[M]    // stupid dependent types...
+    repr.map(_.compact(repr.P.trans.TransSpec1.Id).canonicalize(YggConfig.maxSliceRows).materialized)
+      .asInstanceOf[Repr].point[M]    // stupid dependent types...
 
   def plan(cp: T[QSM]): M[Repr] = {
     def qScriptCorePlanner =
@@ -104,7 +111,7 @@ final class MimirQScriptEvaluator[
       _ match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value.left)
         case _ => errorImpossible
       }
     }
@@ -118,8 +125,8 @@ final class MimirQScriptEvaluator[
       in match {
         case QScriptCore(value) => qScriptCorePlanner.plan(planQST)(value)
         case EquiJoin(value)    => equiJoinPlanner.plan(planQST)(value)
-        case ShiftedRead(value) => shiftedReadPlanner.plan(ec)(value.left)
-        case InterpretedRead(value) => shiftedReadPlanner.plan(ec)(value.right)
+        case ShiftedRead(value) => shiftedReadPlanner.plan(value.left)
+        case InterpretedRead(value) => shiftedReadPlanner.plan(value.right)
       }
     }
 
@@ -132,7 +139,7 @@ object MimirQScriptEvaluator {
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]: PhaseResultTell](
       cake: Cake)(
-      implicit ec: ExecutionContext)
+      implicit cs: ContextShift[IO], ec: ExecutionContext)
       : QScriptEvaluator[T, AssociatesT[T, F, IO, ?], MimirRepr] =
     new MimirQScriptEvaluator[T, F](cake)
 }

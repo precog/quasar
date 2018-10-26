@@ -18,36 +18,22 @@ package quasar.mimir
 
 import quasar.Disposable
 import quasar.contrib.cats.effect._
-import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedSegmentFormat, VersionedCookedBlockFormat}
-
+import quasar.niflheim.{Chef, V1CookedBlockFormat, V1SegmentFormat, VersionedCookedBlockFormat, VersionedSegmentFormat}
 import quasar.yggdrasil.table.VFSColumnarTableModule
-import quasar.yggdrasil.vfs.SerialVFS
-
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.routing.{
-  ActorRefRoutee,
-  CustomRouterConfig,
-  RouterConfig,
-  RoundRobinRoutingLogic,
-  Routee,
-  Router
-}
-
-import cats.effect.IO
-
-import fs2.Stream
-
-import shims._
-
-import org.slf4s.Logging
-
-import scalaz.syntax.apply._
+import quasar.yggdrasil.vfs.{POSIXWithIO, SerialVFS}
 
 import java.io.File
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.collection.immutable.IndexedSeq
+
+import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.routing.{ActorRefRoutee, CustomRouterConfig, RoundRobinRoutingLogic, Routee, Router, RouterConfig}
+import cats.effect.{ContextShift, IO}
+import fs2.Stream
+import org.slf4s.Logging
+import scalaz.syntax.apply._
+import shims._
 
 final class Precog private (
     dataDir0: File,
@@ -88,9 +74,17 @@ final class Precog private (
 
 object Precog extends Logging {
 
-  def apply(dataDir: File)(implicit ec: ExecutionContext): IO[Disposable[IO, Precog]] =
+  def apply(
+    dataDir: File,
+    blockingPool: ExecutionContext)(
+    implicit
+    cs: ContextShift[IO],
+    csPwIO: ContextShift[POSIXWithIO],
+    ec: ExecutionContext)
+      : IO[Disposable[IO, Precog]] = {
+
     for {
-      vfsd <- SerialVFS[IO](dataDir, ec)
+      vfsd <- SerialVFS[IO](dataDir, blockingPool)
 
       sysd <- IO {
         val sys = ActorSystem(
@@ -104,7 +98,15 @@ object Precog extends Logging {
         case (vfs, sys) => new Precog(dataDir, sys, vfs)
       })
     } yield pcd
+  }
 
-  def stream(dataDir: File)(implicit ec: ExecutionContext): Stream[IO, Precog] =
-    Stream.bracket(apply(dataDir))(d => Stream.emit(d.unsafeValue), _.dispose)
+  def stream(
+    dataDir: File,
+    blockingPool: ExecutionContext)(
+    implicit
+    cs: ContextShift[IO],
+    csPwIO: ContextShift[POSIXWithIO],
+    ec: ExecutionContext)
+      : Stream[IO, Precog] =
+    Stream.bracket(apply(dataDir, blockingPool))(_.dispose).flatMap(d => Stream.emit(d.unsafeValue))
 }

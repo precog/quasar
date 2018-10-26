@@ -20,7 +20,7 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.IdStatus.ExcludeId
 import quasar.ParseInstruction
 import quasar.ParseInstruction.{Mask, Pivot, Wrap}
-import quasar.common.CPath
+import quasar.common.{CPath, CPathIndex}
 import quasar.contrib.iota._
 import quasar.ejson
 import quasar.fp.{liftFG, Injectable}
@@ -36,7 +36,9 @@ import matryoshka.patterns.{ginterpretM, CoEnv}
 import scalaz.{\/, -\/, \/-, Const, Functor}
 import scalaz.Scalaz._ // apply-traverse syntax conflict
 
-final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
+
+  import MapFuncsCore.{Constant, IntLit, ProjectIndex, ProjectKey}
 
   // We perform this rewrite before `extraShift` because sometimes
   // a no-op Map is added in the transformation from `QScriptEducated`,
@@ -61,10 +63,22 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
       val linearStruct: FreeMap = struct.linearize
       val pathOpt: Option[CPath] = findPath(linearStruct)
 
+      // arrays are compacted during static array projection
+      // resulting in a single-element array
+      def compactArrayDerefs(mf: CoMapFuncR[T, Hole]): CoMapFuncR[T, Hole] =
+        mf.run match {
+          case \/-(MFC(ProjectIndex(src, ExtractFunc(Constant(Embed(EX(ejson.Int(_)))))))) =>
+            val func: MapFunc[FreeMap] = MFC(ProjectIndex(src, IntLit(0)))
+            CoEnv(func.right[Hole])
+          case f => CoEnv(f)
+        }
+
       val mfOpt: Option[FreeMap] =
         repair.traverseM[Option, Hole] {
           case LeftSide => None  // repair must not contain LeftSide
-          case RightSide => Func[T].ProjectKeyS(linearStruct, ShiftedKey).some
+          case RightSide =>
+            val compacted: FreeMap = linearStruct.transCata[FreeMap](compactArrayDerefs)
+            Func[T].ProjectKeyS(compacted, ShiftedKey).some
         }
 
       val srOpt: Option[ShiftedRead[A]] = SR.prj(src) flatMap { srConst =>
@@ -80,10 +94,18 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         case (mf, sr, path) =>
           val tpe = ShiftType.toParseType(shiftType)
 
+          // arrays are compacted during static array projection
+          // resulting in a single-element array
+          val compactedPath: CPath =
+            CPath(path.nodes.map {
+              case CPathIndex(_) => CPathIndex(0)
+              case node => node
+            })
+
           val instructions: List[ParseInstruction] = List(
             Mask(SMap((path, Set(tpe)))),
-            Wrap(path, ShiftedKey),
-            Pivot(path \ ShiftedKey, shiftStatus, tpe))
+            Wrap(compactedPath, ShiftedKey),
+            Pivot(compactedPath \ ShiftedKey, shiftStatus, tpe))
 
           val src: T[F] = ER.inj(Const[InterpretedRead[A], T[F]](
             InterpretedRead[A](sr.path, instructions))).embed
@@ -99,13 +121,15 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
 
   /* Matches on a `FreeMap` of the form
    * ```
-   * ProjectKey(ProjectKey(...(ProjectKey(Hole, Const(Str))), Const(Str)), Const(Str))
+   * Project<Key or Index>(
+   *   Project<Key or Index>(...(
+   *     Project<Key or Index>(Hole, Const(<Str or Int>))),
+   *     Const(<Str or Int>)),
+   *   Const(<Str or Int>))
    * ```
    * returning the `CPath` when that form is matched.
    */
   def findPath(fm: FreeMap): Option[CPath] = {
-    import MapFuncsCore.{Constant, ProjectKey}
-
     // A `FreeMap` effectively has two leaf types: `Constant` and `Hole`.
     // When we hit a `Constant` we need to keep searching even though
     // we haven't found a path to shift, and so we encode this as `Unit`.
@@ -121,9 +145,20 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
         case MFC(Constant(Embed(EC(ejson.Str(_))))) =>
           ().left.some // this is awkward but we have to keep going
 
+        case MFC(Constant(Embed(EX(ejson.Int(_))))) =>
+          ().left.some // this is awkward but we have to keep going
+
         // the source of a `ProjectKey` must have encoded as a `CPath`
-        case MFC(ProjectKey((_, \/-(srcPath)), (ExtractFunc(Constant(Embed(EC(ejson.Str(str))))), _))) =>
+        case MFC(ProjectKey(
+            (_, \/-(srcPath)),
+            (ExtractFunc(Constant(Embed(EC(ejson.Str(str))))), _))) =>
           (str \: srcPath).right.some
+
+        // the source of a `ProjectIndex` must have encoded as a `CPath`
+        case MFC(ProjectIndex(
+            (_, \/-(srcPath)),
+            (ExtractFunc(Constant(Embed(EX(ejson.Int(idx))))), _))) if idx.isValidInt =>
+          (idx.toInt \: srcPath).right.some
 
         case _ => none
       }
@@ -143,7 +178,7 @@ final class Optimize[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   }
 }
 
-object Optimize {
+object RewritePushdown {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[a] <: ACopK[a], A](
       implicit GF: Injectable[G, F],
                ESRF: Const[InterpretedRead[A], ?] :<<: F,
@@ -152,13 +187,13 @@ object Optimize {
                QCG: QScriptCore[T, ?] :<<: G)
       : G[T[F]] => F[T[F]] = {
 
-    val opt = new Optimize[T]
+    val pushdown = new RewritePushdown[T]
 
     val rewrite1: G[T[F]] => F[T[F]] =
-      gtf => QCG.prj(gtf).fold(GF.inject(gtf))(opt.elideNoopMap[F])
+      gtf => QCG.prj(gtf).fold(GF.inject(gtf))(pushdown.elideNoopMap[F])
 
     val rewrite2: F[T[F]] => F[T[F]] =
-      liftFG[QScriptCore[T, ?], F, T[F]](opt.rewriteLeftShift[F, A])
+      liftFG[QScriptCore[T, ?], F, T[F]](pushdown.rewriteLeftShift[F, A])
 
     rewrite1 andThen rewrite2
   }

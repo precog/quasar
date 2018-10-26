@@ -33,6 +33,8 @@ final class LocalDatasourceSpec
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
+  implicit val tmr = IO.timer(global)
+
   val datasource =
     LocalDatasource[IO](Paths.get("./it/src/main/resources/tests"), 1024, global)
 

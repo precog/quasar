@@ -19,7 +19,7 @@ package quasar.yggdrasil.table
 import quasar.Disposable
 import quasar.blueeyes.json.JValue
 import quasar.contrib.cats.effect._
-import quasar.contrib.pathy.{firstSegmentName, ADir, AFile, APath, PathSegment}
+import quasar.contrib.pathy.{ADir, AFile, APath, PathSegment, firstSegmentName}
 import quasar.niflheim.NIHDB
 import quasar.precog.common.{Path => PrecogPath}
 import quasar.precog.util.IOUtils
@@ -28,30 +28,22 @@ import quasar.yggdrasil.bytecode.JType
 import quasar.yggdrasil.nihdb.{NIHDBProjection, SegmentsWrapper}
 import quasar.yggdrasil.vfs._
 
-import scala.concurrent.duration._
-
 import java.util.concurrent.{ConcurrentHashMap, ScheduledThreadPoolExecutor, ThreadFactory}
 import java.util.concurrent.atomic.AtomicInteger
-
 import java.io.File
 import java.nio.file.Files
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 import akka.actor.{ActorRef, ActorSystem}
-
 import cats.effect._
-
 import fs2.Stream
-import fs2.async.{Promise, Ref}
-
-import shims._
-
 import org.slf4s.Logging
-
 import pathy.Path
-
-import scalaz.{-\/, \/, EitherT, Monad, OptionT, Scalaz, StreamT}, Scalaz._
-
-import scala.concurrent.ExecutionContext
+import scalaz.{-\/, EitherT, Monad, OptionT, Scalaz, StreamT, \/}
+import Scalaz._
+import cats.effect.concurrent.{Deferred, Ref}
+import shims._
 
 trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging {
   private type ET[F[_], A] = EitherT[F, ResourceError, A]
@@ -72,6 +64,7 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
     })
 
   implicit def ExecutionContext: ExecutionContext
+  implicit def cs = IO.contextShift(ExecutionContext)
 
   def CookThreshold: Int
   def StorageTimeout: FiniteDuration
@@ -258,18 +251,18 @@ trait VFSColumnarTableModule extends BlockStoreColumnarTableModule with Logging 
       target.force.map(Disposable(_, IO.pure(())))
     } else {
       for {
-        started <- Ref[IO, Boolean](false)
-        cacheTarget <- Promise.empty[IO, (NIHDB, File)]
+        started <- Ref.of[IO, Boolean](false)
+        cacheTarget <- Deferred[IO, (NIHDB, File)]
 
         slices = target.slices
         size = target.size
 
         cachedSlicesM = for {
-          change <- started.tryModify(_ => true)
+          change <- started.tryModify(b => (true, b))
 
           winner = change match {
-            case Some(Ref.Change(false, _)) => true
-            case Some(Ref.Change(true, _)) | None => false   // either we lost a race, or we won but it was already true
+            case Some(false) => true
+            case Some(true) | None => false   // either we lost a race, or we won but it was already true
           }
 
           streamM = if (winner) {

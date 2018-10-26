@@ -88,6 +88,8 @@ trait ColumnarTableModuleSpec extends TestColumnarTableModule
   import DataGenerators._
   import trans._
 
+  implicit val cs = IO.contextShift(global)
+
   def testConcat = {
     val json1 = """{ "a": 1, "b": "x", "c": null }"""
     val json2 = """[4, "foo", null, true]"""

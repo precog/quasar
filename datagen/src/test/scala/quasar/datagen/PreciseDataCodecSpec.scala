@@ -21,9 +21,8 @@ import quasar.common.data.{Data, DataGenerators}
 import quasar.frontend.data.DataCodec
 import quasar.ejson._
 
-import fs2.{Pure, Stream}
+import fs2.Stream
 import matryoshka.data.Fix
-import scalaz.std.list._
 
 final class PreciseDataCodecSpec extends quasar.Qspec with DataGenerators {
   type J = Fix[EJson]
@@ -41,10 +40,10 @@ final class PreciseDataCodecSpec extends quasar.Qspec with DataGenerators {
 
     Stream.emit(encoded)
       .unNone
-      .through(codec.ejsonDecodePreciseData[Pure, J])
-      .through(codec.ejsonEncodePreciseData[Pure, J])
+      .through(codec.ejsonDecodePreciseData[fs2.Fallible, J])
+      .through(codec.ejsonEncodePreciseData[fs2.Fallible, J])
       .map(parsePrecise)
       .unNone
-      .toList must equal(decoded.toList)
+      .toList must beRight(decoded.toList)
   }
 }

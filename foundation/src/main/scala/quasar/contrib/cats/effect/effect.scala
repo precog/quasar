@@ -18,17 +18,15 @@ package quasar.contrib.cats.effect
 
 import slamdata.Predef.{Either, Throwable}
 
-import scala.concurrent.ExecutionContext
-
-import cats.effect.{Effect, IO}
-import fs2.async.Promise
+import cats.effect.{ContextShift, Effect, IO}
+import cats.effect.concurrent.Deferred
 
 object effect {
-  def unsafeRunEffect[F[_]: Effect, A](fa: F[A])(implicit ec: ExecutionContext): A = {
+  def unsafeRunEffect[F[_]: Effect, A](fa: F[A])(implicit cs: ContextShift[IO]): A = {
     val ioa = for {
-      p <- Promise.empty[IO, Either[Throwable, A]]
-      _ <- Effect[F].runAsync(fa)(p.complete(_))
-      r <- p.get
+      d <- Deferred[IO, Either[Throwable, A]]
+      _ <- Effect[F].runAsync(fa)(d.complete(_)).to[IO]
+      r <- d.get
       a <- IO.fromEither(r)
     } yield a
 

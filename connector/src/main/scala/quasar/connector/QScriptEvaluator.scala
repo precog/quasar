@@ -56,11 +56,11 @@ abstract class QScriptEvaluator[
   /** Returns the result of executing the `Repr`. */
   def execute(repr: Repr): F[R]
 
-  /** Returns the executable representation of the given optimized QScript. */
+  /** Returns the executable representation of the provided QScript. */
   def plan(cp: T[QSM]): F[Repr]
 
-  /** Rewrites the qscript to prepare for optimal evaluation. */
-  def optimize: QSMRewrite[T[QSM]] => QSM[T[QSM]]
+  /** Rewrites the qscript to use InterpretedRead whenever possible. */
+  def rewritePushdown: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]]
 
   def toTotal: T[QSM] => T[QScriptTotal[T, ?]]
 
@@ -72,8 +72,9 @@ abstract class QScriptEvaluator[
     for {
       shifted <- Unirewrite[T, QSRewrite[T], F](
         new Rewrite[T], κ(Set[PathSegment]().point[F])).apply(qsr)
-      optimized <- phase[F][T[QSM]]("QScript (Optimized)", shifted.transCata[T[QSM]](optimize))
-      repr <- plan(optimized)
+      pushdown <- rewritePushdown
+      interpreted <- phase[F][T[QSM]]("QScript (Interpreted)", shifted.transCata[T[QSM]](pushdown))
+      repr <- plan(interpreted)
       result <- execute(repr)
     } yield result
 

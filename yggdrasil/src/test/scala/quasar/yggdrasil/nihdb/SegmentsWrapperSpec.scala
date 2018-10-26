@@ -73,6 +73,9 @@ object SegmentsWrapperSpec extends Specification with ScalaCheck with NIHDBAkkaS
 
     "persist arbitrary tables" in prop { slices: List[Slice] =>
       val dir = Files.createTempDirectory("SegmentsWrapperSpec").toFile
+
+      implicit val cs = IO.contextShift(global)
+
       try {
         val ioa = for {
           nihdbV <- IO {

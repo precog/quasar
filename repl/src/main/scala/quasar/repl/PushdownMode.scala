@@ -14,27 +14,17 @@
  * limitations under the License.
  */
 
-package quasar.contrib.cats
+package quasar.repl
 
 import slamdata.Predef._
+import quasar.mimir.evaluate.Pushdown
 
-import scala.concurrent.Future
+import scalaz._, Scalaz._
 
-import cats.effect._
-import cats.syntax.functor._
-
-package object effect {
-  implicit class toOps[F[_], A](val fa: F[A]) extends AnyVal {
-    def to[G[_]](implicit F: Effect[F], G: Async[G]): G[A] =
-      Async[G].async { l =>
-        Effect[F].runAsync(fa)(c =>
-          IO(l(c))
-        ).unsafeRunSync
-      }
+object PushdownMode {
+  def fromString(str: String): Option[Pushdown] = str.toLowerCase match {
+    case "true" => Pushdown.EnablePushdown.some
+    case "false" => Pushdown.DisablePushdown.some 
+    case _ => none
   }
-
-  implicit class IOOps(val self: IO.type) extends AnyVal {
-    def fromFutureShift[A](iofa: IO[Future[A]])(implicit cs: ContextShift[IO]): IO[A] =
-      IO.fromFuture(iofa).flatMap(a => IO.shift.as(a))
-   }
 }

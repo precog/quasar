@@ -57,7 +57,7 @@ private[table] object SliceIngest {
 
     def rec(next: ChunkSliced[A], values: Stream[F, A]): Pull[F, Slice, Unit] =
       if (next.isEmpty) {
-        values.pull.unconsChunk flatMap {
+        values.pull.uncons flatMap {
           case Some((chunk, next)) =>
             rec(ChunkSliced.fromChunk(chunk), next)
           case None =>

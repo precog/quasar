@@ -26,9 +26,9 @@ import java.io.File
 import scala.concurrent.ExecutionContext
 
 import cats.effect._
+import cats.effect.concurrent.Ref
 import cats.syntax.{applicative, flatMap, functor}, applicative._, flatMap._, functor._
-import fs2.{Stream, StreamApp}, StreamApp.ExitCode
-import fs2.async.Ref
+import fs2.Stream
 import org.apache.commons.io.FileUtils
 import org.jline.reader._
 import org.jline.terminal._
@@ -47,7 +47,7 @@ final class Repl[F[_]: ConcurrentEffect: PhaseResultListen](
     F.start(evaluator(cmd)) >>= (_.join)
 
   private def print(strings: Stream[F, String]): F[Unit] =
-    strings.observe1(s => F.delay(println(s))).compile.drain
+    strings.evalTap(s => F.delay(println(s))).compile.drain
 
   val loop: F[ExitCode] =
     for {
@@ -66,7 +66,7 @@ object Repl {
       : Repl[F] =
     new Repl[F](prompt, reader, evaluator)
 
-  def mk[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
+  def mk[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultListen: PhaseResultTell: Timer](
       ref: Ref[F, ReplState],
       quasar: Quasar[F])(
       implicit ec: ExecutionContext)

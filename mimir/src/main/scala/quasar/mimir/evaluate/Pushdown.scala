@@ -14,15 +14,21 @@
  * limitations under the License.
  */
 
-package quasar.mimir
+package quasar.mimir.evaluate
 
-import slamdata.Predef.Option
-import quasar.contrib.pathy.AFile
-import quasar.impl.evaluate.Source
+import cats.effect.Sync
+import cats.effect.concurrent.Ref
 
-import scalaz.Kleisli
+import scala.{Product, Serializable}
 
-package object evaluate {
-  type Associates[T[_[_]], F[_]] = AFile => Option[Source[QueryAssociate[T, F]]]
-  type AssociatesT[T[_[_]], F[_], G[_], A] = Kleisli[F, Associates[T, G], A]
+sealed trait Pushdown extends Product with Serializable
+
+object Pushdown {
+  final case object EnablePushdown extends Pushdown
+  final case object DisablePushdown extends Pushdown
+}
+
+final class PushdownControl[F[_]: Sync](ref: Ref[F, Pushdown]) {
+  def set(pushdown: Pushdown): F[Unit] = ref.set(pushdown)
+  def get: F[Pushdown] = ref.get
 }

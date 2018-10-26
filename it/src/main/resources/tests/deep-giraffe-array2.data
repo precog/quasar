@@ -1,0 +1,9 @@
+{"first":{"second":[0, 1, {"S":{"to":["ethan@example.com"],"rId":"2fe76790"},"dateTime":1518610539149.4202, "testField":"A"}, "P"]}}
+{"first":{"second":[0, 1, {"S":{"to":["jacques@example.com"],"rId":"8e820358"},"dateTime":1518610554083.7378, "testField":"B"}, "Q"]}}
+{"first":{"second":[0, 1, {"S":{"to":["deshawn@example.com"],"rId":"28642fbe"},"dateTime":1518610722075.8232, "testField":"C"}, "R"]}}
+{"first":{"second":[0, 1, {"MAS":{"sId":"661929ef","rId":"08a42ad4"},"dateTime":1518610493869.1462, "testField":"D"}, "S"]}}
+{"first":{"second":[0, 1, {"MAS":{"sId":"c12c935b","rId":"0b609f84"},"dateTime":1518610653487.1868, "testField":"E"}, "T"]}}
+{}
+[]
+[3, 5, 7, 11]
+123.456

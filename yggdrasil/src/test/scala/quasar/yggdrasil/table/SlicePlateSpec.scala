@@ -21,7 +21,7 @@ import quasar.blueeyes.json.JValue
 import quasar.common.data.{Data, DataGenerators}
 import quasar.frontend.data.DataCodec
 import quasar.precog.JsonTestSupport
-import quasar.precog.common.RValue
+import quasar.precog.common.{CLong, CNum, RValue}
 
 import org.specs2.ScalaCheck
 import org.specs2.mutable.Specification
@@ -29,6 +29,7 @@ import org.specs2.mutable.Specification
 import tectonic.json.Parser
 
 import scala.collection.immutable.ListMap
+import scala.math.BigDecimal
 
 object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators {
   import JsonTestSupport._
@@ -57,6 +58,30 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
         case (Right(slices1), Right(slices2)) =>
           val results = (slices1 ++ slices2).flatMap(_.toRValues).map(RValue.toData(_)).map(sortFields(_))
           results mustEqual values
+      }
+    }
+
+    "parse Long.MaxValue + 1" in {
+      val input = "9223372036854775808"
+      val plate = new SlicePlate(true)
+      val parser = Parser(plate, Parser.ValueStream)
+
+      (parser.absorb(input), parser.finish()) must beLike {
+        case (Right(slices1), Right(slices2)) =>
+          val results = (slices1 ++ slices2).flatMap(_.toRValues)
+          results mustEqual List(CNum(BigDecimal("9223372036854775808")))
+      }
+    }
+
+    "parse Long.MinValue" in {
+      val input = Long.MinValue.toString
+      val plate = new SlicePlate(true)
+      val parser = Parser(plate, Parser.ValueStream)
+
+      (parser.absorb(input), parser.finish()) must beLike {
+        case (Right(slices1), Right(slices2)) =>
+          val results = (slices1 ++ slices2).flatMap(_.toRValues)
+          results mustEqual List(CLong(Long.MinValue))
       }
     }
   }

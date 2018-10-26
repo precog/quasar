@@ -16,39 +16,31 @@
 
 package quasar.yggdrasil.vfs
 
-import slamdata.Predef.{SuppressWarnings, Array}
-
+import slamdata.Predef.{Array, SuppressWarnings}
 import quasar.Disposable
-import quasar.contrib.pathy.{unsafeSandboxAbs, ADir, AFile, APath, RPath}
-import quasar.contrib.scalaz.stateT, stateT._
-import quasar.fp.free._
 import quasar.contrib.iota.{:<<:, ACopK}
+import quasar.contrib.pathy.{ADir, AFile, APath, RPath, unsafeSandboxAbs}
+import quasar.contrib.scalaz.stateT._
+import quasar.fp.free._
+
+import java.io.File
+import java.util.UUID
+import scala.util.Either
+import scala.concurrent.ExecutionContext
 
 import argonaut.{Argonaut, Parse}
-
-import cats.effect.{Concurrent, ConcurrentEffect, Effect, IO, LiftIO}
-
+import cats.effect._
+import cats.effect.concurrent.Deferred
 import fs2.Stream
-import fs2.async, async.mutable
-
-import pathy.Path, Path.file
-
-import scalaz.{~>, Equal, Free, Monad, Show, StateT, Scalaz}, Scalaz._
-
+import fs2.concurrent.{Queue, SignallingRef}
 import iotaz.CopK
-
+import pathy.Path, Path.file
+import scalaz.{Equal, Free, Monad, Scalaz, Show, StateT, ~>}, Scalaz._
 import scodec.Codec
 import scodec.bits.ByteVector
 import scodec.codecs, codecs.uint16
 import scodec.interop.scalaz.ByteVectorMonoidInstance
-
 import shims.monoidToCats
-
-import java.io.File
-import java.util.UUID
-
-import scala.util.Either
-import scala.concurrent.ExecutionContext
 
 final case class VFS(
     baseDir: ADir,
@@ -536,9 +528,9 @@ object FreeVFS {
 final class SerialVFS[F[_]] private (
     root: File,
     @volatile private var current: VFS,
-    worker: mutable.Queue[F, F[Unit]],    // this exists solely for #serialize
+    worker: Queue[F, F[Unit]],    // this exists solely for #serialize
     interp: POSIXWithIO ~> F)(
-    implicit F: Effect[F], ec: ExecutionContext) {
+    implicit F: Concurrent[F]) {
 
   import SerialVFS.S
   import shims.monadToScalaz
@@ -595,7 +587,7 @@ final class SerialVFS[F[_]] private (
 
   private def serialize[A](fa: F[A]): F[A] = {
     for {
-      ref <- async.Promise.empty[F, Either[Throwable, A]]
+      ref <- Deferred[F, Either[Throwable, A]]
       _ <- worker.enqueue1(F.attempt(fa).flatMap(ref.complete))
       r <- ref.get
       a <- F.fromEither(r)
@@ -614,22 +606,20 @@ object SerialVFS {
    * TODO: Return a `Stream[F, SerialVFS[F]]` to allow for better resource
    *       handling once we're rid of `BackendModule`.
    */
-  def apply[F[_]: ConcurrentEffect](root: File, pool: ExecutionContext)
+  def apply[F[_]: Concurrent](root: File, blockingPool: ExecutionContext)(implicit cs: ContextShift[POSIXWithIO])
       : F[Disposable[F, SerialVFS[F]]] = {
 
     import shims.monadToScalaz
 
-    implicit val ec: ExecutionContext = pool
-
     val ioToF = λ[IO ~> F](LiftIO[F].liftIO(_))
 
     for {
-      pint <- RealPOSIX[F](root)
+      pint <- RealPOSIX[F](root, blockingPool)
       interp = CopK.NaturalTransformation.of[S, F](pint, ioToF)
       vfs <- FreeVFS.init[S](Path.rootDir).foldMap(interp)
 
-      worker <- async.boundedQueue[F, F[Unit]](10)
-      sdown <- async.signalOf[F, Boolean](false)
+      worker <- Queue.bounded[F, F[Unit]](10)
+      sdown <- SignallingRef[F, Boolean](false)
 
       svfs = new SerialVFS(root, vfs, worker, λ[POSIXWithIO ~> F](_.foldMap(interp)))
       exec = worker.dequeue.evalMap(t => t).interruptWhen(sdown)

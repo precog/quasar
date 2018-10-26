@@ -22,8 +22,6 @@ import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
 
 import fs2.{Chunk, Pipe, Stream}
-import scalaz.syntax.monad._
-import shims._
 
 object pipe {
 

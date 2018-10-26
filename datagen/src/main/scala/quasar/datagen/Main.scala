@@ -24,12 +24,13 @@ import quasar.sst._
 import quasar.contrib.iota.copkTraverse
 
 import java.io.File
+import java.util.concurrent.Executors
 import scala.Console, Console.{RED, RESET}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
-import cats.effect.{IO, Sync}
-import cats.syntax.applicativeError._
-import fs2.Stream
+import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
+import cats.syntax.functor._
+import fs2.{RaiseThrowable, Stream}
 import fs2.text
 import fs2.io.file
 import matryoshka.data.Mu
@@ -40,21 +41,25 @@ import scalaz.syntax.either._
 import scalaz.syntax.show._
 import spire.std.double._
 
-object Main {
+object Main extends IOApp {
 
-  def run(args: List[String]) =
+  def run(args: List[String]) = {
+
+    val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+
     Stream.eval(CliOptions.parse[IO](args))
       .unNone
       .flatMap(opts =>
-        sstsFromFile[IO](opts.sstFile, opts.sstSource)
+        sstsFromFile[IO](opts.sstFile, opts.sstSource, blockingPool)
           .flatMap(generatedJson[IO])
           .take(opts.outSize.value)
           .intersperse("\n")
           .through(text.utf8Encode)
-          .through(file.writeAllAsync[IO](opts.outFile.toPath, opts.writeOptions)))
+          .through(file.writeAll[IO](opts.outFile.toPath, blockingPool, opts.writeOptions)))
       .compile
       .drain
-      .recoverWith(printErrors)
+      .redeemWith(printErrors, _ => IO.pure(ExitCode.Success))
+  }
 
   ////
 
@@ -71,11 +76,11 @@ object Main {
       .through(codec.ejsonEncodePreciseData[F, EJ])
 
   /** A stream of `SSTS` decoded from the given file. */
-  def sstsFromFile[F[_]: Sync](src: File, kind: SstSource): Stream[F, SSTS] = {
-    def decodingErr[F[_], A](t: RenderedTree, msg: String): Stream[F, A] =
-      failedStream(s"Failed to decode SST: ${msg}\n\n${t.shows}")
+  def sstsFromFile[F[_]: RaiseThrowable: Sync: ContextShift](src: File, kind: SstSource, blockingPool: ExecutionContext): Stream[F, SSTS] = {
+    def decodingErr[A](t: RenderedTree, msg: String): Stream[F, A] =
+      failedStream[F, A](s"Failed to decode SST: ${msg}\n\n${t.shows}")
 
-    file.readAll[F](src.toPath, 4096)
+    file.readAll[F](src.toPath, blockingPool, 4096)
       .through(text.utf8Decode)
       .through(text.lines)
       .take(1)
@@ -87,7 +92,7 @@ object Main {
         ).fold(decodingErr, Stream.emit(_).covary[F]))
   }
 
-  val printErrors: PartialFunction[Throwable, IO[Unit]] = {
+  val printErrors: PartialFunction[Throwable, IO[ExitCode]] = {
     case alreadyExists: java.nio.file.FileAlreadyExistsException =>
       printError(s"Output file already exists: ${alreadyExists.getFile}.")
 
@@ -98,6 +103,7 @@ object Main {
       printError(other.getMessage)
   }
 
-  def printError(msg: String): IO[Unit] =
+  def printError(msg: String): IO[ExitCode] =
     IO(Console.err.println(s"${RESET}${RED}[ERROR] ${msg}${RESET}"))
+      .as(ExitCode.Error)
 }

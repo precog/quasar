@@ -17,7 +17,6 @@
 package quasar.mimir
 
 import slamdata.Predef._
-
 import quasar.common.data.Data
 import quasar.contrib.scalacheck.gen
 import quasar.fp.ski.κ
@@ -26,29 +25,29 @@ import quasar.fp.tree.{BinaryArg, TernaryArg, UnaryArg}
 import quasar.precog.common.RValue
 import quasar.qscript._
 import quasar.std.StdLibSpec
+import quasar.yggdrasil.vfs.contextShiftForS
+
 import qdata.time.{DateTimeInterval, TimeGenerators}
+import java.nio.file.Files
+import java.time.{Duration => _, _}
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 
+import cats.effect.IO
 import org.scalacheck.{Arbitrary, Gen}
-
 import org.specs2.execute.{Result, Skipped}
 import org.specs2.specification.{AfterAll, Scope}
-
-import java.time.{Duration => _, _}
-
 import matryoshka.AlgebraM
 import matryoshka.data.{Fix, freeRecursive}
 import matryoshka.implicits._
 import matryoshka.patterns._
-
-import scalaz.{\/, Id}
+import scalaz.{Id, \/}
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-import java.nio.file.Files
-
 class MimirStdLibSpec extends StdLibSpec with PrecogCake {
+
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
 
   private val notImplemented: Result = Skipped("TODO")
 
@@ -223,9 +222,14 @@ class MimirStdLibSpec extends StdLibSpec with PrecogCake {
 }
 
 trait PrecogCake extends Scope with AfterAll {
-  private val caked = Precog(Files.createTempDirectory("mimir").toFile()).unsafeRunSync
 
-  val cake = caked.unsafeValue
+  val blockingPool: ExecutionContext
+
+  implicit lazy val cs = IO.contextShift(global)
+
+  private lazy val caked = Precog(Files.createTempDirectory("mimir").toFile(), blockingPool).unsafeRunSync
+
+  lazy val cake = caked.unsafeValue
 
   def afterAll(): Unit = caked.dispose.unsafeRunSync
 }

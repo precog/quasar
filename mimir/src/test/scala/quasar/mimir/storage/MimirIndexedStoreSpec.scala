@@ -22,11 +22,12 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.IndexedStoreSpec
 import quasar.mimir.Precog
 import quasar.precog.common.RValue
-import quasar.yggdrasil.vfs.ResourceError
+import quasar.yggdrasil.vfs.{contextShiftForS, ResourceError}
 
 import java.nio.file.Files
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext, ExecutionContext.Implicits.global
 import scala.util.Random
-import scala.concurrent.ExecutionContext.Implicits.global
 
 import cats.effect.IO
 import monocle.Prism
@@ -34,6 +35,9 @@ import pathy.Path._
 import shims._
 
 final class MimirIndexedStoreSpec extends IndexedStoreSpec[IO, StoreKey, RValue] {
+
+  val blockingPool = ExecutionContext.fromExecutor(Executors.newCachedThreadPool)
+
   implicit val ioMonadResourceError: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](Prism.partial[Throwable, ResourceError] {
       case e: RuntimeException => ResourceError.corrupt(e.getMessage)
@@ -42,7 +46,7 @@ final class MimirIndexedStoreSpec extends IndexedStoreSpec[IO, StoreKey, RValue]
   lazy val P = {
     val init = for {
       tmpDir <- IO(Files.createTempDirectory("mimir-indexed-store-spec-"))
-      precog <- Precog(tmpDir.toFile)
+      precog <- Precog(tmpDir.toFile, blockingPool)
       result = precog.onDispose(deleteRecursively[IO](tmpDir))
     } yield result
 

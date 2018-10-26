@@ -21,6 +21,7 @@ import slamdata.Predef._
 import quasar.api.datasource._
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableName
+import quasar.mimir.evaluate.Pushdown
 import quasar.run.optics.{stringUuidP => UuidString}
 import quasar.sql.Query
 
@@ -45,6 +46,7 @@ object Command {
   private val SummaryCountPattern          = """(?i)(?:set +)?summaryCount *= *(\d+)""".r
   private val FormatPattern                = "(?i)(?:set +)?format *= *((?:table)|(?:precise)|(?:readable)|(?:csv)|(?:homogeneouscsv))".r
   private val ModePattern                  = "(?i)(?:set +)?mode *= *((?:console)|(?:file))".r
+  private val SetPushdownPattern           = "(?i)(?:set +)?pushdown *= *((?:true)|(?:false))".r
   private val SetVarPattern                = """(?i)(?:set +)?(\w+) *= *(.*\S)""".r
   private val UnsetVarPattern              = """(?i)unset +(\w+)""".r
   private val ListVarPattern               = "(?i)env".r
@@ -80,6 +82,7 @@ object Command {
   final case class SetTimingFormat(format: TimingFormat) extends Command
   final case class SetVar(name: VarName, value: VarValue) extends Command
   final case class UnsetVar(name: VarName) extends Command
+  final case class SetPushdown(pushdown: Pushdown) extends Command
 
   final case object DatasourceList extends Command
   final case object DatasourceTypes extends Command
@@ -109,6 +112,7 @@ object Command {
       case SummaryCountPattern(rows)                => SummaryCount(rows.toInt)
       case FormatPattern(format)                    => Format(OutputFormat.fromString(format) | OutputFormat.Precise)
       case ModePattern(mode)                        => Mode(OutputMode.fromString(mode) | OutputMode.Console)
+      case SetPushdownPattern(pd)                   => SetPushdown(PushdownMode.fromString(pd) | Pushdown.EnablePushdown)
       case HelpPattern()                            => Help
       case SetVarPattern(name, value)               => SetVar(VarName(name), VarValue(value))
       case UnsetVarPattern(name)                    => UnsetVar(VarName(name))

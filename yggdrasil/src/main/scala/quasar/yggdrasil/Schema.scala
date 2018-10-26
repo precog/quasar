@@ -53,27 +53,6 @@ object Schema {
     case _                => Set.empty
   }
 
-  def cpath(jtype: JType): List[CPath] = {
-    val cpaths = jtype match {
-      case JArrayFixedT(indices) =>
-        indices.toList flatMap { case (idx, tpe) => CPath(CPathIndex(idx)) combine cpath(tpe) }
-      case JObjectFixedT(fields) =>
-        fields.toList flatMap { case (name, tpe) => CPath(CPathField(name)) combine cpath(tpe) }
-      case JArrayHomogeneousT(elemType) =>
-        List(CPath(CPathArray))
-      case _ => Nil
-    }
-
-    cpaths.sorted
-  }
-
-  def sample(jtype: JType, size: Int): Option[JType] = {
-    val paths                        = flatten(jtype, Nil) groupBy { _.selector } toSeq
-    val sampledPaths: Seq[ColumnRef] = scala.util.Random.shuffle(paths).take(size) flatMap { _._2 }
-
-    mkType(sampledPaths)
-  }
-
   def flatten(jtype: JType, refsOriginal: List[ColumnRef]): Set[ColumnRef] = {
     def buildPath(nodes: List[CPathNode], refs: List[ColumnRef], jType: JType): List[ColumnRef] = jType match {
       case JArrayFixedT(indices) if indices.isEmpty =>
@@ -180,26 +159,6 @@ object Schema {
     case CLocalDate             => Some(JLocalDateT)
     case CInterval              => Some(JIntervalT)
     case _                      => None
-  }
-
-  /**
-    * replaces all leaves in `jtype` with `leaf`
-    */
-  def replaceLeaf(jtype: JType)(leaf: JType): JType = {
-    def inner(jtype: JType): JType = jtype match {
-      case JNumberT | JTextT | JBooleanT | JNullT |
-           JLocalDateTimeT | JLocalTimeT | JLocalDateT |
-           JOffsetDateTimeT | JOffsetTimeT | JOffsetDateT |
-           JIntervalT              => leaf
-      case JArrayFixedT(elements)  => JArrayFixedT(elements.mapValues(inner))
-      case JObjectFixedT(fields)   => JObjectFixedT(fields.mapValues(inner))
-      case JUnionT(left, right)    => JUnionT(inner(left), inner(right))
-      case JArrayHomogeneousT(tpe) => JArrayHomogeneousT(inner(tpe))
-      case JArrayUnfixedT          => JArrayUnfixedT
-      case JObjectUnfixedT         => JObjectUnfixedT
-    }
-
-    inner(jtype)
   }
 
   /**

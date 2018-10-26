@@ -25,16 +25,16 @@ import quasar.contrib.scalaz.MonadError_
 import quasar.mimir.MimirCake.Cake
 import quasar.niflheim.NIHDB
 import quasar.precog.common.ColumnRef
-import quasar.yggdrasil.{Config, ExactSize}
+import quasar.yggdrasil.ExactSize
 import quasar.yggdrasil.nihdb.SegmentsWrapper
 import quasar.yggdrasil.vfs.ResourceError
 import quasar.yggdrasil.nihdb.NIHDBProjection
 
 import cats.arrow.FunctionK
-import cats.effect.{IO, LiftIO}
+import cats.effect.{ContextShift, IO, LiftIO}
 
 import fs2.Stream
-import fs2.async.mutable.Signal
+import fs2.concurrent.SignallingRef
 
 import pathy.Path
 
@@ -54,6 +54,7 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
     val cake: Cake,
     tablesPrefix: ADir)(
     implicit ME: MonadError_[F, ResourceError],
+    cs: ContextShift[IO],
     ec: ExecutionContext) {
 
   import cake.{Table => PTable}
@@ -61,21 +62,8 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
   // has overwrite semantics
   def write(key: StoreKey, table: PTable): Stream[F, Unit] = {
 
-    def doWrite(completed: Signal[IO, Boolean]) =
+    def doWrite(completed: SignallingRef[IO, Boolean]) =
       Stream.bracket(cake.createDB(keyToFile(key)).map(_.toOption))({
-        case Some((_, _, db)) =>
-          val can = table.compact(cake.trans.TransSpec1.Id).canonicalize(Config.maxSliceRows)
-
-          (fromStreamT(can.slices).zipWithIndex evalMap {
-            case (slice, offset) =>
-              val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
-              IO.fromFutureShift(
-                IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments)))
-          }) ++ Stream.eval_(completed.set(true))
-
-        case None =>
-          Stream.empty
-      }, {
         case Some((blob, version, db)) =>
           completed.get.flatMap { c =>
             if (c)
@@ -86,10 +74,22 @@ final class MimirPTableStore[F[_]: Monad: LiftIO] private (
 
         case None =>
           IO.pure(())
-      })
+      }).flatMap {
+        case Some((_, _, db)) =>
+          // we assume the table will be compacted/canonicalized before storage, if desired
+          (fromStreamT(table.slices).zipWithIndex evalMap {
+            case (slice, offset) =>
+              val segments = SegmentsWrapper.sliceToSegments(offset.toLong, slice)
+              IO.fromFutureShift(
+                IO(db.insertSegmentsVerified(offset.toLong, slice.size, segments)))
+          }) ++ Stream.eval_(completed.set(true))
+
+        case None =>
+          Stream.empty
+      }
 
     val ios = for {
-      completed <- Stream.eval(fs2.async.signalOf[IO, Boolean](false))
+      completed <- Stream.eval(SignallingRef[IO, Boolean](false))
       res <- doWrite(completed)
     } yield res
 
@@ -154,7 +154,9 @@ object MimirPTableStore {
   def apply[F[_]: Monad: LiftIO: MonadError_[?[_], ResourceError]](
       cake: Cake,
       tablesPrefix: ADir)(
-      implicit ec: ExecutionContext)
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : MimirPTableStore[F] =
     new MimirPTableStore[F](cake, tablesPrefix)
 }

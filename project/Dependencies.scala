@@ -8,9 +8,10 @@ import sbt._
 object Dependencies {
   private val algebraVersion      = "0.7.0"
   private val argonautVersion     = "6.2.2"
+  private val catsEffectVersion   = "1.0.0"
   private val disciplineVersion   = "0.7.2"
-  private val jawnVersion         = "0.11.1"
-  private val jawnfs2Version      = "0.12.2"
+  private val jawnVersion         = "0.13.0"
+  private val jawnfs2Version      = "0.13.0"
   private val matryoshkaVersion   = "0.18.3"
   private val monocleVersion      = "1.4.0"
   private val pathyVersion        = "0.2.11"
@@ -26,7 +27,7 @@ object Dependencies {
   private val specsVersion        = "4.3.3"
   private val spireVersion        = "0.14.1"
   private val akkaVersion         = "2.5.1"
-  private val fs2Version          = "0.10.6"
+  private val fs2Version          = "1.0.0"
   private val qdataVersion        = IO.read(file("./qdata-version")).trim
   private val tectonicVersion     = IO.read(file("./tectonic-version")).trim
   private val slf4sVersion        = "1.7.25"
@@ -37,7 +38,7 @@ object Dependencies {
     "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
     "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
     "com.codecommit"             %% "shims"                     % "1.2.1",
-    "org.typelevel"              %% "cats-effect"               % "0.10.1",
+    "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
     "co.fs2"                     %% "fs2-core"                  % fs2Version,
     "co.fs2"                     %% "fs2-io"                    % fs2Version,
     "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,

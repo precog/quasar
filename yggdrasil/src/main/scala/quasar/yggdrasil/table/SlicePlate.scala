@@ -38,8 +38,6 @@ private[table] final class SlicePlate(precise: Boolean)
 
   import PreciseKeys._
 
-  private val MaxLongStrLength = Long.MinValue.toString.length
-
   private val PreciseKeySet = Set[CPathNode](
     CPathField(LocalDateTimeKey),
     CPathField(LocalDateKey),
@@ -104,18 +102,20 @@ private[table] final class SlicePlate(precise: Boolean)
   }
 
   def num(s: CharSequence, decIdx: Int, expIdx: Int): Signal = {
+    import tectonic.util.{parseLong, parseLongUnsafe, InvalidLong, MaxSafeLongLength}
+
     growArrays()
 
-    if (decIdx < 0 && expIdx < 0 && s.length < MaxLongStrLength) {
+    if (decIdx < 0 && expIdx < 0 && s.length < MaxSafeLongLength) {
       val col = checkGet(ColumnRef(CPath(cursor.reverse), CLong)).asInstanceOf[ArrayLongColumn]
-      col(size) = java.lang.Long.parseLong(s.toString)
+      col(size) = parseLongUnsafe(s)
     } else if (decIdx < 0) {
       try {
-        val ln = java.lang.Long.parseLong(s.toString)
+        val ln = parseLong(s)
         val col = checkGet(ColumnRef(CPath(cursor.reverse), CLong)).asInstanceOf[ArrayLongColumn]
         col(size) = ln
       } catch {
-        case _: NumberFormatException =>
+        case _: InvalidLong =>
           val col = checkGet(ColumnRef(CPath(cursor.reverse), CNum)).asInstanceOf[ArrayNumColumn]
           col(size) = BigDecimal(s.toString)
       }

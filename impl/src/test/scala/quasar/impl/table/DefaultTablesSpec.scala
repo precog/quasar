@@ -38,6 +38,8 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
 
   sequential
 
+  implicit val cs = IO.contextShift(global)
+
   val freshId: IO[UUID] = IO(UUID.randomUUID)
 
   val tableStore: IndexedStore[IO, UUID, TableRef[String]] =

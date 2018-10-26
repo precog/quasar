@@ -29,14 +29,6 @@ import scalaz.syntax.show._
 sealed trait CPath { self =>
   def nodes: List[CPathNode]
 
-  def combine(paths: List[CPath]): List[CPath] =
-    if (paths.isEmpty)
-      List(this)
-    else
-      paths map { path =>
-        CPath(this.nodes ++ path.nodes)
-      }
-
   def \(that: CPath): CPath = CPath(self.nodes ++ that.nodes)
   def \(that: String): CPath = CPath(self.nodes :+ CPathField(that))
   def \(that: Int): CPath = CPath(self.nodes :+ CPathIndex(that))
@@ -46,10 +38,7 @@ sealed trait CPath { self =>
   def \:(that: Int): CPath = CPath(CPathIndex(that) +: self.nodes)
 
   def hasPrefixComponent(p: CPathNode): Boolean = nodes.startsWith(p :: Nil)
-  def hasSuffixComponent(p: CPathNode): Boolean = nodes.endsWith(p :: Nil)
-
   def hasPrefix(p: CPath): Boolean = nodes.startsWith(p.nodes)
-  def hasSuffix(p: CPath): Boolean = nodes.endsWith(p.nodes)
 
   def dropPrefix(p: CPath): Option[CPath] = {
     @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -72,14 +61,10 @@ sealed trait CPath { self =>
   }
 
   def head: Option[CPathNode] = nodes.headOption
-
   def tail: CPath = CPath(nodes.drop(1): _*)
 
-  def path: String = nodes.mkString("")
-
-  def length: Int = nodes.length
-
-  override def toString = if (nodes.isEmpty) "." else path
+  // this is required by a few tests in niflheim
+  override def toString = if (nodes.isEmpty) "." else nodes.mkString("")
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.Overloading"))
@@ -130,9 +115,6 @@ object CPath {
 
   private[this] final case class CompositeCPath(nodes: List[CPathNode]) extends CPath
 
-  private val PathPattern = """\.|(?=\[\d+\])|(?=\[\*\])""".r
-  private val IndexPattern = """^\[(\d+)\]$""".r
-
   val Identity = apply()
 
   def apply(n: CPathNode*): CPath = CompositeCPath(n.toList)
@@ -143,7 +125,11 @@ object CPath {
 
   def unapplySeq(path: String): Option[List[CPathNode]] = Some(parse(path).nodes)
 
+  // TODO parse CPathMeta
   def parse(path: String): CPath = {
+    val PathPattern = """\.|(?=\[\d+\])|(?=\[\*\])""".r
+    val IndexPattern = """^\[(\d+)\]$""".r
+
     @SuppressWarnings(Array(
       "org.wartremover.warts.Equals",
       "org.wartremover.warts.Recursion"))

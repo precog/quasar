@@ -25,15 +25,13 @@ import quasar.yggdrasil.bytecode.JType
 import qdata.QDataDecode
 import qdata.time.{DateTimeInterval, OffsetDate}
 
-import scala.collection.immutable.Set
-
-import cats.effect.{IO, LiftIO}
-
-import scalaz._
-
 import java.nio.CharBuffer
 import java.time.{LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime}
+import scala.collection.immutable.Set
 import scala.concurrent.ExecutionContext
+
+import cats.effect.{ContextShift, IO, LiftIO}
+import scalaz._
 
 // TODO: define better upper/lower bound methods, better comparisons,
 // better names, better everything!
@@ -157,13 +155,15 @@ trait TableModule extends TransSpecModule {
 
     def fromRValues(values: Stream[RValue], maxSliceRows: Option[Int] = None): Table
 
-    def fromQDataStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO, A: QDataDecode](values: fs2.Stream[IO, A])(implicit ec: ExecutionContext): M[Table]
+    def fromQDataStream[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO, A: QDataDecode](values: fs2.Stream[IO, A])(implicit cs: ContextShift[IO], ec: ExecutionContext): M[Table]
 
     def parseJson[M[_]: Monad: MonadFinalizers[?[_], IO]: LiftIO](
         bytes: fs2.Stream[IO, Byte],
         instructions: List[ParseInstruction],
         precise: Boolean = false)(
-        implicit ec: ExecutionContext)
+        implicit
+        cs: ContextShift[IO],
+        ec: ExecutionContext)
         : M[Table]
 
     def align(sourceLeft: Table, alignOnL: TransSpec1, sourceRight: Table, alignOnR: TransSpec1): IO[(Table, Table)]

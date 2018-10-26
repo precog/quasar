@@ -20,8 +20,8 @@ import slamdata.Predef._
 
 import cats.effect.IO
 
-import fs2.{async, Stream}
-import fs2.async.mutable.Signal
+import fs2.Stream
+import fs2.concurrent.SignallingRef
 
 import org.specs2.mutable._
 
@@ -39,6 +39,8 @@ import scala.concurrent.duration._
 
 object PreparationsManagerSpec extends Specification {
   import PreparationsManager._
+
+  implicit val cs = IO.contextShift(global)
 
   "preparations manager" should {
     "prepare a table upon request" in {
@@ -83,8 +85,8 @@ object PreparationsManagerSpec extends Specification {
       val Id = "table-id"
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
-        b <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
+        b <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, String, String, Unit](
           _ => IO.pure(()))(
@@ -146,7 +148,7 @@ object PreparationsManagerSpec extends Specification {
       val results = for {
         manager <- PreparationsManager[IO, Unit, Unit, Unit](
           _ => IO.pure(()))(
-          (_, _) => IO.pure(Stream.raiseError(TestException)))
+          (_, _) => IO.pure(Stream.raiseError[IO](TestException)))
 
         _ <- Stream.eval(manager.prepareTable((), ()))
         event <- manager.notifications.take(1)    // note: this doesn't catch repeated events
@@ -164,11 +166,11 @@ object PreparationsManagerSpec extends Specification {
       case object TestException extends Exception
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, Unit, Unit, Unit](
           _ => IO.pure(()))(
-          (_, _) => IO.pure(Stream.raiseError(TestException).onComplete(Stream.eval_(a.set(true)))))
+          (_, _) => IO.pure(Stream.raiseError[IO](TestException).onComplete(Stream.eval_(a.set(true)))))
 
         _ <- Stream.eval(manager.prepareTable((), ()))
         _ <- Stream.eval(latchGet(a))
@@ -191,7 +193,7 @@ object PreparationsManagerSpec extends Specification {
       val Id = "table-id"
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, String, PreparationsManager[IO, String, _, Unit], Unit](
           { manager =>    // is this not clever? (actually it's probably really stupid; feel free to say so)
@@ -221,8 +223,8 @@ object PreparationsManagerSpec extends Specification {
       val Id = "table-id"
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
-        b <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
+        b <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, String, String, Unit](
           _ => IO.pure(()))(
@@ -248,7 +250,7 @@ object PreparationsManagerSpec extends Specification {
       val Id2 = "identity-2"
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, String, Unit, Unit](
           _ => IO.pure(()),
@@ -277,8 +279,8 @@ object PreparationsManagerSpec extends Specification {
       val Id = "table-id"
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
-        b <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
+        b <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, String, String, Unit](
           _ => IO.pure(()))(
@@ -318,7 +320,7 @@ object PreparationsManagerSpec extends Specification {
       val Id2 = "table-id-2"
 
       val results = for {
-        a <- Stream.eval(async.signalOf[IO, Boolean](false))
+        a <- Stream.eval(SignallingRef[IO, Boolean](false))
 
         manager <- PreparationsManager[IO, String, Unit, Unit](
           _ => IO.pure(()))(
@@ -386,7 +388,7 @@ object PreparationsManagerSpec extends Specification {
     }
   }
 
-  def latchGet(s: Signal[IO, Boolean]): IO[Unit] =
+  def latchGet(s: SignallingRef[IO, Boolean]): IO[Unit] =
     s.discrete.filter(_ == true).take(1).compile.drain
 
   def rethrowInStream(
@@ -395,7 +397,7 @@ object PreparationsManagerSpec extends Specification {
 
     events flatMap {
       case PreparationEvent.PreparationErrored(_, _, _, t) =>
-        Stream.raiseError(t)
+        Stream.raiseError[IO](t)
 
       case event =>
         Stream(event)

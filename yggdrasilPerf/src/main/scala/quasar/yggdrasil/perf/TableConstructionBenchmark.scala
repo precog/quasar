@@ -44,6 +44,8 @@ import java.nio.ByteBuffer
 @State(Scope.Benchmark)
 class TableConstructionBenchmark {
 
+  implicit val cs = IO.contextShift(global)
+
   val P = new TestColumnarTableModule {}
 
   @Param(value = Array(/*"old",*/ "streaming", "tectonic"))

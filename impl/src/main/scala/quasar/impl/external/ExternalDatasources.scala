@@ -40,9 +40,9 @@ import java.util.jar.JarFile
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
-import cats.effect.{Effect, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Effect, Sync, Timer}
 import cats.syntax.applicativeError._
-import fs2.{Segment, Stream}
+import fs2.{Chunk, Stream}
 import fs2.io.file
 import jawn.AsyncParser
 import jawn.support.argonaut.Parser._
@@ -56,15 +56,15 @@ object ExternalDatasources extends Logging {
   val PluginChunkSize = 8192
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
-  def apply[F[_]: Timer](config: ExternalConfig)(
-      implicit F: Effect[F], ec: ExecutionContext)
+  def apply[F[_]: ContextShift: Timer](config: ExternalConfig, blockingPool: ExecutionContext)(
+      implicit F: ConcurrentEffect[F])
       : Stream[F, IMap[DatasourceType, DatasourceModule]] = {
 
     val moduleStream = config match {
       case PluginDirectory(directory) =>
         convert.fromJavaStream(F.delay(Files.list(directory)))
           .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-          .flatMap(loadPlugin[F](_))
+          .flatMap(loadPlugin[F](_, blockingPool))
 
       case ExplodedDirs(modules) =>
         for {
@@ -72,7 +72,7 @@ object ExternalDatasources extends Logging {
 
           (cn, cp) = exploded
 
-          classLoader <- ClassPath.classLoader[Stream[F, ?]](ParentCL, cp)
+          classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, cp))
 
           module <- loadModule[F](cn.value, classLoader)
         } yield module
@@ -89,7 +89,9 @@ object ExternalDatasources extends Logging {
   private val PluginExtSuffix = "." + Plugin.FileExtension
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf", "org.wartremover.warts.Null"))
-  private def loadModule[F[_]: Sync](className: String, classLoader: ClassLoader)
+  private def loadModule[F[_]](
+    className: String, classLoader: ClassLoader)(
+    implicit F: Sync[F])
       : Stream[F, DatasourceModule] = {
 
     def handleFailedLoad[A](s: Stream[F, A]): Stream[F, A] =
@@ -105,7 +107,7 @@ object ExternalDatasources extends Logging {
       }
 
     def loadModule0(clazz: Class[_])(f: Object => DatasourceModule): Stream[F, DatasourceModule] =
-      Sync[Stream[F, ?]].delay(f(clazz.getDeclaredField("MODULE$").get(null)))
+      Stream.eval(F.delay(f(clazz.getDeclaredField("MODULE$").get(null))))
 
     def loadLightweight(clazz: Class[_]): Stream[F, DatasourceModule] =
       loadModule0(clazz) { o =>
@@ -118,7 +120,7 @@ object ExternalDatasources extends Logging {
       }
 
     for {
-      clazz <- Sync[Stream[F, ?]].delay(classLoader.loadClass(className)) recoverWith {
+      clazz <- Stream.eval(F.delay(classLoader.loadClass(className))) recoverWith {
         case cnf: ClassNotFoundException =>
           warnStream[F](s"Could not locate class for datasource module '$className'", Some(cnf))
       }
@@ -127,27 +129,25 @@ object ExternalDatasources extends Logging {
     } yield module
   }
 
-  private def loadPlugin[F[_]: Effect: Timer](
-      pluginFile: Path)(
-      implicit ec: ExecutionContext)
+  private def loadPlugin[F[_]: ContextShift: Effect: Timer](
+    pluginFile: Path,
+    blockingPool: ExecutionContext)
       : Stream[F, DatasourceModule] = {
-
-    val S = Sync[Stream[F, ?]]
 
     for {
       js <-
-        file.readAllAsync[F](pluginFile, PluginChunkSize)
+        file.readAll[F](pluginFile, blockingPool, PluginChunkSize)
           .chunks
           .map(_.toByteBuffer)
           .parseJson[Json](AsyncParser.SingleValue)
 
-      pluginResult <- Plugin.fromJson[Stream[F, ?]](js)
+      pluginResult <- Stream.eval(Plugin.fromJson[F](js))
 
       plugin <- pluginResult.fold(
         (s, c) => warnStream[F](s"Failed to decode plugin from '$pluginFile': $s ($c)", None),
-        _.withAbsolutePaths[Stream[F, ?]](pluginFile.getParent))
+        r => Stream.eval(r.withAbsolutePaths[F](pluginFile.getParent)))
 
-      classLoader <- ClassPath.classLoader[Stream[F, ?]](ParentCL, plugin.classPath)
+      classLoader <- Stream.eval(ClassPath.classLoader[F](ParentCL, plugin.classPath))
 
       mainJar = new JarFile(plugin.mainJar.toFile)
 
@@ -164,24 +164,24 @@ object ExternalDatasources extends Logging {
           warnStream[F](s"No '${Plugin.ManifestAttributeName}' attribute found in Manifest for '$pluginFile'.", None)
 
         case Some(attr) =>
-          S.pure(attr.split(" "))
+          Stream.emit(attr.split(" "))
       }
 
       moduleClass <- if (moduleClasses.isEmpty)
         warnStream[F](s"No classes defined for '${Plugin.ManifestAttributeName}' attribute in Manifest from '$pluginFile'.", None)
       else
-        Stream.segment(Segment.array(moduleClasses)).covary[F]
+        Stream.chunk(Chunk.array(moduleClasses)).covary[F]
 
       mod <- loadModule[F](moduleClass, classLoader)
     } yield mod
   }
 
   private def jarAttribute[F[_]: Sync](j: JarFile, attr: String): Stream[F, Option[String]] =
-    Sync[Stream[F, ?]].delay(Option(j.getManifest.getMainAttributes.getValue(attr)))
+    Stream.eval(Sync[F].delay(Option(j.getManifest.getMainAttributes.getValue(attr))))
 
   private def warnStream[F[_]: Sync](msg: => String, cause: Option[Throwable]): Stream[F, Nothing] =
-    Sync[Stream[F, ?]].delay(cause.fold(log.warn(msg))(log.warn(msg, _))).drain
+    Stream.eval(Sync[F].delay(cause.fold(log.warn(msg))(log.warn(msg, _)))).drain
 
   private def infoStream[F[_]: Sync](msg: => String): Stream[F, Unit] =
-    Sync[Stream[F, ?]].delay(log.info(msg))
+    Stream.eval(Sync[F].delay(log.info(msg)))
 }

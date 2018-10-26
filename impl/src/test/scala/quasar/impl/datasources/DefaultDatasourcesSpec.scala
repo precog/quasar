@@ -23,6 +23,7 @@ import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.contrib.cats.stateT._
 import quasar.contrib.cats.writerT._
+import quasar.contrib.cats.effect.stateT.catsStateTEffect
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadState_
 import quasar.impl.storage.PureIndexedStore

@@ -38,6 +38,8 @@ import shims._
 
 object ToRValuesBenchmark {
 
+  implicit val cs = IO.contextShift(global)
+
   val P = new TestColumnarTableModule {}
 
   def createAndConsumeTable(data: Stream[IO, RValue], bh: Blackhole): IO[Unit] = {

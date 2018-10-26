@@ -161,15 +161,6 @@ object FreeVFSSpecs extends Specification with DisjunctionMatchers {
           case CPR(io) => io
         }.replicateM(4)
 
-        _ <- H.pattern[FreeVFS.VFSVersion] {
-          case CPR(ta) =>
-            ta.map { a =>
-              a mustEqual FreeVFS.currentVFSVersion
-
-              a
-            }
-        }
-
         _ <- H.pattern[Boolean] {
           case CPL(Exists(target)) =>
             IO {

@@ -17,7 +17,6 @@
 package quasar.run
 
 import slamdata.Predef.{Array, Double, SuppressWarnings}
-
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
 import quasar.api.table.Tables
@@ -33,7 +32,7 @@ import quasar.impl.external.{ExternalConfig, ExternalDatasources}
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.table.{DefaultTables, PreparationsManager}
 import quasar.mimir.{MimirRepr, Precog}
-import quasar.mimir.evaluate.MimirQueryFederation
+import quasar.mimir.evaluate.{MimirQueryFederation, Pushdown, PushdownControl}
 import quasar.mimir.storage.{MimirIndexedStore, MimirPTableStore, PTableSchema, StoreKey}
 import quasar.run.implicits._
 import quasar.run.optics._
@@ -44,9 +43,10 @@ import scala.concurrent.ExecutionContext
 import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.~>
-import cats.effect.{ConcurrentEffect, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.concurrent.Ref
 import cats.syntax.flatMap._
-import fs2.{Scheduler, Stream}
+import fs2.Stream
 import matryoshka.data.Fix
 import pathy.Path._
 import scalaz.IMap
@@ -58,7 +58,8 @@ import spire.std.double._
 final class Quasar[F[_]](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
     val tables: Tables[F, UUID, SqlQuery, Stream[F, MimirRepr], PTableSchema],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]])
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, MimirRepr]],
+    val pushdown: PushdownControl[F])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar {
@@ -82,15 +83,21 @@ object Quasar {
     * @param sstSampleSize the number of records to sample when generating SST schemas
     * @param sstParallelism the number of chunks to process in parallel when generating SST schemas
     */
-  def apply[F[_]: ConcurrentEffect: MonadQuasarErr: PhaseResultTell: Timer](
+  def apply[F[_]: ConcurrentEffect: ContextShift: MonadQuasarErr: PhaseResultTell: Timer](
       precog: Precog,
       extConfig: ExternalConfig,
-      sstEvalConfig: SstEvalConfig)(
-      implicit ec: ExecutionContext)
+      sstEvalConfig: SstEvalConfig,
+      blockingPool: ExecutionContext)(
+      implicit
+      cs: ContextShift[IO],
+      ec: ExecutionContext)
       : Stream[F, Quasar[F]] = {
 
     for {
-      extMods <- ExternalDatasources[F](extConfig)
+      pushdownRef <- Stream.eval(Ref.of[F, Pushdown](Pushdown.EnablePushdown))
+      pushdown = new PushdownControl(pushdownRef)
+
+      extMods <- ExternalDatasources[F](extConfig, blockingPool)
 
       modules = extMods.insert(
         LocalDatasourceModule.kind,
@@ -116,15 +123,11 @@ object Quasar {
 
       configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
 
-      scheduler <- Scheduler(corePoolSize = 1, threadPrefix = "quasar-scheduler")
-
       mr <- Stream.bracket(
         DatasourceManagement[Fix, F, UUID, Double](
           modules,
           configured,
-          sstEvalConfig,
-          scheduler))(
-        Stream.emit(_),
+          sstEvalConfig))(
         { case (_, r) => r.get.flatMap(_.traverse_(_.dispose)) })
 
       (mgmt, running) = mr
@@ -134,7 +137,7 @@ object Quasar {
       datasources = DefaultDatasources[F, UUID, Json, SstConfig[Fix[EJson], Double]](
         freshUUID, datasourceRefs, mgmt, mgmt)
 
-      federation = MimirQueryFederation[Fix, F](precog)
+      federation = MimirQueryFederation[Fix, F](precog, pushdown)
 
       pTableStore = MimirPTableStore[F](precog, PreparationLocation)
 
@@ -164,6 +167,6 @@ object Quasar {
               t.asInstanceOf[pTableStore.cake.Table])).covary[F])), // yolo x2
         i => pTableStore.schema(storeKeyUuidP.reverseGet(i)))
 
-    } yield new Quasar(datasources, tables, queryEvaluator)
+    } yield new Quasar(datasources, tables, queryEvaluator, pushdown)
   }
 }

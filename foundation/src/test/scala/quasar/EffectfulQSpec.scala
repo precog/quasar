@@ -21,11 +21,14 @@ import quasar.contrib.cats.effect.effect._
 
 import scala.concurrent.ExecutionContext
 
-import cats.effect.Effect
+import cats.effect.{Effect, IO}
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
 
 abstract class EffectfulQSpec[F[_]: Effect](implicit ec: ExecutionContext) extends Qspec {
+
+  implicit val cs = IO.contextShift(ec)
+
   /** Provides syntax for defining effectful examples:
     *
     * "some example name" >>* {

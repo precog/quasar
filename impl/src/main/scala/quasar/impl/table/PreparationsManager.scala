@@ -22,10 +22,10 @@ import quasar.Condition
 import quasar.api.QueryEvaluator
 import quasar.api.table.PreparationEvent
 
-import cats.effect.{ConcurrentEffect, Effect}
+import cats.effect.{Concurrent, ConcurrentEffect}
 
-import fs2.{async, Stream}
-import fs2.async.mutable.Queue
+import fs2.Stream
+import fs2.concurrent.{Queue, SignallingRef}
 
 // monad/traverse syntax conflict
 import scalaz.{-\/, \/-, \/, Equal, OptionT, Scalaz}, Scalaz._
@@ -39,26 +39,25 @@ import scala.concurrent.duration._
 import java.time.OffsetDateTime
 import java.util.concurrent.ConcurrentHashMap
 
-class PreparationsManager[F[_]: Effect, I, Q, R] private (
+class PreparationsManager[F[_]: Concurrent, I, Q, R] private (
     evaluator: QueryEvaluator[F, Q, R],
     notificationsQ: Queue[F, Option[PreparationEvent[I]]],
     background: Stream[F, Nothing] => F[Unit])(
-    runToStore: (I, R) => F[Stream[F, Unit]])(
-    implicit ec: ExecutionContext) {
+    runToStore: (I, R) => F[Stream[F, Unit]]) {
 
   import PreparationsManager._
 
   private val status: ConcurrentHashMap[I, F[Unit] \/ Preparation[F]] =
     new ConcurrentHashMap[I, F[Unit] \/ Preparation[F]]
 
-  val F = Effect[F]
+  val F = Concurrent[F]
 
   val notifications: Stream[F, PreparationEvent[I]] = notificationsQ.dequeue.unNoneTerminate
 
   // fake Equal for fake parametricity
   def prepareTable(tableId: I, query: Q)(implicit I: Equal[I]): F[Condition[InProgressError[I]]] = {
     for {
-      s <- async.signalOf[F, Boolean](false)
+      s <- SignallingRef[F, Boolean](false)
       cancel = s.set(true)
 
       check <- F.delay(Option(status.putIfAbsent(tableId, -\/(cancel))).isDefined)
@@ -116,8 +115,8 @@ class PreparationsManager[F[_]: Effect, I, Q, R] private (
 
           Stream.bracket(
             F.delay(status.replace(tableId, -\/(cancel), \/-(preparation))))(
-            flag => if (flag) handled else Stream.empty,
-            _ => F.delay(status.remove(tableId, \/-(preparation))).void)
+            _ => F.delay(status.remove(tableId, \/-(preparation))).void
+          ).flatMap(flag => if (flag) handled else Stream.empty)
         }
 
         background(configured.drain).as(Condition.normal[InProgressError[I]]())
@@ -178,14 +177,14 @@ object PreparationsManager {
 
     for {
       q <-
-        Stream.eval(async.boundedQueue[F, Stream[F, Nothing]](maxStreams))
+        Stream.eval(Queue.bounded[F, Stream[F, Nothing]](maxStreams))
 
       notificationsQ <-
-        Stream.eval(async.boundedQueue[F, Option[PreparationEvent[I]]](maxNotifications))
+        Stream.eval(Queue.bounded[F, Option[PreparationEvent[I]]](maxNotifications))
 
       emit = Stream(new PreparationsManager[F, I, Q, R](evaluator, notificationsQ, q.enqueue1(_))(runToStore))
 
-      back <- emit.concurrently(Stream.InvariantOps(q.dequeue).join(maxConcurrency)) onComplete {
+      back <- emit.concurrently(q.dequeue.parJoin(maxConcurrency)) onComplete {
         Stream.eval_(notificationsQ.enqueue1(None))
       }
     } yield back

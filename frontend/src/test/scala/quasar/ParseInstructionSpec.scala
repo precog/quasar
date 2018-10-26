@@ -1020,6 +1020,18 @@ object ParseInstructionSpec {
           input must pivotInto(".a[0]", IdStatus.IncludeId, ParseType.Object)(expected)
         }
       }
+
+      "shift an object under .shifted with IncludeId and only one field" in {
+        val input = ldjson("""
+          { "shifted": { "shifted1": { "foo": "bar" } } }
+          """)
+
+        val expected = ldjson("""
+          { "shifted": ["shifted1", { "foo": "bar" }] }
+          """)
+
+        input must pivotInto(".shifted", IdStatus.IncludeId, ParseType.Object)(expected)
+      }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream

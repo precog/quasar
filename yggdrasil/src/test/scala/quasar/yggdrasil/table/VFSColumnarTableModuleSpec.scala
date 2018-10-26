@@ -54,7 +54,7 @@ object VFSColumnarTableModuleSpec
       val test = for {
         created <- createDB(path) map {
           case \/-(t) => t
-          case -\/(_) => true must_== false
+          case -\/(_) => ko
         }
         (blob: Blob, version: Version, db: NIHDB) = created
 
@@ -62,7 +62,7 @@ object VFSColumnarTableModuleSpec
 
         created2 <- createDB(path) map {
           case \/-(t) => t
-          case -\/(_) => true must_== false
+          case -\/(_) => ko
         }
         (_, version2: Version, db2: NIHDB) = created2
 

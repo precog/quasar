@@ -178,19 +178,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
       case (l,    r)    => f(l.getOrElse(lOrig), r.getOrElse(rOrig)).some
     }
 
-  private def eliminateRightSideProj[A: Equal](func: FreeMapA[A], a: A): Option[FreeMapA[A]] = {
-    val target = Free.point[MapFunc, A](a)
-    val oneRef = Free.roll[MapFunc, A](MFC(ProjectIndex(target, IntLit(1))))
-    val rightCount: Int = func.elgotPara[Int](count(target))
-
-    // all `RightSide` access is through `oneRef`
-    (func.elgotPara[Int](count(oneRef)) ≟ rightCount).option(
-      func.transApoT(substitute(oneRef, target)))
-  }
-
-  private def eliminateRightSideProjUnary(fm: FreeMap): Option[FreeMap] =
-    eliminateRightSideProj(fm, SrcHole)
-
   def qscriptCore[G[a] <: ACopK[a]](implicit QC: QScriptCore :<<: G): Coalesce.Aux[T, QScriptCore, G] =
     new Coalesce[QScriptCore] {
       type IT[F[_]] = T[F]

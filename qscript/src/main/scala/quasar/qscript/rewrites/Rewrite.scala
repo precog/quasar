@@ -161,20 +161,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     case _ => None
   }
 
-  private def findUniqueBuckets(buckets: List[FreeMap]): Option[List[FreeMap]] = {
-    val uniqued = buckets.distinctE.toList
-    (uniqued ≠ buckets).option(uniqued)
-  }
-
-  val uniqueBuckets = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
-    case Reduce(src, bucket, reducers, repair) =>
-      // FIXME: Update indexes into bucket.
-      findUniqueBuckets(bucket).map(Reduce(src, _, reducers, repair))
-    case Sort(src, bucket, order) =>
-      findUniqueBuckets(bucket).map(Sort(src, _, order))
-    case _ => None
-  }
-
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
   // - Subset can have a normalized order _if_ their counts are constant
@@ -200,7 +186,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactQC(_: QScriptCore[T[G]])),
       liftFGTrans[QScriptCore, G, T[G]](qcPrism)(compactLeftShift[G](qcPrism)),
-      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(uniqueBuckets(_: QScriptCore[T[G]])),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
       liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
       liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])

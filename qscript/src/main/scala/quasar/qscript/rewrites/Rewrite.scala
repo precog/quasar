@@ -23,13 +23,10 @@ import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.{ADir, AFile}
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.fp.ski._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore._
 import quasar.qscript.MapFuncsCore._
-
-import scala.collection.immutable.{Map => ScalaMap}
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -178,30 +175,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
     case _ => None
   }
 
-  val compactReductions = λ[QScriptCore ~> (Option ∘ QScriptCore)#λ] {
-    case Reduce(src, bucket, reducers, repair) =>
-      val (_, mapping, newReducers) =
-        // (shift as duplicate reducers are found, new mapping of reducers, resulting reducers)
-        reducers.zipWithIndex.foldLeft[(Int, ScalaMap[Int, Int], List[ReduceFunc[FreeMap]])](
-          (0, scala.collection.immutable.Map[Int, Int](), Nil)) {
-          case ((shift, mapping, lrf), (rf, origIndex)) =>
-            val i = lrf.indexWhere(_ ≟ rf)
-            (i ≟ -1).fold(
-              // when the reducer is new, we apply the shift
-              (shift, mapping + ((origIndex, origIndex - shift)), lrf :+ rf),
-              // when the reducer already exists, we record a shift
-              (shift + 1, mapping + ((origIndex, i)), lrf))
-        }
-      (newReducers ≠ reducers).option(
-        Reduce(
-          src,
-          bucket,
-          newReducers,
-          repair.map(ri => ReduceIndex(ri.idx.map(i => mapping.applyOrElse(i, κ(i)))))))
-
-    case _ => None
-  }
-
   // TODO: add reordering
   // - Filter can be moved ahead of Sort
   // - Subset can have a normalized order _if_ their counts are constant
@@ -228,7 +201,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactQC(_: QScriptCore[T[G]])),
       liftFGTrans[QScriptCore, G, T[G]](qcPrism)(compactLeftShift[G](qcPrism)),
       liftFFTrans[QScriptCore, G, T[G]](qcPrism)(uniqueBuckets(_: QScriptCore[T[G]])),
-      liftFFTrans[QScriptCore, G, T[G]](qcPrism)(compactReductions(_: QScriptCore[T[G]])),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
       liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
       liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])

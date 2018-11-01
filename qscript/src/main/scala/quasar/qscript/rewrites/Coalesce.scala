@@ -48,12 +48,6 @@ trait Coalesce[IN[_]] {
     (implicit QC: QScriptCore[IT, ?] :<<: OUT)
       : IN[IT[F]] => Option[IN[IT[F]]]
 
-  /** Coalesce for types containing EquiJoin. */
-  protected[qscript] def coalesceEJ[F[_]: Functor]
-    (FToOut: F ~> λ[α => Option[OUT[α]]])
-    (implicit EJ: EquiJoin[IT, ?] :<<: OUT)
-      : IN[IT[F]] => Option[OUT[IT[F]]]
-
   /** Coalesce for types containing ThetaJoin. */
   // FOOBAR 5
   protected[qscript] def coalesceTJ[F[_]: Functor]
@@ -107,10 +101,6 @@ trait CoalesceInstances {
             case I(ca) => C.coalesceQC(FToOut).apply(ca).map(I(_))
           }
 
-          def coalesceEJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit EJ: EquiJoin[IT, ?] :<<: OUT) = {
-            case I(ca) => C.coalesceEJ(FToOut).apply(ca)
-          }
-
           def coalesceTJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit TJ: ThetaJoin[IT, ?] :<<: OUT) = {
             case I(ca) => C.coalesceTJ(FToOut).apply(ca)
           }
@@ -136,11 +126,6 @@ trait CoalesceInstances {
               .apply(other.asInstanceOf[CopK[LL, T[F]]]).asInstanceOf[Option[CopK[C ::: LL, T[F]]]]
           }
 
-          def coalesceEJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit EJ: EquiJoin[IT, ?] :<<: OUT) = {
-            case I(ca) => C.coalesceEJ(FToOut).apply(ca)
-            case other => LL.materialize(offset + 1).coalesceEJ(FToOut).apply(other.asInstanceOf[CopK[LL, T[F]]])
-          }
-
           def coalesceTJ[F[_]: Functor](FToOut: F ~> λ[α => Option[OUT[α]]])(implicit TJ: ThetaJoin[IT, ?] :<<: OUT) = {
             case I(ca) => C.coalesceTJ(FToOut).apply(ca)
             case other => LL.materialize(offset + 1).coalesceTJ(FToOut).apply(other.asInstanceOf[CopK[LL, T[F]]])
@@ -158,11 +143,6 @@ trait CoalesceInstances {
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore[IT, ?] :<<: OUT) =
-        κ(None)
-
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin[IT, ?] :<<: OUT) =
         κ(None)
 
       def coalesceTJ[F[_]: Functor]
@@ -202,9 +182,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
 
   private def freeQC(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceQC(coenvPrism[QScriptTotal, Hole]))
-
-  private def freeEJ(branch: FreeQS): FreeQS =
-    freeTotal(branch)(CoalesceTotal.coalesceEJ(coenvPrism[QScriptTotal, Hole].get))
 
   private def freeTJ(branch: FreeQS): FreeQS =
     freeTotal(branch)(CoalesceTotal.coalesceTJ(coenvPrism[QScriptTotal, Hole].get))
@@ -433,19 +410,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         case _ => None
       }
 
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin :<<: OUT) = {
-        case Map(Embed(src), mf) =>
-          (FToOut(src) >>= EJ.prj.apply).map(
-            ej => EJ.inj(EquiJoin.combine.modify(mf.linearize >> (_: JoinFunc))(ej)))
-        case Subset(src, from, sel, count) =>
-          makeBranched(from, count)(ifNeq(freeEJ))((l, r) => QC.inj(Subset(src, l, sel, r)))
-        case Union(src, from, count) =>
-          makeBranched(from, count)(ifNeq(freeEJ))((l, r) => QC.inj(Union(src, l, r)))
-        case _ => None
-      }
-
       def coalesceTJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
         (implicit TJ: ThetaJoin :<<: OUT) = {
@@ -483,11 +447,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
         }
       }
 
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin :<<: OUT) =
-        κ(None)
-
       def coalesceTJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
         (implicit TJ: ThetaJoin :<<: OUT) =
@@ -506,14 +465,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           tj.lBranch, tj.rBranch)(
           ifNeq(freeQC))(
           ThetaJoin(tj.src, _, _, tj.on, tj.f, tj.combine))
-
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin :<<: OUT) =
-        tj => makeBranched(
-          tj.lBranch, tj.rBranch)(
-          ifNeq(freeEJ))((l, r) =>
-          TJ.inj(ThetaJoin(tj.src, l, r, tj.on, tj.f, tj.combine)))
 
       def coalesceTJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])
@@ -559,14 +510,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
           }
           coalesceBranchMaps(branched.getOrElse(ej)) orElse branched
         }
-
-      def coalesceEJ[F[_]: Functor]
-        (FToOut: F ~> λ[α => Option[OUT[α]]])
-        (implicit EJ: EquiJoin :<<: OUT) =
-        ej => makeBranched(
-          ej.lBranch, ej.rBranch)(
-          ifNeq(freeEJ))((l, r) =>
-          EJ.inj(EquiJoin(ej.src, l, r, ej.key, ej.f, ej.combine)))
 
       def coalesceTJ[F[_]: Functor]
         (FToOut: F ~> λ[α => Option[OUT[α]]])

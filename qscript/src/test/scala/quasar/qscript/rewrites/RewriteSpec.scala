@@ -37,12 +37,9 @@ import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
 
 class RewriteSpec extends quasar.Qspec with QScriptHelpers {
-  import IdStatus.{ExcludeId, IncludeId}
+  import IdStatus.ExcludeId
 
   val rewrite = new Rewrite[Fix]
-
-  def normalizeExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](rewrite.normalizeTJ[QS])
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
@@ -106,75 +103,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
           ShiftType.Array,
           OnUndefined.Omit,
           func.RightSide).unFix.some)
-    }
-
-    "coalesce a Filter into a preceding ThetaJoin" in {
-      import qstdsl._
-      val sampleFile = rootDir </> file("bar")
-
-      val exp =
-        fix.Filter(
-          fix.ThetaJoin(
-            fix.Unreferenced,
-            free.ShiftedRead[AFile](sampleFile, IncludeId),
-            free.ShiftedRead[AFile](sampleFile, IncludeId),
-            func.And(
-              func.Eq(func.ProjectKeyS(func.LeftSide, "l_id"), func.ProjectKeyS(func.RightSide, "r_id")),
-              func.Eq(
-                func.Add(
-                  func.ProjectKeyS(func.LeftSide, "l_min"),
-                  func.ProjectKeyS(func.LeftSide, "l_max")),
-                func.Subtract(
-                  func.ProjectKeyS(func.RightSide, "l_max"),
-                  func.ProjectKeyS(func.RightSide, "l_min")))),
-            JoinType.Inner,
-            func.StaticMapS(
-              "l" -> func.LeftSide,
-              "r" -> func.RightSide)),
-          recFunc.Lt(
-            recFunc.ProjectKeyS(
-              recFunc.ProjectKeyS(recFunc.Hole, "l"),
-              "lat"),
-            recFunc.ProjectKeyS(
-              recFunc.ProjectKeyS(recFunc.Hole, "l"),
-              "lon"))).unFix
-
-      Coalesce[Fix, QST, QST].coalesceTJ(idPrism[QST].get).apply(exp).map(rewrite.normalizeTJ[QST]) must
-      equal(
-        fix.ThetaJoin(
-          fix.Unreferenced,
-          free.ShiftedRead[AFile](sampleFile, IncludeId),
-          free.ShiftedRead[AFile](sampleFile, IncludeId),
-          func.And(
-            func.And(
-              func.Eq(func.ProjectKeyS(func.LeftSide, "l_id"), func.ProjectKeyS(func.RightSide, "r_id")),
-              func.Eq(
-                func.Add(
-                  func.ProjectKeyS(func.LeftSide, "l_min"),
-                  func.ProjectKeyS(func.LeftSide, "l_max")),
-                func.Subtract(
-                  func.ProjectKeyS(func.RightSide, "l_max"),
-                  func.ProjectKeyS(func.RightSide, "l_min")))),
-            func.Lt(
-              func.ProjectKeyS(
-                func.ProjectKeyS(
-                  func.StaticMapS(
-                    "l" -> func.LeftSide,
-                    "r" -> func.RightSide),
-                  "l"),
-                "lat"),
-              func.ProjectKeyS(
-                func.ProjectKeyS(
-                  func.StaticMapS(
-                    "l" -> func.LeftSide,
-                    "r" -> func.RightSide),
-                  "l"),
-                "lon"))),
-          JoinType.Inner,
-          func.StaticMapS(
-            "l" -> func.LeftSide,
-            "r" -> func.RightSide)).unFix.some)
-
     }
 
     "simplify an outer ThetaJoin with a statically known condition" in {

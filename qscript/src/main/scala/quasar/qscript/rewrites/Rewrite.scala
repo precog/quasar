@@ -105,31 +105,6 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
       : T[F] => T[H] =
     shiftRead[F, G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
 
-
-  // TODO: These optimizations should give rise to various property tests:
-  //       • elideNopMap ⇒ no `Map(???, HoleF)`
-  //       • normalize ⇒ a whole bunch, based on MapFuncsCore
-  //       • coalesceMaps ⇒ no `Map(Map(???, ???), ???)`
-  //       • coalesceMapJoin ⇒ no `Map(ThetaJoin(???, …), ???)`
-
-  def elideNopQC[F[_]: Functor]: QScriptCore[T[F]] => Option[F[T[F]]] = {
-    case Filter(Embed(src), RecBoolLit(true)) => some(src)
-    case Map(Embed(src), mf) if mf ≟ HoleR    => some(src)
-    case _                                    => none
-  }
-
-  // TODO: add reordering
-  // - Filter can be moved ahead of Sort
-  // - Subset can have a normalized order _if_ their counts are constant
-  //   (maybe in some additional cases)
-
-  // The order of optimizations is roughly this:
-  // - elide NOPs
-  // - read conversion given to us by the filesystem
-  // - convert any remaning projects to maps
-  // - coalesce nodes
-  // - normalize mapfunc
-  //
   // FOOBAR 6
   private def applyNormalizations[F[a] <: ACopK[a]: Functor, G[_]: Functor](
     prism: PrismNT[G, F],
@@ -142,8 +117,7 @@ class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[
 
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
-      liftFGTrans[F, G, T[G]](prism)(normalizeJoins),
-      liftFGTrans[QScriptCore, G, T[G]](qcPrism)(elideNopQC[G])
+      liftFGTrans[F, G, T[G]](prism)(normalizeJoins)
     ))(prism(ftf))
   }
 

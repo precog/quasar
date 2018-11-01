@@ -47,11 +47,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
 
-  def compactLeftShiftExpr(expr: Fix[QS]): Fix[QS] =
-    expr.transCata[Fix[QS]](liftFG[QScriptCore, QS, Fix[QS]](
-      injectRepeatedly[QScriptCore, QS, Fix[QS]](
-        rewrite.compactLeftShift[QS](PrismNT.injectCopK).apply(_: QScriptCore[Fix[QS]]))))
-
   def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
     expr.transCata[Fix[QST]](
       (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))(qst)) >>>
@@ -329,58 +324,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             "b" -> func.RightSide))
 
       includeToExcludeExpr(originalQScript) must_= expectedQScript
-    }
-
-    "transform a left shift with a static array as the source" in {
-      import qsdsl._
-      val original: Fix[QS] =
-        fix.LeftShift(
-          fix.Map(
-            fix.Root,
-            recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))),
-          recFunc.Hole,
-          ExcludeId,
-          ShiftType.Array,
-          OnUndefined.Emit,
-          func.StaticMapS(
-            "right" -> func.RightSide,
-            "left" -> func.LeftSide))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Root,
-          recFunc.StaticMapS(
-            "right" -> recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))),
-            "left" -> recFunc.MakeArray(recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3))))))
-
-      compactLeftShiftExpr(original) must equal(expected)
-    }
-
-    "transform a left shift with a static array as the struct" in {
-      import qsdsl._
-      val original: Fix[QS] =
-        fix.LeftShift(
-          fix.Map(
-            fix.Root,
-            recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
-          recFunc.MakeArray(recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5)))),
-          ExcludeId,
-          ShiftType.Array,
-          OnUndefined.Emit,
-          func.StaticMapS(
-            "right" -> func.RightSide,
-            "left" -> func.LeftSide))
-
-      val expected: Fix[QS] =
-        fix.Map(
-          fix.Map(
-            fix.Root,
-            recFunc.Add(recFunc.Hole, recFunc.Constant(json.int(3)))),
-          recFunc.StaticMapS(
-            "right" -> recFunc.Subtract(recFunc.Hole, recFunc.Constant(json.int(5))),
-            "left" -> recFunc.Hole))
-
-      compactLeftShiftExpr(original) must equal(expected)
     }
   }
 }

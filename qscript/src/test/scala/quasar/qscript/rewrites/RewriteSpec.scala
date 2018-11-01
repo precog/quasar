@@ -19,7 +19,7 @@ package quasar.qscript.rewrites
 import slamdata.Predef._
 import quasar._
 import quasar.common.JoinType
-import quasar.contrib.pathy.{ADir, AFile}
+import quasar.contrib.pathy.AFile
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.contrib.iota.SubInject
@@ -46,11 +46,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
 
   def simplifyJoinExpr(expr: Fix[QS]): Fix[QST] =
     expr.transCata[Fix[QST]](SimplifyJoin[Fix, QS, QST].simplifyJoin(idPrism.reverseGet))
-
-  def includeToExcludeExpr(expr: Fix[QST]): Fix[QST] =
-    expr.transCata[Fix[QST]](
-      (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, ADir](idPrism))(qst)) >>>
-      (qst => repeatedly[QST[Fix[QST]]](Coalesce[Fix, QST, QST].coalesceSR[QST, AFile](idPrism))(qst)))
 
   type QSI[A] = CopK[QScriptCore ::: ProjectBucket ::: ThetaJoin ::: Const[DeadEnd, ?] ::: TNilK, A]
 
@@ -276,54 +271,6 @@ class RewriteSpec extends quasar.Qspec with QScriptHelpers {
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.LeftK),
             recFunc.ProjectKeyS(recFunc.Hole, SimplifyJoin.RightK)))
       }
-    }
-
-    "transform a ShiftedRead with IncludeId to ExcludeId when possible" in {
-      import qstdsl._
-      val sampleFile = rootDir </> file("bar")
-
-      val originalQScript =
-        fix.Map(
-          fix.ShiftedRead[AFile](sampleFile, IncludeId),
-          recFunc.Add(
-            recFunc.ProjectIndexI(recFunc.Hole, 1),
-            recFunc.ProjectIndexI(recFunc.Hole, 1)))
-
-      val expectedQScript =
-        fix.Map(
-          fix.ShiftedRead[AFile](sampleFile, ExcludeId),
-          recFunc.Add(recFunc.Hole, recFunc.Hole))
-
-      includeToExcludeExpr(originalQScript) must_= expectedQScript
-    }
-
-    "transform a ShiftedRead inside a LeftShift to ExcludeId when possible" in {
-      import qstdsl._
-      val sampleFile = rootDir </> file("bar")
-
-      val originalQScript =
-        fix.LeftShift(
-          fix.ShiftedRead[AFile](sampleFile, IncludeId),
-          recFunc.ProjectKeyS(recFunc.ProjectIndexI(recFunc.Hole, 1), "foo"),
-          ExcludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          func.StaticMapS(
-            "a" -> func.ProjectKeyS(func.ProjectIndexI(func.LeftSide, 1), "quux"),
-            "b" -> func.RightSide))
-
-      val expectedQScript =
-        fix.LeftShift(
-          fix.ShiftedRead[AFile](sampleFile, ExcludeId),
-          recFunc.ProjectKeyS(recFunc.Hole, "foo"),
-          ExcludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          func.StaticMapS(
-            "a" -> func.ProjectKeyS(func.LeftSide, "quux"),
-            "b" -> func.RightSide))
-
-      includeToExcludeExpr(originalQScript) must_= expectedQScript
     }
   }
 }

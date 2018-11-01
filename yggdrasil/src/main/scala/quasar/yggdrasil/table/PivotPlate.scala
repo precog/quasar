@@ -16,7 +16,7 @@
 
 package quasar.yggdrasil.table
 
-import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
+import quasar.{CompositeParseType, IdStatus, ParseType}
 import quasar.common.{CPath, CPathField, CPathIndex, CPathMeta, CPathNode}
 
 import tectonic.{DelegatingPlate, Plate, Signal}

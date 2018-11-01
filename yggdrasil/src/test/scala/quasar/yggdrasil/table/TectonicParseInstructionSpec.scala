@@ -36,7 +36,13 @@ object TectonicParseInstructionSpec extends ParseInstructionSpec {
     evalPlate(stream)(new IdsPlate(_))
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
-    evalPlate(stream)(new PivotPlate(pivot, _))
+    if (pivot.pivots.size == 1)
+      pivot.pivots.head match {
+        case (path, (idStatus, structure)) =>
+          evalPlate(stream)(new PivotPlate(path, idStatus, structure, _))
+      }
+    else
+      sys.error(s"Cannot evaluate mutiple pivots")
 
   private def evalPlate(stream: JsonStream)(f: Plate[List[Event]] => Plate[List[Event]]): JsonStream = {
     val plate = f(new ReifiedTerminalPlate)

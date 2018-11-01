@@ -36,7 +36,13 @@ object RValueParseInstructionSpec
     stream.flatMap(RValueParseInstructionInterpreter.interpretMask(mask, _).toList)
 
   def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream =
-    stream.flatMap(RValueParseInstructionInterpreter.interpretPivot(pivot, _))
+    if (pivot.pivots.size == 1)
+      pivot.pivots.head match {
+        case (path, (status, structure)) =>
+          stream.flatMap(RValueParseInstructionInterpreter.interpretPivot(path, status, structure, _))
+      }
+    else
+      scala.sys.error(s"Multiple pivots not supported")
 
   def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream =
     stream.map(RValueParseInstructionInterpreter.interpretWrap(wrap, _))

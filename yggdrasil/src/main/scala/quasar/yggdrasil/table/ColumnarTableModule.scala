@@ -391,8 +391,14 @@ trait ColumnarTableModule
         case (instr @ ParseInstruction.Mask(_), plate) =>
           new MaskPlate(instr, plate)
 
-        case (instr @ ParseInstruction.Pivot(_, _, _), plate) =>
-          new PivotPlate(instr, plate)
+        case (instr @ ParseInstruction.Pivot(pivots), plate) =>
+          if (pivots.size == 1)
+            pivots.head match {
+              case (path, (idStatus, structure)) =>
+                new PivotPlate(path, idStatus, structure, plate)
+            }
+          else
+            sys.error("Multiple pivots not supported")
       }
 
       val jsonMode =

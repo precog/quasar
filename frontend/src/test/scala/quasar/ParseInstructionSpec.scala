@@ -1055,7 +1055,7 @@ object ParseInstructionSpec {
         expected: JsonStream)
         : Matcher[JsonStream] =
       bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalPivot(Pivot(CPath.parse(path), idStatus, structure), str)
+        evalPivot(Pivot(Map((CPath.parse(path), (idStatus, structure)))), str)
       }
   }
 }

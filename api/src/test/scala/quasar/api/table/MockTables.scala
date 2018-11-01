@@ -126,7 +126,7 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
       store.put(updatedMap)
     }
 
-    cancelled >> ().point[F]
+    cancelled.void
   }
 
   // the live data is the query

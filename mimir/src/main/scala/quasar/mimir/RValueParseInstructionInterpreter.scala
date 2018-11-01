@@ -21,7 +21,7 @@ import slamdata.Predef.List
 import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Ids, Mask, Pivot, Wrap}
-import quasar.common.{CPathField, CPathIndex, CPathNode}
+import quasar.common.{CPath, CPathField, CPathIndex, CPathNode}
 import quasar.precog.common._
 
 import scalaz.syntax.std.stream._
@@ -33,8 +33,14 @@ object RValueParseInstructionInterpreter {
       case (prev, instr @ Mask(_)) =>
         prev.flatMap(interpretMask(instr, _).toList)
 
-      case (prev, instr @ Pivot(_, _, _)) =>
-        prev.flatMap(interpretPivot(instr, _))
+      case (prev, instr @ Pivot(pivots)) =>
+        if (pivots.size == 1)
+          pivots.head match {
+            case (path, (idStatus, structure)) =>
+              prev.flatMap(interpretPivot(path, idStatus, structure, _))
+          }
+        else
+          scala.sys.error("Multiple pivots not supported for RValue interpretation")
 
       case (prev, instr @ Wrap(_, _)) =>
         prev.flatMap(interpretWrap(instr, _) :: Nil)
@@ -136,10 +142,8 @@ object RValueParseInstructionInterpreter {
     inner(input, rvalue)
   }
 
-  def interpretPivot(pivot: Pivot, rvalue: RValue): List[RValue] = {
-    val structure: CompositeParseType = pivot.structure
-    val status: IdStatus = pivot.idStatus
-
+  def interpretPivot(path: CPath, status: IdStatus, structure: CompositeParseType, rvalue: RValue)
+      : List[RValue] = {
     def inner(remaining: List[CPathNode], rvalue: RValue): List[RValue] =
       remaining match {
         // perform the pivot
@@ -214,7 +218,7 @@ object RValueParseInstructionInterpreter {
           scala.sys.error(s"Cannot pivot through $nodes")
       }
 
-    inner(pivot.path.nodes, rvalue)
+    inner(path.nodes, rvalue)
   }
 
   def interpretWrap(wrap: Wrap, rvalue: RValue): RValue = {

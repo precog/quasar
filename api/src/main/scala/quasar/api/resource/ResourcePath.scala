@@ -23,6 +23,7 @@ import quasar.fp.ski.{ι, κ}
 import monocle.{Iso, Prism}
 import pathy.Path._
 import scalaz.{ICons, IList, INil, Order, Show}
+import scalaz.syntax.equal._
 
 /** Identifies a resource in a datasource. */
 sealed trait ResourcePath extends Product with Serializable {
@@ -56,6 +57,21 @@ sealed trait ResourcePath extends Product with Serializable {
     ResourcePath.resourceNamesIso(
       ResourcePath.resourceNamesIso.get(this) ++
         ResourcePath.resourceNamesIso.get(path))
+
+  def relativeTo(path: ResourcePath): Option[ResourcePath] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
+    @tailrec
+    def go(base: IList[ResourceName], tgt: IList[ResourceName]): Option[ResourcePath] =
+      (base, tgt) match {
+        case (ICons(bh, bt), ICons(th, tt)) if bh === th => go(bt, tt)
+        case (INil(), t) => Some(ResourcePath.resourceNamesIso(t))
+        case _ => None
+      }
+
+    go(
+      ResourcePath.resourceNamesIso.get(path),
+      ResourcePath.resourceNamesIso.get(this))
+  }
 
   def toPath: APath =
     fold(ι, rootDir)

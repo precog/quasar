@@ -16,8 +16,8 @@
 
 package quasar.yggdrasil.table
 
-import quasar.{IdStatus, ParseInstruction, ParseType}
-import quasar.common.{CPathField, CPathIndex, CPathMeta, CPathNode}
+import quasar.{CompositeParseType, IdStatus, ParseInstruction, ParseType}
+import quasar.common.{CPath, CPathField, CPathIndex, CPathMeta, CPathNode}
 
 import tectonic.{DelegatingPlate, Plate, Signal}
 
@@ -25,12 +25,12 @@ import scala.annotation.tailrec
 
 // currently assumes retain = false, meaning you *cannot* have any non-shifted stuff in the row
 private[table] final class PivotPlate[A](
-    pivot: ParseInstruction.Pivot,
+    path: CPath,
+    idStatus: IdStatus,
+    structure: CompositeParseType,
     delegate: Plate[A])
     extends DelegatingPlate(delegate)
     with CPathPlate[A] {
-
-  import pivot._
 
   private val rfocus = path.nodes.reverse
   private val rfocusPlus1 = CPathIndex(1) :: rfocus

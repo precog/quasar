@@ -21,7 +21,7 @@ import slamdata.Predef.{Map => SMap, _}
 import quasar.{ParseType, Qspec}
 import quasar.IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.ParseInstruction.{Mask, Pivot, Wrap}
-import quasar.common.{CPath, CPathField, CPathIndex}
+import quasar.common.CPath
 import quasar.contrib.iota._
 import quasar.contrib.pathy._
 import quasar.ejson.{EJson, Fixed}
@@ -78,12 +78,12 @@ object RewritePushdownSpec extends Qspec {
 
     "find the path of a single object projection" >> {
       pushdown.findPath(funcE.ProjectKeyS(funcE.Hole, "xyz")) must equal(
-        Some(CPath(CPathField("xyz"))))
+        Some(CPath.parse(".xyz")))
     }
 
     "find the path of a single array projection" >> {
       pushdown.findPath(funcE.ProjectIndexI(funcE.Hole, 7)) must equal(
-        Some(CPath(CPathIndex(7))))
+        Some(CPath.parse("[7]")))
     }
 
     "find the path of a triple object projection" >> {
@@ -97,7 +97,7 @@ object RewritePushdownSpec extends Qspec {
           "ccc")
 
       pushdown.findPath(fm) must equal(
-        Some(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"))))
+        Some(CPath.parse(".aaa.bbb.ccc")))
     }
 
     "find the path of a triple array projection" >> {
@@ -111,7 +111,7 @@ object RewritePushdownSpec extends Qspec {
           0)
 
       pushdown.findPath(fm) must equal(
-        Some(CPath(CPathIndex(2), CPathIndex(6), CPathIndex(0))))
+        Some(CPath.parse("[2][6][0]")))
     }
 
     "find the path of an array projection and object projection" >> {
@@ -125,7 +125,7 @@ object RewritePushdownSpec extends Qspec {
           "ccc")
 
       pushdown.findPath(fm) must equal(
-        Some(CPath(CPathField("aaa"), CPathIndex(42), CPathField("ccc"))))
+        Some(CPath.parse(".aaa[42].ccc")))
     }
 
     "fail find the path of an object projection with a non-string key" >> {
@@ -224,7 +224,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey), 0)),
@@ -251,7 +251,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), IdOnly, ParseType.Object))),
+                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (IdOnly, ParseType.Object)))))),
             recFuncE.MakeMapS("k1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
@@ -275,7 +275,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), ExcludeId, ParseType.Object))),
+                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (ExcludeId, ParseType.Object)))))),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey)))
 
@@ -303,7 +303,7 @@ object RewritePushdownSpec extends Qspec {
               List(
                 Mask(SMap((CPath.Identity, Set(ParseType.Object)))),
                 Wrap(CPath.Identity, ShiftedKey),
-                Pivot(CPath(CPathField(ShiftedKey)), ExcludeId, ParseType.Object))),
+                Pivot(SMap((CPath.parse(s".$ShiftedKey"), (ExcludeId, ParseType.Object)))))),
             recFuncE.MakeMapS("v1",
               recFuncE.ProjectKeyS(recFuncE.Hole, ShiftedKey))),
           recFuncE.Constant(ejs.bool(true)))
@@ -328,9 +328,9 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               List(
-                Mask(SMap((CPath(CPathField("xyz")), Set(ParseType.Object)))),
-                Wrap(CPath(CPathField("xyz")), ShiftedKey),
-                Pivot(CPath(CPathField("xyz"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Mask(SMap((CPath.parse(".xyz"), Set(ParseType.Object)))),
+                Wrap(CPath.parse(".xyz"), ShiftedKey),
+                Pivot(SMap((CPath.parse(s".xyz.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
@@ -370,9 +370,9 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               List(
-                Mask(SMap((CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc")), Set(ParseType.Object)))),
-                Wrap(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc")), ShiftedKey),
-                Pivot(CPath(CPathField("aaa"), CPathField("bbb"), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Mask(SMap((CPath.parse(".aaa.bbb.ccc"), Set(ParseType.Object)))),
+                Wrap(CPath.parse(".aaa.bbb.ccc"), ShiftedKey),
+                Pivot(SMap((CPath.parse(s".aaa.bbb.ccc.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
@@ -413,9 +413,9 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               List(
-                Mask(SMap((CPath(CPathField("aaa"), CPathIndex(42), CPathField("ccc")), Set(ParseType.Object)))),
-                Wrap(CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc")), ShiftedKey),
-                Pivot(CPath(CPathField("aaa"), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Mask(SMap((CPath.parse(".aaa[42].ccc"), Set(ParseType.Object)))),
+                Wrap(CPath.parse(".aaa[0].ccc"), ShiftedKey),
+                Pivot(SMap((CPath.parse(s".aaa[0].ccc.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(
@@ -455,9 +455,9 @@ object RewritePushdownSpec extends Qspec {
             fixE.InterpretedRead[AFile](
               rootDir </> file("foo"),
               List(
-                Mask(SMap((CPath(CPathIndex(17), CPathIndex(42), CPathField("ccc")), Set(ParseType.Object)))),
-                Wrap(CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc")), ShiftedKey),
-                Pivot(CPath(CPathIndex(0), CPathIndex(0), CPathField("ccc"), CPathField(ShiftedKey)), IncludeId, ParseType.Object))),
+                Mask(SMap((CPath.parse("[17][42].ccc"), Set(ParseType.Object)))),
+                Wrap(CPath.parse("[0][0].ccc"), ShiftedKey),
+                Pivot(SMap((CPath.parse(s"[0][0].ccc.$ShiftedKey"), (IncludeId, ParseType.Object)))))),
             recFuncE.ConcatMaps(
               recFuncE.MakeMapS("k1",
                 recFuncE.ProjectIndexI(

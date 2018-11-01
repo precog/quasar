@@ -105,7 +105,7 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
           val instructions: List[ParseInstruction] = List(
             Mask(SMap((path, Set(tpe)))),
             Wrap(compactedPath, ShiftedKey),
-            Pivot(compactedPath \ ShiftedKey, shiftStatus, tpe))
+            Pivot(SMap((compactedPath \ ShiftedKey, (shiftStatus, tpe)))))
 
           val src: T[F] = ER.inj(Const[InterpretedRead[A], T[F]](
             InterpretedRead[A](sr.path, instructions))).embed

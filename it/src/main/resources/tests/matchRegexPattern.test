@@ -6,5 +6,5 @@
     "query": "select city from `zips.data` where city ~ \"OULD.{0,2} CIT\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
-    "expected": ["GOULD CITY", "BOULDER CITY"]
+    "expected": [{"city": "GOULD CITY"}, {"city": "BOULDER CITY"}]
 }

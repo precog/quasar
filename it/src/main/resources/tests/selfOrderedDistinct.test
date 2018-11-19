@@ -9,14 +9,14 @@
 
     "predicate": "initial",
 
-    "expected": ["AARON",
-                 "AARONSBURG",
-                 "ABAC",
-                 "ABBEVILLE",
-                 "ABBOT VILLAGE",
-                 "ABBOTSFORD",
-                 "ABBOTT",
-                 "ABBOTT PARK",
-                 "ABBOTTSTOWN",
-                 "ABBYVILLE"]
+    "expected": [{"city": "AARON"},
+                 {"city": "AARONSBURG"},
+                 {"city": "ABAC"},
+                 {"city": "ABBEVILLE"},
+                 {"city": "ABBOT VILLAGE"},
+                 {"city": "ABBOTSFORD"},
+                 {"city": "ABBOTT"},
+                 {"city": "ABBOTT PARK"},
+                 {"city": "ABBOTTSTOWN"},
+                 {"city": "ABBYVILLE"}]
 }

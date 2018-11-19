@@ -18,8 +18,8 @@
           duplicate results (#732), so we currently don’t ignore the result
           order.",
     "predicate": "exactly",
-    "expected": [{ "name": "Mary Jane", "age": 29, "title": "Dr" },
-                 { "name": "Mary Jane", "age": 29, "title": "Dr" },
-                 { "name": "Mary Jane", "age": 29, "title": "Dr" },
-                 { "name": "Mary Jane", "age": 29, "title": "Dr" }]
+    "expected": [{"profile": { "name": "Mary Jane", "age": 29, "title": "Dr" }},
+                 {"profile": { "name": "Mary Jane", "age": 29, "title": "Dr" }},
+                 {"profile": { "name": "Mary Jane", "age": 29, "title": "Dr" }},
+                 {"profile": { "name": "Mary Jane", "age": 29, "title": "Dr" }}]
 }

@@ -11,10 +11,9 @@
   "ignoreResultOrder": true,
 
   "expected": [
-    "a"
-  , null
-  , "b"
-  , "c"
-  , "d"
-  ]
+    {"foo": "a"},
+    {"foo": null},
+    {"foo": "b"},
+    {"foo": "c"},
+    {"foo": "d"}]
 }

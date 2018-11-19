@@ -7,10 +7,9 @@
      "query": "SELECT DISTINCT (city) FROM `patients.data` WHERE state = \"CO\" ORDER BY city ASC LIMIT 5",
     "predicate": "exactly",
     "expected": [
-      "ANTONITO",
-      "ARAPAHOE",
-      "ARBOLES" ,
-      "ARRIBA"  ,
-      "ARVADA"  
-    ]
+      {"city": "ANTONITO"},
+      {"city": "ARAPAHOE"},
+      {"city": "ARBOLES"},
+      {"city": "ARRIBA"},
+      {"city": "ARVADA"}]
 }

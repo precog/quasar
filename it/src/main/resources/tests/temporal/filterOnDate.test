@@ -12,5 +12,5 @@
                 or date_trunc(\"day\", ts) = start_of_day(offsetdate(\"2014-08-22+00:00\"))",
     "predicate": "exactly",
     "ignoreResultOrder": true,
-    "expected": ["Monday", "Wednesday", "Friday"]
+    "expected": [{"day": "Monday"}, {"day": "Wednesday"}, {"day": "Friday"}]
 }

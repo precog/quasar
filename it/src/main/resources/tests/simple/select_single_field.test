@@ -12,5 +12,5 @@
 
   "ignoreFieldOrder": false,
 
-  "expected": [4, 42]
+  "expected": [{"num": 4}, {"num": 42}]
 }

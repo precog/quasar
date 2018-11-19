@@ -6,5 +6,8 @@
     "query": "select distinct discipline from `demo/olympics.data` where event like \"%pursuit\"",
     "predicate": "exactly",
     "ignoreResultOrder": true,
-    "expected": ["Speed skating", "Biathlon", "Cross Country S"]
+    "expected": [
+      {"discipline": "Speed skating"},
+      {"discipline": "Biathlon"},
+      {"discipline": "Cross Country S"}]
 }

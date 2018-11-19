@@ -5,7 +5,7 @@
     "mimir":     "ignoreFieldOrder"
   },
   "data": ["demo/patients.data", "zips.data"],
-  "query": "SELECT first_name, last_name FROM `demo/patients.data` AS p where state in (SELECT DISTINCT state FROM `zips.data`) ORDER BY last_name, first_name",
+  "query": "SELECT first_name, last_name FROM `demo/patients.data` AS p where state in (SELECT DISTINCT state FROM `zips.data`).state ORDER BY last_name, first_name",
   "predicate": "initial",
   "expected": [
     { "first_name": "Adelina", "last_name": "Abbott" },

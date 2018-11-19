@@ -4,5 +4,5 @@
     "query": "select city from `zips.data` where city like \"%OULD%CIT%\"",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
-    "expected": ["GOULD CITY", "BOULDER CITY"]
+    "expected": [{"city": "GOULD CITY"}, {"city": "BOULDER CITY"}]
 }

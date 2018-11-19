@@ -503,6 +503,12 @@ final class Compiler[M[_], T: Equal]
                       .map(_.expr)
                       .traverse(compile0)
                       .map(buildRecord(names, _)))
+                case List(Proj(Cofree(_, Ident(_)), None)) =>
+                  (names.some,
+                    projections
+                      .map(_.expr)
+                      .traverse(compile0)
+                      .map(buildRecord(names, _)))
                 case List(Proj(expr, None)) => (none, compile0(expr))
                 case _ =>
                   (names.some,

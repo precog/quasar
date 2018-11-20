@@ -437,10 +437,10 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
         lpf.invoke1(Squash,
           lpf.invoke2(MakeMap,
             lpf.constant(Data.Str("bar")),
-            lpf.constant(Data.Int(12))))
+            lpf.invoke1(Squash, lpf.constant(Data.Int(12)))))
 
       testLogicalPlanCompile(query, expectation)
-    }.pendingUntilFixed
+    }
 
     "compile let with select in form and body" in {
       val query = sqlE"foo := select * from bar; select * from foo"

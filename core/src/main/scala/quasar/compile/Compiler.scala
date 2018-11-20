@@ -497,19 +497,11 @@ final class Compiler[M[_], T: Equal]
 
             val (nam, initial) =
               projections match {
-                case List(Proj(Cofree(_, Splice(_)), None)) =>
+                case List(proj @ Proj(Cofree(_, Splice(_) | Ident(_)), None)) =>
                   (names.some,
-                    projections
-                      .map(_.expr)
-                      .traverse(compile0)
-                      .map(buildRecord(names, _)))
-                case List(Proj(Cofree(_, Ident(_)), None)) =>
-                  (names.some,
-                    projections
-                      .map(_.expr)
-                      .traverse(compile0)
-                      .map(buildRecord(names, _)))
-                case List(Proj(expr, None)) => (none, compile0(expr))
+                    compile0(proj.expr).map(name => buildRecord(names, List(name))))
+                case List(Proj(expr, None)) =>
+                  (none, compile0(expr))
                 case _ =>
                   (names.some,
                     projections

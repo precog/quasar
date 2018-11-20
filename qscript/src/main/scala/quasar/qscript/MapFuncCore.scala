@@ -263,47 +263,6 @@ object MapFuncCore {
         })
   }
 
-  // Transform effectively constant `MapFunc` into a `Constant` value.
-  // This is a mini-evaluator for constant qscript values.
-  def foldConstant[T[_[_]]: BirecursiveT, A]
-      : CoMapFuncR[T, A] => Option[T[EJson]] = {
-    object ConstEC {
-      def unapply[B](tco: FreeMapA[T, B]): Option[ejson.Common[T[EJson]]] = {
-        tco.project.run match {
-          case \/-(MFC(Constant(Embed(EC(v))))) => Some(v)
-          case _                           => None
-        }
-      }
-    }
-
-    _.run.fold[Option[ejson.EJson[T[ejson.EJson]]]](
-      κ(None),
-      {
-        // relations
-        case MFC(And(ConstEC(ejson.Bool(v1)), ConstEC(ejson.Bool(v2)))) =>
-          EC.inj(ejson.Bool(v1 && v2)).some
-        case MFC(Or(ConstEC(ejson.Bool(v1)), ConstEC(ejson.Bool(v2)))) =>
-          EC.inj(ejson.Bool(v1 || v2)).some
-        case MFC(Not(ConstEC(ejson.Bool(v1)))) =>
-          EC.inj(ejson.Bool(!v1)).some
-
-        // string
-        case MFC(Lower(ConstEC(ejson.Str(v1)))) =>
-          EC.inj(ejson.Str(v1.toLowerCase)).some
-        case MFC(Upper(ConstEC(ejson.Str(v1)))) =>
-          EC.inj(ejson.Str(v1.toUpperCase)).some
-
-        // structural
-        case MFC(MakeArray(ExtractFunc(Constant(v1)))) =>
-          EC.inj(ejson.Arr(List(v1))).some
-        case MFC(MakeMap(ConstEC(ejson.Str(v1)), ExtractFunc(Constant(v2)))) =>
-          EX.inj(ejson.Map(List(EC.inj(ejson.Str[T[ejson.EJson]](v1)).embed -> v2))).some
-        case MFC(ConcatArrays(ConstEC(ejson.Arr(v1)), ConstEC(ejson.Arr(v2)))) =>
-          EC.inj(ejson.Arr(v1 ++ v2)).some
-        case _ => None
-      }) ∘ (_.embed)
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def flattenAnd[T[_[_]], A](fm: FreeMapA[T, A]): NonEmptyList[FreeMapA[T, A]] =
     fm.resume match {
@@ -368,14 +327,12 @@ object MapFuncCore {
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     orOriginal(DedupeGuards[T, A]) <<<
     repeatedly(applyTransforms(
-      foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))),
       ExtractFiltering[T, A]))
 
   def normalize[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     orOriginal(DedupeGuards[T, A]) <<<
     repeatedly(applyTransforms(
-      foldConstant[T, A].apply(_) ∘ (const => rollMF[T, A](MFC(Constant(const)))),
       rewrite[T, A],
       ExtractFiltering[T, A]))
 

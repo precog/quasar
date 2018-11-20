@@ -378,10 +378,13 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
     "compile let with select in body selecting let binding ident" in {
       val query = sqlE"foo := 12; select foo from bar"
       val expectation =
-        lpf.invoke1(Squash, lpf.constant(Data.Int(12)))
+        lpf.invoke1(Squash,
+          lpf.invoke2(MakeMap,
+            lpf.constant(Data.Str("foo")),
+            lpf.constant(Data.Int(12))))
 
       testLogicalPlanCompile(query, expectation)
-    }.pendingUntilFixed
+    }
 
     "fail to compile let inside select with ambigious reference" in {
       // TODO: Investigate why this is not producing an ambigious reference

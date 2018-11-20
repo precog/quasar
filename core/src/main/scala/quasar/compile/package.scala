@@ -103,7 +103,7 @@ package object compile {
   ): Option[String] = {
     val loop: T => (Option[String] \/ (Option[String] \/ T)) =
       _.project match {
-        case Ident(name) if !relationName.element(name)  => some(name).left
+        case Ident(name)                                 => some(name).left
         case Binop(_, Embed(StringLiteral(v)), KeyDeref) => some(v).left
         case Unop(arg, FlattenMapValues)                 => arg.right.right
         case Unop(arg, FlattenArrayValues)               => arg.right.right

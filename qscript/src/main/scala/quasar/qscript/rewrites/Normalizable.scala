@@ -128,14 +128,6 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   def freeMF[A: Equal: Show](fm: Free[MapFunc, A]): Free[MapFunc, A] =
     fm.transCata[Free[MapFunc, A]](MapFuncCore.normalize[T, A])
 
-  def transformMFEq[A: Equal](fm: Free[MapFunc, A]): Option[Free[MapFunc, A]] = {
-    val fmTransformed = transformMF[A](fm)
-    (fm ≠ fmTransformed).option(fmTransformed)
-  }
-
-  def transformMF[A: Equal](fm: Free[MapFunc, A]): Free[MapFunc, A] =
-    fm.transCata[Free[MapFunc, A]](MapFuncCore.transform[T, A])
-
   def makeNorm[A, B, C](
     lOrig: A, rOrig: B)(
     left: A => Option[A], right: B => Option[B])(
@@ -213,7 +205,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
     λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj => {
       def normalizeOn(j: JoinFunc, jt: JoinType): Option[JoinFunc] = jt match {
         case JoinType.Inner => freeMFEq(j)
-        case _ => transformMFEq(j)
+        case _ => freeMFEq(j)
       }
 
       (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), normalizeOn(tj.on, tj.f), freeMFEq(tj.combine)) match {

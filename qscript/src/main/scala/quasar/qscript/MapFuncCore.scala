@@ -322,13 +322,6 @@ object MapFuncCore {
       case _ => none
     }
 
-  // normalize but don't rewrite
-  def transform[T[_[_]]: BirecursiveT: EqualT, A: Equal]
-      : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
-    orOriginal(DedupeGuards[T, A]) <<<
-    repeatedly(applyTransforms(
-      ExtractFiltering[T, A]))
-
   def normalize[T[_[_]]: BirecursiveT: EqualT, A: Equal]
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     orOriginal(DedupeGuards[T, A]) <<<
@@ -344,8 +337,6 @@ object MapFuncCore {
       case x => CoEnv(x)
     }
 
-  // TODO: This could be split up as it is in LP, with each function containing
-  //       its own normalization.
   private def rewrite[T[_[_]]: BirecursiveT: EqualT, A: Equal]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
     _.run.toOption >>= (MFC.unapply _) >>= {

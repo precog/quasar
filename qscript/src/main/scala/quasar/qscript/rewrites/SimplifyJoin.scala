@@ -92,7 +92,6 @@ object SimplifyJoin {
           @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
             fm.resume match {
-              // TODO: Use `MapFunc.flattenAnd` instead of this case.
               case -\/(MFC(And(a, b))) =>
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(

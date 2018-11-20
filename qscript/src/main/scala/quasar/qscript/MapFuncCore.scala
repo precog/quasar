@@ -263,13 +263,6 @@ object MapFuncCore {
         })
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-  def flattenAnd[T[_[_]], A](fm: FreeMapA[T, A]): NonEmptyList[FreeMapA[T, A]] =
-    fm.resume match {
-      case -\/(MFC(And(a, b))) => flattenAnd(a) append flattenAnd(b)
-      case _                   => NonEmptyList(fm)
-    }
-
   /** Converts conditional `Undefined`s into conditions that can be used in a
     * `Filter`.
     *
@@ -328,14 +321,6 @@ object MapFuncCore {
     repeatedly(applyTransforms(
       rewrite[T, A],
       ExtractFiltering[T, A]))
-
-  def replaceJoinSides[T[_[_]]: BirecursiveT](left: Symbol, right: Symbol)
-      : CoMapFuncR[T, JoinSide] => CoMapFuncR[T, JoinSide] =
-    _.run match {
-      case \/-(MFC(JoinSideName(`left`))) => CoEnv(-\/(LeftSide))
-      case \/-(MFC(JoinSideName(`right`))) => CoEnv(-\/(RightSide))
-      case x => CoEnv(x)
-    }
 
   private def rewrite[T[_[_]]: BirecursiveT: EqualT, A: Equal]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =

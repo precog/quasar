@@ -857,9 +857,6 @@ final class CollapseShifts[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] pr
       case qgraph if stop(qgraph) =>
         None
 
-      case LeftShift(Read(_), _, _, _, _, _) =>
-        None
-
       case
         LeftShift(
           MappableRegion.MaximalUnary(oparent @ Self(parent, inners), fm),

@@ -83,7 +83,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
 
       val (remap, lshift) = QSUGraph.fromAnnotatedTree[Fix](
         qsu.leftShift('ls, (
-          qsu.read('r, foo),
+          qsu.read('r, (foo, ExcludeId)),
           recFunc.ProjectKeyS(recFunc.Hole, "bar"),
           ExcludeId,
           OnUndefined.Omit,
@@ -104,7 +104,7 @@ object ResolveOwnIdentitiesSpec extends Qspec with QSUTTypes[Fix] with TreeMatch
 
       val (remap, lshift) = QSUGraph.fromAnnotatedTree[Fix](
         qsu.leftShift('ls, (
-          qsu.read('r, foo),
+          qsu.read('r, (foo, ExcludeId)),
           recFunc.ProjectKeyS(recFunc.Hole, "bar"),
           IdOnly,
           OnUndefined.Omit,

@@ -22,32 +22,32 @@ import scalaz.Monoid
 
 final case class QScriptCount(
     interpretedRead: QScriptCount.InterpretedReadCount,
-    shiftedRead: QScriptCount.ShiftedReadCount,
+    read: QScriptCount.ReadCount,
     leftShift: QScriptCount.LeftShiftCount)
 
 object QScriptCount {
   final case class InterpretedReadCount(count: Int)
-  final case class ShiftedReadCount(count: Int)
+  final case class ReadCount(count: Int)
   final case class LeftShiftCount(count: Int)
 
   implicit val monoid: Monoid[QScriptCount] =
     new Monoid[QScriptCount] {
       def zero: QScriptCount =
-        QScriptCount(InterpretedReadCount(0), ShiftedReadCount(0), LeftShiftCount(0))
+        QScriptCount(InterpretedReadCount(0), ReadCount(0), LeftShiftCount(0))
 
       def append(f1: QScriptCount, f2: => QScriptCount): QScriptCount =
         QScriptCount(
           InterpretedReadCount(f1.interpretedRead.count + f2.interpretedRead.count),
-          ShiftedReadCount(f1.shiftedRead.count + f2.shiftedRead.count),
+          ReadCount(f1.read.count + f2.read.count),
           LeftShiftCount(f1.leftShift.count + f2.leftShift.count))
     }
 
   def incrementInterpretedRead: QScriptCount =
-    QScriptCount(InterpretedReadCount(1), ShiftedReadCount(0), LeftShiftCount(0))
+    QScriptCount(InterpretedReadCount(1), ReadCount(0), LeftShiftCount(0))
 
-  def incrementShiftedRead: QScriptCount =
-    QScriptCount(InterpretedReadCount(0), ShiftedReadCount(1), LeftShiftCount(0))
+  def incrementRead: QScriptCount =
+    QScriptCount(InterpretedReadCount(0), ReadCount(1), LeftShiftCount(0))
 
   def incrementLeftShift: QScriptCount =
-    QScriptCount(InterpretedReadCount(0), ShiftedReadCount(0), LeftShiftCount(1))
+    QScriptCount(InterpretedReadCount(0), ReadCount(0), LeftShiftCount(1))
 }

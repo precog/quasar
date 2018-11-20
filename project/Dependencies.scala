@@ -118,7 +118,10 @@ object Dependencies {
     "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,
     "org.slf4s"      %% "slf4s-api"      % slf4sVersion,
     "org.spire-math" %% "jawn-argonaut"  % jawnVersion,
-    "org.spire-math" %% "jawn-util"      % jawnVersion
+    "org.spire-math" %% "jawn-util"      % jawnVersion,
+    // woodstox is added here as a quick and dirty way to get azure working
+    // see ch3385 for details
+    "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"
   )
 
   def repl = Seq(

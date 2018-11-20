@@ -15,4 +15,8 @@ bumpInDownstream() { echo $1 > quasar-version; }
 export -f bumpInDownstream
 
 scripts/bumpDependentProject slamdata slamdata-backend bumpInDownstream
-scripts/bumpDependentProject slamdata quasar-s3 bumpInDownstream
+
+# connectors
+for c in s3 datasource-azure datasource-url; do
+  scripts/bumpDependentProject slamdata "quasar-$c" bumpInDownstream
+done

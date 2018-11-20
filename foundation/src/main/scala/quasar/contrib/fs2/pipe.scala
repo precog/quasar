@@ -19,11 +19,25 @@ package quasar.contrib.fs2
 import slamdata.Predef._
 
 import java.nio.CharBuffer
-import java.nio.charset.CodingErrorAction
+import java.nio.charset.{CodingErrorAction, StandardCharsets}
 
 import fs2.{Chunk, Pipe, Stream}
 
 object pipe {
+  // https://en.wikipedia.org/wiki/Byte_order_mark#UTF-8
+  private val Utf8Bom = Chunk.bytes(Array[Byte](0xEF.toByte, 0xBB.toByte, 0xBF.toByte))
+
+  private val Utf8 = StandardCharsets.UTF_8
+
+  /**
+   * A variant of the charBufferToByte pipe specialized on UTF-8 to allow us to
+   * inject the byte-order mark when relevant. You should use this instead of
+   * charBufferToByte whenever converting specifically to UTF-8.
+   */
+  def charBufferToByteUtf8[F[_]](bom: Boolean): Pipe[F, CharBuffer, Byte] = { str =>
+    val prefix = if (bom) Stream.chunk(Utf8Bom) else Stream.empty
+    prefix ++ charBufferToByte(Utf8)(str)
+  }
 
   def charBufferToByte[F[_]](cs: Charset): Pipe[F, CharBuffer, Byte] = { str =>
     Stream suspend {

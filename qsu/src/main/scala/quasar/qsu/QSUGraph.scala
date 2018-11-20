@@ -126,11 +126,13 @@ final case class QSUGraph[T[_[_]]](
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   def replaceWithRename[
       F[_]: Monad: NameGenerator: MonadState_[?[_], QSUGraph.RevIdx[T]]](
-      src: Symbol, target: Symbol): F[QSUGraph[T]] = {
+      prefix: String,
+      src: Symbol,
+      target: Symbol): F[QSUGraph[T]] = {
 
     import QScriptUniform._
 
-    val withName = QSUGraph.withName[T, F]("qsu")_
+    val withName = QSUGraph.withName[T, F](prefix) _
 
     if (src =/= target) {
 
@@ -143,11 +145,12 @@ final case class QSUGraph[T[_[_]]](
 
           case _ =>
             for {
-              pattern <- unfold.traverse(_.replaceWithRename[F](src, target))
+              pattern <- unfold.traverse(_.replaceWithRename[F](prefix, src, target))
               bare = pattern.map(_.root)
               renamed <- withName(bare)
-              verts2 = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
-            } yield renamed.copy(vertices = verts2 ++ renamed.vertices)
+              patternVerts = pattern.foldLeft(SMap[Symbol, QScriptUniform[T, Symbol]]())(_ ++ _.vertices)
+              back = this ++: renamed
+            } yield back.copy(vertices = back.vertices ++ patternVerts)
         }
       }
     } else {
@@ -641,7 +644,7 @@ object QSUGraph extends QSUGraphInstances {
       def unapply[T[_[_]]: BirecursiveT](qgraph: QSUGraph[T])(
           implicit IC: MapFuncCore[T, ?] :<<: MapFunc[T, ?]): Option[String] = qgraph match {
 
-        case Transpose(Read(path), QSU.Retain.Values, QSU.Rotation.ShiftMap) =>
+        case Read(path, _) =>
           for {
             (front, end) <- Path.peel(path)
             file <- end.toOption

@@ -29,7 +29,7 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
-import quasar.qscript.{qScriptReadToQscriptTotal, HoleF, LeftShift, OnUndefined, PlannerError, ReduceFuncs, ReduceIndex, RightSideF, ShiftType}
+import quasar.qscript.{qScriptReadToQscriptTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK
@@ -78,13 +78,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
     "select * from foo" >> {
       val lp = read("foo")
 
-      val expected = qs.LeftShift(
-        qs.Read(ResourcePath.leaf(afoo)),
-        recFunc.Hole,
-        ExcludeId,
-        ShiftType.Map,
-        OnUndefined.Omit,
-        RightSideF[Fix])
+      val expected = qs.Read(ResourcePath.leaf(afoo), ExcludeId)
 
       lp must compileTo(expected)
     }
@@ -97,13 +91,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
           read("foo")))
 
       val expected = qs.Reduce(
-        qs.LeftShift(
-          qs.Read(ResourcePath.leaf(afoo)),
-          recFunc.Hole,
-          ExcludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          RightSideF[Fix]),
+        qs.Read(ResourcePath.leaf(afoo), ExcludeId),
         Nil,
         List(ReduceFuncs.Count(HoleF[Fix])),
         Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0))))
@@ -152,7 +140,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
           }
         }
 
-        count mustEqual 2   // shifted read and the *one* collapsed shift
+        count mustEqual 1   // the *one* collapsed shift
       }
     }
   }

@@ -164,7 +164,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
       def holeAs(sym: Symbol): Hole => Symbol =
         κ(sym)
 
-      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => Access[B] \/ B)(f: B => Symbol): F[FreeMapA[B]] =
+      def resolveAccess[A, B](fa: FreeMapA[A])(ex: A => Access[B] \/ B)(f: B => Symbol)
+          : F[FreeMapA[B]] =
         MR.asks(_.resolveAccess[A, B](name, fa)(f)(ex))
 
       def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[IdAccess] => F[JoinFunc] = {
@@ -176,9 +177,9 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
       }
 
       qsu match {
-        case QSU.Read(path) =>
+        case QSU.Read(path, idStatus) =>
           CopK.Inject[Const[Read[ResourcePath], ?], QSE].inj(
-            Const(Read(ResourcePath.leaf(path)))).point[F]
+            Const(Read(ResourcePath.leaf(path), idStatus))).point[F]
 
         case QSU.Map(source, fm) =>
           QCE(Map[T, QSUGraph](source, fm)).point[F]

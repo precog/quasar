@@ -41,7 +41,7 @@ object RewritePushdownSpec extends Qspec {
   type QSBase =
     QScriptCore[Fix, ?] :::
     EquiJoin[Fix, ?] :::
-    Const[ShiftedRead[ResourcePath], ?] :::
+    Const[Read[ResourcePath], ?] :::
     TNilK
 
   // initial QScript
@@ -210,7 +210,7 @@ object RewritePushdownSpec extends Qspec {
       "with IncludeId" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
-            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+            fixE.Read[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             IncludeId, // IncludeId
             ShiftType.Map,
@@ -239,7 +239,7 @@ object RewritePushdownSpec extends Qspec {
       "with IdOnly" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
-            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+            fixE.Read[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             IdOnly, // IdOnly
             ShiftType.Map,
@@ -263,7 +263,7 @@ object RewritePushdownSpec extends Qspec {
       "with ExcludeId" >> {
         val initial: Fix[QSExtra] =
           fixE.LeftShift(
-            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+            fixE.Read[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             ExcludeId, // ExcludeId
             ShiftType.Map,
@@ -289,7 +289,7 @@ object RewritePushdownSpec extends Qspec {
       val initial: Fix[QSExtra] =
         fixE.Filter(
           fixE.LeftShift(
-            fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+            fixE.Read[ResourcePath](path, ExcludeId),
             recFuncE.Hole,
             ExcludeId, // ExcludeId
             ShiftType.Map,
@@ -316,7 +316,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift source is a single object projection" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(recFunc.Hole, "xyz"), // shift source is a single projection
           IncludeId,
           ShiftType.Map,
@@ -353,7 +353,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift source is three object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS( // shift source is three projections
             recFuncE.ProjectKeyS(
               recFuncE.ProjectKeyS(recFunc.Hole,
@@ -396,7 +396,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift struct contains static array and object projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.ProjectIndexI( // shift source contains an array projection
               recFuncE.ProjectKeyS(recFunc.Hole,
@@ -438,7 +438,7 @@ object RewritePushdownSpec extends Qspec {
     "rewrite when the shift struct contains two static array projections" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.ProjectIndexI( // shift source contains an array projection
               recFuncE.ProjectIndexI(recFunc.Hole,
@@ -482,7 +482,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the shift struct is not a projection and not Hole" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.ProjectKeyS(
             recFuncE.MakeMapS( // shift source is not a projection
               "i am a key",
@@ -501,7 +501,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the non-shifted data is referenced (via LeftSide)" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFunc.Hole,
           IncludeId,
           ShiftType.Map,
@@ -513,10 +513,10 @@ object RewritePushdownSpec extends Qspec {
       rewriteLeftShift(initial) must equal(initial)
     }
 
-    "not rewrite when the ShiftedRead has IncludeId" >> {
+    "not rewrite when the Read has IncludeId" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, IncludeId), // IncludeId
+          fixE.Read[ResourcePath](path, IncludeId), // IncludeId
           recFunc.Hole,
           IncludeId,
           ShiftType.Map,
@@ -526,10 +526,10 @@ object RewritePushdownSpec extends Qspec {
       rewriteLeftShift(initial) must equal(initial)
     }
 
-    "not rewrite when the ShiftedRead has IdOnly" >> {
+    "not rewrite when the Read has IdOnly" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, IdOnly), // IdOnly
+          fixE.Read[ResourcePath](path, IdOnly), // IdOnly
           recFunc.Hole,
           IncludeId,
           ShiftType.Map,
@@ -542,7 +542,7 @@ object RewritePushdownSpec extends Qspec {
     "not rewrite when the shift struct is a (nonsensical) constant" >> {
       val initial: Fix[QSExtra] =
         fixE.LeftShift(
-          fixE.ShiftedRead[ResourcePath](path, ExcludeId),
+          fixE.Read[ResourcePath](path, ExcludeId),
           recFuncE.Constant(ejs.str("string!")), // constant string
           IncludeId,
           ShiftType.Map,
@@ -567,7 +567,7 @@ object RewritePushdownSpec extends Qspec {
 
     "elide outer no-op Map" >> {
       val src: Fix[QS] =
-        fix.ShiftedRead[ResourcePath](path, ExcludeId)
+        fix.Read[ResourcePath](path, ExcludeId)
 
       elideNoopMap(fix.Map(src, recFunc.Hole)) must equal(src)
     }
@@ -575,7 +575,7 @@ object RewritePushdownSpec extends Qspec {
     "elide nested no-op Map" >> {
       val src: Fix[QS] =
         fix.Map(
-          fix.ShiftedRead[ResourcePath](path, ExcludeId),
+          fix.Read[ResourcePath](path, ExcludeId),
           recFunc.ProjectKeyS(recFunc.Hole, "bar"))
 
       val qs: Fix[QS] =
@@ -593,7 +593,7 @@ object RewritePushdownSpec extends Qspec {
 
     "elide double no-op Map" >> {
       val src: Fix[QS] =
-        fix.ShiftedRead[ResourcePath](path, ExcludeId)
+        fix.Read[ResourcePath](path, ExcludeId)
 
       elideNoopMap(fix.Map(fix.Map(src, recFunc.Hole), recFunc.Hole)) must equal(src)
     }

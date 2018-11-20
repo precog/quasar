@@ -67,8 +67,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
   val afile = Path.rootDir[Sandboxed] </> Path.file("afile")
   val afile2 = Path.rootDir[Sandboxed] </> Path.file("afile2")
 
-  val shiftedRead =
-    qsu.leftShift(qsu.read(afile), recFunc.Hole, ExcludeId, OnUndefined.Omit, RightTarget[Fix], Rotation.ShiftMap)
+  val shiftedRead = qsu.read(afile, ExcludeId)
 
   import qprov.prov.implicits._
 
@@ -77,15 +76,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.map(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "foo")),
           qsu.map(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "bar")),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
-        case Map(Read(_), fm) =>
+        case Map(Read(_, ExcludeId), fm) =>
           // must_=== doesn't work
           fm must beTreeEqual(
             recFunc.Add(
@@ -97,13 +96,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     "convert Typecheck to a Map(_, Guard)" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin3((
-          qsu.read(afile),
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
+          qsu.read(afile, ExcludeId),
           qsu.undefined(),
           _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))))
 
       runOn(qgraph) must beLike {
-        case Map(Read(_), fm) =>
+        case Map(Read(_, ExcludeId), fm) =>
           // must_=== doesn't work
           fm must beTreeEqual(recFunc.Guard(recFunc.Hole, Type.AnyObject, recFunc.Hole, recFunc.Undefined))
       }
@@ -113,12 +112,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.qsReduce(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             Nil,
             List(ReduceFuncs.Count(func.Hole)),
             func.ReduceIndex(\/-(0))),
           qsu.qsReduce(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             Nil,
             List(ReduceFuncs.Sum(func.Hole)),
             func.ReduceIndex(\/-(0))),
@@ -127,7 +126,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case Map(
           QSReduce(
-            Read(_),
+            Read(_, ExcludeId),
             Nil,
             List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
             repair),
@@ -156,18 +155,18 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.autojoin2((
             qsu.qsReduce(
-              qsu.read(afile),
+              qsu.read(afile, ExcludeId),
               Nil,
               List(ReduceFuncs.Count(func.Hole)),
               func.ReduceIndex(\/-(0))),
             qsu.qsReduce(
-              qsu.read(afile),
+              qsu.read(afile, ExcludeId),
               Nil,
               List(ReduceFuncs.Sum(func.Hole)),
               func.ReduceIndex(\/-(0))),
             _(MapFuncsCore.Add(_, _)))),
           qsu.qsReduce(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             Nil,
             List(ReduceFuncs.Max(func.Hole)),
             func.ReduceIndex(\/-(0))),
@@ -176,7 +175,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case Map(
           QSReduce(
-            Read(_),
+            Read(_, ExcludeId),
             Nil,
             List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2), ReduceFuncs.Max(h3)),
             repair),
@@ -207,7 +206,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         qsu.autojoin2((
           qsu.qsReduce(
             qsu.autojoin2((
-              qsu.read(afile),
+              qsu.read(afile, ExcludeId),
               qsu.map1((
                 qsu.unreferenced(),
                 MapFuncsCore.Constant[Fix, Hole](J.str("hey")))),
@@ -216,7 +215,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             List(ReduceFuncs.Count(func.Hole)),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
           qsu.qsReduce(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             Nil,
             List(ReduceFuncs.Sum(func.Hole)),
             Free.pure[MapFunc, ReduceIndex](ReduceIndex(\/-(0)))),
@@ -225,7 +224,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case Map(
           QSReduce(
-            Read(_),
+            Read(_, ExcludeId),
             Nil,
             List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
             repair),
@@ -256,14 +255,14 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     "rewrite filter into cond only to avoid join" in {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
           qsu.qsFilter(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
-        case Map(Read(_), fm) =>
+        case Map(Read(_, ExcludeId), fm) =>
           fm must beTreeEqual(
             recFunc.Add(
               recFunc.Hole,
@@ -278,15 +277,15 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.qsFilter(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
           qsu.qsFilter(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("bar")))),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
-        case Map(Read(_), fm) =>
+        case Map(Read(_, ExcludeId), fm) =>
           fm must beTreeEqual(
             recFunc.Add(
               recFunc.Cond(
@@ -323,7 +322,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case
           Map(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _, _),
+              Read(`afile`, ExcludeId),
               _, _, _, _, _),
             fm) =>
 
@@ -341,7 +340,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.qsFilter(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             recFunc.Eq(recFunc.Hole, recFunc.Constant(J.str("foo")))),
           qsu.cint(42),
           _(MapFuncsCore.Add(_, _)))))
@@ -405,7 +404,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
     "coalesce two summed bucketing reductions, inlining functions into the buckets" in {
       val readAndThings =
         qsu.map1((
-          qsu.read(afile),
+          qsu.read(afile, ExcludeId),
           MapFuncsCore.Negate(SrcHole)))
 
       val qgraph = QSUGraph.fromTree[Fix](
@@ -425,7 +424,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case Map(
           QSReduce(
-            Read(_),
+            Read(_, ExcludeId),
             List(bucket),
             List(ReduceFuncs.Count(h1), ReduceFuncs.Sum(h2)),
             repair),
@@ -455,7 +454,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val readAndThings =
         qsu.map((
           qsu.dimEdit((
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             DTrans.Group(func.ProjectKeyS(func.Hole, "label")))),
           recFunc.Negate(recFunc.ProjectKeyS(recFunc.Hole, "metric"))))
 
@@ -479,7 +478,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
                 qprov.prov.both(
                   qprov.prov.injValue(J.str("0")),
                   qprov.prov.injValue(J.str("1"))),
-                qprov.prov.value(IdAccess.bucket(r.root, 0))))
+                qprov.prov.value(IdAccess.bucket(r.root, 0))),
+              qprov.prov.prjPath(J.str("afile")))
 
           auth.dims(m.root) must_= expDims
       }
@@ -489,12 +489,12 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.qsReduce(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             Nil,
             List(ReduceFuncs.Sum(func.Hole)),
             func.ReduceIndex(\/-(0))),
           qsu.qsReduce(
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
             List(func.ProjectKeyS(AccessHole[Fix], "state")),
             List(ReduceFuncs.Sum(func.Hole)),
             func.ReduceIndex(\/-(0))),
@@ -502,8 +502,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       runOn(qgraph) must beLike {
         case AutoJoin2C(
-          QSReduce(Read(_), Nil, _, _),
-          QSReduce(Read(_), List(_), _, _),
+          QSReduce(Read(_, ExcludeId), Nil, _, _),
+          QSReduce(Read(_, ExcludeId), List(_), _, _),
           MapFuncsCore.Add(LeftSide, RightSide)) => ok
       }
     }
@@ -512,8 +512,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.autojoin2((
-            qsu.read(afile),
-            qsu.read(afile2),
+            qsu.read(afile, ExcludeId),
+            qsu.read(afile2, ExcludeId),
             _(MapFuncsCore.Subtract(_, _)))),
           qsu.cint(42),
           _(MapFuncsCore.Add(_, _)))))
@@ -521,7 +521,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val results = runOn(qgraph)
 
       results must beLike {
-        case AutoJoin2(Read(`afile`), Read(`afile2`), fm) =>
+        case AutoJoin2(Read(`afile`, ExcludeId), Read(`afile2`, ExcludeId), fm) =>
           fm must beTreeEqual(
             func.Add(
               func.Subtract(
@@ -538,8 +538,8 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       val groupedGuardedRead =
         qsu.dimEdit(
           qsu.autojoin3((
-            qsu.read(afile),
-            qsu.read(afile),
+            qsu.read(afile, ExcludeId),
+            qsu.read(afile, ExcludeId),
             qsu.undefined(),
             _(MapFuncsCore.Guard(_, Type.AnyObject, _, _)))),
           DTrans.Group(groupKey))
@@ -566,9 +566,9 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       runOn(qgraph) must beLike {
         case AutoJoin2(
-          Map(Read(_), guardL),
+          Map(Read(_, ExcludeId), guardL),
           QSReduce(
-            Map(Read(_), guardR),
+            Map(Read(_, ExcludeId), guardR),
             bucket :: Nil,
             ReduceFuncs.Sum(prjPop) :: Nil,
             _),
@@ -602,7 +602,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case
           Map(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _, _),
+              Read(`afile`, ExcludeId),
               struct,
               ExcludeId,
               _,
@@ -641,7 +641,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case
           Map(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _, _),
+              Read(`afile`, ExcludeId),
               struct,
               ExcludeId,
               OnUndefined.Emit,
@@ -689,7 +689,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           QSReduce(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _, _),
+              Read(`afile`, ExcludeId),
               struct,
               ExcludeId,
               OnUndefined.Emit,
@@ -748,7 +748,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           QSReduce(
             LeftShift(
-              LeftShift(Read(`afile`), _, _, _, _, _),
+              Read(`afile`, ExcludeId),
               struct,
               ExcludeId,
               OnUndefined.Emit,
@@ -806,7 +806,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(`afile`), _, _, _, _, _),
+                Read(`afile`, ExcludeId),
                 structInner,
                 IncludeId,
                 OnUndefined.Emit,
@@ -877,7 +877,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             LeftShift(
               LeftShift(
                 LeftShift(
-                  LeftShift(Read(`afile`), _, _, _, _, _),
+                  Read(`afile`, ExcludeId),
                   structInnerInner,
                   IncludeId,
                   OnUndefined.Emit,
@@ -961,7 +961,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               MultiLeftShift(
-                LeftShift(Read(_), _, _, _, _, _),
+                Read(_, ExcludeId),
                 List(
                   (cstruct, _, _),
                   (dstruct, _, _)),
@@ -1061,7 +1061,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
             LeftShift(
               MultiLeftShift(
                 MultiLeftShift(
-                  LeftShift(Read(`afile`), _, _, _, _, _),
+                  Read(`afile`, ExcludeId),
                   List(
                     (innerastruct, _, _),
                     (innercstruct, _, _),
@@ -1210,7 +1210,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(_), _, _, _, _, _),
+                Read(_, ExcludeId),
                 innerStruct,
                 _,
                 OnUndefined.Emit,
@@ -1264,22 +1264,13 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
     // select [a, foo[*][*]] from afile
     "properly coalesce a more realistic double-shift example" in {
-      val qsu0 = qsu.read(afile)
+      val qsu0 = qsu.read(afile, ExcludeId)
       val qsu2 = qsu.unreferenced()
 
       val qsu3 = qsu.map(qsu2, recFunc.Undefined[Hole])
 
-      val qsu1 =
-        qsu.leftShift(
-          qsu0,
-          recFunc.Hole,
-          ExcludeId,
-          OnUndefined.Omit,
-          RightTarget[Fix],
-          Rotation.ShiftMap)
-
       val qsu9 =
-        qsu.map(qsu1, recFunc.ProjectKeyS(recFunc.Hole, "foo"))
+        qsu.map(qsu0, recFunc.ProjectKeyS(recFunc.Hole, "foo"))
 
       val qsu11 =
         qsu.leftShift(
@@ -1302,7 +1293,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           _(MapFuncsCore.Guard(_, Type.AnyArray, _, _))))
 
       val qsu6 =
-        qsu.map(qsu1, recFunc.ProjectKeyS(recFunc.Hole, "a"))
+        qsu.map(qsu0, recFunc.ProjectKeyS(recFunc.Hole, "a"))
 
       val qsu13 =
         qsu.leftShift(
@@ -1332,7 +1323,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(_), _, _, _, _, _),
+                Read(_, ExcludeId),
                 innerStruct,
                 _,
                 OnUndefined.Emit,
@@ -1375,7 +1366,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
           Map(
             LeftShift(
               LeftShift(
-                LeftShift(Read(_), _, _, _, _, _),
+                Read(_, ExcludeId),
                 innerStruct,
                 _,
                 _,
@@ -1449,7 +1440,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
         case Map(
           LeftShift(
             MultiLeftShift(
-              LeftShift(Read(_), _, _, _, _, _),
+              Read(_, ExcludeId),
               List(
                 (innerastruct, _, _),
                 (innerbstruct, _, _)),
@@ -1558,7 +1549,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       // TODO: Should really be 3, but another bug is duplicating the inner
       //       shift common to both sides of the `Or`
-      leftShiftCount must_= 3
+      leftShiftCount must_= 2
     }
 
     "create a single AutoJoin2 when there are exactly two sources" in {
@@ -1581,7 +1572,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
 
       runOn(twoSources) must beLike {
         case AutoJoin2(
-          LeftShift(Read(_), _, _, _, _, _),
+          Read(_, ExcludeId),
           QSReduce(_, _, _, _),
           repair) =>
 
@@ -1618,7 +1609,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(shifts) must beLike {
         case Map(
           LeftShift(
-            LeftShift(Read(_), _, _, _, _, _),
+            Read(_, ExcludeId),
             struct,
             IncludeId,
             OnUndefined.Emit,
@@ -1672,7 +1663,7 @@ object MinimizeAutoJoinsSpec extends Qspec with TreeMatchers with QSUTTypes[Fix]
       runOn(qgraph) must beLike {
         case Map(
           MultiLeftShift(
-            LeftShift(Read(_), _, _, _, _, _),
+            Read(_, ExcludeId),
             List((structA, IncludeId, Rotation.ShiftMap), (structB, IdOnly, Rotation.ShiftArray)),
             OnUndefined.Emit,
             repair), outerMap) =>

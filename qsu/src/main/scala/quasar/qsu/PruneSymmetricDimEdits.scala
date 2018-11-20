@@ -53,7 +53,7 @@ final class PruneSymmetricDimEdits[T[_[_]]] private () extends QSUTTypes[T] {
               back <- tip traverse { sg =>
                 roots.foldLeftM(sg) {
                   case (g, target @ DimEdit(parent, _)) =>
-                    g.replaceWithRename[G](target.root, parent.root)
+                    g.replaceWithRename[G]("psde", target.root, parent.root)
 
                   case (g, _ ) => g.point[G]
                 }

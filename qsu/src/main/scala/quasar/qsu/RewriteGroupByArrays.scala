@@ -40,7 +40,7 @@ final class RewriteGroupByArrays[T[_[_]]: BirecursiveT: ShowT] private () extend
           // this is a bizarre rewrite, because it generates invalid graphs along the way
           // this happens because inner and target don't necessarily exist in key's vertices
           for {
-            key2 <- key.replaceWithRename[G](target.root, inner.root)
+            key2 <- key.replaceWithRename[G]("rga", target.root, inner.root)
             replaced <- QSUGraph.withName[T, G]("rga")(QSU.GroupBy[T, Symbol](inner.root, key2.root))
           } yield replaced :++ inner :++ key2
         }

@@ -57,7 +57,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   "convert singly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset")),
+      qsu.read(rootDir </> file("dataset"), ExcludeId),
       recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
@@ -79,7 +79,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         LeftShift(
           LeftShift(
             LeftShift(
-              Read(afile),
+              Read(afile, ExcludeId),
               shiftedReadStruct,
               ExcludeId,
               OnUndefined.Omit,
@@ -136,7 +136,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   "convert singly nested LeftShift/ThetaJoin with onUndefined = OnUndefined.Emit" in {
     val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset")),
+      qsu.read(rootDir </> file("dataset"), ExcludeId),
       recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
@@ -158,7 +158,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         LeftShift(
           LeftShift(
             LeftShift(
-              Read(afile),
+              Read(afile, ExcludeId),
               shiftedReadStruct,
               ExcludeId,
               OnUndefined.Omit,
@@ -184,7 +184,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   "convert doubly nested LeftShift/ThetaJoin" in {
     val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset")),
+      qsu.read(rootDir </> file("dataset"), ExcludeId),
       recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
@@ -208,7 +208,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           LeftShift(
             LeftShift(
               LeftShift(
-                Read(afile),
+                Read(afile, ExcludeId),
                 shiftedReadStruct,
                 ExcludeId,
                 OnUndefined.Omit,
@@ -282,7 +282,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
   "join shifts of the same focus" >> {
     val dataset = qsu.leftShift(
-      qsu.read(rootDir </> file("dataset")),
+      qsu.read(rootDir </> file("dataset"), ExcludeId),
       recFunc.Hole,
       ExcludeId,
       OnUndefined.Omit,
@@ -306,7 +306,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         LeftShift(
           LeftShift(
             LeftShift(
-              Read(afile),
+              Read(afile, ExcludeId),
               shiftedReadStruct,
               ExcludeId,
               OnUndefined.Omit,

@@ -78,7 +78,7 @@ final class FederatingQueryEvaluator[
           (implicit UC: Corecursive.Aux[U, G], UR: Recursive.Aux[U, G])
           : Const[QRead[ResourcePath], U] => M[G[U]] = {
 
-        case Const(QRead(path)) =>
+        case Const(QRead(path, idStatus)) =>
           val sourceM: M[(AFile, Source[S])] = path match {
             case ResourcePath.Leaf(file) =>
               lookupLeaf(file).map(s => (file, s))
@@ -90,7 +90,7 @@ final class FederatingQueryEvaluator[
           for {
             source <- sourceM
             _ <- MonadTell_[M, DList[(AFile, Source[S])]].tell(DList(source))
-          } yield GtoF(Const(QRead(path)))
+          } yield GtoF(Const(QRead(path, idStatus)))
       }
     }
 

@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.Qspec
+import quasar.{IdStatus, Qspec}
 import quasar.common.data.{Data, DataGenerators}
 import quasar.common.{JoinType, SortDir}
 import quasar.contrib.scalaz.{NonEmptyListE => NELE}
@@ -59,6 +59,7 @@ import iotaz.CopK
 
 object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
+  import IdStatus.ExcludeId
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -71,7 +72,7 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
   "reading lp into qsu" should {
     "convert Read nodes" in {
       read("foobar") must readQsuAs {
-        case Transpose(Read(path), QSU.Retain.Values, QSU.Rotation.ShiftMap) =>
+        case Read(path, ExcludeId) =>
           path mustEqual (root </> file("foobar"))
       }
     }
@@ -279,7 +280,7 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
             lpf.free('tmp1),
             lpf.free('tmp1)))) must readQsuAs {
 
-        case qgraph => qgraph.vertices must haveSize(4)
+        case qgraph => qgraph.vertices must haveSize(3)
       }
     }
 
@@ -302,7 +303,7 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
       val result = evaluate(qgraphM).toOption
 
       result must beSome
-      result.get.vertices must haveSize(3)
+      result.get.vertices must haveSize(2)
     }
 
     "manage a straightforward query" in {
@@ -339,16 +340,10 @@ object ReadLPSpec extends Qspec with LogicalPlanHelpers with DataGenerators with
           DimEdit(
             AutoJoin2C(
               LPFilter( // 8
-                Transpose(    // '__tmp1
-                  Read(_),
-                  QSU.Retain.Values,
-                  QSU.Rotation.ShiftMap),
+                Read(_, ExcludeId),    // '__tmp1
                 AutoJoin3C( // 7
                   AutoJoin2C(   // '__tmp2
-                    Transpose(    // '__tmp1
-                      Read(_),
-                      QSU.Retain.Values,
-                      QSU.Rotation.ShiftMap),
+                    Read(_, ExcludeId),  // '__tmp1
                     DataConstant(Data.Str("city")),
                     MapFuncsCore.ProjectKey(LeftSide, RightSide)),
                   DataConstant(Data.Str("OULD.{0,2} CIT")),

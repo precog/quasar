@@ -51,7 +51,7 @@ import scalaz.std.map._
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
   import ApplyProvenance.{AuthenticatedQSU, computeFuncDims}
-  import QScriptUniform.{DTrans, Retain, Rotation}
+  import QScriptUniform.{DTrans, Rotation}
 
   type F[A] = PlannerError \/ A
   type QSU[A] = QScriptUniform[A]
@@ -79,11 +79,15 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
       val tree: Cofree[QSU, Symbol] =
         qsu.map('name0,
-          (qsu.read('name1, afile), fm))
+          (qsu.read('name1, (afile, ExcludeId)), fm))
 
       val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> Dimensions.origin(P.prjPath(J.str("foobar"))),
-        'name1 -> Dimensions.origin(P.prjPath(J.str("foobar"))))
+        'name0 -> Dimensions.origin(
+          P.value(IdAccess.identity('name1)),
+          P.prjPath(J.str("foobar"))),
+        'name1 -> Dimensions.origin(
+          P.value(IdAccess.identity('name1)),
+          P.prjPath(J.str("foobar"))))
 
       tree must haveDimensions(dims)
     }
@@ -94,7 +98,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           qsu.map('n3, (
             qsu.dimEdit('n2, (
               qsu.dimEdit('n1, (
-                qsu.read('n0, afile),
+                qsu.read('n0, (afile, ExcludeId)),
                 DTrans.Group(func.ProjectKeyS(func.Hole, "x")))),
               DTrans.Group(func.ProjectKeyS(func.Hole, "y")))),
             recFunc.ProjectKeyS(recFunc.Hole, "pop"))),
@@ -103,15 +107,18 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       tree must haveDimensions(SMap(
         'n4 -> Dimensions.origin(
           P.value(IdAccess.bucket('n4, 1)),
-          P.value(IdAccess.bucket('n4, 0))),
+          P.value(IdAccess.bucket('n4, 0)),
+          P.prjPath(J.str("foobar"))),
         'n3 -> Dimensions.origin(
-          P.prjValue(J.str("pop")) ≺: P.prjPath(J.str("foobar")),
+          P.prjValue(J.str("pop")) ≺: P.value(IdAccess.identity('n2)),
           P.value(IdAccess.groupKey('n2, 1)),
-          P.value(IdAccess.groupKey('n2, 0))),
+          P.value(IdAccess.groupKey('n2, 0)),
+          P.prjPath(J.str("foobar"))),
         'n2 -> Dimensions.origin(
-          P.prjPath(J.str("foobar")),
+          P.value(IdAccess.identity('n2)),
           P.value(IdAccess.groupKey('n2, 1)),
-          P.value(IdAccess.groupKey('n2, 0)))
+          P.value(IdAccess.groupKey('n2, 0)),
+          P.prjPath(J.str("foobar")))
       ))
     }
 
@@ -119,10 +126,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       val tree =
         qsu.dimEdit('n0, (
           qsu.map('n1, (
-            qsu.transpose('n2, (
-              qsu.read('n3, afile),
-              Retain.Values,
-              Rotation.ShiftMap)),
+            qsu.read('n2, (afile, ExcludeId)),
             recFunc.Add(
               recFunc.Constant(J.int(7)),
               recFunc.ProjectKeyS(recFunc.Hole, "bar")))),
@@ -135,8 +139,6 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
             P.prjPath(J.str("foobar")))),
         'n2 -> Dimensions.origin(
           P.value(IdAccess.identity('n2)),
-          P.prjPath(J.str("foobar"))),
-        'n3 -> Dimensions.origin(
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -146,7 +148,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     "flatten with trivial struct and repair is dimensional flatten" >> {
       val tree =
         qsu.leftShift('n0, (
-          qsu.read('n1, afile),
+          qsu.read('n1, (afile, ExcludeId)),
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
@@ -157,8 +159,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         'n0 -> Dimensions.origin(
           P.thenn(
             P.value(IdAccess.identity('n0)),
-            P.prjPath(J.str("foobar")))),
+            P.value(IdAccess.identity('n1))),
+          P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -166,7 +170,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     "shift with trivial struct and repair is dimensional shift" >> {
       val tree =
         qsu.leftShift('n0, (
-          qsu.read('n1, afile),
+          qsu.read('n1, (afile, ExcludeId)),
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
@@ -176,8 +180,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       tree must haveDimensions(SMap(
         'n0 -> Dimensions.origin(
           P.value(IdAccess.identity('n0)),
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -185,7 +191,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     "include id affects provenance" >> {
       val tree =
         qsu.leftShift('n0, (
-          qsu.read('n1, afile),
+          qsu.read('n1, (afile, ExcludeId)),
           recFunc.Hole,
           IncludeId,
           OnUndefined.Omit,
@@ -199,8 +205,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
               P.injValue(J.int(0)),
               P.injValue(J.int(1))),
             P.value(IdAccess.identity('n0))),
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -208,7 +216,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     "struct affects provenance prior to shift" >> {
       val tree =
         qsu.leftShift('n0, (
-          qsu.read('n1, afile),
+          qsu.read('n1, (afile, ExcludeId)),
           recFunc.ProjectKeyS(recFunc.Hole, "k"),
           ExcludeId,
           OnUndefined.Omit,
@@ -220,8 +228,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           P.value(IdAccess.identity('n0)),
           P.thenn(
             P.prjValue(J.str("k")),
-            P.prjPath(J.str("foobar")))),
+            P.value(IdAccess.identity('n1))),
+          P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -229,7 +239,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     "repair affects provenance after shift" >> {
       val tree =
         qsu.leftShift('n0, (
-          qsu.read('n1, afile),
+          qsu.read('n1, (afile, ExcludeId)),
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
@@ -241,8 +251,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           P.thenn(
             P.prjValue(J.str("k")),
             P.value(IdAccess.identity('n0))),
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -250,7 +262,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     "non-structure preserving result in repair results in shift provenance" >> {
       val tree =
         qsu.leftShift('n0, (
-          qsu.read('n1, afile),
+          qsu.read('n1, (afile, ExcludeId)),
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
@@ -260,8 +272,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       tree must haveDimensions(SMap(
         'n0 -> Dimensions.origin(
           P.value(IdAccess.identity('n0)),
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar"))),
         'n1 -> Dimensions.origin(
+          P.value(IdAccess.identity('n1)),
           P.prjPath(J.str("foobar")))
       ))
     }
@@ -272,17 +286,17 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
       val joinOnP =
         qsu._autojoin2('n0, (
           qsu.map('n1, (
-            qsu.read('n2, afile),
+            qsu.read('n2, (afile, ExcludeId)),
             recFunc.MakeMapS("A", recFunc.ProjectKeyS(recFunc.Hole, "X")))),
           qsu.map('n3, (
-            qsu.read('n4, afile),
+            qsu.read('n4, (afile, ExcludeId)),
             recFunc.MakeMapS("B", recFunc.ProjectKeyS(recFunc.Hole, "Y")))),
           func.ConcatMaps(func.LeftSide, func.RightSide)))
 
       val pOnJoin =
         qsu._autojoin2('n0, (
-          qsu.read('n2, afile),
-          qsu.read('n4, afile),
+          qsu.read('n2, (afile, ExcludeId)),
+          qsu.read('n4, (afile, ExcludeId)),
           func.ConcatMaps(
             func.MakeMapS("A", func.ProjectKeyS(func.LeftSide, "X")),
             func.MakeMapS("B", func.ProjectKeyS(func.RightSide, "Y")))))

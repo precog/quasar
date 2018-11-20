@@ -17,6 +17,7 @@
 package quasar.qsu
 
 import quasar.{Qspec, TreeMatchers}
+import quasar.IdStatus.ExcludeId
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
@@ -66,11 +67,11 @@ object InlineNullarySpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           qsu.map(
             qsu.unreferenced(),
             key),
-          qsu.read(dataA),
+          qsu.read(dataA, ExcludeId),
           fm))
 
       inlineNullary(g) must beLike {
-        case Map(Read(p), f) =>
+        case Map(Read(p, ExcludeId), f) =>
           val exp = mf.MakeMapS("k1", mf.Hole)
           p must_= dataA
           f.linearize must beTreeEqual(exp)
@@ -83,12 +84,12 @@ object InlineNullarySpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           qsu.map(
             qsu.unreferenced(),
             rec.Eq(rec.Now[Hole], rec.Constant(J.int(0)))),
-          qsu.read(dataA),
-          qsu.read(dataB),
+          qsu.read(dataA, ExcludeId),
+          qsu.read(dataB, ExcludeId),
           mf.Cond(mf.LeftSide3, mf.Center, mf.RightSide3)))
 
       inlineNullary(g) must beLike {
-        case AutoJoin2(Read(l), Read(r), f) =>
+        case AutoJoin2(Read(l, ExcludeId), Read(r, ExcludeId), f) =>
           l must_= dataA
           r must_= dataB
 
@@ -107,14 +108,14 @@ object InlineNullarySpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
           qsu.map(
             qsu.unreferenced(),
             rec.Eq(rec.Now[Hole], rec.Constant(J.int(0)))),
-          qsu.read(dataA),
+          qsu.read(dataA, ExcludeId),
           qsu.map(
             qsu.unreferenced(),
             rec.Constant[Hole](J.str("row"))),
           mf.Cond(mf.LeftSide3, mf.Center, mf.RightSide3)))
 
       inlineNullary(g) must beLike {
-        case Map(Read(l), f) =>
+        case Map(Read(l, ExcludeId), f) =>
           l must_= dataA
 
           val exp = mf.Cond(

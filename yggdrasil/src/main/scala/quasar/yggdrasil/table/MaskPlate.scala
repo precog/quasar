@@ -36,7 +36,7 @@ private[table] final class MaskPlate[A] private (
   private val revIdx: Map[List[CPathNode], Set[ParseType]] =
     masks map {
      case (path, tpes) => path.nodes.reverse -> tpes
-   }
+    }
 
   private val foci: Set[List[CPathNode]] = revIdx.keys.toSet
   private val prefixes: Set[List[CPathNode]] = foci.flatMap(_.tails.toSet)
@@ -199,6 +199,11 @@ private[table] final class MaskPlate[A] private (
 
       back
     }
+  }
+
+  override def skipped(bytes: Int): Unit = {
+    sawSomething = true
+    super.skipped(bytes)
   }
 
   override def finishRow(): Unit = {

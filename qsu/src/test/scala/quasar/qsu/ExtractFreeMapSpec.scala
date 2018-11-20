@@ -17,7 +17,7 @@
 package quasar.qsu
 
 import slamdata.Predef._
-import quasar.{Qspec, TreeMatchers}
+import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.common.{SortDir, JoinType}
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
@@ -38,6 +38,7 @@ import scalaz.Scalaz._
 object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   import QScriptUniform.{DTrans, Retain, Rotation}
   import QSUGraph.Extractors._
+  import IdStatus.ExcludeId
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
   type QSU[A] = QScriptUniform[A]
@@ -67,11 +68,11 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpFilter(
-          qsu.read(orders),
-          qsu.map(qsu.read(orders), predicate)))
+          qsu.read(orders, ExcludeId),
+          qsu.map(qsu.read(orders, ExcludeId), predicate)))
 
       evaluate(extractFM(graph)) must beLike {
-        case \/-(QSFilter(Read(`orders`), fm)) => fm must_= predicate
+        case \/-(QSFilter(Read(`orders`, ExcludeId), fm)) => fm must_= predicate
       }
     }
 
@@ -80,15 +81,15 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpFilter(
-          qsu.read(orders),
-          qsu.transpose(qsu.map(qsu.read(orders), predicate), Retain.Values, Rotation.ShiftMap)))
+          qsu.read(orders, ExcludeId),
+          qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), predicate), Retain.Values, Rotation.ShiftMap)))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(Map(
             QSFilter(
               AutoJoin2(
-                Read(`orders`),
-                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                Read(`orders`, ExcludeId),
+                Transpose(Map(Read(`orders`, ExcludeId), fm), Retain.Values, Rotation.ShiftMap),
                 autojoinCondition),
               filterPredicate),
             valueAccess)) =>
@@ -111,9 +112,9 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpFilter(
-          qsu.read(orders),
+          qsu.read(orders, ExcludeId),
           qsu.autojoin2((
-            qsu.transpose(qsu.map(qsu.read(orders), field), Retain.Values, Rotation.ShiftMap),
+            qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), field), Retain.Values, Rotation.ShiftMap),
             qsu.cint(42),
             _(MapFuncsCore.Gt(_, _))))))
 
@@ -121,8 +122,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
         case \/-(Map(
             QSFilter(
               AutoJoin2(
-                Read(`orders`),
-                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                Read(`orders`, ExcludeId),
+                Transpose(Map(Read(`orders`, ExcludeId), fm), Retain.Values, Rotation.ShiftMap),
                 autojoinCondition),
               filterPredicate),
             valueAccess)) =>
@@ -142,11 +143,11 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(orders),
-          qsu.map(qsu.read(orders), key)))
+          qsu.read(orders, ExcludeId),
+          qsu.map(qsu.read(orders, ExcludeId), key)))
 
       evaluate(extractFM(graph)) must beLike {
-        case \/-(DimEdit(Read(`orders`), DTrans.Group(fm))) => fm must_= key.linearize
+        case \/-(DimEdit(Read(`orders`, ExcludeId), DTrans.Group(fm))) => fm must_= key.linearize
       }
     }
 
@@ -155,15 +156,15 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(orders),
-          qsu.transpose(qsu.map(qsu.read(orders), key), Retain.Values, Rotation.ShiftMap)))
+          qsu.read(orders, ExcludeId),
+          qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), key), Retain.Values, Rotation.ShiftMap)))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(Map(
             DimEdit(
               AutoJoin2(
-                Read(`orders`),
-                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                Read(`orders`, ExcludeId),
+                Transpose(Map(Read(`orders`, ExcludeId), fm), Retain.Values, Rotation.ShiftMap),
                 autojoinCondition),
               DTrans.Group(groupKey)),
             valueAccess)) =>
@@ -186,17 +187,17 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.groupBy(
-          qsu.read(orders),
+          qsu.read(orders, ExcludeId),
           qsu.map(
-            qsu.transpose(qsu.map(qsu.read(orders), key), Retain.Values, Rotation.ShiftMap),
+            qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), key), Retain.Values, Rotation.ShiftMap),
             f)))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(Map(
             DimEdit(
               AutoJoin2(
-                Read(`orders`),
-                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                Read(`orders`, ExcludeId),
+                Transpose(Map(Read(`orders`, ExcludeId), fm), Retain.Values, Rotation.ShiftMap),
                 autojoinCondition),
               DTrans.Group(groupKey)),
             valueAccess)) =>
@@ -217,14 +218,14 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
-          qsu.read(orders),
+          qsu.read(orders, ExcludeId),
           NEL[(Fix[QSU], SortDir)](
-            qsu.map(qsu.read(orders), key1) -> SortDir.Ascending,
-            qsu.map(qsu.read(orders), key2) -> SortDir.Descending)))
+            qsu.map(qsu.read(orders, ExcludeId), key1) -> SortDir.Ascending,
+            qsu.map(qsu.read(orders, ExcludeId), key2) -> SortDir.Descending)))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(QSSort(
-            Read(`orders`),
+            Read(`orders`, ExcludeId),
             Nil,
             NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil())))) =>
           fm1 must_= key1.linearize
@@ -238,17 +239,17 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
-          qsu.read(orders),
+          qsu.read(orders, ExcludeId),
           NEL[(Fix[QSU], SortDir)](
-            qsu.map(qsu.read(orders), key1) -> SortDir.Ascending,
-            qsu.transpose(qsu.map(qsu.read(orders), key2), Retain.Values, Rotation.ShiftMap) -> SortDir.Descending)))
+            qsu.map(qsu.read(orders, ExcludeId), key1) -> SortDir.Ascending,
+            qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), key2), Retain.Values, Rotation.ShiftMap) -> SortDir.Descending)))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(Map(
             QSSort(
               AutoJoin2(
-                Read(`orders`),
-                Transpose(Map(Read(`orders`), fm), Retain.Values, Rotation.ShiftMap),
+                Read(`orders`, ExcludeId),
+                Transpose(Map(Read(`orders`, ExcludeId), fm), Retain.Values, Rotation.ShiftMap),
                 autojoinCondition),
               Nil,
               NEL((fm1, SortDir.Ascending), ICons((fm2, SortDir.Descending), INil()))),
@@ -275,22 +276,22 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph: QSUGraph = QSUGraph.fromTree[Fix](
         qsu.lpSort(
-          qsu.read(orders),
+          qsu.read(orders, ExcludeId),
           NEL[(Fix[QSU], SortDir)](
-            qsu.map(qsu.read(orders), key1) -> SortDir.Ascending,
-            qsu.transpose(qsu.map(qsu.read(orders), key2), Retain.Values, Rotation.ShiftMap) -> SortDir.Descending,
-            qsu.map(qsu.read(orders), key3) -> SortDir.Descending,
-            qsu.transpose(qsu.map(qsu.read(orders), key4), Retain.Identities, Rotation.ShiftArray) -> SortDir.Ascending)))
+            qsu.map(qsu.read(orders, ExcludeId), key1) -> SortDir.Ascending,
+            qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), key2), Retain.Values, Rotation.ShiftMap) -> SortDir.Descending,
+            qsu.map(qsu.read(orders, ExcludeId), key3) -> SortDir.Descending,
+            qsu.transpose(qsu.map(qsu.read(orders, ExcludeId), key4), Retain.Identities, Rotation.ShiftArray) -> SortDir.Ascending)))
 
       evaluate(extractFM(graph)) must beLike {
         case \/-(Map(
             QSSort(
               AutoJoin2(
                 AutoJoin2(
-                  Read(`orders`),
-                  Transpose(Map(Read(`orders`), innerFM), Retain.Values, Rotation.ShiftMap),
+                  Read(`orders`, ExcludeId),
+                  Transpose(Map(Read(`orders`, ExcludeId), innerFM), Retain.Values, Rotation.ShiftMap),
                   innerAutojoinCondition),
-                Transpose(Map(Read(`orders`), outerFM), Retain.Identities, Rotation.ShiftArray),
+                Transpose(Map(Read(`orders`, ExcludeId), outerFM), Retain.Identities, Rotation.ShiftArray),
                 outerAutojoinCondition),
               Nil,
               NEL(
@@ -327,8 +328,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpJoin(
-          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
-          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu.read(orders, ExcludeId),
+          qsu.read(customers, ExcludeId),
           qsu._autojoin2(
             qsu.map(qsu.union(qsu.joinSideRef('leftJoin), qsu.joinSideRef('rightJoin)), projectFoo),
             qsu._autojoin2(
@@ -341,14 +342,14 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       evaluate(extractFM(graph)) must beLike {
         case \/-(ThetaJoin(
           AutoJoin2(
-            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
+            Read(`orders`, ExcludeId),
             Union(
-              Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
-              Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap)),
+              Read(`orders`, ExcludeId),
+              Read(`customers`, ExcludeId)),
             autojoinConditionOrders),
           AutoJoin2(
-            Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
-            Transpose(Map(Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap), structCustomers), Retain.Values, Rotation.ShiftArray),
+            Read(`customers`, ExcludeId),
+            Transpose(Map(Read(`customers`, ExcludeId), structCustomers), Retain.Values, Rotation.ShiftArray),
             autojoinConditionCustomers),
           on, JoinType.Inner, repair)) => {
 
@@ -380,8 +381,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpJoin(
-          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
-          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu.read(orders, ExcludeId),
+          qsu.read(customers, ExcludeId),
           qsu._autojoin2(
             qsu.transpose(qsu.map(qsu.joinSideRef('leftJoin), projectOrdersKey), Retain.Values, Rotation.ShiftArray),
             qsu.transpose(qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey), Retain.Values, Rotation.ShiftArray),
@@ -391,12 +392,12 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       evaluate(extractFM(graph)) must beLike {
         case \/-(ThetaJoin(
           AutoJoin2(
-            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
-            Transpose(Map(Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap), structOrders), Retain.Values, Rotation.ShiftArray),
+            Read(`orders`, ExcludeId),
+            Transpose(Map(Read(`orders`, ExcludeId), structOrders), Retain.Values, Rotation.ShiftArray),
             autojoinConditionOrders),
           AutoJoin2(
-            Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
-            Transpose(Map(Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap), structCustomers), Retain.Values, Rotation.ShiftArray),
+            Read(`customers`, ExcludeId),
+            Transpose(Map(Read(`customers`, ExcludeId), structCustomers), Retain.Values, Rotation.ShiftArray),
             autojoinConditionCustomers),
           on, JoinType.Inner, repair)) => {
 
@@ -426,8 +427,8 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       val graph = QSUGraph.fromTree[Fix](
         qsu.lpJoin(
-          qsu.transpose(qsu.read(orders), Retain.Values, Rotation.ShiftMap),
-          qsu.transpose(qsu.read(customers), Retain.Values, Rotation.ShiftMap),
+          qsu.read(orders, ExcludeId),
+          qsu.read(customers, ExcludeId),
           qsu._autojoin2(
             qsu.transpose(qsu.map(qsu.joinSideRef('leftJoin), projectOrdersKey), Retain.Values, Rotation.ShiftArray),
             qsu.map(qsu.joinSideRef('rightJoin), projectCustomersKey),
@@ -437,10 +438,10 @@ object ExtractFreeMapSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       evaluate(extractFM(graph)) must beLike {
         case \/-(ThetaJoin(
           AutoJoin2(
-            Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap),
-            Transpose(Map(Transpose(Read(`orders`), Retain.Values, Rotation.ShiftMap), struct), Retain.Values, Rotation.ShiftArray),
+            Read(`orders`, ExcludeId),
+            Transpose(Map(Read(`orders`, ExcludeId), struct), Retain.Values, Rotation.ShiftArray),
             autojoinCondition),
-          Transpose(Read(`customers`), Retain.Values, Rotation.ShiftMap),
+          Read(`customers`, ExcludeId),
           on, JoinType.Inner, repair)) => {
 
           autojoinCondition must beTreeEqual(makeMap("left_source", "left_target_0"))

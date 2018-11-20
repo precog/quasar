@@ -67,7 +67,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
 
       reifyBuckets(tree) must beLike {
         case \/-(QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _, _, Rotation.ShiftMap),
+            Read(_, ExcludeId),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -97,7 +97,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            LeftShift(Read(_), _, ExcludeId, _, _, _),
+            Read(_, ExcludeId),
             List(b),
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -122,7 +122,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
       reifyBuckets(tree) must beLike {
         case \/-(
           QSReduce(
-            Map(LeftShift(Read(_), _, ExcludeId, _, _, _), fm),
+            Map(Read(_, ExcludeId), fm),
             Nil,
             List(ReduceFuncs.Sum(r)),
             _)) =>
@@ -182,13 +182,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             AutoJoin2(
               city,
               QSReduce(
-                LeftShift(
-                  Read(_),
-                  Embed(CoEnv(-\/(SrcHole))),
-                  ExcludeId,
-                  _,
-                  _,
-                  Rotation.ShiftMap),
+                Read(_, ExcludeId),
                 List(arbBucket),
                 List(ReduceFuncs.Arbitrary(arbExpr)),
                 _),
@@ -197,22 +191,10 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               str1,
               QSReduce(
                 AutoJoin2(
-                  LeftShift(
-                    Read(_),
-                    Embed(CoEnv(-\/(SrcHole))),
-                    ExcludeId,
-                    _,
-                    _,
-                    Rotation.ShiftMap),
+                  Read(_, ExcludeId),
                   LeftShift(
                     AutoJoin2(
-                      LeftShift(
-                        Read(_),
-                        Embed(CoEnv(-\/(SrcHole))),
-                        ExcludeId,
-                        _,
-                        _,
-                        Rotation.ShiftMap),
+                      Read(_, ExcludeId),
                       loc,
                       _),
                     Embed(CoEnv(-\/(SrcHole))),
@@ -286,13 +268,7 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
             AutoJoin2(
               city,
               QSReduce(
-                LeftShift(
-                  Read(_),
-                  Embed(CoEnv(-\/(SrcHole))),
-                  ExcludeId,
-                  _,
-                  _,
-                  Rotation.ShiftMap),
+                Read(_, ExcludeId),
                 List(arbBucket),
                 List(ReduceFuncs.Arbitrary(arbExpr)),
                 _),
@@ -301,22 +277,10 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               str1,
               QSReduce(
                 AutoJoin2(
-                  LeftShift(
-                    Read(_),
-                    Embed(CoEnv(-\/(SrcHole))),
-                    ExcludeId,
-                    _,
-                    _,
-                    Rotation.ShiftMap),
+                  Read(_, ExcludeId),
                   LeftShift(
                     AutoJoin2(
-                      LeftShift(
-                        Read(_),
-                        Embed(CoEnv(-\/(SrcHole))),
-                        ExcludeId,
-                        _,
-                        _,
-                        Rotation.ShiftMap),
+                      Read(_, ExcludeId),
                       loc,
                       _),
                     Embed(CoEnv(-\/(SrcHole))),

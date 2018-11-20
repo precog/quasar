@@ -44,7 +44,7 @@ import shims._
 import scala.concurrent.ExecutionContext
 import scala.collection.mutable.ArrayBuffer
 
-final class FederatedShiftedReadPlanner[
+final class FederatedReadPlanner[
     T[_[_]]: BirecursiveT: EqualT: ShowT,
     F[_]: LiftIO: Monad: MonadPlannerErr: MonadFinalizers[?[_], IO]](
     val P: Cake)(
@@ -52,15 +52,15 @@ final class FederatedShiftedReadPlanner[
     cs: ContextShift[IO],
     ec: ExecutionContext) {
 
-  import FederatedShiftedReadPlanner.DefaultDecompressionBufferSize
+  import FederatedReadPlanner.DefaultDecompressionBufferSize
 
   type Assocs = Associates[T, IO]
   type M[A] = EvalConfigT[T, F, IO, A]
 
-  type Read[A] = Const[ShiftedRead[AFile], A] \/ Const[InterpretedRead[AFile], A]
+  type FederatedRead[A] = Const[Read[AFile], A] \/ Const[InterpretedRead[AFile], A]
 
-  def plan: AlgebraM[M, Read, MimirRepr] = {
-    case -\/(Const(ShiftedRead(file, status))) =>
+  def plan: AlgebraM[M, FederatedRead, MimirRepr] = {
+    case -\/(Const(Read(file, status))) =>
       planRead(file, Nil) map { repr =>
         import repr.P.trans._
 
@@ -87,8 +87,6 @@ final class FederatedShiftedReadPlanner[
   ////
 
   private val dsl = construction.mkGeneric[T, QScriptRead[T, ?]]
-  private val func = construction.Func[T]
-  private val recFunc = construction.RecFunc[T]
 
   private def planRead(file: AFile, instructions: List[ParseInstruction])
       : M[MimirRepr] = {
@@ -118,16 +116,9 @@ final class FederatedShiftedReadPlanner[
           f(source.path).to[F]
 
         case QueryAssociate.Heavyweight(f) =>
-          val shiftedRead =
-            dsl.LeftShift(
-              dsl.Read(ResourcePath.leaf(path): ResourcePath),
-              recFunc.Hole,
-              ExcludeId,
-              ShiftType.Map,
-              OnUndefined.Omit,
-              func.RightSide)
+          val read = dsl.Read(ResourcePath.leaf(path), ExcludeId)
 
-          f(shiftedRead).to[F]
+          f(read).to[F]
       }
 
       table <- tableFromQueryResult(path, queryResult, instructions)
@@ -202,7 +193,7 @@ final class FederatedShiftedReadPlanner[
     }
 }
 
-object FederatedShiftedReadPlanner {
+object FederatedReadPlanner {
   // 32k buffer, anything less would be uncivilized.
   val DefaultDecompressionBufferSize: Int = 32768
 }

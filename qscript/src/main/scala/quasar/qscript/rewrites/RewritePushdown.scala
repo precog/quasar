@@ -52,11 +52,11 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
   def rewriteLeftShift[F[a] <: ACopK[a]: Functor, A](
       implicit
         ER: Const[InterpretedRead[A], ?] :<<: F,
-        SR: Const[ShiftedRead[A], ?] :<<: F,
+        SR: Const[Read[A], ?] :<<: F,
         QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
-    // LeftShift(ShiftedRead(_, ExcludeId), /foo/bar/, _, _, Omit, f(RightSide))
+    // LeftShift(Read(_, ExcludeId), /foo/bar/, _, _, Omit, f(RightSide))
     case qc @ LeftShift(Embed(src), struct, shiftStatus, shiftType, OnUndefined.Omit, repair) => {
       import construction.Func
 
@@ -81,11 +81,11 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] extends TTypes[T] {
             Func[T].ProjectKeyS(compacted, ShiftedKey).some
         }
 
-      val srOpt: Option[ShiftedRead[A]] = SR.prj(src) flatMap { srConst =>
+      val srOpt: Option[Read[A]] = SR.prj(src) flatMap { srConst =>
         val sr = srConst.getConst
 
         sr.idStatus match {
-          case ExcludeId => sr.some  // only rewrite if ShiftedRead has ExcludeId
+          case ExcludeId => sr.some  // only rewrite if Read has ExcludeId
           case _ => None
         }
       }
@@ -182,7 +182,7 @@ object RewritePushdown {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[a] <: ACopK[a], A](
       implicit GF: Injectable[G, F],
                ESRF: Const[InterpretedRead[A], ?] :<<: F,
-               SRF: Const[ShiftedRead[A], ?] :<<: F,
+               SRF: Const[Read[A], ?] :<<: F,
                QCF: QScriptCore[T, ?] :<<: F,
                QCG: QScriptCore[T, ?] :<<: G)
       : G[T[F]] => F[T[F]] = {

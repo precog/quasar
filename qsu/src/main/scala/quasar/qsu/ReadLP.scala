@@ -19,6 +19,7 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 import quasar.{
   BinaryFunc,
+  IdStatus,
   Mapping,
   NullaryFunc,
   Reduction,
@@ -113,14 +114,9 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       : AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
 
     case lp.Read(path) =>
-      val afile = mkAbsolute(rootDir[Sandboxed], path)
-
-      val shiftedRead = for {
-        read <- withName[G](QSU.Read[T, Symbol](afile))
-        shifted <- extend1[G](read)(QSU.Transpose[T, Symbol](_, QSU.Retain.Values, QSU.Rotation.ShiftMap))
-      } yield shifted
-
-      shiftedRead
+      withName[G](QSU.Read[T, Symbol](
+        mkAbsolute(rootDir[Sandboxed], path),
+        IdStatus.ExcludeId)) // `IdStatus` is updated in `ReifyIdentities`, when necessary
 
     case lp.Constant(data) =>
       val back = fromData(data).fold[PlannerError \/ MapFunc[Hole]](

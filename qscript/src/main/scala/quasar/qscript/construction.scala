@@ -752,12 +752,6 @@ object construction {
     def Unreferenced: R =
       core(qscript.Unreferenced())
 
-    def BucketKey(src: R, value: FreeMap[T], name: FreeMap[T])(implicit F: Injectable[ProjectBucket[T, ?], F]): R =
-      embed(F.inject(qscript.BucketKey(src, value, name)))
-
-    def BucketIndex(src: R, value: FreeMap[T], index: FreeMap[T])(implicit F: Injectable[ProjectBucket[T, ?], F]): R =
-      embed(F.inject(qscript.BucketIndex(src, value, index)))
-
     def ThetaJoin(src: R,
                   lBranch: Free[F, Hole],
                   rBranch: Free[F, Hole],
@@ -786,22 +780,15 @@ object construction {
         f,
         combine)))
 
-    def ShiftedRead[A](path: A,
-                       idStatus: IdStatus)
-                      (implicit F: Injectable[Const[ShiftedRead[A], ?], F]): R =
-      embed(F.inject(Const(qscript.ShiftedRead(path, idStatus))))
-
     def InterpretedRead[A](path: A,
                            instructions: List[ParseInstruction])
                            (implicit F: Injectable[Const[InterpretedRead[A], ?], F]): R =
       embed(F.inject(Const(qscript.InterpretedRead(path, instructions))))
 
-    def Read[A](path: A)
+    def Read[A](path: A,
+                idStatus: IdStatus)
                (implicit F: Injectable[Const[Read[A], ?], F]): R =
-      embed(F.inject(Const(qscript.Read(path))))
-
-    def Root(implicit F: Injectable[Const[DeadEnd, ?], F]): R =
-      embed(F.inject(Const(qscript.Root)))
+      embed(F.inject(Const(qscript.Read(path, idStatus))))
 
     def Hole(implicit ev: Free[F, Hole] === R): R =
       ev(Free.pure(SrcHole))

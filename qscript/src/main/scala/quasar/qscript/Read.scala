@@ -17,21 +17,25 @@
 package quasar.qscript
 
 import slamdata.Predef.List
-import quasar.RenderTree
+import quasar.{IdStatus, RenderTree}
 
 import monocle.macros.Lenses
 import scalaz.{Equal, Show}
+import scalaz.std.tuple._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
 
 /** A backend-resolved `Root`, which is now a path. */
-@Lenses final case class Read[A](path: A)
+@Lenses final case class Read[A](path: A, idStatus: IdStatus)
 
 object Read {
-  implicit def equal[A: Equal]: Equal[Read[A]] = Equal.equalBy(_.path)
+  implicit def equal[A: Equal]: Equal[Read[A]] =
+    Equal.equalBy((sr => (sr.path, sr.idStatus)))
 
   implicit def show[A: Show]: Show[Read[A]] = RenderTree.toShow
 
   implicit def renderTree[A: Show]: RenderTree[Read[A]] =
-    RenderTree.simple(List("Read"), _.path.shows.some)
+    RenderTree.simple(List("Read"), r => {
+      (r.path.shows + ", " + r.idStatus.shows).some
+    })
 }

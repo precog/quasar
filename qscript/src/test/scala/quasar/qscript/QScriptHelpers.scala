@@ -20,7 +20,6 @@ import quasar.api.resource.ResourcePath
 import quasar.ejson, ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
-import quasar.contrib.iota.SubInject
 
 import iotaz.{TNilK,CopK}
 import iotaz.TListK.:::
@@ -36,26 +35,19 @@ trait QScriptHelpers extends TTypes[Fix] {
     QScriptCore :::
     ThetaJoin :::
     Const[Read[ResourcePath], ?] :::
-    Const[DeadEnd, ?] :::
     TNilK, A]
 
-  val DE = implicitly[Const[DeadEnd, ?] :<<: QS]
   val RD = implicitly[Const[Read[ResourcePath], ?]  :<<: QS]
   val QC = implicitly[QScriptCore :<<: QS]
   val TJ = implicitly[ThetaJoin :<<: QS]
 
-  implicit val QS: Injectable[QS, QST] = SubInject[QS, QST]
-
   type QST[A] = QScriptTotal[A]
   def QST[F[_]](implicit ev: Injectable[F, QST]) = ev
 
-  val DET = implicitly[Const[DeadEnd, ?] :<<: QST]
   val RTD = implicitly[Const[Read[ResourcePath], ?] :<<: QST]
   val QCT = implicitly[QScriptCore :<<: QST]
   val TJT = implicitly[ThetaJoin :<<: QST]
   val EJT = implicitly[EquiJoin :<<: QST]
-  val PBT = implicitly[ProjectBucket :<<: QST]
-  val SRTD = implicitly[Const[ShiftedRead[ResourcePath], ?] :<<: QST]
 
   val qsdsl = construction.mkDefaults[Fix, QS]
   val qstdsl = construction.mkDefaults[Fix, QST]

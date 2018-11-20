@@ -588,6 +588,11 @@ object ParseInstructionSpec {
       "remove array entirely when no values are retained" in {
         ldjson("[42]") must maskInto("[0]" -> Set(Boolean))(ldjson(""))
       }
+
+      "retain vector at depth and all recursive contents" in {
+        val input = ldjson("""{ "a": { "b": { "c": { "e": true }, "d": 42 } } }""")
+        input must maskInto(".a.b" -> Set(Object))(input)
+      }
     }
 
     def evalMask(mask: Mask, stream: JsonStream): JsonStream

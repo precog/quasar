@@ -51,7 +51,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
       case _ => false
     }
 
-    filters.nonEmpty // && notShiftedRead
+    filters.nonEmpty
   }
 
   def extract[

@@ -49,7 +49,7 @@ final class RegressionQScriptEvaluator[
   type QSRewrite[U[_[_]]] =
     QScriptCore[U, ?]            :::
     EquiJoin[U, ?]               :::
-    Const[ShiftedRead[ResourcePath], ?] :::
+    Const[Read[ResourcePath], ?] :::
     TNilK
 
   type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QSRewrite[U]
@@ -90,13 +90,13 @@ final class RegressionQScriptEvaluator[
   def plan(cp: T[QSM]): F[Repr] = {
     val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
     val EquiJoin = CopK.Inject[EquiJoin[T, ?], QSM]
-    val ShiftedRead = CopK.Inject[Const[ShiftedRead[ResourcePath], ?], QSM]
+    val Read = CopK.Inject[Const[Read[ResourcePath], ?], QSM]
     val InterpretedRead = CopK.Inject[Const[InterpretedRead[ResourcePath], ?], QSM]
 
     def count: QSM[QScriptCount] => QScriptCount = {
       case InterpretedRead(_) => QScriptCount.incrementInterpretedRead
 
-      case ShiftedRead(_) => QScriptCount.incrementShiftedRead
+      case Read(_) => QScriptCount.incrementRead
 
       case EquiJoin(value) =>
         value.src |+| countBranch(value.lBranch) |+| countBranch(value.rBranch)

@@ -18,16 +18,38 @@ package quasar.yggdrasil.table
 
 import cats.effect.IO
 
-import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec}
+import quasar.{CompositeParseType, IdStatus, ParseInstructionSpec, ParseType}
 import quasar.common.CPath
 
-import tectonic.Plate
+import tectonic.{Plate, Signal}
 import tectonic.json.Parser
 import tectonic.test.{Event, ReifiedTerminalPlate}
 
 object TectonicParseInstructionSpec extends ParseInstructionSpec {
 
   type JsonStream = List[Event]
+
+  "MaskPlate" should {
+    "consider skipping to be contents-seen" in {
+      val events = List(
+        Event.NestMap("a"),
+        Event.Skipped(42),
+        Event.Unnest,
+        Event.FinishRow)
+
+      val plateF = ReifiedTerminalPlate[IO].flatMap(
+        MaskPlate[IO, List[Event]](
+          Mask(Map(CPath.parse(".a") -> Set(ParseType.Object))), _))
+
+      val plate = plateF.unsafeRunSync()
+
+      plate.nestMap("a") mustEqual Signal.Continue
+      plate.skipped(42)
+      plate.unnest() mustEqual Signal.Continue
+      plate.finishRow()
+      (plate.finishBatch(false) ++ plate.finishBatch(true)) mustEqual events
+    }
+  }
 
   def evalMask(mask: Mask, stream: JsonStream): JsonStream =
     evalPlate(stream)(MaskPlate[IO, List[Event]](mask, _))

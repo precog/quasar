@@ -17,6 +17,7 @@
 package quasar.qsu
 
 import quasar.{Qspec, TreeMatchers}
+import quasar.IdStatus.ExcludeId
 import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.contrib.pathy.AFile
@@ -46,11 +47,11 @@ object CoalesceUnaryMappableSpec extends Qspec with QSUTTypes[Fix] with TreeMatc
     "be the identity for a Map applied to a non-mappable root" >> {
       val g = QSUGraph.fromTree[Fix](
         qsu.map(
-          qsu.read(dataA),
+          qsu.read(dataA, ExcludeId),
           rec.ProjectKeyS(rec.Hole, "A")))
 
       coalesce(g) must beLike {
-        case Map(Read(p), f) =>
+        case Map(Read(p, ExcludeId), f) =>
           val exp = mf.ProjectKeyS(mf.Hole, "A")
           p must_= dataA
           f.linearize must beTreeEqual(exp)
@@ -62,13 +63,13 @@ object CoalesceUnaryMappableSpec extends Qspec with QSUTTypes[Fix] with TreeMatc
         qsu.map(
           qsu.map(
             qsu.map(
-              qsu.read(dataA),
+              qsu.read(dataA, ExcludeId),
               rec.ProjectKeyS(rec.Hole, "X")),
             rec.ProjectKeyS(rec.Hole, "Y")),
           rec.ProjectKeyS(rec.Hole, "Z")))
 
       coalesce(g) must beLike {
-        case Map(Read(p), f) =>
+        case Map(Read(p, ExcludeId), f) =>
           val exp =
             mf.ProjectKeyS(mf.ProjectKeyS(mf.ProjectKeyS(mf.Hole, "X"), "Y"), "Z")
 
@@ -82,18 +83,18 @@ object CoalesceUnaryMappableSpec extends Qspec with QSUTTypes[Fix] with TreeMatc
         qsu._autojoin2(
           qsu.map(
             qsu.map(
-              qsu.read(dataA),
+              qsu.read(dataA, ExcludeId),
               rec.ProjectKeyS(rec.Hole, "X")),
             rec.MakeMapS("A", rec.Hole)),
           qsu.map(
             qsu.map(
-              qsu.read(dataB),
+              qsu.read(dataB, ExcludeId),
               rec.ProjectKeyS(rec.Hole, "Y")),
             rec.MakeMapS("B", rec.Hole)),
           mf.ConcatMaps(mf.LeftSide, mf.RightSide)))
 
       coalesce(g) must beLike {
-        case AutoJoin2(Read(l), Read(r), f) =>
+        case AutoJoin2(Read(l, ExcludeId), Read(r, ExcludeId), f) =>
           val exp =
             mf.ConcatMaps(
               mf.MakeMapS("A", mf.ProjectKeyS(mf.LeftSide, "X")),
@@ -109,16 +110,16 @@ object CoalesceUnaryMappableSpec extends Qspec with QSUTTypes[Fix] with TreeMatc
       val g = QSUGraph.fromTree[Fix](
         qsu._autojoin3(
           qsu.map(
-            qsu.read(dataA),
+            qsu.read(dataA, ExcludeId),
             rec.ProjectKeyS(rec.Hole, "X")),
           qsu.map(
-            qsu.read(dataB),
+            qsu.read(dataB, ExcludeId),
             rec.ProjectKeyS(rec.Hole, "Y")),
-          qsu.read(dataA),
+          qsu.read(dataA, ExcludeId),
           mf.Cond(mf.LeftSide3, mf.RightSide3, mf.Center)))
 
       coalesce(g) must beLike {
-        case AutoJoin3(Read(l), Read(c), Read(r), f) =>
+        case AutoJoin3(Read(l, ExcludeId), Read(c, ExcludeId), Read(r, ExcludeId), f) =>
           val exp =
             mf.Cond(
               mf.ProjectKeyS(mf.LeftSide3, "X"),

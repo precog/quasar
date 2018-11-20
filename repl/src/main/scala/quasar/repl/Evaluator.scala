@@ -40,7 +40,6 @@ import quasar.yggdrasil.util.NullRemover
 
 import java.lang.Exception
 import java.nio.CharBuffer
-import java.nio.charset.StandardCharsets
 import java.nio.file.{Path => JPath}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -541,7 +540,7 @@ final class Evaluator[F[_]: ContextShift: Effect: MonadQuasarErr: PhaseResultLis
       path.fold(f => fileParent(f) </> dir(fileName(f).value), rootDir)
 
     private def writeToPath(path: JPath, s: Stream[F, CharBuffer]): F[Unit] =
-      s.through(pipe.charBufferToByte(StandardCharsets.UTF_8))
+      s.through(pipe.charBufferToByteUtf8(true))
         .through(fs2.io.file.writeAll(path, ec))
         .compile.drain
 }

@@ -18,6 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 import quasar.{Qspec, Type}
+import quasar.IdStatus.ExcludeId
 import quasar.common.data.Data
 import quasar.ejson.{EJson, Fixed}
 import quasar.qscript.{
@@ -59,7 +60,7 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
 
       elim(qgraph) must beLike {
         case Map(
-          Transpose(Read(_), QSU.Retain.Values, QSU.Rotation.ShiftMap),
+          Read(_, ExcludeId),
           FMFC1(MapFuncsCore.Negate(SrcHole))) => ok
       }
     }
@@ -76,7 +77,7 @@ object EliminateUnarySpec extends Qspec with QSUTTypes[Fix] {
       elim(qgraph) must beLike {
         case Subset(
           Map(
-            Transpose(Read(_), QSU.Retain.Values, QSU.Rotation.ShiftMap),
+            Read(_, ExcludeId),
             FMFC1(MapFuncsCore.Negate(SrcHole))),
           Take,
           DataConstantMapped(Data.Int(i))) => i mustEqual 11

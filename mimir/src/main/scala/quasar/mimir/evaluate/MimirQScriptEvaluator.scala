@@ -61,7 +61,7 @@ final class MimirQScriptEvaluator[
   type QSRewrite[U[_[_]]] =
     QScriptCore[U, ?]            :::
     EquiJoin[U, ?]               :::
-    Const[ShiftedRead[ResourcePath], ?] :::
+    Const[Read[ResourcePath], ?] :::
     TNilK
 
   type QS[U[_[_]]] = Const[InterpretedRead[ResourcePath], ?] ::: QSRewrite[U]
@@ -114,12 +114,12 @@ final class MimirQScriptEvaluator[
       new mimir.EquiJoinPlanner[T, M]
 
     def shiftedReadPlanner =
-      new FederatedShiftedReadPlanner[T, F](cake)
+      new FederatedReadPlanner[T, F](cake)
 
     lazy val planQST: AlgebraM[M, QScriptTotal[T, ?], Repr] = {
       val QScriptCore = CopK.Inject[QScriptCore[T, ?], QScriptTotal[T, ?]]
       val EquiJoin = CopK.Inject[EquiJoin[T, ?], QScriptTotal[T, ?]]
-      val ShiftedRead = CopK.Inject[Const[ShiftedRead[ResourcePath], ?], QScriptTotal[T, ?]]
+      val Read = CopK.Inject[Const[Read[ResourcePath], ?], QScriptTotal[T, ?]]
 
       _ match {
         case QScriptCore(value) =>
@@ -128,13 +128,13 @@ final class MimirQScriptEvaluator[
         case EquiJoin(value) =>
           equiJoinPlanner.plan(planQST)(value)
 
-        case ShiftedRead(value) =>
+        case Read(value) =>
           val sr = value.getConst
 
           sr.path match {
             case ResourcePath.Leaf(file) =>
               shiftedReadPlanner.plan(Const(
-                quasar.qscript.ShiftedRead[AFile](file, sr.idStatus)).left)
+                quasar.qscript.Read[AFile](file, sr.idStatus)).left)
             case ResourcePath.Root =>
               errorImpossible
           }
@@ -146,7 +146,7 @@ final class MimirQScriptEvaluator[
     def planQSM(in: QSM[Repr]): M[Repr] = {
       val QScriptCore = CopK.Inject[QScriptCore[T, ?], QSM]
       val EquiJoin = CopK.Inject[EquiJoin[T, ?], QSM]
-      val ShiftedRead = CopK.Inject[Const[ShiftedRead[ResourcePath], ?], QSM]
+      val Read = CopK.Inject[Const[Read[ResourcePath], ?], QSM]
       val InterpretedRead = CopK.Inject[Const[InterpretedRead[ResourcePath], ?], QSM]
 
       in match {
@@ -156,13 +156,13 @@ final class MimirQScriptEvaluator[
         case EquiJoin(value) =>
           equiJoinPlanner.plan(planQST)(value)
 
-        case ShiftedRead(value) =>
+        case Read(value) =>
           val sr = value.getConst
 
           sr.path match {
             case ResourcePath.Leaf(file) =>
               shiftedReadPlanner.plan(Const(
-                quasar.qscript.ShiftedRead[AFile](file, sr.idStatus)).left)
+                quasar.qscript.Read[AFile](file, sr.idStatus)).left)
             case ResourcePath.Root =>
               errorImpossible
           }

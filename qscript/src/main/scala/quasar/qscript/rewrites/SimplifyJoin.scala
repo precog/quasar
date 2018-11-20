@@ -92,7 +92,6 @@ object SimplifyJoin {
           @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
           def separateConditions(fm: JoinFunc[T]): SimplifiedJoinCondition[T] =
             fm.resume match {
-              // TODO: Use `MapFunc.flattenAnd` instead of this case.
               case -\/(MFC(And(a, b))) =>
                 val (fir, sec) = (separateConditions(a), separateConditions(b))
                 SimplifiedJoinCondition(
@@ -217,26 +216,12 @@ object SimplifyJoin {
         fa => GtoH(F.inj(fa))
     }
 
-  implicit def deadEnd[T[_[_]], F[a] <: ACopK[a]](implicit DE: Const[DeadEnd, ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[DeadEnd, ?], F] =
-    default
-
   implicit def read[T[_[_]], F[a] <: ACopK[a], A](implicit R: Const[Read[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
-  implicit def shiftedRead[T[_[_]], F[a] <: ACopK[a], A]
-    (implicit SR: Const[ShiftedRead[A], ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[ShiftedRead[A], ?], F] =
-    default
-
-  implicit def extraShiftedRead[T[_[_]], F[a] <: ACopK[a], A]
+  implicit def interpretedRead[T[_[_]], F[a] <: ACopK[a], A]
     (implicit SR: Const[InterpretedRead[A], ?] :<<: F)
       : SimplifyJoin.Aux[T, Const[InterpretedRead[A], ?], F] =
-    default
-
-  implicit def projectBucket[T[_[_]], F[a] <: ACopK[a]]
-    (implicit PB: ProjectBucket[T, ?] :<<: F)
-      : SimplifyJoin.Aux[T, ProjectBucket[T, ?], F] =
     default
 }

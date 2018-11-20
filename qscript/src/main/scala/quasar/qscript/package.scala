@@ -71,13 +71,10 @@ package object qscript {
     */
   type QScriptTotal[T[_[_]], A] = CopK[
          QScriptCore[T, ?]
-     ::: ProjectBucket[T, ?]
      ::: ThetaJoin[T, ?]
      ::: EquiJoin[T, ?]
-     ::: Const[ShiftedRead[ResourcePath], ?]
      ::: Const[InterpretedRead[ResourcePath], ?]
      ::: Const[Read[ResourcePath], ?]
-     ::: Const[DeadEnd, ?]
      ::: TNilK, A]
 
   object QCT {
@@ -112,16 +109,6 @@ package object qscript {
 
   implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable[QScriptRead[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptRead[T, ?], QScriptTotal[T, ?]]
-
-  /** QScript that has gone through Read conversion and shifted conversion.
-    *
-    * NB: Once QScriptTotal goes away, this could become parametric in the path type.
-    */
-  type QScriptShiftRead[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[ShiftedRead[ResourcePath], ?] ::: TNilK, A]
-
-  implicit def qScriptShiftReadToQScriptTotal[T[_[_]]]: Injectable[QScriptShiftRead[T, ?], QScriptTotal[T, ?]] =
-    SubInject[QScriptShiftRead[T, ?], QScriptTotal[T, ?]]
 
   type MapFunc[T[_[_]], A] = CopK[MapFuncCore[T, ?] ::: MapFuncDerived[T, ?] ::: TNilK, A]
 

@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.{Qspec, TreeMatchers}
+import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.ejson.{EJson, Fixed}
 import quasar.fp._
 import quasar.contrib.iota._
@@ -35,6 +35,7 @@ import scalaz.{EitherT, INil, Need, StateT}
 object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
   import QSUGraph.Extractors._
   import ApplyProvenance.AuthenticatedQSU
+  import IdStatus.ExcludeId
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -53,17 +54,17 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu.autojoin2((
           qsu.map(
-            qsu.read(afile1),
+            qsu.read(afile1, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "foo")),
           qsu.map(
-            qsu.read(afile2),
+            qsu.read(afile2, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "bar")),
           _(MapFuncsCore.Add(_, _)))))
 
       runOn(qgraph) must beLike {
         case QSAutoJoin(
-          Map(Read(`afile1`), fmL),
-          Map(Read(`afile2`), fmR),
+          Map(Read(`afile1`, ExcludeId), fmL),
+          Map(Read(`afile2`, ExcludeId), fmR),
           JoinKeys(INil()),
           fmCombiner) =>
 
@@ -82,24 +83,24 @@ object ReifyAutoJoinSpecs extends Qspec with TreeMatchers with QSUTTypes[Fix] {
       val qgraph = QSUGraph.fromTree[Fix](
         qsu._autojoin3((
           qsu.map(
-            qsu.read(afile1),
+            qsu.read(afile1, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "foo")),
           qsu.map(
-            qsu.read(afile2),
+            qsu.read(afile2, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "bar")),
           qsu.map(
-            qsu.read(afile3),
+            qsu.read(afile3, ExcludeId),
             recFunc.ProjectKeyS(recFunc.Hole, "baz")),
           func.Subtract(func.Add(func.LeftSide3, func.RightSide3), func.Center))))
 
       runOn(qgraph) must beLike {
         case QSAutoJoin(
           QSAutoJoin(
-            Map(Read(`afile1`), fmL),
-            Map(Read(`afile2`), fmC),
+            Map(Read(`afile1`, ExcludeId), fmL),
+            Map(Read(`afile2`, ExcludeId), fmC),
             JoinKeys(INil()),
             fmInner),
-          Map(Read(`afile3`), fmR),
+          Map(Read(`afile3`, ExcludeId), fmR),
           JoinKeys(INil()),
           fmOuter) =>
 

@@ -155,13 +155,7 @@ final class DatasourceManagement[
     def sampleQuery =
       dsl.Subset(
         dsl.Unreferenced,
-        freeDsl.LeftShift(
-          freeDsl.Read(path),
-          recFunc.Hole,
-          IdStatus.ExcludeId,
-          ShiftType.Map,
-          OnUndefined.Omit,
-          func.RightSide),
+        freeDsl.Read(path, IdStatus.ExcludeId),
         Take,
         freeDsl.Map(
           freeDsl.Unreferenced,

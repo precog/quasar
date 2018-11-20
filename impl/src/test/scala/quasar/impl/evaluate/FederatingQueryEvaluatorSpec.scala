@@ -17,7 +17,7 @@
 package quasar.impl.evaluate
 
 import slamdata.Predef._
-import quasar.{Qspec, TreeMatchers}
+import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.api.resource._
 import quasar.connector.ResourceError
 import quasar.contrib.pathy.AFile
@@ -35,6 +35,7 @@ import scalaz.syntax.either._
 
 final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
   import ResourceError._
+  import IdStatus.ExcludeId
 
   implicit val showTree: Show[Tree[ResourceName]] =
     Show.shows(_.drawTree)
@@ -60,7 +61,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     "returns NAR for root" >> {
       val query =
         qs.fix.Map(
-          qs.fix.Read[ResourcePath](ResourcePath.Root),
+          qs.fix.Read[ResourcePath](ResourcePath.Root, ExcludeId),
           qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
 
       fqe.evaluate(query).swap.toOption must_= Some(notAResource(ResourcePath.root()))
@@ -69,7 +70,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
     "returns PNF when no source" >> {
       val query =
         qs.fix.Map(
-          qs.fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar"))),
+          qs.fix.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar")), ExcludeId),
           qs.recFunc.MakeMapS("value", qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "value")))
 
       val rp =
@@ -82,8 +83,8 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
       val query =
         qs.fix.Union(
           qs.fix.Unreferenced,
-          qs.free.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("abs") </> file("a"))),
-          qs.free.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar"))))
+          qs.free.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("abs") </> file("a")), ExcludeId),
+          qs.free.Read[ResourcePath](ResourcePath.leaf(rootDir </> dir("foo") </> file("bar")), ExcludeId))
 
       val rp =
         ResourcePath.root() / ResourceName("abs") / ResourceName("a")
@@ -102,8 +103,8 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
         qs.fix.Filter(
           qs.fix.Union(
             qs.fix.Unreferenced,
-            qs.free.Read[ResourcePath](ResourcePath.leaf(absf)),
-            qs.free.Read[ResourcePath](ResourcePath.leaf(xysf))),
+            qs.free.Read[ResourcePath](ResourcePath.leaf(absf), ExcludeId),
+            qs.free.Read[ResourcePath](ResourcePath.leaf(xysf), ExcludeId)),
           qs.recFunc.Gt(
             qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
             qs.recFunc.Now))

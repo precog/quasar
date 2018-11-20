@@ -82,7 +82,8 @@ object QScriptUniform {
       case Map(source, fm) =>
         f(source).map(Map(_, fm))
 
-      case Read(path) => (Read(path): QScriptUniform[T, B]).point[G]
+      case Read(path, idStatus) =>
+        (Read(path, idStatus): QScriptUniform[T, B]).point[G]
 
       case Transpose(source, retain, rotations) =>
         f(source).map(Transpose(_, retain, rotations))
@@ -164,8 +165,8 @@ object QScriptUniform {
           case Map(source, fm) =>
             s"Map(${source.shows}, ${fm.shows})"
 
-          case Read(path) =>
-            s"Read(${Path.posixCodec.printPath(path)})"
+          case Read(path, idStatus) =>
+            s"Read(${Path.posixCodec.printPath(path)}, ${idStatus.shows})"
 
           case Transpose(source, retain, rotations) =>
             s"Transpose(${source.shows}, ${retain.shows}, ${rotations.shows})"
@@ -289,7 +290,9 @@ object QScriptUniform {
       source: A,
       fm: RecFreeMap[T]) extends QScriptUniform[T, A]
 
-  final case class Read[T[_[_]], A](path: AFile) extends QScriptUniform[T, A]
+  final case class Read[T[_[_]], A](
+      path: AFile,
+      idStatus: IdStatus) extends QScriptUniform[T, A]
 
   // LPish
   final case class Transpose[T[_[_]], A](
@@ -568,10 +571,10 @@ object QScriptUniform {
         case QSSort(a, buckets, keys) => (a, buckets, keys)
       } { case (a, buckets, keys) => QSSort(a, buckets, keys) }
 
-    def read[A]: Prism[QScriptUniform[A], AFile] =
-      Prism.partial[QScriptUniform[A], AFile] {
-        case Read(f) => f
-      } (Read(_))
+    def read[A]: Prism[QScriptUniform[A], (AFile, IdStatus)] =
+      Prism.partial[QScriptUniform[A], (AFile, IdStatus)] {
+        case Read(f, s) => (f, s)
+        } { case (f, s) => Read(f, s) }
 
     def subset[A]: Prism[QScriptUniform[A], (A, SelectionOp, A)] =
       Prism.partial[QScriptUniform[A], (A, SelectionOp, A)] {
@@ -714,8 +717,8 @@ object QScriptUniform {
     def qsSort: Prism[A, F[(A, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])]] =
       composeLifting[(?, List[FreeAccess[Hole]], NEL[(FreeMap, SortDir)])](O.qsSort[A])
 
-    def read: Prism[A, F[AFile]] = {
-      type G[_] = AFile
+    def read: Prism[A, F[(AFile, IdStatus)]] = {
+      type G[_] = (AFile, IdStatus)
       composeLifting[G](O.read[A])
     }
 
@@ -751,7 +754,7 @@ object QScriptUniform {
 
     // read
     def tread(file: AFile): T[QSU] =
-      transpose(read(file), Retain.Values, Rotation.ShiftMap)
+      read((file, IdStatus.ExcludeId))
 
     def tread1(name: String): T[QSU] =
       tread(Path.rootDir </> Path.file(name))

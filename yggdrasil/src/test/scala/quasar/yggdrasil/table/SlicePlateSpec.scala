@@ -164,6 +164,156 @@ object SlicePlateSpec extends Specification with ScalaCheck with DataGenerators 
             RObject("a" -> CLong(10), "b" -> CBoolean(false), "c" -> CString("qux")))
       }
     }
+
+    "correctly build the deep-giraffe-plus.data dataset after parseinstructions" in {
+      // just here for documentation
+      /*val input = """
+        {"first":{"second":{"shifted":"b2fe01ea-a7e0-452c-95e6-7047a62ecc71"}}}
+        {"first":{"second":{"shifted":"X"}}}
+        {"first":{"second":{"shifted":"f5fb62c9-564d-4c3f-b0a5-a804a3cc4d25"}}}
+        {"first":{"second":{"shifted":"X"}}}
+        {"first":{"second":{"shifted":"d153fccb-1707-42e3-ba90-03c473687964"}}}
+        {"first":{"second":{"shifted":"X"}}}
+        {"first":{"second":{"shifted":"b5207e48-10b4-4a42-8e6e-9a4551a88249"}}}
+        {"first":{"second":{"shifted":"X"}}}
+        {"first":{"second":{"shifted":"cfc2c0d5-b81e-4f3c-9bf4-d6d06e4ba82f"}}}
+        {"first":{"second":{"shifted":"X"}}}
+        {"first":{"second":{"shifted":"shifted"}}}
+        {"first":{"second":{"shifted":"shifted"}}}
+        """*/
+
+      val plate = SlicePlate[IO](false).unsafeRunSync()
+
+      // this is exactly `input`
+      val (slices1, slices2) = {
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("b2fe01ea-a7e0-452c-95e6-7047a62ecc71")
+        plate.skipped(99)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("X")
+        plate.skipped(5)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("f5fb62c9-564d-4c3f-b0a5-a804a3cc4d25")
+        plate.skipped(101)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("X")
+        plate.skipped(5)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("d153fccb-1707-42e3-ba90-03c473687964")
+        plate.skipped(101)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("X")
+        plate.skipped(5)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("b5207e48-10b4-4a42-8e6e-9a4551a88249")
+        plate.skipped(91)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("X")
+        plate.skipped(5)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("cfc2c0d5-b81e-4f3c-9bf4-d6d06e4ba82f")
+        plate.skipped(91)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("X")
+        plate.skipped(5)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("shifted")
+        plate.skipped(7)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        plate.nestMap("first")
+        plate.nestMap("second")
+        plate.nestMap("shifted")
+        plate.str("shifted")
+        plate.skipped(19)
+        plate.unnest()
+        plate.unnest()
+        plate.unnest()
+        plate.finishRow()
+        (plate.finishBatch(false), plate.finishBatch(true))
+      }
+
+      val slices = slices1 ++ slices2
+      val results = slices.flatMap(_.toRValues)
+
+      results mustEqual List(
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("b2fe01ea-a7e0-452c-95e6-7047a62ecc71")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("X")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("f5fb62c9-564d-4c3f-b0a5-a804a3cc4d25")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("X")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("d153fccb-1707-42e3-ba90-03c473687964")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("X")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("b5207e48-10b4-4a42-8e6e-9a4551a88249")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("X")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("cfc2c0d5-b81e-4f3c-9bf4-d6d06e4ba82f")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("X")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("shifted")))),
+        RObject("first" -> RObject("second" -> RObject("shifted" -> CString("shifted")))))
+    }
   }
 
   private[this] def sortFields(data: Data): Data = data match {

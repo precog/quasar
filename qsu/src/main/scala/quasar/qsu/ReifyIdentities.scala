@@ -53,7 +53,8 @@ import scalaz.Scalaz._
 final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
-  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[ResearchedQSU[T]] =
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T])
+      : F[ResearchedQSU[T]] =
     reifyIdentities[F](gatherReferences(aqsu.graph), aqsu)
 
   ////
@@ -162,6 +163,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     type G[A] = ReifyT[F, A]
     val G = MonadState_[G, ReifyState]
 
+    // if the root of the graph contains reified identities
     def emitsIVMap(g: QSUGraph): G[Boolean] =
       G.gets(_.status.lookup(g.root) getOrElse false)
 
@@ -171,7 +173,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     def isReferenced(access: Access[Symbol]): G[Boolean] =
       G.gets(_.refs.accessed.member(access))
 
-    def includeIdRepair(oldRepair: FreeMapA[ShiftTarget], oldIdStatus: IdStatus): FreeMapA[ShiftTarget] =
+    def includeIdRepair(oldRepair: FreeMapA[ShiftTarget], oldIdStatus: IdStatus)
+        : FreeMapA[ShiftTarget] =
       if (oldIdStatus === ExcludeId)
         oldRepair >>= {
           case ShiftTarget.RightTarget => func.ProjectIndexI(RightTarget, 1)
@@ -262,6 +265,36 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
     // Reifies shift identity and reduce bucket access.
     val reifyNonGroupKeys: PartialFunction[QSUGraph, G[QSUGraph]] = {
+
+      case g @ E.Read(file, idStatus) =>
+        val idA = Access.id(IdAccess.identity(g.root), g.root)
+
+        isReferenced(idA) flatMap { ref =>
+          if (ref) {
+            val mapping: FreeMap = makeIV(
+              makeI1(g.root, func.ProjectIndexI(func.Hole, 0)),
+              func.ProjectIndexI(func.Hole, 1))
+
+            val newRead = g.overwriteAtRoot(O.read(file, IncludeId))
+
+            for {
+              mapped <- mapResultOf(newRead, mapping)
+
+              (nestedRoot, newBranch) = mapped
+
+              mapRoot = newBranch.root
+
+              _ <- setStatus(nestedRoot, false)
+              _ <- setStatus(mapRoot, true)
+
+              modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(mapRoot))(rebaseV))
+
+              _ <- G.modify(modifyValueAccess)
+            } yield newBranch
+          } else {
+            setStatus(g.root, false) as g
+          }
+        }
 
       case g @ E.Distinct(source) =>
         preserveIV(source, g) as g

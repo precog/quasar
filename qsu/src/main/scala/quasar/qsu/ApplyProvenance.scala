@@ -294,11 +294,16 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
               .apply(sdims))
         }
 
-      case Read(file) =>
+      case Read(file, idStatus) =>
+        val tid = IdAccess.identity(g.root)
+
         val rdims = segments(file).toNel.fold(Dimensions.empty[dims.P]) { ss =>
           dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
         }
-        QAuthS[F].modify(_.addDims(g.root, rdims)) as rdims
+
+        val sdims = applyIdStatus(idStatus, dims.lshift(tid, rdims))
+
+        QAuthS[F].modify(_.addDims(g.root, sdims)) as sdims
 
       case Subset(from, _, count) =>
         compute2[F](g, from, count)(dims.join(_, _))

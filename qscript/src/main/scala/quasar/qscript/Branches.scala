@@ -107,15 +107,6 @@ object Branches {
         }
     }
 
-  implicit def projectBucket[T[_[_]]]: Branches[T, ProjectBucket[T, ?]] =
-    new Branches[T, ProjectBucket[T, ?]] {
-      def branches[A]: Traversal[ProjectBucket[T, A], FreeQS[T]] =
-        new Traversal[ProjectBucket[T, A], FreeQS[T]] {
-          def modifyF[F[_]: Applicative](f: FreeQS[T] => F[FreeQS[T]])(s: ProjectBucket[T, A]): F[ProjectBucket[T, A]] =
-            Applicative[F].pure(s)
-        }
-    }
-
   implicit def thetaJoin[T[_[_]]]: Branches[T, ThetaJoin[T, ?]] =
     new Branches[T, ThetaJoin[T, ?]] {
       def branches[A]:Traversal[ThetaJoin[T, A], FreeQS[T]] =

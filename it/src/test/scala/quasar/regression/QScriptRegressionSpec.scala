@@ -56,13 +56,13 @@ object QScriptRegressionSpec extends Qspec {
 
   "pushdown-optimized qscript" should {
 
-    "have a ShiftedRead" >> {
+    "have a Read" >> {
 
       val q1 = "select * from foo"
       q1 in {
         val result = count(q1)
 
-        result must countShiftedReadAs(1)
+        result must countReadAs(1)
         result must countInterpretedReadAs(0)
         result must countLeftShiftAs(0)
       }
@@ -74,7 +74,7 @@ object QScriptRegressionSpec extends Qspec {
       q1 in {
         val result = count(q1)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -83,7 +83,7 @@ object QScriptRegressionSpec extends Qspec {
       q2 in {
         val result = count(q2)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -92,7 +92,7 @@ object QScriptRegressionSpec extends Qspec {
       q3 in {
         val result = count(q3)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -101,7 +101,7 @@ object QScriptRegressionSpec extends Qspec {
       q4 in {
         val result = count(q4)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -110,7 +110,7 @@ object QScriptRegressionSpec extends Qspec {
       q5 in {
         val result = count(q5)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -119,7 +119,7 @@ object QScriptRegressionSpec extends Qspec {
       q6 in {
         val result = count(q6)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -130,7 +130,7 @@ object QScriptRegressionSpec extends Qspec {
       q1 in {
         val result = count(q1)
 
-        result must countShiftedReadAs(1)
+        result must countReadAs(1)
         result must countInterpretedReadAs(0)
         result must countLeftShiftAs(3)
       }
@@ -139,7 +139,7 @@ object QScriptRegressionSpec extends Qspec {
       q2 in {
         val result = count(q2)
 
-        result must countShiftedReadAs(2)
+        result must countReadAs(2)
         result must countInterpretedReadAs(0)
         result must countLeftShiftAs(2)
       }
@@ -149,7 +149,7 @@ object QScriptRegressionSpec extends Qspec {
       q3 in {
         val result = count(q3)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(0)
       }
@@ -160,7 +160,7 @@ object QScriptRegressionSpec extends Qspec {
       q4 in {
         val result = count(q4)
 
-        result must countShiftedReadAs(0)
+        result must countReadAs(0)
         result must countInterpretedReadAs(1)
         result must countLeftShiftAs(2)
       }
@@ -181,10 +181,10 @@ object QScriptRegressionSpec extends Qspec {
       }
     }
 
-  def countShiftedReadAs(expected: Int): Matcher[QScriptCount] =
+  def countReadAs(expected: Int): Matcher[QScriptCount] =
     new Matcher[QScriptCount] {
       def apply[S <: QScriptCount](s: Expectable[S]): MatchResult[S] = {
-        val actual = s.value.shiftedRead.count
+        val actual = s.value.read.count
         result(
           actual == expected,
           s"Received expected ${s.value}",

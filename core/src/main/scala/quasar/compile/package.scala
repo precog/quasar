@@ -125,7 +125,32 @@ package object compile {
         alias.cata(
           a => (used, a -> expr).right,
           {
-            val tentativeName = projectionName(expr, relName) getOrElse index.toString
+            projectionName(expr, relName).flatMap { tn =>
+              val alternatives = Stream.from(0).map(suffix => tn + suffix.toString)
+                (tn #:: alternatives).dropWhile(used.contains).headOption.map { name =>
+                  // WartRemover seems to be confused by the `+` method on `Set`
+                  @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
+                  val newUsed = used + name
+                  (newUsed, name -> expr)
+                }
+            } \/> SemanticError.GenericError("Could not infer fields names for projections")
+          })
+      }.map(_._2))
+  }
+
+  def ordinalProjectionNames[T]
+    (projections: List[Proj[T]], relName: Option[String])
+    (implicit T: Recursive.Aux[T, Sql])
+      : SemanticError \/ List[(String, T)] = {
+    val aliases = projections.flatMap(_.alias.toList)
+
+    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
+      duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
+      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
+        alias.cata(
+          a => (used, a -> expr).right,
+          {
+            val tentativeName = index.toString
             val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
             (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
               // WartRemover seems to be confused by the `+` method on `Set`

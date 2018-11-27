@@ -475,40 +475,67 @@ final class Compiler[M[_], T: Equal]
          * 9. Prune synthetic fields
          */
 
+        val forgetAnn: CoExpr => Fix[Sql] =
+          forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations] _
+        val projs = projections.map(_.map(forgetAnn))
+
         // Selection of wildcards aren't named, we merge them into any other
         // objects created from other columns:
-        val namesOrError: SemanticError \/ List[Option[String]] =
-          projectionNames[Fix[Sql]](projections.map(_.map(forgetAnnotation[CoExpr, Fix[Sql], Sql, SA.Annotations])), relationName(node).toOption).map(_.map {
+        val inferredNamesOrError: SemanticError \/ List[Option[String]] =
+          projectionNames[Fix[Sql]](projs, relationName(node).toOption).map(_.map {
             case (name, Embed(expr)) => expr match {
               case Splice(_) => None
               case _         => name.some
             }
           })
 
-        namesOrError.fold(
+        val ordinalNamesOrError: SemanticError \/ List[Option[String]] =
+          ordinalProjectionNames[Fix[Sql]](projs, relationName(node).toOption).map(_.map {
+            case (name, Embed(expr)) => expr match {
+              case Splice(_) => None
+              case _         => name.some
+            }
+          })
+
+        val namesOrError: SemanticError \/ List[Option[String]] = for {
+          inferred <- inferredNamesOrError
+          ordinals <- ordinalNamesOrError
+        } yield (inferred.zipWith(ordinals) {
+          case (Some(inf), _) => inf.some
+          case (None, Some(Some(ord))) => ord.some
+          case _ => none
+        }._2)
+
+        (namesOrError ||| inferredNamesOrError ||| ordinalNamesOrError).fold(
           MErr.raiseError,
           names => {
-
             val syntheticNames: List[String] =
               names.zip(syntheticOf(node)).flatMap {
                 case (Some(name), Some(_)) => List(name)
                 case (_, _) => Nil
               }
 
-            val (nam, initial) =
-              projections match {
-                case List(proj @ Proj(Cofree(_, Splice(_) | Ident(_)), None)) =>
-                  (names.some,
-                    compile0(proj.expr).map(name => buildRecord(names, List(name))))
-                case List(Proj(expr, None)) =>
-                  (none, compile0(expr))
-                case _ =>
-                  (names.some,
-                    projections
-                      .map(_.expr)
-                      .traverse(compile0)
-                      .map(buildRecord(names, _)))
-              }
+            val (nam, initial) = namesOrError match {
+              case \/-(inferredNames) =>
+                (names.some, projections
+                  .map(_.expr)
+                  .traverse(compile0)
+                  .map(buildRecord(names, _)))
+              case -\/(_) =>
+                projections match {
+                  case List(Proj(expr @ Cofree(_, Splice(_) | Ident(_)), None)) =>
+                    (names.some,
+                      compile0(expr).map(name => buildRecord(names, List(name))))
+                  case List(Proj(expr, None)) =>
+                    (none, compile0(expr))
+                  case _ =>
+                    (names.some,
+                      projections
+                        .map(_.expr)
+                        .traverse(compile0)
+                        .map(buildRecord(names, _)))
+                }
+            }
 
             relations.foldRight(
               initial)(

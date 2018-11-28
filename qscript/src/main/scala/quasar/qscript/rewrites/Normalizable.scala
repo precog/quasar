@@ -112,7 +112,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
   lazy val rewrite = new Rewrite[T]
 
   def freeTC(free: FreeQS): FreeQS =
-    free.transCata[FreeQS](liftCo(rewrite.normalizeTJCoEnv[QScriptTotal]))
+    free.transCata[FreeQS](liftCo(rewrite.normalizeCoEnv))
 
   def freeTCEq(free: FreeQS): Option[FreeQS] = {
     val freeNormalized = freeTC(free)
@@ -168,46 +168,6 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
       }
     }))
 
-  /** Extracts filter predicates from the join condition, pushing them out
-    * to the branches and eliminates the same predicates from the combiner.
-    */
-  private def extractFilterFromThetaJoin[A](tj: ThetaJoin[A]): Option[ThetaJoin[A]] = {
-    val lFilter = MapFuncCore.extractFilter(tj.on) {
-      case LeftSide => SrcHole.some
-      case RightSide => none
-    }
-
-    val rFilter = MapFuncCore.extractFilter(tj.on) {
-        case LeftSide => none
-        case RightSide => SrcHole.some
-    }
-
-    def simplifyCombine(f: JoinFunc => Option[JoinFunc]): JoinFunc =
-      tj.combine.transApoT(c => f(c) <\/ c)
-
-    (lFilter, rFilter) match {
-      case (None, None) => none
-
-      case (Some((lf, on, f)), _) =>
-        some(quasar.qscript.ThetaJoin(
-          tj.src,
-          Free.roll(QCT(Filter(tj.lBranch, lf.asRec))),
-          tj.rBranch,
-          on,
-          tj.f,
-          simplifyCombine(f)))
-
-      case (_, Some((rf, on, f))) =>
-        some(quasar.qscript.ThetaJoin(
-          tj.src,
-          tj.lBranch,
-          Free.roll(QCT(Filter(tj.rBranch, rf.asRec))),
-          on,
-          tj.f,
-          simplifyCombine(f)))
-    }
-  }
-
   def ThetaJoin = make(
     λ[ThetaJoin ~> (Option ∘ ThetaJoin)#λ](tj => {
       def normalizeOn(j: JoinFunc, jt: JoinType): Option[JoinFunc] = jt match {
@@ -217,7 +177,7 @@ class NormalizableT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends T
 
       (freeTCEq(tj.lBranch), freeTCEq(tj.rBranch), normalizeOn(tj.on, tj.f), freeMFEq(tj.combine)) match {
         case (None, None, None, None) =>
-          extractFilterFromThetaJoin(tj)
+          None
 
         case (lBranchNorm, rBranchNorm, onNorm, combineNorm) =>
           some(quasar.qscript.ThetaJoin(

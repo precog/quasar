@@ -27,6 +27,7 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
+  educatedToTotal,
   Hole,
   HoleF,
   JoinSide,
@@ -38,8 +39,7 @@ import quasar.qscript.{
   ReduceIndexF,
   ShiftType,
   SrcHole,
-  Take,
-  qScriptReadToQscriptTotal
+  Take
 }
 import quasar.qscript.PlannerError.InternalError
 import quasar.qscript.MapFuncsCore.{IntLit, RecIntLit}

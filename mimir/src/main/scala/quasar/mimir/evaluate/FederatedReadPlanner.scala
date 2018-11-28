@@ -86,7 +86,7 @@ final class FederatedReadPlanner[
 
   ////
 
-  private val dsl = construction.mkGeneric[T, QScriptRead[T, ?]]
+  private val dsl = construction.mkGeneric[T, QScriptEducated[T, ?]]
 
   private def planRead(file: AFile, instructions: List[ParseInstruction])
       : M[MimirRepr] = {

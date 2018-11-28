@@ -26,7 +26,6 @@ import quasar.fp.ski._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore._
-import quasar.qscript.MapFuncsCore._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.data._
@@ -178,13 +177,6 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
       type IT[F[_]] = T[F]
       type OUT[A] = G[A]
 
-      def fmIsCondUndef(jf: JoinFunc): Boolean = {
-        jf.resumeTwice.fold({
-          case MFC(MapFuncsCore.Cond(_, _, -\/(MFC(MapFuncsCore.Undefined())))) => true
-          case _ => false
-        }, _ => false)
-      }
-
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<<: OUT) = {
@@ -198,62 +190,16 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
               Map(srcInner, mf >> mfInner).some
             case LeftShift(srcInner, struct, id, stpe, undef, repair) =>
               LeftShift(srcInner, struct, id, stpe, undef, mf.linearize >> repair).some
-            case Reduce(srcInner, bucket, funcs, repair) =>
-              Reduce(srcInner, bucket, funcs, mf.linearize >> repair).some
-            case Subset(innerSrc, lb, sel, rb) =>
-              Subset(innerSrc,
-                Free.roll(CopK.Inject[QScriptCore, QScriptTotal].inj(Map(lb, mf))),
-                sel,
-                rb).some
-            case Filter(Embed(innerSrc), cond) => FToOut.get(innerSrc) >>= QC.prj.apply >>= {
-              case Map(doubleInner, mfInner) =>
-                Map(
-                  FToOut.reverseGet(QC.inj(Filter(
-                    doubleInner,
-                    cond >> mfInner))).embed,
-                  mf >> mfInner).some
-              case _ => None
-            }
-            case Sort(Embed(innerSrc), buckets, ordering) => FToOut.get(innerSrc) >>= QC.prj.apply >>= {
-              case Map(doubleInner, mfInner) =>
-                Map(
-                  FToOut.reverseGet(QC.inj(Sort(
-                    doubleInner,
-                    buckets ∘ (_ >> mfInner.linearize),
-                    ordering ∘ (_.leftMap(_ >> mfInner.linearize))))).embed,
-                  mf >> mfInner).some
-              case _ => None
-            }
             case _ => None
           })
         case LeftShift(Embed(src), struct, id, stpe, undef, shiftRepair) =>
           FToOut.get(src) >>= QC.prj.apply >>= {
-            case LeftShift(innerSrc, innerStruct, innerId, innerStpe, innerUndef, innerRepair)
-                if !shiftRepair.element(LeftSide) && !fmIsCondUndef(shiftRepair) && struct ≠ HoleR =>
-              LeftShift(
-                FToOut.reverseGet(QC.inj(LeftShift(
-                  innerSrc,
-                  innerStruct,
-                  innerId,
-                  innerStpe,
-                  innerUndef,
-                  struct.linearize >> innerRepair))).embed,
-                HoleR,
-                id,
-                stpe,
-                OnUndefined.omit,
-                shiftRepair).some
             // TODO: Should be able to apply this where there _is_ a `LeftSide`
             //       reference, but currently that breaks merging.
             case Map(innerSrc, mf) if !shiftRepair.element(LeftSide) =>
               LeftShift(innerSrc, struct >> mf, id, stpe, OnUndefined.omit, shiftRepair).some
             case _ => None
           }
-        case Filter(Embed(src), cond) => FToOut.get(src) >>= QC.prj.apply >>= {
-          case Filter(srcInner, condInner) =>
-            Filter(srcInner, RecFreeS.roll[MapFunc, Hole](MFC(And(condInner, cond)))).some
-          case _ => None
-        }
         case Subset(src, from, sel, count) =>
           makeBranched(from, count)(ifNeq(freeQC))(Subset(src, _, sel, _))
         case Union(src, from, count) =>
@@ -284,33 +230,10 @@ class CoalesceT[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TType
       def coalesceQC[F[_]: Functor]
         (FToOut: PrismNT[F, OUT])
         (implicit QC: QScriptCore :<<: OUT) =
-        (ej: EquiJoin[IT[F]]) => {
-          val branched: Option[EquiJoin[T[F]]] = makeBranched(
+          ej => makeBranched(
             ej.lBranch, ej.rBranch)(
             ifNeq(freeQC))(
             EquiJoin(ej.src, _, _, ej.key, ej.f, ej.combine))
-
-          val qct = CopK.Inject[QScriptCore, QScriptTotal]
-
-          def coalesceBranchMaps(ej: EquiJoin[T[F]]): Option[EquiJoin[T[F]]] = {
-            def coalesceSide(branch: FreeQS, key: List[FreeMap], side: JoinSide):
-                Option[(FreeQS, List[FreeMap], JoinFunc)] =
-              branch.project.run.map(qct.prj.apply) match {
-                case \/-(Some(Map(innerSrc, mf))) => (innerSrc, key ∘ (_ >> mf.linearize), mf.linearize.as(side)).some
-                case _ => none
-              }
-
-            (coalesceSide(ej.lBranch, ej.key ∘ (_._1), LeftSide) |@| coalesceSide(ej.rBranch, ej.key ∘ (_._2), RightSide)) {
-              case ((lSrc, lKey, lComb), (rSrc, rKey, rComb)) =>
-                val combine = ej.combine >>= {
-                  case LeftSide => lComb
-                  case RightSide => rComb
-                }
-                EquiJoin(ej.src, lSrc, rSrc, lKey zip rKey, ej.f, combine)
-            }
-          }
-          coalesceBranchMaps(branched.getOrElse(ej)) orElse branched
-        }
     }
 }
 

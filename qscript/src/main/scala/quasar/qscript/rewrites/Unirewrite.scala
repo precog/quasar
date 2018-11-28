@@ -16,39 +16,30 @@
 
 package quasar.qscript.rewrites
 
-import quasar.contrib.iota._
 import quasar.qscript._
 
-import iotaz.{CopK, TListK}
 import matryoshka.BirecursiveT
-import scalaz.{Functor, Monad, Traverse}
-import scalaz.syntax.applicative._
+import scalaz.Functor
 
-sealed trait Unirewrite[T[_[_]], L <: TListK] {
-  def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T])
-      : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]]
+sealed trait Unirewrite[T[_[_]], G[_]] {
+  def apply(r: Rewrite[T]): T[QScriptEducated[T, ?]] => T[G]
 }
 
 object Unirewrite {
 
-  def apply[T[_[_]], L <: TListK, F[_]: Monad: MonadPlannerErr](
+  def apply[T[_[_]], G[_]](
       rew: Rewrite[T])(
-      implicit U: Unirewrite[T, L]) =
-    U.apply[F](rew)
+      implicit U: Unirewrite[T, G]) =
+    U.apply(rew)
 
-  implicit def fileRead[T[_[_]]: BirecursiveT, L <: TListK](
+  implicit def unirewrite[T[_[_]]: BirecursiveT, G[_]: Functor](
     implicit
-      FC: Functor[CopK[L, ?]],
-      TC0: Traverse[CopK[L, ?]],
-      J: SimplifyJoin.Aux[T, QScriptRead[T, ?], CopK[L, ?]],
-      C: Coalesce.Aux[T, QScriptRead[T, ?], QScriptRead[T, ?]],
-      N: Normalizable[QScriptRead[T, ?]])
-      : Unirewrite[T, L] =
-    new Unirewrite[T, L] {
-      def apply[F[_]: Monad: MonadPlannerErr](r: Rewrite[T])
-          : T[QScriptRead[T, ?]] => F[T[CopK[L, ?]]] = { qs =>
-        r.simplifyJoinOnNorm[QScriptRead[T, ?], CopK[L, ?]]
-          .apply(qs).point[F]
-      }
+      J: ThetaToEquiJoin.Aux[T, QScriptEducated[T, ?], G],
+      C: Coalesce.Aux[T, QScriptEducated[T, ?], QScriptEducated[T, ?]],
+      N: Normalizable[QScriptEducated[T, ?]])
+      : Unirewrite[T, G] =
+    new Unirewrite[T, G] {
+      def apply(r: Rewrite[T]): T[QScriptEducated[T, ?]] => T[G] =
+        r.normalize[G]
   }
 }

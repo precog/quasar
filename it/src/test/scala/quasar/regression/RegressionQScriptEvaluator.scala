@@ -79,8 +79,8 @@ final class RegressionQScriptEvaluator[
   def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
-    implicitly[Unirewrite[T, QSRewrite[T]]]
+  def UnirewriteT: Unirewrite[T, QSMRewrite] =
+    implicitly[Unirewrite[T, QSMRewrite]]
 
   def optimize: F[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
     RewritePushdown[T, QSM, QSMRewrite, ResourcePath].point[F]

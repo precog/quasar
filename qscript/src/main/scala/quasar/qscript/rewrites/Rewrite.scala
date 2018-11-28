@@ -17,67 +17,61 @@
 package quasar.qscript.rewrites
 
 import quasar.RenderTreeT
-import quasar.contrib.matryoshka._
+import quasar.contrib.matryoshka.applyTransforms
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.qscript._
 
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
-import matryoshka.patterns._
-import scalaz.{:+: => _, Divide => _, _},
-  BijectionT._,
-  Leibniz._,
-  Scalaz._
+import matryoshka.patterns.CoEnv
+import scalaz._, BijectionT._, Scalaz._
 
 class Rewrite[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] extends TTypes[T] {
 
-  def normTJ[G[a] <: ACopK[a]: Traverse]
-    (implicit QC: QScriptCore :<<: G,
-              C: Coalesce.Aux[T, G, G],
-              N: Normalizable[G])
-      : T[G] => T[G] =
-    _.cata[T[G]](
-      normalizeTJ[G] >>>
-      repeatedly(N.normalizeF(_: G[T[G]])) >>>
+  type QSEd[A] = QScriptEducated[A]
+  type QSTotal[A] = QScriptTotal[A]
+
+  def normalize[H[_]: Functor](
+      implicit J: ThetaToEquiJoin.Aux[T, QSEd, H],
+               C: Coalesce.Aux[T, QSEd, QSEd],
+               N: Normalizable[QSEd])
+      : T[QSEd] => T[H] =
+    normalizeAll.apply(_).transCata[T[H]](J.rewrite[J.G](idPrism.reverseGet))
+
+  private def normalizeAll(
+      implicit C: Coalesce.Aux[T, QSEd, QSEd],
+               N: Normalizable[QSEd])
+      : T[QSEd] => T[QSEd] =
+    _.cata[T[QSEd]](
+      normalizeT >>>
+      repeatedly(N.normalizeF(_: QSEd[T[QSEd]])) >>>
       (_.embed))
 
-  def simplifyJoinOnNorm[G[a] <: ACopK[a]: Traverse, H[_]: Functor]
-    (implicit QC: QScriptCore :<<: G,
-              J: SimplifyJoin.Aux[T, G, H],
-              C: Coalesce.Aux[T, G, G],
-              N: Normalizable[G])
-      : T[G] => T[H] =
-    normTJ[G].apply(_).transCata[T[H]](J.simplifyJoin[J.G](idPrism.reverseGet))
-
-  private def applyNormalizations[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor](
-    prism: PrismNT[G, F])(
-    implicit C: Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F):
-      F[T[G]] => G[T[G]] =
+  private def applyNormalizations[F[a] <: ACopK[a]: Normalizable, G[_]: Functor](
+      prism: PrismNT[G, F])(
+      implicit C: Coalesce.Aux[T, F, F],
+               QC: QScriptCore :<<: F)
+      : F[T[G]] => G[T[G]] =
     ftf => repeatedly[G[T[G]]](applyTransforms[G[T[G]]](
       liftFFTrans[F, G, T[G]](prism)(Normalizable[F].normalizeF(_: F[T[G]])),
       liftFFTrans[F, G, T[G]](prism)(C.coalesceQC[G](prism)),
     ))(prism(ftf))
 
   private def normalizeWithBijection[F[a] <: ACopK[a]: Functor: Normalizable, G[_]: Functor, A](
-    bij: Bijection[A, T[G]])(
-    prism: PrismNT[G, F])(
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F):
-      F[A] => G[A] =
+      bij: Bijection[A, T[G]])(
+      prism: PrismNT[G, F])(
+      implicit C: Coalesce.Aux[T, F, F],
+               QC: QScriptCore :<<: F)
+      : F[A] => G[A] =
     fa => applyNormalizations[F, G](prism)
       .apply(fa ∘ bij.toK.run) ∘ bij.fromK.run
 
-  def normalizeTJ[F[a] <: ACopK[a]: Traverse: Normalizable](
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F):
-      F[T[F]] => F[T[F]] =
-    normalizeWithBijection[F, F, T[F]](bijectionId)(idPrism)
+  def normalizeT(implicit C: Coalesce.Aux[T, QSEd, QSEd])
+      :QSEd[T[QSEd]] => QSEd[T[QSEd]] =
+    normalizeWithBijection[QSEd, QSEd, T[QSEd]](bijectionId)(idPrism)
 
-  def normalizeTJCoEnv[F[a] <: ACopK[a]: Traverse: Normalizable](
-    implicit C:  Coalesce.Aux[T, F, F],
-             QC: QScriptCore :<<: F):
-      F[Free[F, Hole]] => CoEnv[Hole, F, Free[F, Hole]] =
-    normalizeWithBijection[F, CoEnv[Hole, F, ?], Free[F, Hole]](coenvBijection)(coenvPrism)
+  def normalizeCoEnv(implicit C: Coalesce.Aux[T, QSTotal, QSTotal])
+      : QSTotal[Free[QSTotal, Hole]] => CoEnv[Hole, QSTotal, Free[QSTotal, Hole]] =
+    normalizeWithBijection[QSTotal, CoEnv[Hole, QSTotal, ?], Free[QSTotal, Hole]](coenvBijection)(coenvPrism)
 }

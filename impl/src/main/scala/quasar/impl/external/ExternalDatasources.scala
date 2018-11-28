@@ -63,9 +63,18 @@ object ExternalDatasources extends Logging {
 
     val moduleStream: Stream[F, DatasourceModule] = config match {
       case PluginDirectory(directory) =>
-        convert.fromJavaStream(F.delay(Files.list(directory)))
-          .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-          .flatMap(loadPlugin[F](_, blockingPool))
+        Stream.eval(F.delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
+          case (true, true) =>
+            convert.fromJavaStream(F.delay(Files.list(directory)))
+              .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
+              .flatMap(loadPlugin[F](_, blockingPool))
+
+          case (true, false) =>
+            warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
+
+          case _ =>
+            Stream.empty
+        }
 
       case PluginFiles(files) =>
         Stream.emits(files).flatMap(loadPlugin[F](_, blockingPool))

@@ -33,11 +33,11 @@ import iotaz.TListK.:::
   * connectors to implement. It potentially adds a [[Filter]] iff there are
   * conditions in the [[ThetaJoin]] that can not be handled by an [[EquiJoin]].
   */
-trait SimplifyJoin[F[_]] {
+trait ThetaToEquiJoin[F[_]] {
   type IT[F[_]]
   type G[A]
 
-  def simplifyJoin[H[_]: Functor](GtoH: G ~> H): F[IT[H]] => H[IT[H]]
+  def rewrite[H[_]: Functor](GtoH: G ~> H): F[IT[H]] => H[IT[H]]
 }
 
 private final case class EquiJoinKey[T[_[_]]]
@@ -46,8 +46,8 @@ private final case class EquiJoinKey[T[_[_]]]
 private final case class SimplifiedJoinCondition[T[_[_]]]
   (keys: List[EquiJoinKey[T]], filter: Option[JoinFunc[T]])
 
-object SimplifyJoin {
-  type Aux[T[_[_]], F[_], H[_]] = SimplifyJoin[F] {
+object ThetaToEquiJoin {
+  type Aux[T[_[_]], F[_], H[_]] = ThetaToEquiJoin[F] {
     type IT[F[_]] = T[F]
     type G[A] = H[A]
   }
@@ -55,20 +55,20 @@ object SimplifyJoin {
   val LeftK = "left"
   val RightK = "right"
 
-  def apply[T[_[_]], F[_], G[_]](implicit ev: SimplifyJoin.Aux[T, F, G]) = ev
+  def apply[T[_[_]], F[_], G[_]](implicit ev: ThetaToEquiJoin.Aux[T, F, G]) = ev
 
   def applyToBranch[T[_[_]]: BirecursiveT: RenderTreeT: ShowT](branch: FreeQS[T]): FreeQS[T] = {
     val modify: T[CoEnvQS[T, ?]] => T[CoEnvQS[T, ?]] =
       _.transCata[T[CoEnvQS[T, ?]]](
-        liftCo(SimplifyJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].simplifyJoin(coenvPrism.reverseGet)))
+        liftCo(ThetaToEquiJoin[T, QScriptTotal[T, ?], QScriptTotal[T, ?]].rewrite(coenvPrism.reverseGet)))
 
     applyCoEnvFrom[T, QScriptTotal[T, ?], Hole](modify).apply(branch)
   }
 
   implicit def thetaJoin[T[_[_]]: BirecursiveT: RenderTreeT: ShowT, F[a] <: ACopK[a]]
     (implicit EJ: EquiJoin[T, ?] :<<: F, QC: QScriptCore[T, ?] :<<: F)
-      : SimplifyJoin.Aux[T, ThetaJoin[T, ?], F] =
-    new SimplifyJoin[ThetaJoin[T, ?]] {
+      : ThetaToEquiJoin.Aux[T, ThetaJoin[T, ?], F] =
+    new ThetaToEquiJoin[ThetaJoin[T, ?]] {
       import MapFuncsCore._
 
       type IT[F[_]] = T[F]
@@ -76,7 +76,7 @@ object SimplifyJoin {
 
       val func = construction.Func[T]
 
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H): ThetaJoin[T, T[H]] => H[T[H]] =
+      def rewrite[H[_]: Functor](GtoH: G ~> H): ThetaJoin[T, T[H]] => H[T[H]] =
         tj => {
           // TODO: This can potentially rewrite conditions to try to get left
           //       and right references on distinct sides.
@@ -129,11 +129,11 @@ object SimplifyJoin {
 
   implicit def qscriptCore[T[_[_]]: BirecursiveT: RenderTreeT: ShowT, F[a] <: ACopK[a]]
     (implicit QC: QScriptCore[T, ?] :<<: F)
-      : SimplifyJoin.Aux[T, QScriptCore[T, ?], F] =
-    new SimplifyJoin[QScriptCore[T, ?]] {
+      : ThetaToEquiJoin.Aux[T, QScriptCore[T, ?], F] =
+    new ThetaToEquiJoin[QScriptCore[T, ?]] {
       type IT[F[_]] = T [F]
       type G[A] = F[A]
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H)
+      def rewrite[H[_]: Functor](GtoH: G ~> H)
           : QScriptCore[T, T[H]] => H[T[H]] = fa => GtoH(QC.inj(fa match {
             case Union(src, lb, rb) =>
               Union(src, applyToBranch(lb), applyToBranch(rb))
@@ -145,11 +145,11 @@ object SimplifyJoin {
 
   implicit def equiJoin[T[_[_]]: BirecursiveT: RenderTreeT: ShowT, F[a] <: ACopK[a]]
     (implicit EJ: EquiJoin[T, ?] :<<: F)
-      : SimplifyJoin.Aux[T, EquiJoin[T, ?], F] =
-    new SimplifyJoin[EquiJoin[T, ?]] {
+      : ThetaToEquiJoin.Aux[T, EquiJoin[T, ?], F] =
+    new ThetaToEquiJoin[EquiJoin[T, ?]] {
       type IT[F[_]] = T [F]
       type G[A] = F[A]
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H): EquiJoin[T, T[H]] => H[T[H]] =
+      def rewrite[H[_]: Functor](GtoH: G ~> H): EquiJoin[T, T[H]] => H[T[H]] =
         ej => GtoH(EJ.inj(EquiJoin(
           ej.src,
           applyToBranch(ej.lBranch),
@@ -159,27 +159,28 @@ object SimplifyJoin {
           ej.combine)))
     }
 
-  implicit def copk[T[_[_]], LL <: TListK, S[_]](implicit M: Materializer[T, LL, S]): SimplifyJoin.Aux[T, CopK[LL, ?], S] =
+  implicit def copk[T[_[_]], LL <: TListK, S[_]](implicit M: Materializer[T, LL, S])
+      : ThetaToEquiJoin.Aux[T, CopK[LL, ?], S] =
     M.materialize(offset = 0)
 
   sealed trait Materializer[T[_[_]], LL <: TListK, S[_]] {
-    def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[LL, ?], S]
+    def materialize(offset: Int): ThetaToEquiJoin.Aux[T, CopK[LL, ?], S]
   }
 
   object Materializer {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     implicit def base[T[_[_]], F[_], S[_]](
       implicit
-      S: SimplifyJoin.Aux[T, F, S]
+      S: ThetaToEquiJoin.Aux[T, F, S]
     ): Materializer[T, F ::: TNilK, S] = new Materializer[T, F ::: TNilK, S] {
-      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[F ::: TNilK, ?], S] = {
+      override def materialize(offset: Int): ThetaToEquiJoin.Aux[T, CopK[F ::: TNilK, ?], S] = {
         val I = mkInject[F, F ::: TNilK](offset)
-        new SimplifyJoin[CopK[F ::: TNilK, ?]] {
+        new ThetaToEquiJoin[CopK[F ::: TNilK, ?]] {
           type IT[F[_]] = T[F]
           type G[A] = S[A]
 
-          def simplifyJoin[H[_]: Functor](GtoH: G ~> H): CopK[F ::: TNilK, T[H]] => H[T[H]] = {
-            case I(fa) => S.simplifyJoin(GtoH).apply(fa)
+          def rewrite[H[_]: Functor](GtoH: G ~> H): CopK[F ::: TNilK, T[H]] => H[T[H]] = {
+            case I(fa) => S.rewrite(GtoH).apply(fa)
           }
         }
       }
@@ -188,18 +189,18 @@ object SimplifyJoin {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
     implicit def induct[T[_[_]], F[_], LL <: TListK, S[_]](
       implicit
-      S: SimplifyJoin.Aux[T, F, S],
+      S: ThetaToEquiJoin.Aux[T, F, S],
       LL: Materializer[T, LL, S]
     ): Materializer[T, F ::: LL, S] = new Materializer[T, F ::: LL, S] {
-      override def materialize(offset: Int): SimplifyJoin.Aux[T, CopK[F ::: LL, ?], S] = {
+      override def materialize(offset: Int): ThetaToEquiJoin.Aux[T, CopK[F ::: LL, ?], S] = {
         val I = mkInject[F, F ::: LL](offset)
-        new SimplifyJoin[CopK[F ::: LL, ?]] {
+        new ThetaToEquiJoin[CopK[F ::: LL, ?]] {
           type IT[F[_]] = T[F]
           type G[A] = S[A]
 
-          def simplifyJoin[H[_]: Functor](GtoH: G ~> H): CopK[F ::: LL, T[H]] => H[T[H]] = {
-            case I(fa) => S.simplifyJoin(GtoH).apply(fa)
-            case other => LL.materialize(offset + 1).simplifyJoin(GtoH).apply(other.asInstanceOf[CopK[LL, T[H]]])
+          def rewrite[H[_]: Functor](GtoH: G ~> H): CopK[F ::: LL, T[H]] => H[T[H]] = {
+            case I(fa) => S.rewrite(GtoH).apply(fa)
+            case other => LL.materialize(offset + 1).rewrite(GtoH).apply(other.asInstanceOf[CopK[LL, T[H]]])
           }
         }
       }
@@ -207,21 +208,21 @@ object SimplifyJoin {
   }
 
   def default[T[_[_]], F[_], I[a] <: ACopK[a]](implicit F: F :<<: I)
-      : SimplifyJoin.Aux[T, F, I] =
-    new SimplifyJoin[F] {
+      : ThetaToEquiJoin.Aux[T, F, I] =
+    new ThetaToEquiJoin[F] {
       type IT[F[_]] = T[F]
       type G[A] = I[A]
 
-      def simplifyJoin[H[_]: Functor](GtoH: G ~> H): F[T[H]] => H[T[H]] =
+      def rewrite[H[_]: Functor](GtoH: G ~> H): F[T[H]] => H[T[H]] =
         fa => GtoH(F.inj(fa))
     }
 
   implicit def read[T[_[_]], F[a] <: ACopK[a], A](implicit R: Const[Read[A], ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[Read[A], ?], F] =
+      : ThetaToEquiJoin.Aux[T, Const[Read[A], ?], F] =
     default
 
   implicit def interpretedRead[T[_[_]], F[a] <: ACopK[a], A]
     (implicit SR: Const[InterpretedRead[A], ?] :<<: F)
-      : SimplifyJoin.Aux[T, Const[InterpretedRead[A], ?], F] =
+      : ThetaToEquiJoin.Aux[T, Const[InterpretedRead[A], ?], F] =
     default
 }

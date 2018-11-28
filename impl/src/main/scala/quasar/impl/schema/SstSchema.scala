@@ -30,6 +30,7 @@ import scalaz.syntax.show._
 import scalaz.syntax.tag._
 import spire.algebra.{AdditiveSemigroup, Field, NRoot}
 import spire.syntax.field._
+import shims._
 
 sealed trait SstSchema[J, A] extends Product with Serializable {
   import SstSchema._
@@ -77,10 +78,10 @@ object SstSchema extends SstSchemaInstances {
       sampleSchema(occurred)
   }
 
-  def occurrenceƒ[J, A: Field]: Coalgebra[STF[J, Occurred[A, TypeStat[A]], ?], (A, A, SST[J, A])] = {
+  def occurrenceƒ[J, A: Field: Order]: Coalgebra[STF[J, Occurred[A, TypeStat[A]], ?], (A, A, SST[J, A])] = {
     case (pp, psize, sst) =>
       val csize = SST.size(sst)
-      val cp = (csize / psize) * pp
+      val cp = Field[A].one.min((csize / psize) * pp)
       Bifunctor[EnvT[?, ST[J, ?], ?]].bimap(sst.project)(Occurred(cp, _), (cp, csize, _))
   }
 }

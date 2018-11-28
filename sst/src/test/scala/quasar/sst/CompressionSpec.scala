@@ -150,6 +150,72 @@ final class CompressionSpec extends quasar.Qspec
     }
   }
 
+  "coalesceKeysWidened" >> {
+    "compresses excessive map to widened keys with values" >> prop {
+      (cs: ISet[Char], n: BigInt, s: String, unk0: Option[(LeafEjs, LeafEjs)]) => (cs.size > 1) ==> {
+
+      val chars = cs.toIList.map(J.char(_))
+      val int = J.int(n)
+      val str = J.str(s)
+      val nul = SST.fromEJson(Real(1), J.nul())
+      val m0 = IMap.fromFoldable((int :: str :: chars) strengthR nul)
+      val unk  = unk0.map(_.umap(_.toSst))
+      val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
+
+      val uval = SST.fromEJson(Real(cs.size + 2), J.nul())
+      val ckey = chars.foldMap1Opt(c => compression.primarySst(false)(Real(1), c))
+      val ikey = compression.primarySst(false)(Real(1), int).some
+      val skey = compression.primarySst(false)(Real(1), str).some
+      val unk1 = (ckey |+| ikey |+| skey).strengthR(uval) |+| unk
+      val exp  = envT(cnt1, TypeST(TypeF.map[J, S](IMap.empty[J, S], unk1))).embed
+
+      attemptCompression(msst, compression.coalesceKeysWidened(2L, 0L, false)) must_= exp
+    }}
+
+    "compresses excessive map to widened keys with values, with retention" >> prop {
+      (c1: Char, c2: Char, n: BigInt, s: String, unk0: Option[(LeafEjs, LeafEjs)]) => (c1 =/= c2) ==> {
+
+      val fc1 = J.char(c1)
+      val sc1 = SST.fromEJson(Real(5), J.nul())
+
+      val fc2 = J.char(c2)
+      val sc2 = SST.fromEJson(Real(3), J.nul())
+
+      val chars = IList((fc1, sc1), (fc2, sc2))
+
+      val int = J.int(n)
+      val str = J.str(s)
+      val nul = SST.fromEJson(Real(1), J.nul())
+      val m0 = IMap.fromFoldable((int, nul) :: (str, nul) :: chars)
+      val unk  = unk0.map(_.umap(_.toSst))
+      val msst = envT(cnt1, TypeST(TypeF.map[J, S](m0, unk))).embed
+
+      val uval = SST.fromEJson(Real(5), J.nul())
+      val ckey = compression.primarySst(false)(Real(3), fc2)
+      val ikey = compression.primarySst(false)(Real(1), int)
+      val skey = compression.primarySst(false)(Real(1), str)
+      val ukey = ckey |+| ikey |+| skey
+      val m1 = IMap.fromFoldable(IList((fc1, sc1)))
+      val unk1 = unk |+| Some((ukey, uval))
+      val exp  = envT(cnt1, TypeST(TypeF.map[J, S](m1, unk1))).embed
+
+      attemptCompression(msst, compression.coalesceKeysWidened(2L, 1L, false)) must_= exp
+    }}
+
+    "ignores map where size of keys does not exceed maxSize" >> prop {
+      (xs: IList[(LeafEjs, LeafEjs)], unk0: Option[(LeafEjs, LeafEjs)]) =>
+
+      val m   = IMap.fromFoldable(xs.map(_.bimap(_.ejs, _.toSst)))
+      val unk = unk0.map(_.umap(_.toSst))
+      val sst = envT(cnt1, TypeST(TypeF.map[J, S](m, unk))).embed
+
+      Natural(m.size.toLong).cata(
+        l => attemptCompression(sst, compression.coalesceKeysWidened(l, 0L, false)),
+        sst
+      ) must_= sst
+    }
+  }
+
   "coalescePrimary" >> {
     "combines consts with their primary SST in unions" >> prop { (sj: LeafEjs, sjs: ISet[LeafEjs]) =>
       val pt = primaryTagOf(sj.ejs)

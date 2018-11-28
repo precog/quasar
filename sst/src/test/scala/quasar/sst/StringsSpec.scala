@@ -16,7 +16,7 @@
 
 package quasar.sst
 
-import slamdata.Predef.{List, Some}
+import slamdata.Predef.{List, Some, None}
 import quasar.contrib.algebra._
 import quasar.contrib.matryoshka.envT
 import quasar.ejson.EJson
@@ -30,6 +30,7 @@ import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
 import scalaz.{IList, NonEmptyList, Show}
+import scalaz.syntax.std.option._
 import scalaz.syntax.foldable1._
 import spire.math.Real
 
@@ -44,6 +45,16 @@ final class StringsSpec extends quasar.Qspec {
     val wid0 = SST.fromEJson(Real(5), exp)
     val wid = envT(strS, TagST[J](Tagged(strings.StructuralString, wid0))).embed
     strings.widen[J, Real](strS, "foo").embed must_= wid
+  }
+
+  "widenStats string yields a character array without literals" >> {
+    val exp = IList('f', 'o', 'o') map (c => compression.primarySst(false)(Real(1), EJson.char[J](c)))
+    val strS = TypeStat.fromEJson(Real(5), EJson.str[J]("foo"))
+    val wid0 = envT(
+      TypeStat.coll(Real(5), Real(3).some, Real(3).some),
+      TypeST[J, SST[J, Real]](TypeF.arr(exp, None))).embed
+    val wid = envT(strS, TagST[J](Tagged(strings.StructuralString, wid0))).embed
+    strings.widenStats[J, Real](strS, "foo").embed must_= wid
   }
 
   "compress string yields a generic array sampled from its characters" >> {

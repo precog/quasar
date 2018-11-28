@@ -17,7 +17,6 @@
 package quasar.impl
 
 import slamdata.Predef._
-import quasar.contrib.matryoshka._
 import quasar.ejson.EJson
 import quasar.contrib.iota.copkTraverse
 import quasar.sst._
@@ -61,55 +60,48 @@ package object schema {
       JR: Recursive.Aux[J, EJson])
       : Pipe[F, Chunk[SST[J, A]], SST[J, A]] = {
 
-    val thresholding: ElgotCoalgebra[SST[J, A] \/ ?, SSTF[J, A, ?], SST[J, A]] = {
-      val independent =
-        orOriginal(applyTransforms(
-          compression.limitStrings[J, A](config.stringMaxLength, config.stringPreserveStructure)))
+    val reduction: SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+      val coalesceKeysWidened =
+        compression.coalesceKeysWidened[J, A](
+          config.mapMaxSize,
+          config.retainKeysSize,
+          config.stringPreserveStructure)
 
-      compression.limitArrays[J, A](config.arrayMaxLength, config.retainIndicesSize)
-        .andThen(_.bimap(_.transAna[SST[J, A]](independent), independent))
+      val coalesceWhenUnknown =
+        compression.coalesceWhenUnknown[J, A](
+          config.retainKeysSize,
+          config.stringPreserveStructure)
+
+      sstf => coalesceWhenUnknown(sstf) orElse coalesceKeysWidened(sstf)
     }
 
-    val reduction: SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] =
-      applyTransforms(
-        compression.coalesceWithUnknown[J, A](config.retainKeysSize, config.stringPreserveStructure),
-        compression.coalesceKeys[J, A](config.mapMaxSize, config.retainKeysSize, config.stringPreserveStructure),
-        compression.coalescePrimary[J, A](config.stringPreserveStructure),
-        compression.narrowUnion[J, A](config.unionMaxSize, config.stringPreserveStructure))
-
-    @SuppressWarnings(Array("org.wartremover.warts.Var"))
-    def iterate(sst: SST[J, A]): Option[SST[J, A]] = {
-      var changed = false
-
-      val compressed = sst.transAna[SST[J, A]](sstf =>
-        reduction(sstf).fold(sstf) { next =>
-          changed = true
-          next
-        })
-
-      changed option compressed
-    }
-
-    val prepare: SST[J, A] => SST[J, A] =
-      _.elgotApo[SST[J, A]](thresholding)
+    def reduce(sst: SST[J, A]): SST[J, A] =
+      sst.transAna[SST[J, A]](orOriginal(reduction))
 
     @SuppressWarnings(Array(
       "org.wartremover.warts.Equals",
       "org.wartremover.warts.Var",
       "org.wartremover.warts.While"))
-    def reduceChunk(c: Chunk[SST[J, A]]): Option[SST[J, A]] =
+    def reduceChunk(stepSize: Int)(c: Chunk[SST[J, A]]): Option[SST[J, A]] =
       if (c.isEmpty) none
-      else if (c.size == 1) some(prepare(c(0)))
+      else if (c.size == 1) some(c(0))
       else {
         var i = 1
-        var acc = prepare(c(0))
+        var acc = c(0)
         while (i < c.size) {
-          acc = repeatedly(iterate)(acc |+| prepare(c(i)))
+          acc = acc |+| c(i)
+
+          if (i % stepSize == 0) {
+            acc = reduce(acc)
+          }
+
           i = i + 1
         }
-        some(acc)
+        some(reduce(acc))
       }
 
-    _.through(f(reduceChunk)).unNone.scan1((x, y) => repeatedly(iterate)(x |+| y))
+    _.through(f(reduceChunk(config.mapMaxSize.value.toInt)))
+      .unNone
+      .scan1((x, y) => reduce(x |+| y))
   }
 }

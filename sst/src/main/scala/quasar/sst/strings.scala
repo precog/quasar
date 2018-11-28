@@ -19,10 +19,12 @@ package quasar.sst
 import slamdata.Predef._
 import quasar.contrib.matryoshka.envT
 import quasar.ejson.{EJson, TypeTag}
+import quasar.fp.numeric.SampleStats
 import quasar.tpe.{SimpleType, TypeF}
 import quasar.contrib.iota.copkTraverse
 
 import matryoshka.{Corecursive, Recursive}
+import matryoshka.implicits._
 import scalaz.{IList, Order}
 import scalaz.std.option._
 import scalaz.syntax.foldable._
@@ -72,6 +74,36 @@ object strings {
 
     val charArr =
       SST.fromEJson(strStat.size, EJson.arr(s.map(EJson.char[J](_)) : _*))
+
+    stringTagged(strStat, charArr)
+  }
+
+  /** Widens a string into a character array, maintaining stats on literals,
+    * but dropping the literals themselves.
+    */
+  def widenStats[J: Order, A: ConvertableTo: Field: Order](strStat: TypeStat[A], s: String)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] = {
+
+    val len =
+      some(ConvertableTo[A].fromInt(s.length))
+
+    val chars =
+      s.foldLeft(IList.empty[SST[J, A]]) { (l, c) =>
+        val s =
+          envT(
+            TypeStat.char(SampleStats.one(ConvertableTo[A].fromInt(c.toInt)), c, c),
+            TypeST(TypeF.simple[J, SST[J, A]](SimpleType.Char))).embed
+
+        s :: l
+      }
+
+    val charArr =
+      envT(
+        TypeStat.coll(strStat.size, len, len),
+        TypeST(TypeF.arr[J, SST[J, A]](chars.reverse, none))).embed
 
     stringTagged(strStat, charArr)
   }

@@ -40,7 +40,7 @@ import quasar.impl.datasource.{ByNeedDatasource, ConditionReportingDatasource, F
 import quasar.impl.parsing.TectonicResourceError
 import quasar.impl.schema._
 import quasar.qscript._
-import quasar.sst._
+import quasar.sst.SST
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext
@@ -152,6 +152,9 @@ final class DatasourceManagement[
 
     type S = SST[T[EJson], N]
 
+    implicit val sstQDataEncode: QDataEncode[S] =
+      QDataCompressedSst.encode[T[EJson], N](sstConfig)
+
     def sampleQuery =
       dsl.Subset(
         dsl.Unreferenced,
@@ -170,7 +173,7 @@ final class DatasourceManagement[
     def sstStream(qr: QueryResult[F]): Stream[F, S] =
       qr match {
         case QueryResult.Parsed(qdd, data) =>
-          data.map(QData.convert(_)(qdd, QDataEncode[S]))
+          data.map(QData.convert(_)(qdd, sstQDataEncode))
 
         case QueryResult.Compressed(CompressionScheme.Gzip, content) =>
           sstStream(content.modifyBytes(gzip.decompress[F](DefaultDecompressionBufferSize)))

@@ -25,6 +25,7 @@ trait TTypes[T[_[_]]] {
   // In this context we shouldn't often need to refer to the original type
   // any longer, so reuse the name.
   type QScriptCore[A]    = quasar.qscript.QScriptCore[T, A]
+  type QScriptEducated[A] = quasar.qscript.QScriptEducated[T, A]
   type QScriptTotal[A]   = quasar.qscript.QScriptTotal[T, A]
   type ThetaJoin[A]      = quasar.qscript.ThetaJoin[T, A]
   type EquiJoin[A]       = quasar.qscript.EquiJoin[T, A]

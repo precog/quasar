@@ -421,15 +421,4 @@ private[ejson] object QDataEJson {
           EJson.fromExt(Map(m.toList map { case (k, v) => (EJson.str(k), v) })),
           Type(tt))
     }
-
-  object TemporalKeys {
-    val year: String = "year"
-    val month: String = "month"
-    val day: String = "day"
-    val hour: String = "hour"
-    val minute: String = "minute"
-    val second: String = "second"
-    val nanosecond: String = "nanosecond"
-    val offset: String = "offset"
-  }
 }

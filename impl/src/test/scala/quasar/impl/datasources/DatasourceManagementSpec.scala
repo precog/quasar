@@ -337,7 +337,7 @@ final class DatasourceManagementSpec extends quasar.Qspec with ConditionMatchers
           c must beNormal
           b.toOption.join.exists(_.size < SST.size(sst))
         }
-      }
+      }.flakyTest("Oops! Received either no data or all the data!")
 
       "datasource not found when no datasource having id" >> withMgmt { (mgmt, _) =>
         mgmt.resourceSchema(-1, ResourcePath.root() / ResourceName("data"), defaultCfg, 1.second)

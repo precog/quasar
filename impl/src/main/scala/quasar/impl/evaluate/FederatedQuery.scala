@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.Option
 import quasar.contrib.pathy.AFile
-import quasar.qscript.QScriptRead
+import quasar.qscript.QScriptEducated
 
 import monocle.macros.Lenses
 import scalaz.{Functor, Show}
@@ -33,7 +33,7 @@ import scalaz.{Functor, Show}
   */
 @Lenses
 final case class FederatedQuery[T[_[_]], S](
-    query: T[QScriptRead[T, ?]],
+    query: T[QScriptEducated[T, ?]],
     sources: AFile => Option[Source[S]])
 
 object FederatedQuery extends FederatedQueryInstances

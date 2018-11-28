@@ -18,7 +18,7 @@ package quasar.impl.schema
 
 import slamdata.Predef.Boolean
 import quasar.api.SchemaConfig
-import quasar.fp.numeric.{Natural, Positive}
+import quasar.fp.numeric.Natural
 
 import eu.timepit.refined.auto._
 
@@ -31,7 +31,6 @@ import eu.timepit.refined.auto._
   * @param retainKeysSize the number of map keys to retain, per type, during compression
   * @param stringMaxLength all strings longer than this are compressed
   * @param stringPreserveStructure whether to preserve structure when compressing strings
-  * @param unionMaxSize unions larger than this will be compressed
   */
 final case class SstConfig[J, A](
     arrayMaxLength: Natural,
@@ -39,8 +38,7 @@ final case class SstConfig[J, A](
     retainIndicesSize: Natural,
     retainKeysSize: Natural,
     stringMaxLength: Natural,
-    stringPreserveStructure: Boolean,
-    unionMaxSize: Positive)
+    stringPreserveStructure: Boolean)
     extends SchemaConfig {
 
   type Schema = SstSchema[J, A]
@@ -53,7 +51,6 @@ object SstConfig {
   val DefaultRetainKeysSize: Natural = 0L
   val DefaultStringMaxLength: Natural = 64L
   val DefaultStringPreserveStructure: Boolean = false
-  val DefaultUnionMaxSize: Positive = 1L
 
   def Default[J, A]: SstConfig[J, A] =
     SstConfig[J, A](
@@ -62,6 +59,5 @@ object SstConfig {
       retainIndicesSize = DefaultRetainIndicesSize,
       retainKeysSize = DefaultRetainKeysSize,
       stringMaxLength = DefaultStringMaxLength,
-      stringPreserveStructure = DefaultStringPreserveStructure,
-      unionMaxSize = DefaultUnionMaxSize)
+      stringPreserveStructure = DefaultStringPreserveStructure)
 }

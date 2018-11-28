@@ -56,7 +56,7 @@ final class FederatingQueryEvaluatorSpec extends Qspec with TreeMatchers {
       qfed, f => srcs.lookup(ResourcePath.leaf(f)).right[ResourceError])
 
   "evaluate" >> {
-    val qs = construction.mkDefaults[Fix, QScriptRead[Fix, ?]]
+    val qs = construction.mkDefaults[Fix, QScriptEducated[Fix, ?]]
 
     "returns NAR for root" >> {
       val query =

@@ -16,7 +16,7 @@
 
 package quasar.impl.schema
 
-import slamdata.Predef.{Int => SInt, Stream => _, _}
+import slamdata.Predef.{Stream => _, _}
 import quasar.common.data.Data
 import quasar.contrib.algebra._
 import quasar.contrib.iota._
@@ -45,7 +45,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
     Show.showFromToString
 
   val J = Fixed[J]
-  val config = SstConfig[J, Real](1000L, 1000L, 0L, 0L, 1000L, true, 1000L)
+  val config = SstConfig[J, Real](1000L, 1000L, 0L, 0L, 1000L, true)
 
   def verify(cfg: SstConfig[J, Real], input: List[Data], expected: S) =
     Stream.emits(input map (SST.fromData[J, Real](Real.one, _)))
@@ -55,109 +55,10 @@ object ProgressiveSstSpec extends quasar.Qspec {
       .compile.last.unsafeRunSync
       .must(beSome(equal(expected)))
 
-  def ints(n: SInt, ns: SInt*): NonEmptyList[S] =
-    NonEmptyList(n, ns: _*) map (n =>
-      envT(
-        TypeStat.int(SampleStats.one(Real(n)), BigInt(n), BigInt(n)),
-        TypeST(TypeF.const[J, S](J.int(BigInt(n))))).embed)
-
   def strSS(s: String): SampleStats[Real] =
     SampleStats.fromFoldable(s.map(c => Real(c.toInt)).toList)
 
-  "compress arrays" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _arr(List(_int(1), _int(2))))),
-      _obj(ListMap("bar" -> _arr(List(_int(1), _int(2), _int(3)))))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.coll(Real(1), Real(2).some, Real(2).some),
-          TypeST(TypeF.arr[J, S](ints(1, 2).list, None))).embed,
-
-        J.str("bar") -> envT(
-          TypeStat.coll(Real(1), Real(3).some, Real(3).some),
-          TypeST(TypeF.arr[J, S](IList[S](), Some(ints(1, 2, 3).suml1)))).embed
-      ), None))).embed
-
-    verify(config.copy(arrayMaxLength = 2L), input, expected)
-  }
-
-  "compress arrays, retaining 1 key" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _arr(List(_int(1), _int(2))))),
-      _obj(ListMap("bar" -> _arr(List(_int(1), _int(2), _int(3)))))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.coll(Real(1), Real(2).some, Real(2).some),
-          TypeST(TypeF.arr[J, S](ints(1, 2).list, None))).embed,
-
-        J.str("bar") -> envT(
-          TypeStat.coll(Real(1), Real(3).some, Real(3).some),
-          TypeST(TypeF.arr[J, S](ints(1).list, Some(ints(2, 3).suml1)))).embed
-      ), None))).embed
-
-    verify(config.copy(arrayMaxLength = 2L, retainIndicesSize = 1L), input, expected)
-  }
-
-  "compress long strings" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _str("abcdef"))),
-      _obj(ListMap("bar" -> _str("abcde")))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.str(Real(1), Real(6), Real(6), "abcde", "abcde"),
-          TagST[J](Tagged(
-            strings.StructuralString,
-            envT(
-              TypeStat.coll(Real(1), Real(6).some, Real(6).some),
-              TypeST(TypeF.arr[J, S](IList[S](), Some(envT(
-                TypeStat.char(strSS("abcdef"), 'a', 'f'),
-                TypeST(TypeF.simple[J, S](SimpleType.Char))).embed)))
-            ).embed))
-          ).embed,
-
-        J.str("bar") -> envT(
-          TypeStat.str(Real(1), Real(5), Real(5), "abcde", "abcde"),
-          TypeST(TypeF.const[J, S](J.str("abcde")))
-        ).embed
-      ), None))).embed
-
-    verify(config.copy(stringMaxLength = 5L), input, expected)
-  }
-
-  "compress long strings without structure" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _str("abcdef"))),
-      _obj(ListMap("bar" -> _str("abcde")))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(2), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.str(Real(1), Real(6), Real(6), "abcde", "abcde"),
-          TypeST(TypeF.simple[J, S](SimpleType.Str))).embed,
-
-        J.str("bar") -> envT(
-          TypeStat.str(Real(1), Real(5), Real(5), "abcde", "abcde"),
-          TypeST(TypeF.const[J, S](J.str("abcde")))).embed
-      ), None))).embed
-
-    verify(config.copy(stringMaxLength = 5L, stringPreserveStructure = false), input, expected)
-  }
-
-  "coalesce map keys until <= max size" >> {
+  "coalesce maps > max size" >> {
     val input = List(
       _obj(ListMap("foo" -> _int(1))),
       _obj(ListMap("bar" -> _int(1))),
@@ -186,7 +87,7 @@ object ProgressiveSstSpec extends quasar.Qspec {
                   TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
                 envT(
                   TypeStat.char(strSS("x"), 'x', 'x'),
-                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed
               ), None))).embed))).embed,
         envT(
           TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
@@ -194,10 +95,10 @@ object ProgressiveSstSpec extends quasar.Qspec {
         ).embed
       ))))).embed
 
-    verify(config.copy(mapMaxSize = 3L, retainKeysSize = 0L, unionMaxSize = 1L), input, expected)
+    verify(config.copy(mapMaxSize = 3L, retainKeysSize = 0L), input, expected)
   }
 
-  "coalesce map keys until <= max size, retaining top 2" >> {
+  "coalesce maps > max size, retaining top 2" >> {
     val input = List(
       _obj(ListMap("a" -> _int(1), "b" -> _int(1), "foo" -> _int(1))),
       _obj(ListMap("a" -> _int(1), "b" -> _int(1), "bar" -> _int(1))),
@@ -234,108 +135,10 @@ object ProgressiveSstSpec extends quasar.Qspec {
                   TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
                 envT(
                   TypeStat.char(strSS("x"), 'x', 'x'),
-                  TypeST(TypeF.const[J, S](J.char('x')))).embed
+                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed
               ), None))).embed))).embed,
           fourOnes))))).embed
 
-    verify(config.copy(mapMaxSize = 3L, retainKeysSize = 2L, unionMaxSize = 1L), input, expected)
-  }
-
-  "coalesce new map keys when primary type in unknown key" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _int(1))),
-      _obj(ListMap("bar" -> _int(1))),
-      _obj(ListMap("baz" -> _int(1))),
-      _obj(ListMap("quux" -> _int(1)))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap.empty[J, S], Some((
-        envT(
-          TypeStat.str(Real(4), Real(3), Real(4), "bar", "quux"),
-          TagST[J](Tagged(
-            strings.StructuralString,
-            envT(
-              TypeStat.coll(Real(4), Real(3).some, Real(4).some),
-              TypeST(TypeF.arr[J, S](IList(
-                envT(
-                  TypeStat.char(strSS("fbbq"), 'b', 'q'),
-                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
-                envT(
-                  TypeStat.char(strSS("oaau"), 'a', 'u'),
-                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
-                envT(
-                  TypeStat.char(strSS("orzu"), 'o', 'z'),
-                  TypeST(TypeF.simple[J, S](SimpleType.Char))).embed,
-                envT(
-                  TypeStat.char(strSS("x"), 'x', 'x'),
-                  TypeST(TypeF.const[J, S](J.char('x')))).embed
-              ), None))).embed))).embed,
-        envT(
-          TypeStat.int(SampleStats.freq(Real(4), Real(1)), BigInt(1), BigInt(1)),
-          TypeST(TypeF.const[J, S](J.int(1)))
-        ).embed
-      ))))).embed
-
-    verify(config.copy(mapMaxSize = 2L, retainKeysSize = 0L, unionMaxSize = 1L), input, expected)
-  }
-
-  "narrow unions until <= max size" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _int(1))),
-      _obj(ListMap("foo" -> _int(2))),
-      _obj(ListMap("foo" -> _bool(true))),
-      _obj(ListMap("foo" -> _bool(false)))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.count(Real(4)),
-          TypeST(TypeF.coproduct[J, S](
-            envT(
-              TypeStat.int(
-                SampleStats.fromFoldable(IList(Real(1), Real(2))),
-                BigInt(1),
-                BigInt(2)),
-              TypeST(TypeF.simple[J, S](SimpleType.Int))).embed,
-            envT(
-              TypeStat.bool(Real(1), Real(1)),
-              TypeST(TypeF.simple[J, S](SimpleType.Bool))).embed))
-        ).embed
-      ), None))).embed
-
-    verify(config.copy(unionMaxSize = 2L), input, expected)
-  }
-
-  "coalesce consts with primary types in unions" >> {
-    val input = List(
-      _obj(ListMap("foo" -> _int(1))),
-      _obj(ListMap("foo" -> _int(2))),
-      _obj(ListMap("foo" -> _bool(true))),
-      _obj(ListMap("foo" -> _int(3)))
-    )
-
-    val expected = envT(
-      TypeStat.coll(Real(4), Real(1).some, Real(1).some),
-      TypeST(TypeF.map[J, S](IMap(
-        J.str("foo") -> envT(
-          TypeStat.count(Real(4)),
-          TypeST(TypeF.coproduct[J, S](
-            envT(
-              TypeStat.int(
-                SampleStats.fromFoldable(IList(Real(1), Real(2), Real(3))),
-                BigInt(1),
-                BigInt(3)),
-              TypeST(TypeF.simple[J, S](SimpleType.Int))).embed,
-            envT(
-              TypeStat.bool(Real(1), Real(0)),
-              TypeST(TypeF.const[J, S](J.bool(true)))).embed))
-        ).embed
-      ), None))).embed
-
-    verify(config.copy(unionMaxSize = 2L), input, expected)
+    verify(config.copy(mapMaxSize = 3L, retainKeysSize = 2L), input, expected)
   }
 }

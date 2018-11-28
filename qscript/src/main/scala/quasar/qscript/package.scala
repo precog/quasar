@@ -89,7 +89,7 @@ package object qscript {
   type QScriptEducated[T[_[_]], A] =
     CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ResourcePath], ?] ::: TNilK, A]
 
-  def educatedToTotal[T[_[_]]]: Injectable[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
+  implicit def educatedToTotal[T[_[_]]]: Injectable[QScriptEducated[T, ?], QScriptTotal[T, ?]] =
     SubInject[QScriptEducated[T, ?], QScriptTotal[T, ?]]
 
   object QCE {
@@ -99,16 +99,6 @@ package object qscript {
     def unapply[T[_[_]], A](qt: QScriptEducated[T, A]): Option[QScriptCore[T, A]] =
       CopK.Inject[QScriptCore[T, ?], QScriptEducated[T, ?]].prj(qt)
   }
-
-  /** QScript that has gone through Read conversion.
-    *
-    * NB: Once QScriptTotal goes away, this could become parametric in the path type.
-    */
-  type QScriptRead[T[_[_]], A] =
-    CopK[QScriptCore[T, ?] ::: ThetaJoin[T, ?] ::: Const[Read[ResourcePath], ?] ::: TNilK, A]
-
-  implicit def qScriptReadToQscriptTotal[T[_[_]]]: Injectable[QScriptRead[T, ?], QScriptTotal[T, ?]] =
-    SubInject[QScriptRead[T, ?], QScriptTotal[T, ?]]
 
   type MapFunc[T[_[_]], A] = CopK[MapFuncCore[T, ?] ::: MapFuncDerived[T, ?] ::: TNilK, A]
 

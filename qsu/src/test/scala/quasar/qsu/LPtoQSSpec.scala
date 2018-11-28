@@ -29,7 +29,7 @@ import quasar.fp._
 import quasar.contrib.iota._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
-import quasar.qscript.{qScriptReadToQscriptTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
+import quasar.qscript.{educatedToTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
 
 import iotaz.CopK

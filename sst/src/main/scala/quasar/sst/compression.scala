@@ -23,6 +23,7 @@ import quasar.fp.numeric._
 import quasar.contrib.iota.copkTraverse
 import quasar.tpe._
 
+import eu.timepit.refined.auto._
 import matryoshka.{project => _, _}
 import matryoshka.patterns.EnvT
 import matryoshka.implicits._
@@ -68,6 +69,41 @@ object compression {
     case _ => none
   }
 
+  /** Like `coalesceKeys` but doesn't consider type and widens keys to their
+    * `PrimaryTag` prior to coalescing.
+    */
+  def coalesceKeysWidened[J: Order, A: Order: Field: ConvertableTo](
+      maxSize: Natural,
+      retainMostFrequent: Natural,
+      stringPreserveStructure: Boolean)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+    case EnvT((ts, TypeST(TypeF.Map(kn, unk)))) if kn.size > maxSize.value =>
+      def compUnk(toComp: IMap[J, SST[J, A]]): Option[(SST[J, A], SST[J, A])] =
+        toComp.foldlWithKey(unk) { (r, j, sst) =>
+          r |+| some((primarySst(stringPreserveStructure)(SST.size(sst), j), sst))
+        }
+
+      val compressed =
+        if (retainMostFrequent.value > 0L) {
+          val pruned =
+            withoutTopValues(kn.map(SST.size[J, A]), retainMostFrequent.value.toInt)
+
+          val toCompress =
+            kn intersection pruned
+
+          (kn \\ toCompress, compUnk(toCompress))
+        } else {
+          (IMap.empty[J, SST[J, A]], compUnk(kn))
+        }
+
+      some(envT(ts, TypeST(TypeF.map[J, SST[J, A]](compressed))))
+
+    case _ => none
+  }
+
   /** Compress unions by combining any constants with their primary type if it
     * also appears in the union.
     */
@@ -90,6 +126,24 @@ object compression {
         }
         coalesced.suml1Opt map (csst => envT(ts, csst.project.lower))
       }
+
+    case _ => none
+  }
+
+  /** Compress maps having unknown keys by coalescing known keys with unknown.
+    *
+    * @param retainMostFrequent the number of keys to retain from a compression set
+    */
+  def coalesceWhenUnknown[J: Order, A: Order: Field: ConvertableTo](
+      retainMostFrequent: Natural,
+      stringPreserveStructure: Boolean)(
+      implicit
+      JC: Corecursive.Aux[J, EJson],
+      JR: Recursive.Aux[J, EJson])
+      : SSTF[J, A, SST[J, A]] => Option[SSTF[J, A, SST[J, A]]] = {
+    case sstf @ EnvT((_, TypeST(TypeF.Map(_, Some((_, _)))))) =>
+      coalesceKeysWidened[J, A](0L, retainMostFrequent, stringPreserveStructure)
+        .apply(sstf)
 
     case _ => none
   }
@@ -214,7 +268,7 @@ object compression {
       JR: Recursive.Aux[J, EJson])
       : SST[J, A] = j match {
     case Embed(C(Str(s))) if stringPreserveStructure =>
-      strings.widen[J, A](TypeStat.fromEJson(cnt, j), s).embed
+      strings.widenStats[J, A](TypeStat.fromEJson(cnt, j), s).embed
 
     case Embed(C(Str(_))) =>
       strings.simple[SST[J, A], J, A](TypeStat.fromEJson(cnt, j)).embed

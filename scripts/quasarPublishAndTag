@@ -17,6 +17,6 @@ export -f bumpInDownstream
 scripts/bumpDependentProject slamdata slamdata-backend bumpInDownstream
 
 # connectors
-for c in s3 datasource-azure datasource-url; do
-  scripts/bumpDependentProject slamdata "quasar-$c" bumpInDownstream
+for c in s3 azure url; do
+  scripts/bumpDependentProject slamdata "quasar-datasource-$c" bumpInDownstream
 done

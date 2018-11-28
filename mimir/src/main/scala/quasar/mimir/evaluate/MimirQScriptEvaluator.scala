@@ -91,8 +91,8 @@ final class MimirQScriptEvaluator[
   def QSMRewriteFunctor: Functor[QSMRewrite] = Functor[QSMRewrite]
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def UnirewriteT: Unirewrite[T, QSRewrite[T]] =
-    implicitly[Unirewrite[T, QSRewrite[T]]]
+  def UnirewriteT: Unirewrite[T, QSMRewrite] =
+    implicitly[Unirewrite[T, QSMRewrite]]
 
   def optimize: M[QSMRewrite[T[QSM]] => QSM[T[QSM]]] =
     Kleisli.ask[F, EvaluatorConfig[T, IO]] map {

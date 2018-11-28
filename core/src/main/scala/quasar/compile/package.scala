@@ -17,6 +17,7 @@
 package quasar
 
 import slamdata.Predef._
+import quasar.CIString._
 import quasar.common.{phase, phaseM, PhaseResultTell}
 import quasar.common.data.Data
 import quasar.contrib.pathy.ADir
@@ -92,6 +93,7 @@ package object compile {
     } yield logical
   }
 
+
   /** Returns the name of the expression when viewed as a projection
     * (of the optional relation), if available.
     */
@@ -101,65 +103,69 @@ package object compile {
   )(implicit
     T: Recursive.Aux[T, Sql]
   ): Option[String] = {
+    val flattening = Set("flatten_map".ci, "flatten_array".ci)
     val loop: T => (Option[String] \/ (Option[String] \/ T)) =
       _.project match {
-        case Ident(name)                                 => some(name).left
+        case Ident(name) => some(name).left
         case Binop(_, Embed(StringLiteral(v)), KeyDeref) => some(v).left
-        case Unop(arg, FlattenMapValues)                 => arg.right.right
-        case Unop(arg, FlattenArrayValues)               => arg.right.right
-        case _                                           => None.left
+        case Unop(arg, FlattenMapValues) => arg.right.right
+        case Unop(arg, FlattenArrayValues) => arg.right.right
+        case InvokeFunction(fnName, List(arg)) if flattening.contains(fnName) => arg.right.right
+        case _ => None.left
       }
 
     \/.loopRight(expr.right, ι[Option[String]], loop)
   }
 
+  sealed trait Ordinal
+  val Ordinal = Tag.of[Ordinal]
+
+  sealed trait Inferred
+  val Inferred = Tag.of[Inferred]
+
+  type ProjectionName = (String @@ Ordinal) \/ (String @@ Inferred)
+
+  def inferred(s: String): ProjectionName =
+    Inferred(s).right
+
+  def ordinal(s: String): ProjectionName =
+    Ordinal(s).left
+
+  def nameOf(p: ProjectionName): String = p match {
+    case \/-(Inferred(inf)) => inf
+    case -\/(Ordinal(ord)) => ord
+  }
+
   def projectionNames[T]
     (projections: List[Proj[T]], relName: Option[String])
     (implicit T: Recursive.Aux[T, Sql])
-      : SemanticError \/ List[(String, T)] = {
+      : SemanticError \/ List[(ProjectionName, T)] = {
     val aliases = projections.flatMap(_.alias.toList)
 
-    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
+    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(ProjectionName, T)]](
       duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
-      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
-        alias.cata(
-          a => (used, a -> expr).right,
-          {
-            projectionName(expr, relName).flatMap { tn =>
-              val alternatives = Stream.from(0).map(suffix => tn + suffix.toString)
-                (tn #:: alternatives).dropWhile(used.contains).headOption.map { name =>
-                  // WartRemover seems to be confused by the `+` method on `Set`
-                  @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
-                  val newUsed = used + name
-                  (newUsed, name -> expr)
-                }
-            } \/> SemanticError.GenericError("Could not infer fields names for projections")
-          })
-      }.map(_._2))
-  }
+      projections.zipWithIndex.mapAccumLeftM[(ProjectionName, T), Set[String], SemanticError \/ ?](aliases.toSet)
+        { case (used, (Proj(expr, alias), index)) =>
+          alias.cata(
+            a => (used, Inferred(a).right -> expr).right,
+            {
+              val indexName = Ordinal(index.toString)
+              val tentativeName: ProjectionName =
+                projectionName(expr, relName)
+                  .map(Inferred(_).right).getOrElse(Ordinal(index.toString).left)
 
-  def ordinalProjectionNames[T]
-    (projections: List[Proj[T]], relName: Option[String])
-    (implicit T: Recursive.Aux[T, Sql])
-      : SemanticError \/ List[(String, T)] = {
-    val aliases = projections.flatMap(_.alias.toList)
+              val alternatives: Stream[ProjectionName] =
+                Stream.from(0).map(suffix => tentativeName match {
+                  case \/-(Inferred(inferred)) => Inferred(inferred.concat(suffix.toString)).right
+                  case -\/(Ordinal(ordinal)) => Ordinal(ordinal.concat(suffix.toString)).left
+                })
 
-    (aliases diff aliases.distinct).headOption.cata[SemanticError \/ List[(String, T)]](
-      duplicateAlias => SemanticError.DuplicateAlias(duplicateAlias).left,
-      projections.zipWithIndex.mapAccumLeftM(aliases.toSet) { case (used, (Proj(expr, alias), index)) =>
-        alias.cata(
-          a => (used, a -> expr).right,
-          {
-            val tentativeName = index.toString
-            val alternatives = Stream.from(0).map(suffix => tentativeName + suffix.toString)
-            (tentativeName #:: alternatives).dropWhile(used.contains).headOption.map { name =>
-              // WartRemover seems to be confused by the `+` method on `Set`
-              @SuppressWarnings(Array("org.wartremover.warts.StringPlusAny"))
-              val newUsed = used + name
-              (newUsed, name -> expr)
-            } \/> SemanticError.GenericError("Could not generate alias for a relation") // unlikely since we know it's an quasi-infinite stream
-          })
-      }.map(_._2))
+              (tentativeName #:: alternatives).dropWhile(n => used.contains(nameOf(n))).headOption.map { name =>
+                val newUsed = used + nameOf(name)
+                (newUsed, name -> expr)
+              } \/> SemanticError.GenericError("Could not generate alias for a relation") // unlikely since we know it's an quasi-infinite stream
+            })
+        }.map(_._2))
   }
 
   /** Returns the `LogicalPlan` for the given SQL^2 query */

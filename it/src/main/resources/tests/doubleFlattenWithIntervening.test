@@ -6,5 +6,5 @@
     "query": "select topObj{*}.botObj{*} from `nested.data`",
     "predicate": "exactly",
     "ignoreResultOrder": true,
-    "expected": ["m", "n", "o"]
+    "expected": [{"botObj": "m"}, {"botObj": "n"}, {"botObj": "o"}]
 }

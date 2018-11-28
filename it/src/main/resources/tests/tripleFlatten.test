@@ -5,5 +5,5 @@
     "data": "nested.data",
     "query": "select topObj{*}{*}{*} from `nested.data`",
     "predicate": "exactly",
-    "expected": ["m", "n", "o"]
+    "expected": [{"topObj": "m"}, {"topObj": "n"}, {"topObj": "o"}]
 }

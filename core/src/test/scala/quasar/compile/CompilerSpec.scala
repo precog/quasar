@@ -920,37 +920,37 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
       testLogicalPlanCompile(
                    sqlE"SELECT foo{:*} FROM foo",
         compileExp(sqlE"SELECT Flatten_Map(foo) FROM foo"))
-    }.pendingUntilFixed
+    }
 
     "expand nested map flatten" in {
       testLogicalPlanCompile(
                    sqlE"SELECT foo.bar{:*} FROM foo",
         compileExp(sqlE"SELECT Flatten_Map(foo.bar) FROM foo"))
-    }.pendingUntilFixed
+    }
 
     "expand field map flatten" in {
       testLogicalPlanCompile(
                    sqlE"SELECT bar{:*} FROM foo",
         compileExp(sqlE"SELECT Flatten_Map(foo.bar) FROM foo"))
-    }.pendingUntilFixed
+    }
 
     "expand top-level array flatten" in {
       testLogicalPlanCompile(
                    sqlE"SELECT foo[:*] FROM foo",
         compileExp(sqlE"SELECT Flatten_Array(foo) FROM foo"))
-    }.pendingUntilFixed
+    }
 
     "expand nested array flatten" in {
       testLogicalPlanCompile(
         sqlE"SELECT foo.bar[:*] FROM foo",
         compileExp(sqlE"SELECT Flatten_Array(foo.bar) FROM foo"))
-    }.pendingUntilFixed
+    }
 
     "expand field array flatten" in {
       testLogicalPlanCompile(
                    sqlE"SELECT bar[:*] FROM foo",
         compileExp(sqlE"SELECT Flatten_Array(foo.bar) FROM foo"))
-    }.pendingUntilFixed
+    }
 
     "compile top-level map flatten" in {
       testLogicalPlanCompile(
@@ -1747,19 +1747,22 @@ class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   }
 
   "namedProjections" should {
+    def inferred(s: String): ProjectionName =
+      Inferred(s).right
+
     "create unique names" >> {
       "when two fields have the same name" in {
         val query = sqlE"SELECT owner.name, car.name from owners as owner join cars as car on car.`_id` = owner.carId"
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
         projectionNames(projections, None) must beLike { case \/-(list) =>
-          list.map(_._1) must contain(allOf("name", "name0"))
+          list.map(_._1) must contain(allOf(inferred("name"), inferred("name0")))
         }
       }
       "when a field and an alias have the same name" in {
         val query = sqlE"SELECT owner.name, car.model as name from owners as owner join cars as car on car.`_id` = owner.carId"
         val projections = query.project.asInstanceOf[Select[Fix[Sql]]].projections
         projectionNames(projections, None) must beLike { case \/-(list) =>
-          list.map(_._1) must contain(allOf("name0", "name"))
+          list.map(_._1) must contain(allOf(inferred("name0"), inferred("name")))
         }
       }
     }

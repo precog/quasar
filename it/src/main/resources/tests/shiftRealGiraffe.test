@@ -5,7 +5,7 @@
         "mimir":     "ignoreFieldOrder"
     },
     "data": "real-giraffe.data",
-    "query": "select (SELECT * FROM (SELECT t{_}.testField FROM `real-giraffe.data` AS t) AS t2 WHERE type_of(t2) = \"string\") AS testField, (SELECT kv{_} FROM `real-giraffe.data` AS kv) AS S",
+    "query": "select (SELECT * FROM (SELECT t{_}.testField FROM `real-giraffe.data` AS t) AS t2 WHERE type_of(t2.testField) = \"string\").testField AS testField, (SELECT kv{_} FROM `real-giraffe.data` AS kv) AS S",
     "predicate": "exactly",
     "ignoreResultOrder": true,
     "expected": [

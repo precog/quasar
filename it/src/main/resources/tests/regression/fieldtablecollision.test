@@ -5,7 +5,5 @@
   },
   "query": "SELECT fieldtablecollision.fieldtablecollision FROM `fieldtablecollision.data` as fieldtablecollision",
   "predicate": "exactly",
-  "expected": [
-    1
-  ]
+  "expected": [{"fieldtablecollision": 1}]
 }

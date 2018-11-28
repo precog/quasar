@@ -81,6 +81,10 @@ object CIString extends CIStringInstances {
 
   val stringIso: Iso[CIString, String] =
     Iso((_: CIString).value)(CIString(_))
+
+  implicit final class CIStringOps(val self: String) extends AnyVal {
+    def ci: CIString= CIString(self)
+  }
 }
 
 sealed abstract class CIStringInstances {

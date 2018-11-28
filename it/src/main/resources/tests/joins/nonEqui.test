@@ -13,11 +13,11 @@
     "ignoreResultOrder": true,
 
     "expected": [
-        "RangeRover-Evoque",
-        "RangeRover-Evoque",
-        "Honda-civic",
-        "Honda-civic",
-        "BMW-X5",
-        "BMW-X5",
-        "BMW-X5"]
+        {"name": "RangeRover-Evoque"},
+        {"name": "RangeRover-Evoque"},
+        {"name": "Honda-civic"},
+        {"name": "Honda-civic"},
+        {"name": "BMW-X5"},
+        {"name": "BMW-X5"},
+        {"name": "BMW-X5"}]
 }

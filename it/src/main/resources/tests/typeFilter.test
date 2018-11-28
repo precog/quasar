@@ -2,8 +2,7 @@
   "name": "type filter projection",
   "backends": {},
   "data": "heterogeneous.data",
-  "NB": "This is the query used by the frontend to implement type filtering",
-  "query": "SELECT c.c1 FROM (SELECT p2.g4 AS c1 FROM (SELECT (SELECT * FROM (SELECT ty.b FROM `heterogeneous.data` AS ty) AS v WHERE type_of(v) = \"string\") AS g4 FROM `heterogeneous.data` AS r3) AS p2) AS c",
+  "query": "SELECT c.c1 FROM (SELECT p2.g4 AS c1 FROM (SELECT (SELECT * FROM (SELECT ty.b FROM `heterogeneous.data` AS ty) AS v WHERE type_of(v.b) = \"string\") AS g4 FROM `heterogeneous.data` AS r3) AS p2) AS c",
   "predicate": "exactly",
-  "expected": [{"b": "string"}]
+  "expected": [{"c1": {"b": "string"}}]
 }

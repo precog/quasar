@@ -6,13 +6,13 @@
     "query": "select commit.author{*} from `slamengine_commits.data`",
     "predicate": "atLeast",
     "ignoreResultOrder": true,
-    "expected": ["Greg Pfeil",
-                 "greg@technomadic.org",
-                 "2015-01-29T15:52:37Z",
-                 "Moss Prescott",
-                 "moss@theprescotts.com",
-                 "2015-01-29T00:23:14Z",
-                 "John A. De Goes",
-                 "john@degoes.net",
-                 "2015-01-26T17:37:40Z"]
+    "expected": [{"author": "Greg Pfeil"},
+                 {"author": "greg@technomadic.org"},
+                 {"author": "2015-01-29T15:52:37Z"},
+                 {"author": "Moss Prescott"},
+                 {"author": "moss@theprescotts.com"},
+                 {"author": "2015-01-29T00:23:14Z"},
+                 {"author": "John A. De Goes"},
+                 {"author": "john@degoes.net"},
+                 {"author": "2015-01-26T17:37:40Z"}]
 }

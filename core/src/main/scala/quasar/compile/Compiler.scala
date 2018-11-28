@@ -481,7 +481,7 @@ final class Compiler[M[_], T: Equal]
 
         // Selection of wildcards aren't named, we merge them into any other
         // objects created from other columns:
-        val inferredNamesOrError: SemanticError \/ List[Option[String]] =
+        val namesOrError: SemanticError \/ List[Option[ProjectionName]] =
           projectionNames[Fix[Sql]](projs, relationName(node).toOption).map(_.map {
             case (name, Embed(expr)) => expr match {
               case Splice(_) => None
@@ -489,53 +489,30 @@ final class Compiler[M[_], T: Equal]
             }
           })
 
-        val ordinalNamesOrError: SemanticError \/ List[Option[String]] =
-          ordinalProjectionNames[Fix[Sql]](projs, relationName(node).toOption).map(_.map {
-            case (name, Embed(expr)) => expr match {
-              case Splice(_) => None
-              case _         => name.some
-            }
-          })
-
-        val namesOrError: SemanticError \/ List[Option[String]] = for {
-          inferred <- inferredNamesOrError
-          ordinals <- ordinalNamesOrError
-        } yield (inferred.zipWith(ordinals) {
-          case (Some(inf), _) => inf.some
-          case (None, Some(Some(ord))) => ord.some
-          case _ => none
-        }._2)
-
-        (namesOrError ||| inferredNamesOrError ||| ordinalNamesOrError).fold(
+        namesOrError.fold(
           MErr.raiseError,
-          names => {
+          names0 => {
+            val names = names0.map(_.map(nameOf(_)))
+
             val syntheticNames: List[String] =
               names.zip(syntheticOf(node)).flatMap {
                 case (Some(name), Some(_)) => List(name)
                 case (_, _) => Nil
               }
 
-            val (nam, initial) = namesOrError match {
-              case \/-(inferredNames) =>
-                (names.some, projections
-                  .map(_.expr)
-                  .traverse(compile0)
-                  .map(buildRecord(names, _)))
-              case -\/(_) =>
-                projections match {
-                  case List(Proj(expr @ Cofree(_, Splice(_) | Ident(_)), None)) =>
-                    (names.some,
-                      compile0(expr).map(name => buildRecord(names, List(name))))
-                  case List(Proj(expr, None)) =>
-                    (none, compile0(expr))
-                  case _ =>
-                    (names.some,
-                      projections
-                        .map(_.expr)
-                        .traverse(compile0)
-                        .map(buildRecord(names, _)))
-                }
-            }
+            val (nam, initial) =
+              if (names0.unite.all(_.isRight))
+                  (names.some, projections.map(_.expr).traverse(compile0).map(buildRecord(names, _)))
+              else projections match {
+                case List(Proj(expr, None)) =>
+                  (none, compile0(expr))
+                case _ =>
+                  (names.some,
+                    projections
+                      .map(_.expr)
+                      .traverse(compile0)
+                      .map(buildRecord(names, _)))
+              }
 
             relations.foldRight(
               initial)(

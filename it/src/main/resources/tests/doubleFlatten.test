@@ -7,16 +7,16 @@
     "predicate": "atLeast",
     "ignoreResultOrder": true,
     "expected": [
-        "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",
-        "https://api.github.com/repos/slamdata/slamengine/commits/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",
-        "https://github.com/slamdata/slamengine/commit/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",
-        "18164870e8803e5885a88f8dfd53b82c80721503",
-        "https://api.github.com/repos/slamdata/slamengine/commits/18164870e8803e5885a88f8dfd53b82c80721503",
-        "https://github.com/slamdata/slamengine/commit/18164870e8803e5885a88f8dfd53b82c80721503",
-        "b29d8f254e5df2c4d1792f077625924cd1fde2db",
-        "https://api.github.com/repos/slamdata/slamengine/commits/b29d8f254e5df2c4d1792f077625924cd1fde2db",
-        "https://github.com/slamdata/slamengine/commit/b29d8f254e5df2c4d1792f077625924cd1fde2db",
-        "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",
-        "https://api.github.com/repos/slamdata/slamengine/commits/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6",
-        "https://github.com/slamdata/slamengine/commit/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"]
+        {"parents": "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"},
+        {"parents": "https://api.github.com/repos/slamdata/slamengine/commits/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"},
+        {"parents": "https://github.com/slamdata/slamengine/commit/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"},
+        {"parents": "18164870e8803e5885a88f8dfd53b82c80721503"},
+        {"parents": "https://api.github.com/repos/slamdata/slamengine/commits/18164870e8803e5885a88f8dfd53b82c80721503"},
+        {"parents": "https://github.com/slamdata/slamengine/commit/18164870e8803e5885a88f8dfd53b82c80721503"},
+        {"parents": "b29d8f254e5df2c4d1792f077625924cd1fde2db"},
+        {"parents": "https://api.github.com/repos/slamdata/slamengine/commits/b29d8f254e5df2c4d1792f077625924cd1fde2db"},
+        {"parents": "https://github.com/slamdata/slamengine/commit/b29d8f254e5df2c4d1792f077625924cd1fde2db"},
+        {"parents": "3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"},
+        {"parents": "https://api.github.com/repos/slamdata/slamengine/commits/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"},
+        {"parents": "https://github.com/slamdata/slamengine/commit/3d44ce48fc0670aaf39ba1acd0e1c161f14cc2d6"}]
 }

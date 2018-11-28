@@ -11,14 +11,11 @@
     "query":
       "SELECT c.p6 AS A, c.p7 AS B, c.p8 AS C
         FROM (SELECT pt1.g3 AS p6, pt1.g4 AS p7, pt1.g5 AS p8
-          FROM (SELECT (
-            SELECT * FROM (SELECT t.teams[_].team FROM `nfl-teams.data` AS t) AS v
-              WHERE type_of(v) = \"string\") AS g3, (
-            SELECT * FROM (SELECT t.teams[_].wins FROM `nfl-teams.data` AS t) AS v
-              WHERE type_of(v) = \"number\") AS g4, (
-            SELECT * FROM (SELECT t.teams[_].losses FROM `nfl-teams.data` AS t) AS v
-              WHERE type_of(v) = \"number\") AS g5
-            FROM `nfl-teams.data` AS gt2) AS pt1) AS c",
+          FROM (SELECT
+                  (SELECT * FROM (SELECT t.teams[_].team FROM `nfl-teams.data` AS t) AS v WHERE type_of(v.team) = \"string\").team AS g3,
+                  (SELECT * FROM (SELECT t.teams[_].wins FROM `nfl-teams.data` AS t) AS v WHERE type_of(v.wins) = \"number\").wins AS g4,
+                  (SELECT * FROM (SELECT t.teams[_].losses FROM `nfl-teams.data` AS t) AS v WHERE type_of(v.losses) = \"number\").losses AS g5
+                FROM `nfl-teams.data` AS gt2) AS pt1) AS c",
 
     "predicate": "exactly",
 

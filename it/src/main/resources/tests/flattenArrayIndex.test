@@ -6,5 +6,11 @@
     "query": "select loc[*:] from `extraSmallZips.data` where city like \"A%\"",
     "predicate": "exactly",
     "ignoreResultOrder": false,
-    "expected": [0, 1, 0, 1, 0, 1]
+    "expected": [
+      { "loc": 0 },
+      { "loc": 1 },
+      { "loc": 0 },
+      { "loc": 1 },
+      { "loc": 0 },
+      { "loc": 1 }]
 }

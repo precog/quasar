@@ -103,13 +103,19 @@ package object compile {
   )(implicit
     T: Recursive.Aux[T, Sql]
   ): Option[String] = {
-    val flattening = Set("flatten_map".ci, "flatten_array".ci)
+    val flattening = Set("flatten_map".ci, "shift_map".ci, "flatten_array".ci, "shift_array".ci)
     val loop: T => (Option[String] \/ (Option[String] \/ T)) =
       _.project match {
         case Ident(name) => some(name).left
         case Binop(_, Embed(StringLiteral(v)), KeyDeref) => some(v).left
+        case Unop(arg, FlattenMapKeys) => arg.right.right
         case Unop(arg, FlattenMapValues) => arg.right.right
+        case Unop(arg, ShiftMapKeys) => arg.right.right
+        case Unop(arg, ShiftMapValues) => arg.right.right
+        case Unop(arg, FlattenArrayIndices) => arg.right.right
         case Unop(arg, FlattenArrayValues) => arg.right.right
+        case Unop(arg, ShiftArrayIndices) => arg.right.right
+        case Unop(arg, ShiftArrayValues) => arg.right.right
         case InvokeFunction(fnName, List(arg)) if flattening.contains(fnName) => arg.right.right
         case _ => None.left
       }

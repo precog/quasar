@@ -37,7 +37,7 @@ import matryoshka.patterns.CoEnv
 import scalaz.{-\/, \/-, Const, Foldable, Free, Functor, Kleisli, IMap, State}
 import scalaz.Scalaz._ // apply-traverse syntax conflict
 
-final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TTypes[T] {
+final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TTypes[T] {
 
   private val mapFunc = construction.Func[T]
   private val recMapFunc = construction.RecFunc[T]
@@ -45,9 +45,9 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
   // Assumes `extractProject` and `extractMask` have been applied to the input.
   def extractPivot[F[a] <: ACopK[a]: Functor, A](
       implicit
-        IR: Const[InterpretedRead[A], ?] :<<: F,
-        R: Const[Read[A], ?] :<<: F,
-        QC: QScriptCore :<<: F)
+      IR: Const[InterpretedRead[A], ?] :<<: F,
+      R: Const[Read[A], ?] :<<: F,
+      QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => Option[F[T[F]]] = {
 
     val Res = Resource[A]
@@ -76,9 +76,9 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
   // Assumes `extractProject` has been applied to the input.
   def extractMask[F[a] <: ACopK[a]: Functor, A](
       implicit
-        IR: Const[InterpretedRead[A], ?] :<<: F,
-        R: Const[Read[A], ?] :<<: F,
-        QC: QScriptCore :<<: F)
+      IR: Const[InterpretedRead[A], ?] :<<: F,
+      R: Const[Read[A], ?] :<<: F,
+      QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
     val Res = Resource[A]
@@ -142,9 +142,9 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
 
   def extractProject[F[a] <: ACopK[a]: Functor, A](
       implicit
-        ER: Const[InterpretedRead[A], ?] :<<: F,
-        SR: Const[Read[A], ?] :<<: F,
-        QC: QScriptCore :<<: F)
+      ER: Const[InterpretedRead[A], ?] :<<: F,
+      SR: Const[Read[A], ?] :<<: F,
+      QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
     val Res = Resource[A]
@@ -250,9 +250,9 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
 
   def extractWrap[F[a] <: ACopK[a]: Functor, A](
       implicit
-        IR: Const[InterpretedRead[A], ?] :<<: F,
-        R: Const[Read[A], ?] :<<: F,
-        QC: QScriptCore :<<: F)
+      IR: Const[InterpretedRead[A], ?] :<<: F,
+      R: Const[Read[A], ?] :<<: F,
+      QC: QScriptCore :<<: F)
       : QScriptCore[T[F]] => F[T[F]] = {
 
     val Res = Resource[A]
@@ -267,6 +267,8 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
       case qc => QC(qc)
     }
   }
+
+  ////
 
   /**
    * Treats the input as a masked expression and returns a concrete expression
@@ -302,17 +304,17 @@ final class RewritePushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
   }
 }
 
-object RewritePushdown {
+object FocusedPushdown {
   def apply[T[_[_]]: BirecursiveT: EqualT, F[a] <: ACopK[a]: Functor, G[a] <: ACopK[a], A](
       implicit
       GF: Injectable[G, F],
-      ESRF: Const[InterpretedRead[A], ?] :<<: F,
-      SRF: Const[Read[A], ?] :<<: F,
+      IRF: Const[InterpretedRead[A], ?] :<<: F,
+      RF: Const[Read[A], ?] :<<: F,
       QCF: QScriptCore[T, ?] :<<: F,
       QCG: QScriptCore[T, ?] :<<: G)
       : G[T[F]] => F[T[F]] = {
 
-    val pushdown = new RewritePushdown[T]
+    val pushdown = new FocusedPushdown[T]
 
     val extractMappable: QScriptCore[T, T[F]] => F[T[F]] =
       pushdown.extractProject[F, A] >>>

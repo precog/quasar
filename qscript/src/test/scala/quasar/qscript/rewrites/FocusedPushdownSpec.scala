@@ -30,12 +30,15 @@ import quasar.qscript._
 
 import iotaz.{CopK, TNilK}
 import iotaz.TListK.:::
+
 import matryoshka.data.Fix
 import matryoshka.implicits._
+
 import pathy.Path._
+
 import scalaz.Const
 
-object RewritePushdownSpec extends Qspec {
+object FocusedPushdownSpec extends Qspec {
 
   type QSBase =
     QScriptCore[Fix, ?] :::
@@ -68,8 +71,8 @@ object RewritePushdownSpec extends Qspec {
 
   val path = ResourcePath.leaf(rootDir </> file("foo"))
 
-  def rewritePushdown(expr: Fix[QSExtra]): Fix[QSExtra] =
-    expr.transCata[Fix[QSExtra]](RewritePushdown[Fix, QSExtra, QSExtra, ResourcePath])
+  def focusedPushdown(expr: Fix[QSExtra]): Fix[QSExtra] =
+    expr.transCata[Fix[QSExtra]](FocusedPushdown[Fix, QSExtra, QSExtra, ResourcePath])
 
   "pivot" >> {
     "when the read is shifted at the top-level and only the shifted values are referenced" >> {
@@ -97,7 +100,7 @@ object RewritePushdownSpec extends Qspec {
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-        rewritePushdown(initial) must equal(expected)
+        focusedPushdown(initial) must equal(expected)
       }
 
       "with IdOnly" >> {
@@ -118,7 +121,7 @@ object RewritePushdownSpec extends Qspec {
               Pivot(CPath.Identity, IdOnly, ParseType.Object),
               Wrap(CPath.Identity, "k1")))
 
-        rewritePushdown(initial) must equal(expected)
+        focusedPushdown(initial) must equal(expected)
       }
 
       "with ExcludeId" >> {
@@ -139,7 +142,7 @@ object RewritePushdownSpec extends Qspec {
               Pivot(CPath.Identity, ExcludeId, ParseType.Object),
               Wrap(CPath.Identity, "v1")))
 
-        rewritePushdown(initial) must equal(expected)
+        focusedPushdown(initial) must equal(expected)
       }
     }
 
@@ -165,7 +168,7 @@ object RewritePushdownSpec extends Qspec {
               Wrap(CPath.Identity, "v1"))),
           recFuncE.Constant(ejs.bool(true)))
 
-      rewritePushdown(initial) must equal(expected)
+      focusedPushdown(initial) must equal(expected)
     }
 
     "when the shift source is a single object projection" >> {
@@ -193,7 +196,7 @@ object RewritePushdownSpec extends Qspec {
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewritePushdown(initial) must equal(expected)
+      focusedPushdown(initial) must equal(expected)
     }
 
     "when the shift source is three object projections" >> {
@@ -226,7 +229,7 @@ object RewritePushdownSpec extends Qspec {
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewritePushdown(initial) must equal(expected)
+      focusedPushdown(initial) must equal(expected)
     }
 
     // 🦖  rawr!
@@ -260,7 +263,7 @@ object RewritePushdownSpec extends Qspec {
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewritePushdown(initial) must equal(expected)
+      focusedPushdown(initial) must equal(expected)
     }
 
     "when the shift struct contains two static array projections" >> {
@@ -293,7 +296,7 @@ object RewritePushdownSpec extends Qspec {
               recFuncE.MakeMapS("k1", recFuncE.ProjectIndexI(recFuncE.Hole, 0)),
               recFuncE.MakeMapS("v1", recFuncE.ProjectIndexI(recFuncE.Hole, 1))))
 
-      rewritePushdown(initial) must equal(expected)
+      focusedPushdown(initial) must equal(expected)
     }
 
     "when the Read has IncludeId" >> {
@@ -314,7 +317,7 @@ object RewritePushdownSpec extends Qspec {
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
             Pivot(CPath.Identity, IncludeId, ParseType.Object)))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
 
     "when the Read has IdOnly" >> {
@@ -336,7 +339,7 @@ object RewritePushdownSpec extends Qspec {
             Mask(SMap(CPath.Identity -> Set(ParseType.Object))),
             Pivot(CPath.Identity, IncludeId, ParseType.Object)))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
 
     // we will need to allow certain static mapfuncs as structs in the future.
@@ -357,7 +360,7 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      rewritePushdown(initial) must_= initial
+      focusedPushdown(initial) must_= initial
     }
 
     "not when the non-shifted data is referenced (via LeftSide)" >> {
@@ -372,7 +375,7 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.LeftSide))) // LeftSide is referenced
 
-      rewritePushdown(initial) must equal(initial)
+      focusedPushdown(initial) must equal(initial)
     }
 
     "not when the shift struct is a (nonsensical) constant" >> {
@@ -387,7 +390,7 @@ object RewritePushdownSpec extends Qspec {
             funcE.MakeMapS("k1", funcE.ProjectIndexI(funcE.RightSide, 0)),
             funcE.MakeMapS("v1", funcE.ProjectIndexI(funcE.RightSide, 1))))
 
-      rewritePushdown(initial) must equal(initial)
+      focusedPushdown(initial) must equal(initial)
     }
 
     "consecutive focused shifts" >> {
@@ -425,7 +428,7 @@ object RewritePushdownSpec extends Qspec {
             Pivot(CPath.Identity, ExcludeId, ParseType.Array),
             Wrap(CPath.Identity, "result")))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
   }
 
@@ -459,7 +462,7 @@ object RewritePushdownSpec extends Qspec {
             recFuncE.ProjectKeyS(recFuncE.Hole, "tax"),
             recFuncE.ProjectKeyS(recFuncE.Hole, "total")))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
 
     "not when expression has 'outer' semantics" >> {
@@ -474,7 +477,7 @@ object RewritePushdownSpec extends Qspec {
               recFuncE.ProjectKeyS(recFuncE.Hole, "x"),
               "foo")))
 
-      rewritePushdown(initial) must_= initial
+      focusedPushdown(initial) must_= initial
     }
   }
 
@@ -514,7 +517,7 @@ object RewritePushdownSpec extends Qspec {
                 "orderB"),
               "total")))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
 
     "projection from array, rewriting index" >> {
@@ -552,7 +555,7 @@ object RewritePushdownSpec extends Qspec {
                 "b"),
               0)))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
 
     "multiple projections from same array, rewriting indicies" >> {
@@ -599,7 +602,7 @@ object RewritePushdownSpec extends Qspec {
                 "b"),
               0)))
 
-      rewritePushdown(initial) must_= expected
+      focusedPushdown(initial) must_= expected
     }
 
     "not when expression has 'outer' semantics" >> {
@@ -624,7 +627,7 @@ object RewritePushdownSpec extends Qspec {
                   "orderB"),
                 "total")))
 
-      rewritePushdown(initial) must_= initial
+      focusedPushdown(initial) must_= initial
     }
   }
 }

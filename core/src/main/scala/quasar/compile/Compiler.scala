@@ -236,6 +236,7 @@ final class Compiler[M[_], T: Equal]
       CIName("to_local")                  -> date.ToLocal,
       CIName("squash")                    -> identity.Squash,
       CIName("type_of")                   -> identity.TypeOf,
+      CIName("ids")                       -> identity.Ids,
       CIName("abs")                       -> math.Abs,
       CIName("ceil")                      -> math.Ceil,
       CIName("floor")                     -> math.Floor,

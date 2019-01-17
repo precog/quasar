@@ -43,6 +43,12 @@ trait IdentityLib extends Library {
     Mapping,
     "Returns the simple type of a value.",
     noSimplification)
+
+  val Ids = UnaryFunc(
+    Mapping,
+    "Returns identities of resource",
+    noSimplification
+  )
 }
 
 object IdentityLib extends IdentityLib

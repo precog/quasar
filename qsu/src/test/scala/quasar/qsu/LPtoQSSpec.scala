@@ -31,6 +31,7 @@ import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
 import quasar.qscript.{educatedToTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
 import quasar.std.{AggLib, IdentityLib, StructuralLib}
+import quasar.IdStatus, IdStatus._
 
 import iotaz.CopK
 
@@ -71,6 +72,32 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
       val expected = qs.Map(
         qs.Unreferenced,
         recFunc.Constant(json.bool(true)))
+
+      lp must compileTo(expected)
+    }
+
+    "ids(path) rewrite" >> {
+      val lp = makeObj(
+        "prj" -> lpf.invoke2(StructuralLib.MapProject, read("foo"), lpf.constant(Data.Str("field"))),
+        "identities" -> lpf.invoke1(IdentityLib.Ids, read("foo"))
+      )
+
+      val expected =
+        qs.Map(
+          qs.Read(ResourcePath.leaf(afoo), IncludeId),
+          recFunc.ConcatMaps(
+            recFunc.MakeMapS(
+              "prj",
+              recFunc.ProjectKeyS(
+                recFunc.ProjectIndexI(recFunc.Hole, 1),
+                "field")
+            ),
+            recFunc.MakeMapS(
+              "identities",
+              recFunc.ProjectIndexI(recFunc.Hole, 0)
+            )
+          )
+        )
 
       lp must compileTo(expected)
     }

@@ -44,6 +44,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     val lpToQs =
       K(ReadLP[T, F])                        >==>
       debug("ReadLP")                        >==>
+      RewriteIdsFunction[T, F]               >==>
+      debug("RewriteIdsFunction")            >==>
       RewriteGroupByArrays[T, F]             >==>
       debug("RewriteGroupByArrays")          >-
       EliminateUnary[T]                      >==>
@@ -75,7 +77,6 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       Graduate[T, F]
 
     log.debug("LogicalPlan\n" + lp.render.shows)
-
     lpToQs(lp)
   }
 

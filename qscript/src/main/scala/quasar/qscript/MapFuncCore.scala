@@ -403,6 +403,7 @@ object MapFuncCore {
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
         case ToLocal(a1) => f(a1) ∘ (ToLocal(_))
         case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
+        case Ids(a1) => f(a1) ∘ (Ids(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
         case Not(a1) => f(a1) ∘ (Not(_))
         case ArrayLength(a1) => f(a1) ∘ (ArrayLength(_))
@@ -507,6 +508,7 @@ object MapFuncCore {
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
         case (ToLocal(a1), ToLocal(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
+        case (Ids(a1), Ids(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
         case (Not(a1), Not(b1)) => in.equal(a1, b1)
         case (ArrayLength(a1), ArrayLength(b1)) => in.equal(a1, b1)
@@ -615,6 +617,7 @@ object MapFuncCore {
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
           case ToLocal(a1) => shz("ToLocal", a1)
           case TypeOf(a1) => shz("TypeOf", a1)
+          case Ids(a1) => shz("Ids", a1)
           case Negate(a1) => shz("Negate", a1)
           case Not(a1) => shz("Not", a1)
           case ArrayLength(a1) => shz("ArrayLength", a1)
@@ -732,6 +735,7 @@ object MapFuncCore {
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
           case ToLocal(a1) => nAry("ToLocal", a1)
           case TypeOf(a1) => nAry("TypeOf", a1)
+          case Ids(a1) => nAry("Ids", a1)
           case Negate(a1) => nAry("Negate", a1)
           case Not(a1) => nAry("Not", a1)
           case ArrayLength(a1) => nAry("ArrayLength", a1)
@@ -863,6 +867,7 @@ object MapFuncsCore {
 
   // identity
   @Lenses final case class TypeOf[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class Ids[T[_[_]], A](a1: A) extends Unary[T, A]
 
   // math
   @Lenses final case class Negate[T[_[_]], A](a1: A) extends Unary[T, A]

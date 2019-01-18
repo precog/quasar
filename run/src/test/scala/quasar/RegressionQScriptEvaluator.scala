@@ -23,7 +23,7 @@ import quasar.connector.QScriptEvaluator
 import quasar.contrib.iota._
 import quasar.fp._
 import quasar.qscript._
-import quasar.qscript.rewrites.RewritePushdown
+import quasar.qscript.rewrites.FocusedPushdown
 
 import cats.effect.IO
 import iotaz.CopK
@@ -59,8 +59,8 @@ final class RegressionQScriptEvaluator[
 
   def QSMFunctor: Functor[QSM] = Functor[QSM]
 
-  def optimize: F[QScriptNormalized[T, T[QSM]] => QSM[T[QSM]]] =
-    RewritePushdown[T, QSM, QScriptNormalized[T, ?], ResourcePath].point[F]
+  def optimize(norm: T[QScriptNormalized[T, ?]]): F[T[QSM]] =
+    norm.transCata[T[QSM]](FocusedPushdown[T, QSM, QScriptNormalized[T, ?], ResourcePath]).point[F]
 
   def execute(repr: Repr): F[QScriptCount] = repr.point[F]
 

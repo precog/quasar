@@ -60,7 +60,7 @@ abstract class QScriptEvaluator[
   def plan(cp: T[QSM]): F[Repr]
 
   /** Rewrites the qscript for optimal evaluation. */
-  def optimize: F[QSNorm[T[QSM]] => QSM[T[QSM]]]
+  def optimize(norm: T[QSNorm]): F[T[QSM]]
 
   def evaluate(qsr: T[QSEd]): F[R] =
     for {
@@ -73,8 +73,8 @@ abstract class QScriptEvaluator[
       normMF <- NormalizeQScriptFreeMap(normQS).point[F]
       _ <- phase[F][T[QSNorm]]("QScript (Normalized FreeMap)", normMF)
 
-      optimized <- optimize
-      interpreted <- phase[F][T[QSM]]("QScript (Optimized)", normMF.transCata[T[QSM]](optimized))
+      optimized <- optimize(normMF)
+      interpreted <- phase[F][T[QSM]]("QScript (Optimized)", optimized)
 
       repr <- plan(interpreted)
       result <- execute(repr)

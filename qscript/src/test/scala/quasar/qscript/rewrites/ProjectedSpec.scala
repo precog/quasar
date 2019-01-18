@@ -29,7 +29,7 @@ object ProjectedSpec extends Qspec {
   import MapFuncsCore.{Add, BoolLit, MakeMap, ProjectKey, StrLit}
 
   val func = new construction.Func[Fix]
-  val projected = Projected.projected[Fix] _
+  val projected = Projected.unapply[Fix] _
 
   "find the path of a single object projection" >> {
     projected(func.ProjectKeyS(func.Hole, "xyz")) must beSome.like {

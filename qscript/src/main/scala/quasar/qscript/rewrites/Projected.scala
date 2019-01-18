@@ -18,16 +18,20 @@ package quasar.qscript.rewrites
 
 import slamdata.Predef.{Option, Some}
 
-import matryoshka.{Hole => _, _}
-import matryoshka.data._
-import matryoshka.implicits._
-import matryoshka.patterns.interpret
-
 import quasar.common.CPath
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.free._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
+
+import scala.util.{Either, Left, Right}
+
+import matryoshka.{Hole => _, _}
+import matryoshka.data._
+import matryoshka.implicits._
+import matryoshka.patterns.interpret
+
+import monocle.Lens
 
 import scalaz.Foldable
 import scalaz.std.anyVal._
@@ -40,33 +44,62 @@ object Projected {
   import MapFuncsCore.{IntLit, ProjectIndex, ProjectKey, StrLit}
 
   def unapply[T[_[_]]: BirecursiveT](fm: FreeMap[T]): Option[FreeMapA[T, CPath]] =
-    projected(fm)
+    projected((_: Hole) => p => p, Lens.id, fm)
 
-  def projected[T[_[_]]: BirecursiveT](fm: FreeMap[T]): Option[FreeMapA[T, CPath]] = {
-    val xformHole: Hole => FreeMapA[T, CPath] =
-      _ => FreeA(CPath.Identity)
+  def projected[T[_[_]]: BirecursiveT, S, A](
+      f: A => CPath => S,
+      l: Lens[S, CPath],
+      fm: FreeMapA[T, A])
+      : Option[FreeMapA[T, S]] =
+    Some(reifyProjections(f, l, fm)) filter { r =>
+      val (cnt, allPrj) = Foldable[FreeMapA[T, ?]].foldMap(r) { p =>
+        (1, l.exist(_ != CPath.Identity)(p).conjunction)
+      }
+      cnt > 0 && allPrj.unwrap
+    }
 
-    val xformFunc: Algebra[MapFunc[T, ?], FreeMapA[T, CPath]] = {
+  // Reify a series of projections of `A` as `S`.
+  def reifyProjections[T[_[_]]: BirecursiveT, S, A](
+      f: A => CPath => S,
+      l: Lens[S, CPath],
+      fm: FreeMapA[T, A])
+      : FreeMapA[T, S] = {
+
+    val xformA: A => FreeMapA[T, S] =
+      a => FreeA(f(a)(CPath.Identity))
+
+    val xformFunc: Algebra[MapFunc[T, ?], FreeMapA[T, S]] = {
       case MFC(ProjectKey(FreeA(p), StrLit(key))) =>
-        FreeA(p \ key)
+        FreeA(l.modify(_ \ key)(p))
 
       case MFC(ProjectIndex(FreeA(p), IntLit(i))) if i.isValidInt =>
-        FreeA(p \ i.toInt)
+        FreeA(l.modify(_ \ i.toInt)(p))
 
       case other =>
         FreeF(other)
     }
 
-    Some(fm.cata(interpret(xformHole, xformFunc))) filter { r =>
-      val (cnt, allPrj) = Foldable[FreeMapA[T, ?]].foldMap(r) { p =>
-        (1, (p != CPath.Identity).conjunction)
-      }
-      cnt > 0 && allPrj.unwrap
-    }
+    fm.cata(interpret(xformA, xformFunc))
   }
 }
 
 object ProjectedRec {
   def unapply[T[_[_]]: BirecursiveT](fm: RecFreeMap[T]): Option[FreeMapA[T, CPath]] =
-    Projected.projected(fm.linearize)
+    Projected.unapply(fm.linearize)
+}
+
+object Projected2 {
+  def unapply[T[_[_]]: BirecursiveT](jf: JoinFunc[T]): Option[FreeMapA[T, Either[CPath, CPath]]] =
+    Projected.projected(liftEither, uEither, jf)
+
+  def uEither[A]: Lens[Either[A, A], A] =
+    Lens[Either[A, A], A](_.merge)(a => {
+      case Left(_) => Left(a)
+      case Right(_) => Right(a)
+    })
+
+  def liftEither: JoinSide => (CPath => Either[CPath, CPath]) = {
+    case LeftSide => Left(_)
+    case RightSide => Right(_)
+  }
 }

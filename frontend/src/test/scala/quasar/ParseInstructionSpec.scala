@@ -1262,6 +1262,46 @@ object ParseInstructionSpec {
 
         input must pivotInto(".shifted", IdStatus.IncludeId, ParseType.Object)(expected)
       }
+
+      "preserve empty arrays as values of an array pivot" in {
+        val input = ldjson("""
+          [ 1, "two", [] ]
+          [ [] ]
+          [ [], 3, "four" ]
+          """)
+
+        val expected = ldjson("""
+          1
+          "two"
+          []
+          []
+          []
+          3
+          "four"
+        """)
+
+        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Array)(expected)
+      }
+
+      "preserve empty objects as values of an object pivot" in {
+        val input = ldjson("""
+          { "1": 1, "2": "two", "3": {} }
+          { "4": {} }
+          { "5": {}, "6": 3, "7": "four" }
+          """)
+
+        val expected = ldjson("""
+          1
+          "two"
+          {}
+          {}
+          {}
+          3
+          "four"
+        """)
+
+        input must pivotInto(".", IdStatus.ExcludeId, ParseType.Object)(expected)
+      }
     }
 
     def evalPivot(pivot: Pivot, stream: JsonStream): JsonStream

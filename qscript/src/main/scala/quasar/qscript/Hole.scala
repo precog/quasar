@@ -28,6 +28,8 @@ sealed abstract class Hole
 final case object SrcHole extends Hole
 
 object Hole {
+  def apply(): Hole = SrcHole
+
   def unit = Iso[Hole, Unit](κ(()))(κ(SrcHole))
 
   implicit val equal: Equal[Hole] = Equal.equalA

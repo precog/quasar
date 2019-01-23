@@ -279,7 +279,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
     def indices(p: CPath): IMap[CPath, Set[Int]] =
       p.nodes.foldLeft((CPath.Identity, IMap.empty[CPath, Set[Int]])) {
         case ((p, m), CPathIndex(i)) => (p \ i, m.insertWith(_ ++ _, p, Set(i)))
-        case ((p, m), n) => (p \ CPath(n), m)
+        case ((p, m), n) => (p \ n, m)
       }._2
 
     val remapping =
@@ -295,7 +295,7 @@ final class FocusedPushdown[T[_[_]]: BirecursiveT: EqualT] private () extends TT
           (p \ k, mapFunc.ProjectKeyS(expr, k))
 
         case ((p, expr), m @ CPathMeta(k)) =>
-          (p \ CPath(m), mapFunc.ProjectKeyS(mapFunc.Meta(expr), k))
+          (p \ m, mapFunc.ProjectKeyS(mapFunc.Meta(expr), k))
 
         case (acc, CPathArray) =>
           acc

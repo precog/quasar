@@ -140,7 +140,7 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
 
   "normalization" >> {
     def normalize(fm: FreeMap): FreeMap =
-      fm.transCata[FreeMap](MapFuncCore.normalize)
+      MapFuncCore.normalized(fm)
 
     "delete key in a static map" >> {
       val expr =
@@ -280,6 +280,48 @@ final class MapFuncCoreSpec extends Qspec with TTypes[Fix] with TreeMatchers {
           func.ProjectKeyS(func.Hole, "test"),
           func.Constant[Hole](ejs.dec(42.42)),
           func.ProjectKeyS(func.Hole, "baz"))
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+
+    "project key from consequent when projecting from a Cond with an undefined alternate" >> {
+      val expr =
+        func.ProjectKeyS(
+          func.ProjectKeyS(
+            func.Cond(
+              func.ProjectKeyS(func.Hole, "test"),
+              func.ConcatMaps(
+                func.ProjectKeyS(func.Hole, "bar"),
+                func.MakeMapS("b", func.ProjectKeyS(func.Hole, "foo"))),
+              func.Undefined),
+            "b"),
+          "c")
+
+      val expect =
+        func.Cond(
+          func.ProjectKeyS(func.Hole, "test"),
+          func.ProjectKeyS(func.ProjectKeyS(func.Hole, "foo"), "c"),
+          func.Undefined)
+
+      normalize(expr) must beTreeEqual(expect)
+    }
+
+    "project index from consequent when projecting from a Cond with an undefined alternate" >> {
+      val expr =
+        func.ProjectIndexI(
+          func.ProjectIndexI(
+            func.Cond(
+              func.ProjectKeyS(func.Hole, "test"),
+              func.ProjectKeyS(func.Hole, "foo"),
+              func.Undefined),
+            7),
+          3)
+
+      val expect =
+        func.Cond(
+          func.ProjectKeyS(func.Hole, "test"),
+          func.ProjectIndexI(func.ProjectIndexI(func.ProjectKeyS(func.Hole, "foo"), 7), 3),
+          func.Undefined)
 
       normalize(expr) must beTreeEqual(expect)
     }

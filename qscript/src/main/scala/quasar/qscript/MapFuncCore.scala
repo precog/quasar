@@ -266,9 +266,17 @@ object MapFuncCore {
       : CoMapFuncR[T, A] => CoMapFuncR[T, A] =
     repeatedly(rewrite[T, A])
 
-  def normalized[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](fm: Free[MapFunc[T, ?], A])
-      : Free[MapFunc[T, ?], A] =
-    fm.transCata[Free[MapFunc[T, ?], A]](normalize[T, A])
+  def normalized[T[_[_]]: BirecursiveT: EqualT, A: Equal: Show](
+      fm: FreeMapA[T, A])
+      : FreeMapA[T, A] = {
+
+    def norm(fa: FreeMapA[T, A]): Option[FreeMapA[T, A]] = {
+      val next = fa.transCata[Free[MapFunc[T, ?], A]](normalize[T, A])
+      (next =/= fa) option next
+    }
+
+    repeatedly(norm)(fm)
+  }
 
   private def rewrite[T[_[_]]: BirecursiveT: EqualT, A: Equal]:
       CoMapFuncR[T, A] => Option[CoMapFuncR[T, A]] =
@@ -322,6 +330,9 @@ object MapFuncCore {
           case (cons, alt) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
         }
 
+      case ProjectIndex(ExtractFunc(Cond(cond, cons, alt @ ExtractFunc(Undefined()))), i) =>
+        some(rollMF[T, A](MFC(Cond(cond, rollMF[T, A](MFC(ProjectIndex(cons, i))).embed, alt))))
+
       case ProjectKey(
         Embed(StaticMapSuffix(ds, ss)),
         kfm @ ExtractFunc(Constant(k)))
@@ -338,6 +349,9 @@ object MapFuncCore {
         (cs.reverse.find(_._1 ≟ k) |@| as.reverse.find(_._1 ≟ k)) {
           case ((_, cons), (_, alt)) => rollMF[T, A](MFC(Cond(cond, cons, alt)))
         }
+
+      case ProjectKey(ExtractFunc(Cond(cond, cons, alt @ ExtractFunc(Undefined()))), k) =>
+        some(rollMF[T, A](MFC(Cond(cond, rollMF[T, A](MFC(ProjectKey(cons, k))).embed, alt))))
 
       case ConcatArrays(Embed(StaticArray(Nil)), Embed(rhs)) => rhs.some
 

@@ -26,6 +26,7 @@ import iotaz.CopK
 import matryoshka.{Hole => _, _}
 import matryoshka.implicits._
 import scalaz.{~>, Functor}
+import scalaz.syntax.functor._
 
 class NormalizeQScriptFreeMap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
     extends Normalize[T] {
@@ -56,7 +57,7 @@ class NormalizeQScriptFreeMap[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
           NormToG(QSC.inj(Reduce(
             src,
             bucket.map(MapFuncCore.normalized(_)),
-            reducers, // TODO normalize the reducers
+            reducers.map(_.map(MapFuncCore.normalized(_))),
             MapFuncCore.normalized(repair))))
 
         case Sort(src, bucket, order) =>

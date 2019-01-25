@@ -245,7 +245,9 @@ lazy val qsu = project
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies += "org.slf4s" %% "slf4s-api" % slf4sVersion)
+    libraryDependencies ++= Seq(
+      "org.slf4s" %% "slf4s-api" % slf4sVersion,
+      "org.slf4j" % "slf4j-log4j12" % "1.7.16")) // logging impl
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12)) => Seq("-Ypatmat-exhaust-depth", "40")

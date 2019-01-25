@@ -101,12 +101,12 @@ QSUGraph('rlp11)[
 //        read("foo")),
 
 //      "count" -> lpf.invoke1(AggLib.Count, lpf.invoke2(StructuralLib.MapProject, read("foo"), lpf.constant(Data.Str("other")))),
-//      "aggregatedShift" ->
-//        lpf.invoke1(
-//          AggLib.Count,
-//          lpf.invoke1(
-//            StructuralLib.ShiftArrayIndices,
-//            read("foo"))),
+      "aggregatedShift" ->
+        lpf.invoke1(
+          AggLib.Count,
+          lpf.invoke1(
+            StructuralLib.ShiftArrayIndices,
+            read("foo"))),
 //      "shiftedAggregation" ->
 //        lpf.invoke1(
 //          StructuralLib.ShiftArrayIndices,

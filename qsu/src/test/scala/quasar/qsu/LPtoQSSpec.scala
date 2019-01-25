@@ -65,6 +65,77 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
 
   val QC = CopK.Inject[QScriptCore, QScriptEducated]
 
+/*
+QSUGraph('rlp15)[
+  'rlp15 -> QSAutoJoin('rwids16, 'rlp13, JoinKeys[], ConcatMaps(ConcatMaps(MakeMap(Constant(Str(prj)), ProjectKey(ProjectIndex(LeftSide, Constant(Int(1))), Constant(Str(field)))), MakeMap(Constant(Str(identities)), ProjectIndex(LeftSide, Constant(Int(0))))), MakeMap(Constant(Str(count)), RightSide)))
+  'rlp13 -> QSReduce('rlp12, [], [Count(SrcHole)], ReduceIndex(\/-(0)))
+  'rlp12 -> Map('rwids16, ProjectKey(ProjectIndex(SrcHole, Constant(Int(1))), Constant(Str(other))))
+  'rwids16 -> Read(/foo, IncludeId)
+]
+
+QSUGraph('rlp10)[
+  'rlp10 -> QSAutoJoin('rwids11, 'rlp8, JoinKeys[], ConcatMaps(MakeMap(Constant(Str(identities)), ProjectIndex(LeftSide, Constant(Int(0)))), MakeMap(Constant(Str(count)), RightSide)))
+  'rlp8 -> QSReduce('rlp7, [], [Count(SrcHole)], ReduceIndex(\/-(0)))
+  'rlp7 -> Map('rwids11, ProjectKey(ProjectIndex(SrcHole, Constant(Int(1))), Constant(Str(other))))
+  'rwids11 -> Read(/foo, IncludeId)
+]
+
+QSUGraph('rlp11)[
+  'rlp11 -> QSAutoJoin('rlp2, 'rlp9, JoinKeys[], ConcatMaps(MakeMap(Constant(Str(prj)), ProjectKey(LeftSide, Constant(Str(field)))), MakeMap(Constant(Str(count)), RightSide)))
+  'rlp9 -> QSReduce('rlp8, [], [Count(SrcHole)], ReduceIndex(\/-(0)))
+  'rlp8 -> Map('rlp2, ProjectKey(SrcHole, Constant(Str(other))))
+  'rlp2 -> Read(/foo, ExcludeId)
+]
+
+ */
+
+  "ids(path) rewrite" >> {
+    val lp = makeObj(
+      "prj" -> lpf.invoke2(StructuralLib.MapProject, read("foo"), lpf.constant(Data.Str("field"))),
+      "identities" -> lpf.invoke1(IdentityLib.Ids, read("foo")),
+//      "shifted" -> lpf.invoke1(
+//        StructuralLib.ShiftArrayIndices,
+//        read("foo")),
+//      "shifted2" -> lpf.invoke1(
+//        StructuralLib.ShiftArray,
+//        read("foo")),
+
+//      "count" -> lpf.invoke1(AggLib.Count, lpf.invoke2(StructuralLib.MapProject, read("foo"), lpf.constant(Data.Str("other")))),
+//      "aggregatedShift" ->
+//        lpf.invoke1(
+//          AggLib.Count,
+//          lpf.invoke1(
+//            StructuralLib.ShiftArrayIndices,
+//            read("foo"))),
+//      "shiftedAggregation" ->
+//        lpf.invoke1(
+//          StructuralLib.ShiftArrayIndices,
+//          lpf.invoke1(
+//            AggLib.Count,
+//            read("foo")))
+    )
+
+    val expected =
+      qs.Map(
+        qs.Read(ResourcePath.leaf(afoo), IncludeId),
+        recFunc.ConcatMaps(
+          recFunc.MakeMapS(
+            "prj",
+            recFunc.ProjectKeyS(
+              recFunc.ProjectIndexI(recFunc.Hole, 1),
+              "field")
+          ),
+          recFunc.MakeMapS(
+            "identities",
+            recFunc.ProjectIndexI(recFunc.Hole, 0)
+          )
+        )
+      )
+
+    lp must compileTo(expected)
+  }
+
+/*
   "logicalplan -> qscript" >> {
     "constant value" >> {
       val lp = lpf.constant(Data.Bool(true))
@@ -76,31 +147,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
       lp must compileTo(expected)
     }
 
-    "ids(path) rewrite" >> {
-      val lp = makeObj(
-        "prj" -> lpf.invoke2(StructuralLib.MapProject, read("foo"), lpf.constant(Data.Str("field"))),
-        "identities" -> lpf.invoke1(IdentityLib.Ids, read("foo"))
-      )
 
-      val expected =
-        qs.Map(
-          qs.Read(ResourcePath.leaf(afoo), IncludeId),
-          recFunc.ConcatMaps(
-            recFunc.MakeMapS(
-              "prj",
-              recFunc.ProjectKeyS(
-                recFunc.ProjectIndexI(recFunc.Hole, 1),
-                "field")
-            ),
-            recFunc.MakeMapS(
-              "identities",
-              recFunc.ProjectIndexI(recFunc.Hole, 0)
-            )
-          )
-        )
-
-      lp must compileTo(expected)
-    }
 
     "select * from foo" >> {
       val lp = read("foo")
@@ -171,7 +218,7 @@ object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
       }
     }
   }
-
+ */
   def compileTo(qs: Fix[QScriptEducated]): Matcher[Fix[LogicalPlan]] =
     compileToMatch(Equal[Fix[QScriptEducated]].equal(_, qs))
 

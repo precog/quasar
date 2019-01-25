@@ -455,9 +455,23 @@ object QSUGraph extends QSUGraphInstances {
       }
     }
 
+    object LPRead {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.LPRead[T, QSUGraph[T]] => QSU.LPRead.unapply(g)
+        case _ => None
+      }
+    }
+
     object Read {
       def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
         case g: QSU.Read[T, QSUGraph[T]] => QSU.Read.unapply(g)
+        case _ => None
+      }
+    }
+
+    object GetIds {
+      def unapply[T[_[_]]](g: QSUGraph[T]) = g.unfold match {
+        case g: QSU.GetIds[T, QSUGraph[T]] => QSU.GetIds.unapply(g)
         case _ => None
       }
     }

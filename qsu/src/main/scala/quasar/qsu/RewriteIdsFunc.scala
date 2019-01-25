@@ -22,37 +22,33 @@ import quasar.common.effect.NameGenerator
 import quasar.contrib.pathy.AFile
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qscript.{HoleR, MFC, MapFuncsCore}
+  import quasar.qscript.construction.RecFunc
 import quasar.IdStatus, IdStatus._
 
 import matryoshka.{BirecursiveT, ShowT}
 
-import scalaz.{Monad, Applicative}
+import scalaz.{Monad, Applicative, IMap, Cord}
 import scalaz.std.list._
+import scalaz.syntax.show._
 import scalaz.syntax.monad._
 
 object RewriteIdsFunction {
+  import QSUGraph.Extractors._
+
   final case class ToRewrite(
     idsSymbol: Symbol,
     readSymbol: Symbol,
     newSymbol: Symbol,
-    idStatus: IdStatus,
     path: AFile
   )
 
-  def apply[
-      T[_[_]]: BirecursiveT: ShowT,
-      F[_]: Applicative: Monad: NameGenerator](
-      qgraph: QSUGraph[T])
-      : F[QSUGraph[T]] = {
-
-    val func = quasar.qscript.construction.RecFunc[T]
-
-    val rewrites: F[List[ToRewrite]] = qgraph.foldMapDownM { graph =>
-      graph.unfold match {
-        case QSU.Unary(inner, MFC(MapFuncsCore.Ids(_))) => inner.unfold match {
-          case QSU.Read(path, idStatus) =>
+  private def collectRewrites[F[_]: Monad: NameGenerator, T[_[_]]: BirecursiveT](graph: QSUGraph[T]) =
+    graph.foldMapDownM { g =>
+      g.unfold match {
+        case QSU.GetIds(inner) => inner.unfold match {
+          case QSU.LPRead(path) =>
             NameGenerator[F].prefixedName("rwids").map { newName =>
-              ToRewrite(graph.root, inner.root, Symbol(newName), idStatus, path).point[List]
+              ToRewrite(graph.root, inner.root, Symbol(newName), path).point[List]
             }
           case _ => List[ToRewrite]().point[F]
         }
@@ -60,27 +56,31 @@ object RewriteIdsFunction {
       }
     }
 
-    rewrites.map { rws =>
-      rws.foldLeft(qgraph){ (graph: QSUGraph[T], inp: ToRewrite) => inp.idStatus match {
-        case IdOnly => {
-          graph.replace(inp.idsSymbol, inp.readSymbol)
-        }
-        case IncludeId => {
-          QSUGraph(
-            graph.root,
-            graph.vertices.updated(inp.idsSymbol, QSU.Map(inp.readSymbol, func.ProjectIndexI(HoleR, 0)))
-          )
-        }
-        case ExcludeId => {
-          QSUGraph(
-            graph.root,
-            graph.vertices
-              .updated(inp.newSymbol, QSU.Read(inp.path, IncludeId))
-              .updated(inp.readSymbol, QSU.Map(inp.newSymbol, func.ProjectIndexI(HoleR, 1)))
-              .updated(inp.idsSymbol, QSU.Map(inp.newSymbol, func.ProjectIndexI(HoleR, 0)))
-          )
-        }
-      }}
+  private def rewriteLPRead[T[_[_]]: BirecursiveT](rws: List[ToRewrite], graph: QSUGraph[T]): QSUGraph[T] =
+    rws.foldLeft(graph) { (inpGraph: QSUGraph[T], inp: ToRewrite) => inpGraph rewrite {
+      case g if g.root == inp.readSymbol =>
+        QSUGraph(g.root, g.vertices.updated(inp.newSymbol, QSU.Read(inp.path, IncludeId)))
+          .overwriteAtRoot(QSU.Map(inp.newSymbol, RecFunc[T].ProjectIndexI(HoleR, 1)))
+    }}
+
+  private def rewriteIds[T[_[_]]: BirecursiveT](rws: List[ToRewrite], graph: QSUGraph[T]): QSUGraph[T] =
+    rws.foldLeft(graph) { (inpGraph: QSUGraph[T], inp: ToRewrite) => inpGraph rewrite {
+      case g if g.root == inp.idsSymbol =>
+        g.overwriteAtRoot(QSU.Map(inp.newSymbol, RecFunc[T].ProjectIndexI(HoleR, 0)))
+    }}
+
+  private def rewriteLPReads[T[_[_]]: BirecursiveT](graph: QSUGraph[T]): QSUGraph[T] =
+    graph rewrite { case g@LPRead(path) => g.overwriteAtRoot(QSU.Read(path, ExcludeId)) }
+
+
+  def apply[
+      T[_[_]]: BirecursiveT: ShowT,
+      F[_]: Monad: NameGenerator](
+      qgraph: QSUGraph[T])
+      : F[QSUGraph[T]] = {
+
+    collectRewrites[F, T](qgraph) map { rws =>
+      rewriteLPReads(rewriteIds(rws, rewriteLPRead(rws, qgraph)))
     }
   }
 }

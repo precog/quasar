@@ -23,9 +23,9 @@ import scalaz.syntax.equal._
 sealed abstract class IdStatus
 
 object IdStatus {
-  case object IdOnly extends IdStatus
   case object IncludeId extends IdStatus
   case object ExcludeId extends IdStatus
+  case object IdOnly extends IdStatus
 
   implicit def equal: Equal[IdStatus] = Equal.equalA
 

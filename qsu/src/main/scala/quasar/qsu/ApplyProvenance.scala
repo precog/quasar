@@ -300,6 +300,26 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
         QAuthS[F].modify(_.addDims(g.root, sdims)) as sdims
 
+      case GetIds(inner @ Extractors.LPRead(file)) =>
+        val tid = IdAccess.identity(g.root)
+        val rdims = segments(file).toNel.fold(Dimensions.empty[dims.P]) { ss =>
+          dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
+        }
+
+        val sdims = applyIdStatus(IncludeId, dims.lshift(tid, rdims))
+
+        QAuthS[F].modify(_.addDims(g.root, sdims)) as sdims
+
+      case LPRead(file) =>
+        val tid = IdAccess.identity(g.root)
+        val rdims = segments(file).toNel.fold(Dimensions.empty[dims.P]) { ss =>
+          dims.squash(Dimensions.origin1(ss.map(projPathSegment).reverse))
+        }
+
+        val sdims = applyIdStatus(ExcludeId, dims.lshift(tid, rdims))
+
+        QAuthS[F].modify(_.addDims(g.root, sdims)) as sdims
+
       case Subset(from, _, count) =>
         compute2[F](g, from, count)(dims.join(_, _))
 

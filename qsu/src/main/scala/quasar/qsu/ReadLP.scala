@@ -19,7 +19,6 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 import quasar.{
   BinaryFunc,
-  IdStatus,
   Mapping,
   NullaryFunc,
   Reduction,
@@ -114,9 +113,8 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
       : AlgebraM[G, lp.LogicalPlan, QSUGraph] = {
 
     case lp.Read(path) =>
-      withName[G](QSU.Read[T, Symbol](
-        mkAbsolute(rootDir[Sandboxed], path),
-        IdStatus.ExcludeId)) // `IdStatus` is updated in `ReifyIdentities`, when necessary
+      withName[G](QSU.LPRead[T, Symbol](
+        mkAbsolute(rootDir[Sandboxed], path)))
 
     case lp.Constant(data) =>
       val back = fromData(data).fold[PlannerError \/ MapFunc[Hole]](
@@ -177,6 +175,9 @@ final class ReadLP[T[_[_]]: BirecursiveT] private () extends QSUTTypes[T] {
 
     case lp.InvokeUnapply(SetLib.Union, Sized(a, b)) =>
       extend2[G](a, b)(QSU.Union[T, Symbol](_, _))
+
+    case lp.InvokeUnapply(IdentityLib.Ids, Sized(a)) =>
+      extend1[G](a)(QSU.GetIds[T, Symbol](_))
 
     case lp.InvokeUnapply(func: UnaryFunc, Sized(a)) if func.effect === Reduction =>
       val translated = ReduceFunc.translateUnaryReduction[Unit](func)(())

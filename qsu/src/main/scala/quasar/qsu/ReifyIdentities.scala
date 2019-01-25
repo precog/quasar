@@ -59,8 +59,12 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   ////
 
+  trait WrapNeed
+  final case object NeedValue extends WrapNeed
+  final case object NeedBoth extends WrapNeed
+
   // Whether the result of a vertex includes reified identities.
-  private type ReifiedStatus = IMap[Symbol, Boolean]
+  private type ReifiedStatus = IMap[Symbol, Option[WrapNeed]]
 
   private val ONEL = Traverse[Option].compose[NonEmptyList]
 
@@ -70,6 +74,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private val IdentitiesK: String = "identities"
   private val ValueK: String = "value"
+  private val BothK: String = "both"
 
   private def bucketSymbol(src: Symbol, idx: Int): Symbol =
     Symbol(s"${src.name}_b$idx")
@@ -85,6 +90,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private def lookupIdentity(src: Symbol): FreeMap =
     func.ProjectKeyS(lookupIdentities, src.name)
+
+  private def lookupBoth: FreeMap =
+    func.ProjectKeyS(func.Hole, BothK)
 
   private val defaultAccess: Access[Symbol] => FreeMap = {
     case Access.Id(idAccess, _) => idAccess match {
@@ -164,8 +172,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     val G = MonadState_[G, ReifyState]
 
     // if the root of the graph contains reified identities
-    def emitsIVMap(g: QSUGraph): G[Boolean] =
-      G.gets(_.status.lookup(g.root) getOrElse false)
+    def emitsIdMap(g: QSUGraph): G[Option[WrapNeed]] =
+      G.gets(_.status.lookup(g.root) getOrElse None)
 
     def freshName: F[Symbol] =
       freshSymbol("rid")
@@ -192,6 +200,11 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       func.StaticMapS(
         IdentitiesK -> initialI,
         ValueK -> initialV)
+
+    def makeIB[A](initialI: FreeMapA[A], initialB: FreeMapA[A]): FreeMapA[A] =
+      func.StaticMapS(
+        IdentitiesK -> initialI,
+        BothK -> initialB)
 
     def modifyAccess(of: Access[Symbol])(f: FreeMap => FreeMap): G[Unit] =
       G.modify(reifyRefs.modify(_.modifyAccess(of)(f)))
@@ -227,8 +240,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
         mapRoot = newBranch.root
 
-        _ <- setStatus(nestedRoot, false)
-        _ <- setStatus(mapRoot, true)
+        _ <- setStatus(nestedRoot, None)
+        _ <- setStatus(mapRoot, Some(NeedValue))
 
         modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(mapRoot))(rebaseV))
 
@@ -237,16 +250,20 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
     /** Handle bookkeeping required when a vertex transitions to emitting IV. */
     def onNeedsIV(g: QSUGraph): G[Unit] =
-      setStatus(g.root, true) >> modifyAccess(Access.value(g.root))(rebaseV)
+      setStatus(g.root, Some(NeedValue)) >> modifyAccess(Access.value(g.root))(rebaseV)
 
     /** Preserves any IV emitted by `src` in the output of `through`, returning
       * whether IV was emitted.
       */
-    def preserveIV(src: QSUGraph, through: QSUGraph): G[Boolean] =
+    def preserveIV(src: QSUGraph, through: QSUGraph): G[Option[WrapNeed]] =
       for {
-        srcStatus <- emitsIVMap(src)
+        srcStatus <- emitsIdMap(src)
         _         <- setStatus(through.root, srcStatus)
-        _         <- srcStatus.whenM(modifyAccess(Access.value(through.root))(rebaseV))
+        _         <- srcStatus match {
+          case None => ().point[G]
+          case Some(NeedValue) => modifyAccess(Access.value(through.root))(rebaseV)
+          case Some(NeedBoth) => modifyAccess(Access.value(through.root))(rebaseB)
+        }
       } yield srcStatus
 
     /** Rebase the given `FreeMap` to access the value side of an IV map. */
@@ -256,42 +273,103 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
     def recRebaseV[A](rfm: RecFreeMapA[A]): RecFreeMapA[A] =
       rfm >>= (r => recFunc.ProjectKeyS(recFunc.Hole, ValueK).as(r))
 
-    def setStatus(root: Symbol, status: Boolean): G[Unit] =
+    def rebaseB[A](fm: FreeMapA[A]): FreeMapA[A] =
+      fm >>= (lookupBoth as _)
+
+    def recRebaseB[A](rfm: RecFreeMapA[A]): RecFreeMapA[A] =
+      rfm >>= (r => recFunc.ProjectKeyS(recFunc.Hole, BothK).as(r))
+
+    def setStatus(root: Symbol, status: Option[WrapNeed]): G[Unit] =
       G.modify(reifyStatus.modify(_.insert(root, status)))
 
     def updateIV[A](srcIV: FreeMapA[A], ids: FreeMapA[A], v: FreeMapA[A]): FreeMapA[A] =
       makeIV(func.ConcatMaps(lookupIdentities >> srcIV, ids), v)
 
+    def updateIB[A](srcIV: FreeMapA[A], ids: FreeMapA[A], b: FreeMapA[A]): FreeMapA[A] =
+      makeIB(func.ConcatMaps(lookupIdentities >> srcIV, ids), b)
+
 
     // Reifies shift identity and reduce bucket access.
+/*
     val reifyNonGroupKeys: PartialFunction[QSUGraph, G[QSUGraph]] = {
 
       case g @ E.Read(file, idStatus) =>
         val idA = Access.id(IdAccess.identity(g.root), g.root)
-
+        scala.Predef.println("!@!!!!")
+        scala.Predef.println(idStatus)
+        scala.Predef.println("!@!!!!")
+        isReferenced(idA) map (x => scala.Predef.println(x))
         isReferenced(idA) flatMap { ref =>
-          if (ref) {
-            val mapping: FreeMap = makeIV(
-              makeI1(g.root, func.ProjectIndexI(func.Hole, 0)),
-              func.ProjectIndexI(func.Hole, 1))
+          scala.Predef.println(ref)
+/*
+QSUGraph('rlp21)[
+  'rlp21 -> QSAutoJoin('rlp15, 'rlp19, JoinKeys[], ConcatMaps(LeftSide, MakeMap(Constant(Str(count)), RightSide)))
+  'rlp15 -> Map('maj26, ConcatMaps(ConcatMaps(MakeMap(Constant(Str(prj)), ProjectKey(ProjectIndex(ProjectKey(SrcHole, Constant(Str(0))), Constant(Int(1))), Constant(Str(field)))), MakeMap(Constant(Str(identities)), ProjectIndex(ProjectKey(SrcHole, Constant(Str(0))), Constant(Int(0))))), MakeMap(Constant(Str(flatten)),
+ ProjectKey(SrcHole, Constant(Str(1))))))
+  'maj26 -> LeftShift('rwids22, ProjectKey(ProjectIndex(SrcHole, Constant(Int(1))), Constant(Str(ololo))), ExcludeId, Emit, ConcatMaps(MakeMap(Constant(Str(1)), RightTarget), MakeMap(Constant(Str(0)), AccessLeftTarget(Value(SrcHole)))), FlattenMap)
+  'rlp19 -> QSReduce('rlp18, [], [Count(SrcHole)], ReduceIndex(\/-(0)))
+  'rlp18 -> Map('rwids22, ProjectKey(ProjectIndex(SrcHole, Constant(Int(1))), Constant(Str(other))))
+  'rwids22 -> Read(/foo, IncludeId)
+]
+QSUGraph('rlp21)[
+  'rlp21 -> QSAutoJoin('rlp15, 'rlp19, JoinKeys[], ConcatMaps(LeftSide, MakeMap(Constant(Str(count)), RightSide)))
+  'rlp15 -> Map('maj26, ConcatMaps(ConcatMaps(MakeMap(Constant(Str(prj)), ProjectKey(ProjectIndex(ProjectKey(SrcHole, Constant(Str(0))), Constant(Int(1))), Constant(Str(field)))), MakeMap(Constant(Str(identities)), ProjectIndex(ProjectKey(SrcHole, Constant(Str(0))), Constant(Int(0))))), MakeMap(Constant(Str(flatten)), ProjectKey(SrcHole, Constant(Str(1))))))
+  'maj26 -> LeftShift('rwids22, ProjectKey(ProjectIndex(SrcHole, Constant(Int(1))), Constant(Str(ololo))), ExcludeId, Emit, ConcatMaps(MakeMap(Constant(Str(1)), RightTarget), MakeMap(Constant(Str(0)), AccessLeftTarget(Value(SrcHole)))), FlattenMap)
+  'rlp19 -> QSReduce('rlp18, [], [Count(SrcHole)], ReduceIndex(\/-(0)))
+  'rlp18 -> Map('rwids22, ProjectKey(ProjectIndex(SrcHole, Constant(Int(1))), Constant(Str(other))))
+  'rwids22 -> Read(/foo, IncludeId)
+]
 
-            val newRead = g.overwriteAtRoot(O.read(file, IncludeId))
+ */
+          if (ref) idStatus match{
+            case ExcludeId =>
+              val mapping: FreeMap = makeIV(
+                makeI1(g.root, func.ProjectIndexI(func.Hole, 0)),
+                func.ProjectIndexI(func.Hole, 1))
 
-            for {
-              mapped <- mapResultOf(newRead, mapping)
+              val newRead = g.overwriteAtRoot(O.read(file, IncludeId))
 
-              (nestedRoot, newBranch) = mapped
+              for {
+                mapped <- mapResultOf(newRead, mapping)
 
-              mapRoot = newBranch.root
+                (nestedRoot, newBranch) = mapped
 
-              _ <- setStatus(nestedRoot, false)
-              _ <- setStatus(mapRoot, true)
+                mapRoot = newBranch.root
 
-              modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(mapRoot))(rebaseV))
+                _ <- setStatus(nestedRoot, false)
+                _ <- setStatus(mapRoot, true)
 
-              _ <- G.modify(modifyValueAccess)
-            } yield newBranch
-          } else {
+                modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(mapRoot))(rebaseV))
+
+                _ <- G.modify(modifyValueAccess)
+              } yield newBranch
+            case IncludeId =>
+              val mapping: FreeMap = makeIV(
+                makeI1(g.root, func.ProjectIndexI(func.Hole, 0)),
+                func.ProjectIndexI(func.Hole, 1))
+//                func.Hole)
+//                func.ProjectIndexI(func.Hole, 1))
+
+//              val newRead = g.overwriteAtRoot(O.read(file, IncludeId))
+
+              for {
+                mapped <- mapResultOf(g, mapping)
+
+                (nestedRoot, newBranch) = mapped
+
+                mapRoot = newBranch.root
+
+                _ <- setStatus(nestedRoot, false)
+                _ <- setStatus(mapRoot, true)
+
+                modifyValueAccess = reifyRefs.modify(_.modifyAccess(Access.value(mapRoot))(rebaseV))
+
+                _ <- G.modify(modifyValueAccess)
+              } yield newBranch
+            case IdOnly =>
+              setStatus(g.root, false) as g
+          }
+          else {
             setStatus(g.root, false) as g
           }
         }
@@ -359,6 +437,9 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
       case g @ E.Map(source, fm) =>
         preserveIV(source, g) map { emitsIV =>
+          scala.Predef.println("EMITTING")
+          scala.Predef.println(emitsIV)
+          scala.Predef.println("EMITTING")
           if (emitsIV) {
             val newFunc = makeIV(lookupIdentities, rebaseV(fm.linearize))
 
@@ -538,11 +619,12 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case g @ E.Unreferenced() =>
         setStatus(g.root, false) as g
     }
-
+ */
     val groupKeyA: Optional[Access[Symbol], (Symbol, Int)] =
       Access.id[Symbol] composePrism IdAccess.groupKey.first composeLens _1
 
     // Reifies group key access.
+
     def reifyGroupKeys(auth: QAuth, g: QSUGraph): G[QSUGraph] = {
 
       def referencedAssocs(indices: IList[Int], valueAccess: FreeMap)
@@ -563,18 +645,18 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
         })
 
       for {
-        srcIV <- emitsIVMap(g)
+        srcIV <- emitsIdMap(g)
 
         indices <- referencedIndices
 
-        assocs <- referencedAssocs(indices, srcIV.fold(lookupValue, func.Hole))
+        assocs <- referencedAssocs(indices, srcIV.fold(lookupValue)(x => func.Hole))
 
         resultG <- assocs.fold(g.point[G]) { as =>
-          val fm =
-            if (srcIV)
-              updateIV(func.Hole, makeI(as), lookupValue)
-            else
-              makeIV(makeI(as), func.Hole)
+          val (fm, newStatus) = srcIV match {
+            case None => (makeIV(makeI(as), func.Hole), NeedValue)
+            case Some(NeedValue) => (updateIV(func.Hole, makeI(as), lookupValue), NeedValue)
+            case Some(NeedBoth) => (updateIB(func.Hole, makeI(as), lookupBoth), NeedBoth)
+          }
 
           for {
             mapped <- mapResultOf(g, fm)
@@ -582,36 +664,44 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
             (newVert, g2) = mapped
 
             _ <- setStatus(newVert, srcIV)
-            _ <- setStatus(g2.root, true)
+            _ <- setStatus(g2.root, Some(newStatus))
 
             // If the original vertex emitted IV, then need to properly remap
             // access to its new name
             //
             // else we need to remap access to the existing name as it now
             // points to a vertex that emits IV.
-            vertexToModify = srcIV.fold(newVert, g2.root)
-            _ <- G.modify(reifyRefs.modify(_.modifyAccess(Access.value(vertexToModify))(rebaseV)))
+            vertexToModify = srcIV.fold(newVert)(x => g2.root)
+            _ <- G.modify(reifyRefs.modify(_.modifyAccess(Access.value(vertexToModify))(newStatus match {
+              case NeedValue => rebaseV
+              case NeedBoth => rebaseB
+            })))
           } yield g2
         }
       } yield resultG
     }
 
     val reified =
-      aqsu.graph.rewriteM[G](reifyNonGroupKeys andThen (_.flatMap(reifyGroupKeys(aqsu.auth, _))))
-        .run(ReifyState(IMap.empty, refs))
+      (ReifyState(IMap.empty, refs), aqsu.graph).point[F]
+//      aqsu.graph.rewriteM[G](x => x.point[G]).run(ReifyState(IMap.empty, refs))
+//      aqsu.graph.rewriteM[G](reifyNonGroupKeys andThen (_.flatMap(reifyGroupKeys(aqsu.auth, _))))
+//        .run(ReifyState(IMap.empty, refs))
 
     reified flatMap {
       case (ReifyState(status, reifiedRefs), reifiedGraph) =>
-        val finalGraph = if (status.lookup(reifiedGraph.root) | false)
-          // The root of the graph emits IV, so we need to project out the value.
-          freshName map { newRoot =>
+        val finalGraph = status.lookup(reifiedGraph.root).flatten match {
+          case None => reifiedGraph.point[F]
+          case Some(NeedValue) => freshName map { newRoot =>
             val QSUGraph(oldRoot, oldVerts) = reifiedGraph
             val updVerts = oldVerts.updated(newRoot, O.map(oldRoot, lookupValue.asRec))
             QSUGraph(newRoot, updVerts)
           }
-        else
-          reifiedGraph.point[F]
-
+          case Some(NeedBoth) => freshName map { newRoot =>
+            val QSUGraph(oldRoot, oldVerts) = reifiedGraph
+            val updVerts = oldVerts.updated(newRoot, O.map(oldRoot, lookupBoth.asRec))
+            QSUGraph(newRoot, updVerts)
+          }
+        }
         finalGraph map (ResearchedQSU(reifiedRefs, _))
     }
   }

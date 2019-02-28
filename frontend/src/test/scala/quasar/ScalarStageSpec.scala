@@ -23,6 +23,7 @@ import quasar.common.{CPath, CPathField}
 
 import org.specs2.execute.PendingUntilFixed._
 import org.specs2.matcher.Matcher
+import org.specs2.matcher.MatchersImplicits._
 import org.specs2.specification.core.SpecStructure
 
 import scala.collection.immutable.{Map, Set}
@@ -87,7 +88,7 @@ object ScalarStageSpec {
           true
           """)
 
-        input must interpretIdsAs(ExcludeId, input)
+        input must interpretIdsAs(ExcludeId, input, 3)
       }
 
       "ids-2 emit vector rows unmodified" in {
@@ -97,7 +98,7 @@ object ScalarStageSpec {
           [{ "d": {} }]
           """)
 
-        input must interpretIdsAs(ExcludeId, input)
+        input must interpretIdsAs(ExcludeId, input, 3)
       }
     }
 
@@ -115,7 +116,7 @@ object ScalarStageSpec {
           2
           """)
 
-        input must interpretIdsAs(IdOnly, expected)
+        input must interpretIdsAs(IdOnly, expected, 3)
       }
 
       "ids-4 return monotonic integers for each vector row" in {
@@ -131,7 +132,7 @@ object ScalarStageSpec {
           2
           """)
 
-        input must interpretIdsAs(IdOnly, expected)
+        input must interpretIdsAs(IdOnly, expected, 3)
       }
     }
 
@@ -149,7 +150,7 @@ object ScalarStageSpec {
           [2, true]
           """)
 
-        input must interpretIdsAs(IncludeId, expected)
+        input must interpretIdsAs(IncludeId, expected, 3)
       }
 
       "ids-6 wrap each vector row in monotonic integers" in {
@@ -165,7 +166,7 @@ object ScalarStageSpec {
           [2, [{ "d": {} }]]
           """)
 
-        input must interpretIdsAs(IncludeId, expected)
+        input must interpretIdsAs(IncludeId, expected, 3)
       }
     }
 
@@ -174,8 +175,14 @@ object ScalarStageSpec {
 
     def evalIds(idStatus: IdStatus, stream: JsonStream): JsonStream
 
-    def interpretIdsAs(idStatus: IdStatus, expected: JsonStream) : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalIds(idStatus, str) }
+    def interpretIdsAs(idStatus: IdStatus, expected: JsonStream, expectedLength: Int)
+      : Matcher[JsonStream] = { stream: JsonStream =>
+
+      val result: JsonStream = evalIds(idStatus, stream)
+
+      (result.length mustEqual expectedLength) and
+        (result must bestSemanticEqual(expected))
+    }
   }
 
   trait WrapSpec extends JsonSpec {
@@ -198,7 +205,7 @@ object ScalarStageSpec {
           { "foo": true }
           """)
 
-        input must wrapInto("foo")(expected)
+        input must wrapInto("foo")(expected, 3)
       }
 
       "wrap-2 nest vectors" in {
@@ -214,7 +221,7 @@ object ScalarStageSpec {
           { "bar": [{ "d": {} }] }
           """)
 
-        input must wrapInto("bar")(expected)
+        input must wrapInto("bar")(expected, 3)
       }
 
       "wrap-3 nest empty objects" in {
@@ -232,7 +239,7 @@ object ScalarStageSpec {
           { "bar": 1 }
           """)
 
-        input must wrapInto("bar")(expected)
+        input must wrapInto("bar")(expected, 4)
       }
     }
 
@@ -241,8 +248,14 @@ object ScalarStageSpec {
 
     def evalWrap(wrap: Wrap, stream: JsonStream): JsonStream
 
-    def wrapInto(name: String)(expected: JsonStream): Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream => evalWrap(Wrap(name), str)}
+    def wrapInto(name: String)(expected: JsonStream, expectedLength: Int)
+      : Matcher[JsonStream] = { stream: JsonStream =>
+
+      val result: JsonStream = evalWrap(Wrap(name), stream)
+
+      (result.length mustEqual expectedLength) and
+        (result must bestSemanticEqual(expected))
+    }
   }
 
   trait ProjectSpec extends JsonSpec {
@@ -263,7 +276,7 @@ object ScalarStageSpec {
           {}
           """)
 
-        project(".", input) must resultIn(input)
+        input must projectInto(".")(input, 7)
       }
 
       "prj-2 extract .a" in {
@@ -286,7 +299,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project(".a", input) must resultIn(expected)
+        input must projectInto(".a")(expected, 7)
       }
 
       "prj-3 extract .a.b" in {
@@ -309,7 +322,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project(".a.b", input) must resultIn(expected)
+        input must projectInto(".a.b")(expected, 7)
       }
 
       "prj-4 extract .a[1]" in {
@@ -332,7 +345,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project(".a[1]", input) must resultIn(expected)
+        input must projectInto(".a[1]")(expected, 7)
       }
 
       "prj-5 extract [1]" in {
@@ -356,7 +369,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project("[1]", input) must resultIn(expected)
+        input must projectInto("[1]")(expected, 7)
       }
 
       "prj-6 extract [1][0]" in {
@@ -380,7 +393,7 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project("[1][0]", input) must resultIn(expected)
+        input must projectInto("[1][0]")(expected, 7)
       }
 
       "prj-7 extract [1].a" in {
@@ -404,10 +417,10 @@ object ScalarStageSpec {
           { "c": 3 }
           """)
 
-        project("[1].a", input) must resultIn(expected)
+        input must projectInto("[1].a")(expected, 7)
       }
 
-      "prj-8 elide rows not containing path" in {
+      "prj-8 produce undefined for rows not containing path" in {
         val input = ldjson("""
           { "x": 1 }
           { "x": 2, "y": 3 }
@@ -428,10 +441,10 @@ object ScalarStageSpec {
           {}
           """)
 
-        project(".x", input) must resultIn(expected)
+        input must projectInto(".x")(expected, 10)
       }
 
-      "prj-9 only extract paths starting from root" in {
+      "prj-9 extract paths starting from root, else returning undefined" in {
         val input = ldjson("""
           { "z": "b", "x": { "y": 4 } }
           { "x": 2, "y": { "x": 1 } }
@@ -444,7 +457,7 @@ object ScalarStageSpec {
           1
           """)
 
-        project(".x.y", input) must resultIn(expected)
+        input must projectInto(".x.y")(expected, 4)
       }
     }
 
@@ -453,11 +466,15 @@ object ScalarStageSpec {
 
     def evalProject(project: Project, stream: JsonStream): JsonStream
 
-    def project(path: String, stream: JsonStream): JsonStream =
-      evalProject(Project(CPath.parse(path)), stream)
+    def projectInto(path: String)(expected: JsonStream, expectedLength: Int)
+      : Matcher[JsonStream] = { stream: JsonStream =>
 
-    def resultIn(expected: JsonStream): Matcher[JsonStream] =
-      bestSemanticEqual(expected)
+      val result: JsonStream =
+        evalProject(Project(CPath.parse(path)), stream)
+
+      (result.length mustEqual expectedLength) and
+        (result must bestSemanticEqual(expected))
+    }
   }
 
   trait MaskSpec extends JsonSpec {
@@ -469,7 +486,7 @@ object ScalarStageSpec {
     val maskPendingExamples: Set[Int]
 
     "masks" should {
-      "mask-1 drop everything when empty" in {
+      "mask-1 return undefined for everything when empty" in {
         val input = ldjson("""
           1
           "hi"
@@ -481,7 +498,7 @@ object ScalarStageSpec {
 
         val expected = ldjson("")
 
-        input must maskInto()(expected)
+        input must maskInto()(expected, 6)
       }
 
       "mask-2 retain two scalar types at identity" in {
@@ -500,7 +517,7 @@ object ScalarStageSpec {
           true
           """)
 
-        input must maskInto("." -> Set(Number, Boolean))(expected)
+        input must maskInto("." -> Set(Number, Boolean))(expected, 7)
       }
 
       "mask-3 retain different sorts of numbers at identity" in {
@@ -518,7 +535,7 @@ object ScalarStageSpec {
           27182e-4
           """)
 
-        input must maskInto("." -> Set(Number))(expected)
+        input must maskInto("." -> Set(Number))(expected, 5)
       }
 
       "mask-4 retain different sorts of objects at identity" in {
@@ -539,7 +556,7 @@ object ScalarStageSpec {
           { "a": true }
           """)
 
-        input must maskInto("." -> Set(Object))(expected)
+        input must maskInto("." -> Set(Object))(expected, 8)
       }
 
       "mask-5 retain different sorts of arrays at identity" in {
@@ -560,7 +577,7 @@ object ScalarStageSpec {
           [{ "d": {} }]
           """)
 
-        input must maskInto("." -> Set(Array))(expected)
+        input must maskInto("." -> Set(Array))(expected, 8)
       }
 
       "mask-6 retain two scalar types at .a.b" in {
@@ -583,7 +600,7 @@ object ScalarStageSpec {
           { "a": { "b": true } }
           """)
 
-        input must maskInto(".a.b" -> Set(Number, Boolean))(expected)
+        input must maskInto(".a.b" -> Set(Number, Boolean))(expected, 11)
       }
 
       "mask-7 retain different sorts of numbers at .a.b" in {
@@ -604,7 +621,7 @@ object ScalarStageSpec {
           { "a": { "b": 27182e-4 } }
           """)
 
-        input must maskInto(".a.b" -> Set(Number))(expected)
+        input must maskInto(".a.b" -> Set(Number))(expected, 8)
       }
 
       "mask-8 retain different sorts of objects at .a.b" in {
@@ -625,7 +642,7 @@ object ScalarStageSpec {
           { "a": { "b": { "a": true } } }
           """)
 
-        input must maskInto(".a.b" -> Set(Object))(expected)
+        input must maskInto(".a.b" -> Set(Object))(expected, 8)
       }
 
       "mask-9 retain different sorts of arrays at .a.b" in {
@@ -646,7 +663,7 @@ object ScalarStageSpec {
           { "a": { "b": [{ "d": {} }] } }
           """)
 
-        input must maskInto(".a.b" -> Set(Array))(expected)
+        input must maskInto(".a.b" -> Set(Array))(expected, 8)
       }
 
       "mask-10 discard unmasked structure" in {
@@ -658,7 +675,7 @@ object ScalarStageSpec {
           { "a": { "c": true } }
           """)
 
-        input must maskInto(".a.c" -> Set(Boolean))(expected)
+        input must maskInto(".a.c" -> Set(Boolean))(expected, 1)
       }
 
       "mask-11 compose disjunctively across paths" in {
@@ -670,7 +687,7 @@ object ScalarStageSpec {
           { "a": { "c": true }, "c": [] }
           """)
 
-        input must maskInto(".a.c" -> Set(Boolean), ".c" -> Set(Array))(expected)
+        input must maskInto(".a.c" -> Set(Boolean), ".c" -> Set(Array))(expected, 1)
       }
 
       "mask-12 compose disjunctively across suffix-overlapped paths" in {
@@ -682,7 +699,7 @@ object ScalarStageSpec {
           { "a": { "b": { "c": true } }, "b": { "c": [] } }
           """)
 
-        input must maskInto(".a.b.c" -> Set(Boolean), ".b.c" -> Set(Array))(expected)
+        input must maskInto(".a.b.c" -> Set(Boolean), ".b.c" -> Set(Array))(expected, 1)
       }
 
       "mask-13 compose disjunctively across paths where one side is false" in {
@@ -694,7 +711,7 @@ object ScalarStageSpec {
           { "a": { "c": true } }
           """)
 
-        input must maskInto(".a.c" -> Set(Boolean), ".a" -> Set(Array))(expected)
+        input must maskInto(".a.c" -> Set(Boolean), ".a" -> Set(Array))(expected, 1)
       }
 
       "mask-14 subsume inner by outer" in {
@@ -706,7 +723,7 @@ object ScalarStageSpec {
           { "a": { "b": 42, "c": true } }
           """)
 
-        input must maskInto(".a.b" -> Set(Boolean), ".a" -> Set(Object))(expected)
+        input must maskInto(".a.b" -> Set(Boolean), ".a" -> Set(Object))(expected, 1)
       }
 
       "mask-15 disallow the wrong sort of vector" in {
@@ -723,12 +740,12 @@ object ScalarStageSpec {
           [1, 2, 3]
           """)
 
-        input must maskInto("." -> Set(Object))(expected1)
-        input must maskInto("." -> Set(Array))(expected2)
+        input must maskInto("." -> Set(Object))(expected1, 2)
+        input must maskInto("." -> Set(Array))(expected2, 2)
       }
 
       "mask-16 compact surrounding array" in {
-        ldjson("[1, 2, 3]") must maskInto("[1]" -> Set(Number))(ldjson("[2]"))
+        ldjson("[1, 2, 3]") must maskInto("[1]" -> Set(Number))(ldjson("[2]"), 1)
       }
 
       "mask-17 compact surrounding array with multiple values retained" in {
@@ -743,7 +760,7 @@ object ScalarStageSpec {
         input must maskInto(
           "[0]" -> Set(Number),
           "[2]" -> Set(Number),
-          "[3]" -> Set(Number))(expected)
+          "[3]" -> Set(Number))(expected, 1)
       }
 
       "mask-18 compact surrounding nested array with multiple values retained" in {
@@ -758,7 +775,7 @@ object ScalarStageSpec {
         input must maskInto(
           ".a.b[0]" -> Set(Number),
           ".a.b[2]" -> Set(Number),
-          ".a.b[3]" -> Set(Number))(expected)
+          ".a.b[3]" -> Set(Number))(expected, 1)
       }
 
       "mask-19 compact array containing nested arrays with single nested value retained" in {
@@ -770,20 +787,20 @@ object ScalarStageSpec {
           { "a": [{"b": [5, 6, 7] }] }
           """)
 
-        input must maskInto(".a[2].b" -> Set(Array))(expected)
+        input must maskInto(".a[2].b" -> Set(Array))(expected, 1)
       }
 
       "mask-20 remove object entirely when no values are retained" in {
-        ldjson("""{ "a": 42 }""") must maskInto(".a" -> Set(Boolean))(ldjson(""))
+        ldjson("""{ "a": 42 }""") must maskInto(".a" -> Set(Boolean))(ldjson(""), 1)
       }
 
       "mask-21 remove array entirely when no values are retained" in {
-        ldjson("[42]") must maskInto("[0]" -> Set(Boolean))(ldjson(""))
+        ldjson("[42]") must maskInto("[0]" -> Set(Boolean))(ldjson(""), 1)
       }
 
       "mask-22 retain vector at depth and all recursive contents" in {
         val input = ldjson("""{ "a": { "b": { "c": { "e": true }, "d": 42 } } }""")
-        input must maskInto(".a.b" -> Set(Object))(input)
+        input must maskInto(".a.b" -> Set(Object))(input, 1)
       }
     }
 
@@ -792,13 +809,15 @@ object ScalarStageSpec {
 
     def evalMask(mask: Mask, stream: JsonStream): JsonStream
 
-    def maskInto(
-        masks: (String, Set[ColumnType])*)(
-        expected: JsonStream)
-        : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalMask(Mask(Map(masks.map({ case (k, v) => CPath.parse(k) -> v }): _*)), str)
-      }
+    def maskInto(masks: (String, Set[ColumnType])*)(expected: JsonStream, expectedLength: Int)
+      : Matcher[JsonStream] = { stream: JsonStream =>
+
+      val result: JsonStream =
+        evalMask(Mask(Map(masks.map({ case (k, v) => CPath.parse(k) -> v }): _*)), stream)
+
+      (result.length mustEqual expectedLength) and
+        (result must bestSemanticEqual(expected))
+    }
   }
 
   trait PivotSpec extends JsonSpec {
@@ -836,7 +855,7 @@ object ScalarStageSpec {
             13
             """)
 
-          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected, 14)
         }
 
         "pivot-2 IdOnly" >> {
@@ -856,7 +875,7 @@ object ScalarStageSpec {
             1
             """)
 
-          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected)
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Array)(expected, 14)
         }
 
         "pivot-3 IncludeId" >> {
@@ -876,7 +895,7 @@ object ScalarStageSpec {
             [1, 13]
             """)
 
-          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected)
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Array)(expected, 14)
         }
       }
 
@@ -907,7 +926,7 @@ object ScalarStageSpec {
             13
             """)
 
-          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+          input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected, 14)
         }
 
         "pivot-5 IdOnly" >> {
@@ -927,7 +946,7 @@ object ScalarStageSpec {
             "m"
             """)
 
-          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected)
+          input must pivotInto(IdStatus.IdOnly, ColumnType.Object)(expected, 14)
         }
 
         "pivot-6 IncludeId" >> {
@@ -947,7 +966,7 @@ object ScalarStageSpec {
             ["m", 13]
             """)
 
-          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected)
+          input must pivotInto(IdStatus.IncludeId, ColumnType.Object)(expected, 14)
         }
       }
 
@@ -968,7 +987,7 @@ object ScalarStageSpec {
           "four"
         """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected, 7)
       }
 
       "pivot-8 preserve empty objects as values of an object pivot" in {
@@ -988,7 +1007,7 @@ object ScalarStageSpec {
           "four"
         """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected, 7)
       }
     }
 
@@ -1000,11 +1019,15 @@ object ScalarStageSpec {
     def pivotInto(
         idStatus: IdStatus,
         structure: ColumnType.Vector)(
-        expected: JsonStream)
-        : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalPivot(Pivot(idStatus, structure), str)
-      }
+        expected: JsonStream, expectedLength: Int)
+      : Matcher[JsonStream] = { stream: JsonStream =>
+
+      val result: JsonStream =
+        evalPivot(Pivot(idStatus, structure), stream)
+
+      (result.length mustEqual expectedLength) and
+        (result must bestSemanticEqual(expected))
+    }
   }
 
   trait CartesianSpec extends JsonSpec {
@@ -1030,7 +1053,7 @@ object ScalarStageSpec {
           (CPathField("c1"), (CPathField("c0"), Nil)),
           (CPathField("d1"), (CPathField("d0"), Nil)))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 1)
       }
 
       // a0 as a1, b0 as b1
@@ -1047,7 +1070,7 @@ object ScalarStageSpec {
           (CPathField("a1"), (CPathField("a0"), Nil)),
           (CPathField("b1"), (CPathField("b0"), Nil)))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 1)
       }
 
       // a0 as a1, b0 as b1, d0 as d1
@@ -1065,7 +1088,7 @@ object ScalarStageSpec {
           (CPathField("b1"), (CPathField("b0"), Nil)),
           (CPathField("d1"), (CPathField("d0"), Nil)))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 1)
       }
 
       // a0[_] as a1, b0 as b1, c0{_} as c1
@@ -1093,7 +1116,7 @@ object ScalarStageSpec {
           (CPathField("c1"),
             (CPathField("c0"), List(Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 6)
       }
 
       // a[_].x0.y0{_} as y, a[_].x1[_] as z, b{_:} as b, c as c
@@ -1141,7 +1164,7 @@ object ScalarStageSpec {
           (CPathField("c"),
             (CPathField("c"), Nil)))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 12)
       }
 
       // a as a, b[_] as ba, b{_} as bm
@@ -1173,7 +1196,7 @@ object ScalarStageSpec {
             Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
             Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 5)
       }
 
       // a as a, b[_][_] as ba
@@ -1204,7 +1227,7 @@ object ScalarStageSpec {
             Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
             Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 6)
       }
 
       // a as a, b{_}{_} as ba
@@ -1235,7 +1258,7 @@ object ScalarStageSpec {
             Mask(Map(CPath.Identity -> Set(ColumnType.Object))),
             Pivot(IdStatus.ExcludeId, ColumnType.Object)))))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 6)
       }
 
       // a[_] as a, b[_] as b
@@ -1264,7 +1287,7 @@ object ScalarStageSpec {
             Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
             Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
 
-        input must cartesianInto(targets)(expected)
+        input must cartesianInto(targets)(expected, 4)
       }
     }
 
@@ -1275,10 +1298,14 @@ object ScalarStageSpec {
 
     def cartesianInto(
         cartouches: Map[CPathField, (CPathField, List[ScalarStage.Focused])])(
-        expected: JsonStream)
-        : Matcher[JsonStream] =
-      bestSemanticEqual(expected) ^^ { str: JsonStream =>
-        evalCartesian(Cartesian(cartouches), str)
-      }
+        expected: JsonStream, expectedLength: Int)
+      : Matcher[JsonStream] = { stream: JsonStream =>
+
+      val result: JsonStream =
+        evalCartesian(Cartesian(cartouches), stream)
+
+      (result.length mustEqual expectedLength) and
+        (result must bestSemanticEqual(expected))
+    }
   }
 }

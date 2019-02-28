@@ -420,7 +420,7 @@ object ScalarStageSpec {
         input must projectInto("[1].a")(expected, 7)
       }
 
-      "prj-8 produce undefined for rows not containing path" in {
+      "prj-8 produce undefined for rows not containing object path" in {
         val input = ldjson("""
           { "x": 1 }
           { "x": 2, "y": 3 }
@@ -432,6 +432,8 @@ object ScalarStageSpec {
           false
           { "y": "nope", "x": {} }
           { "one": 1, "two": 2 }
+          {}
+          []
           """)
 
         val expected = ldjson("""
@@ -441,7 +443,7 @@ object ScalarStageSpec {
           {}
           """)
 
-        input must projectInto(".x")(expected, 10)
+        input must projectInto(".x")(expected, 12)
       }
 
       "prj-9 extract paths starting from root, else returning undefined" in {
@@ -458,6 +460,34 @@ object ScalarStageSpec {
           """)
 
         input must projectInto(".x.y")(expected, 4)
+      }
+
+      "prj-10 produce undefined for rows not containing array path" in {
+        val input = ldjson("""
+          [0, 1, 2, -1, -2]
+          [3]
+          [4, 5]
+          { "y": 6, "z": 7 }
+          ["a", "b", "c"]
+          ["a", [8]]
+          ["a", { "x": 9 }]
+          4.8
+          "seven"
+          false
+          null
+          {}
+          []
+          """)
+
+        val expected = ldjson("""
+          1
+          5
+          "b"
+          [8]
+          { "x": 9 }
+          """)
+
+        input must projectInto("[1]")(expected, 13)
       }
     }
 
@@ -1008,6 +1038,50 @@ object ScalarStageSpec {
         """)
 
         input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected, 7)
+      }
+
+      "pivot-9 return undefined when object pivoting a value of a different kind" in {
+        val input = ldjson("""
+          1
+          "three"
+          false
+          null
+          ["x", true, {}, []]
+          { "a": 1, "b": "two", "c": {}, "d": [] }
+          []
+          {}
+          """)
+
+        val expected = ldjson("""
+          1
+          "two"
+          {}
+          []
+        """)
+
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected, 11)
+      }
+
+      "pivot-10 return undefined when array pivoting a value of a different kind" in {
+        val input = ldjson("""
+          1
+          "two"
+          false
+          null
+          ["x", true, {}, []]
+          { "a": 1, "b": "two", "c": {}, "d": [] }
+          []
+          {}
+          """)
+
+        val expected = ldjson("""
+          "x"
+          true
+          {}
+          []
+        """)
+
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected, 11)
       }
     }
 

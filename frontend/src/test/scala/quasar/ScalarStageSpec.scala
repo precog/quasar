@@ -407,7 +407,7 @@ object ScalarStageSpec {
         input must projectInto("[1].a")(expected)
       }
 
-      "prj-8 elide rows not containing path" in {
+      "prj-8 elide rows not containing object path" in {
         val input = ldjson("""
           { "x": 1 }
           { "x": 2, "y": 3 }
@@ -419,6 +419,8 @@ object ScalarStageSpec {
           false
           { "y": "nope", "x": {} }
           { "one": 1, "two": 2 }
+          {}
+          []
           """)
 
         val expected = ldjson("""
@@ -1016,6 +1018,58 @@ object ScalarStageSpec {
         """)
 
         input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+      }
+
+
+      "pivot-9 omit results when object pivoting a value of a different kind" in {
+        val input = ldjson("""
+          1
+          "three"
+          false
+          null
+          ["x", true, {}, []]
+          { "a": 1, "b": "two", "c": {}, "d": [] }
+          """)
+
+        val expected = ldjson("""
+          1
+          "two"
+          {}
+          []
+        """)
+
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected)
+      }
+
+      "pivot-10 omit results when array pivoting a value of a different kind" in {
+        val input = ldjson("""
+          1
+          "two"
+          false
+          null
+          ["x", true, {}, []]
+          { "a": 1, "b": "two", "c": {}, "d": [] }
+          """)
+
+        val expected = ldjson("""
+          "x"
+          true
+          {}
+          []
+        """)
+
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected)
+      }
+
+      "pivot-11 omit empty vector from pivot results" in {
+
+        val input = ldjson("""
+          {}
+          []
+        """)
+
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(ldjson(""))
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(ldjson(""))
       }
     }
 

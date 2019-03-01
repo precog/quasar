@@ -1081,7 +1081,7 @@ object ScalarStageSpec {
           []
         """)
 
-        input must pivotInto(IdStatus.ExcludeId, ColumnType.Object)(expected, 11)
+        input must pivotInto(IdStatus.ExcludeId, ColumnType.Array)(expected, 11)
       }
     }
 

@@ -95,7 +95,7 @@ object RValueScalarStagesInterpreter {
         }
     }
 
-  def interpretMask(mask: Mask, rvalue: RValue): Option[RValue] = {
+  def interpretMask(mask: Mask, rvalue: RValue): RValue = {
 
     // recurse down:
     // remove structure which is definitely not needed based on the current cpaths
@@ -167,7 +167,7 @@ object RValueScalarStagesInterpreter {
       case (k, v) => (k.nodes, v)
     }
 
-    inner(input, rvalue)
+    inner(input, rvalue).getOrElse(CUndefined)
   }
 
   def interpretPivot(pivot: Pivot, rvalue: RValue): Iterator[RValue] =
@@ -195,22 +195,15 @@ object RValueScalarStagesInterpreter {
           case ExcludeId => elems.iterator
         }
 
-      // pivot empty object drops the row
-      case (CEmptyObject, ColumnType.Object) => Iterator.empty
-
-      // pivot empty array drops the row
-      case (CEmptyArray, ColumnType.Array) => Iterator.empty
-
-      case (v, t) =>
-        scala.sys.error(s"Invalid pivot input: ${(v, t)}")
+      case (v, t) => Iterator(CUndefined)
     }
 
-  def interpretProject(project: Project, rvalue: RValue): Option[RValue] =
-    project.path.nodes.foldLeftM(rvalue) {
+  def interpretProject(project: Project, rvalue: RValue): RValue =
+    (project.path.nodes.foldLeftM(rvalue) {
       case (rv, CPathField(name)) => RValue.rField1(name).getOption(rv)
       case (rv, CPathIndex(idx)) => RValue.rElement(idx).getOption(rv)
-      case _ => None
-    }
+      case (_, _) => None
+    }).getOrElse(CUndefined)
 
   def interpretWrap(wrap: Wrap, rvalue: RValue): RValue =
     RObject(wrap.name -> rvalue)
@@ -256,13 +249,13 @@ object RValueScalarStagesInterpreter {
       : Iterator[RValue] =
     stage match {
       case instr @ Mask(_) =>
-        interpretMask(instr, rvalue).iterator
+        Iterator(interpretMask(instr, rvalue))
 
       case instr @ Pivot(_, _) =>
         interpretPivot(instr, rvalue)
 
       case instr @ Project(_) =>
-        interpretProject(instr, rvalue).iterator
+        Iterator(interpretProject(instr, rvalue))
 
       case instr @ Wrap(_) =>
         Iterator(interpretWrap(instr, rvalue))

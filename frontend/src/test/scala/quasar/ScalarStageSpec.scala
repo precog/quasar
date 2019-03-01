@@ -1871,6 +1871,37 @@ object ScalarStageSpec {
 
         input must cartesianInto(targets)(expected)
       }
+
+      // a[_] as a, b[_] as b
+      "cart-10 pivoting retains row alignment through undefineds (pt II)" in {
+        import ScalarStage.{Mask, Pivot}
+
+        val input = ldjson("""
+          { "a": [1], "b": [4, 5] }
+          { "a": [2] }
+          { "b": [6] }
+          { "a": [3], "b": [7] }
+          """)
+
+        val expected = ldjson("""
+          { "a": 1, "b": 4 }
+          { "a": 1, "b": 5 }
+          { "a": 2 }
+          { "b": 6 }
+          { "a": 3, "b": 7 }
+          """)
+
+        val targets = Map(
+          (CPathField("a"), (CPathField("a"), List(
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
+
+          (CPathField("b"), (CPathField("b"), List(
+            Mask(Map(CPath.Identity -> Set(ColumnType.Array))),
+            Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
+      }
     }
 
     override def is: SpecStructure =

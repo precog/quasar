@@ -18,7 +18,7 @@ package quasar.impl.evaluate
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.{IdStatus, ScalarStageSpec}
+import quasar.{IdStatus, ScalarStage, ScalarStageSpec}
 import quasar.common.data.RValue
 
 import scala.concurrent.ExecutionContext
@@ -33,6 +33,8 @@ import org.typelevel.jawn.{AsyncParser, Facade}
 
 import qdata.json.QDataFacade
 
+import scalaz.NonEmptyList
+
 object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   import quasar.impl.evaluate.{RValueScalarStagesInterpreter => Interpreter}
 
@@ -46,6 +48,7 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
   val projectPendingExamples: Set[Int] = Set()
   val maskPendingExamples: Set[Int] = Set()
   val pivotPendingExamples: Set[Int] = Set()
+  val focusedPendingExamples: Set[Int] = Set()
   val cartesianPendingExamples: Set[Int] = Set()
 
   override def bestSemanticEqual(js: JsonStream): Matcher[JsonStream] = {
@@ -70,6 +73,13 @@ object RValueScalarStagesInterpreterSpec extends ScalarStageSpec {
 
   def evalProject(project: Project, stream: JsonStream): JsonStream =
     stream.map(Interpreter.interpretProject(project, _))
+
+  def evalFocused(stages: List[ScalarStage.Focused], stream: JsonStream): JsonStream =
+    if (stages.isEmpty)
+      stream
+    else
+      stream.flatMap(Interpreter.interpretFocused(
+        NonEmptyList(stages.head, stages.tail:_*), _)).toList
 
   def evalCartesian(cartesian: Cartesian, stream: JsonStream): JsonStream = {
     val parallelism = java.lang.Runtime.getRuntime().availableProcessors()

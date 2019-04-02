@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef.{Map => SMap, _}
 
-import quasar.{IdStatus, Qspec, Type}, IdStatus.{ExcludeId, IncludeId}
+import quasar.{IdStatus, Qspec, Type}, IdStatus.{ExcludeId, IdOnly, IncludeId}
 import quasar.contrib.pathy.AFile
 import quasar.ejson
 import quasar.ejson.{EJson, Fixed}
@@ -28,6 +28,7 @@ import quasar.fp.ski.κ
 import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
+  HoleR,
   LeftSide,
   OnUndefined,
   PlannerError,
@@ -715,6 +716,50 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         qprov.projectStatic(J.str("y"), rdims))
 
       computeFuncDims(fm)(κ(rdims)) must_= Some(exp)
+    }
+  }
+
+  "graph transformation" should {
+
+    "default to OnUndefined.Emit in LeftShift" in {
+      val tree =
+        qsu.transpose('n1, (
+          qsu.read('n0, (afile, ExcludeId)),
+          QScriptUniform.Retain.Identities,
+          Rotation.FlattenMap))
+
+      val (renames, inputGraph): (QSUGraph.Renames, QSUGraph) =
+        QSUGraph.fromAnnotatedTree[Fix](tree.map(Some(_)))
+
+      val actual: PlannerError \/ AuthenticatedQSU[Fix] = app(inputGraph)
+
+      actual.bimap(
+        err => ko(s"unexpected PlannerError: $err"),
+        { case AuthenticatedQSU(graph, _) =>
+          val n0: Option[Symbol] = renames.get('n0)
+          val n1: Option[Symbol] = renames.get('n1)
+
+          graph.vertices must haveSize(2)
+
+          Some(graph.root) mustEqual(n1)
+
+          val read: Option[QScriptUniform[Symbol]] =
+            n1.map(s =>
+              QScriptUniform.Read[Fix, Symbol](afile, ExcludeId))
+
+          val leftshift: Option[QScriptUniform[Symbol]] =
+            n0.map(s =>
+              QScriptUniform.LeftShift[Fix, Symbol](
+                s,
+                HoleR,
+                IdOnly,
+                OnUndefined.Emit,
+                RightTarget[Fix],
+                Rotation.FlattenMap))
+
+          n0.flatMap(graph.vertices.get) mustEqual read
+          n1.flatMap(graph.vertices.get) mustEqual leftshift
+        }).merge
     }
   }
 

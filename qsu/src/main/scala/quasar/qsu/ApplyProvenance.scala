@@ -83,7 +83,13 @@ final class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       case g @ Extractors.Transpose(src, retain, rot) =>
         computeDims[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, recFunc.Hole, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, RightTarget[T], rot)
+          LeftShift(
+            src.root,
+            recFunc.Hole,
+            retain.fold[IdStatus](IdOnly, ExcludeId),
+            OnUndefined.Emit,
+            RightTarget[T],
+            rot)
         }
 
       case other =>

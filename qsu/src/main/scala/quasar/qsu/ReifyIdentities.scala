@@ -141,7 +141,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
       case QSU.QSAutoJoin(left, right, autojoin, combiner) =>
         val keysAccess = for {
-          conj <- autojoin.keys.toList
+          conj <- autojoin.keys.toSortedSet
           key <- conj.toNonEmptyList.toList
           keyAccess <- joinKeyAccess(g.root, key)
         } yield keyAccess

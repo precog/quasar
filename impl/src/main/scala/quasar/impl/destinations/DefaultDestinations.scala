@@ -87,13 +87,10 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
   def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     refs.lookup(destinationId) >>= {
       case Some(_) => for {
-        _ <- removeDestination(destinationId)
-        _ <- refs.insert(destinationId, ref)
+        removeStatus <- removeDestination(destinationId)
         destStatus <- manager.initDestination(destinationId, ref)
-      } yield Condition.abnormal.getOption(destStatus) match {
-        case Some(ex) => Condition.abnormal[DestinationError[I, C]](ex)
-        case None => Condition.normal()
-      }
+        _ <- refs.insert(destinationId, ref)
+      } yield destStatus orElse removeStatus
       case None =>
         Condition.abnormal(
           DestinationError.destinationNotFound[I, DestinationError[I, C]](destinationId)).pure[F]

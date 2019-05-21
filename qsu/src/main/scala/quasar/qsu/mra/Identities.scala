@@ -35,9 +35,9 @@ import cats.instances.set._
 import cats.instances.sortedSet._
 import cats.instances.tuple._
 import cats.kernel.Semilattice
-import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.functor._
+import cats.syntax.order._
 import cats.syntax.reducible._
 import cats.syntax.semigroup._
 import cats.syntax.show._
@@ -343,9 +343,7 @@ final class Identities[A] private (
     zip0(roots, that.roots, Monoid[C].empty)
   }
 
-  /** Returns whether `this` is equal to `that`. */
-  @SuppressWarnings(Array("org.wartremover.warts.Equals"))
-  def === (that: Identities[A])(implicit A: Order[A]): Boolean = {
+  def compare(that: Identities[A])(implicit A: Order[A]): Int = {
     type E = (Node[A], Node[A])
 
     val zset = SortedSet.empty[E](Order[E].toOrdering)
@@ -363,15 +361,21 @@ final class Identities[A] private (
       }
 
     @tailrec
-    def levelsEqual(thislvl: Set[Int], thatlvl: Set[Int]): Boolean =
+    def levelsCompare(thislvl: Set[Int], thatlvl: Set[Int]): Int =
       if (thislvl.isEmpty && thatlvl.isEmpty) {
-        true
-      } else if (thislvl.isEmpty ^ thatlvl.isEmpty) {
-        false
+        0
+      } else if (thislvl.isEmpty) {
+        -1
+      } else if (thatlvl.isEmpty) {
+        1
       } else {
         val (thisEdges, thisNext) = edgesAndNext(thislvl, g)
         val (thatEdges, thatNext) = edgesAndNext(thatlvl, that.g)
-        (thisEdges === thatEdges) && levelsEqual(thisNext, thatNext)
+
+        thisEdges.compare(thatEdges) match {
+          case 0 => levelsCompare(thisNext, thatNext)
+          case i => i
+        }
       }
 
     def nodes(lvl: Set[Int], gg: G): SortedSet[Node[A]] =
@@ -379,7 +383,10 @@ final class Identities[A] private (
         ns + vnode(v).get(gg)
       }
 
-    nodes(ends, g) === nodes(that.ends, that.g) && levelsEqual(roots, that.roots)
+    nodes(ends, g).compare(nodes(that.ends, that.g)) match {
+      case 0 => levelsCompare(roots, that.roots)
+      case i => i
+    }
   }
 
   override def toString: String = {
@@ -543,8 +550,8 @@ object Identities extends IdentitiesInstances {
 }
 
 sealed abstract class IdentitiesInstances {
-  implicit def eqv[A: Order]: Eq[Identities[A]] =
-    Eq.instance(_ === _)
+  implicit def order[A: Order]: Order[Identities[A]] =
+    Order.from(_ compare _)
 
   implicit def semilattice[A: Order]: Semilattice[Identities[A]] =
     new Semilattice[Identities[A]] {

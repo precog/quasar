@@ -95,6 +95,8 @@ object DestinationError {
         k1 === k2 && s1 === s2
       case (DestinationNameExists(n1), DestinationNameExists(n2)) =>
         n1 === n2
+      case (e1: InitializationError[C], e2: InitializationError[C]) =>
+        Equal[InitializationError[C]].equal(e1, e2)
       case _ =>
         false
     }
@@ -118,8 +120,6 @@ object DestinationError {
     Equal.equal {
       case (DestinationNotFound(i1), DestinationNotFound(i2)) =>
         i1 === i2
-      case _ =>
-        false
     }
 
   implicit def equal[I: Equal, C: Equal]: Equal[DestinationError[I, C]] =
@@ -133,7 +133,8 @@ object DestinationError {
         }
       case (e1: ExistentialError[I], e2: ExistentialError[I]) =>
         Equal[ExistentialError[I]].equal(e1, e2)
-      case _ => false
+      case _ =>
+        false
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =

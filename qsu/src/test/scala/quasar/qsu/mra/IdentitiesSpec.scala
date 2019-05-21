@@ -25,7 +25,7 @@ import scala.Predef.$conforms
 import cats.data.NonEmptyList
 import cats.instances.int._
 import cats.instances.option._
-import cats.kernel.laws.discipline.{SemilatticeTests, EqTests}
+import cats.kernel.laws.discipline.{OrderTests, SemilatticeTests}
 import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.list._
@@ -389,6 +389,6 @@ object IdentitiesSpec extends Qspec
     }
   }
 
-  checkAll("Eq[Identities[Int]]", EqTests[Identities[Int]].eqv)
+  checkAll("Order[Identities[Int]]", OrderTests[Identities[Int]].order)
   checkAll("Semilattice[Identities[Int]]", SemilatticeTests[Identities[Int]].semilattice)
 }

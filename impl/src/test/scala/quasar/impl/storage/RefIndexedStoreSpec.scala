@@ -14,27 +14,28 @@
  * limitations under the License.
  */
 
-package quasar.qsu.mra
+package quasar.impl.storage
 
-import slamdata.Predef.Set
+import slamdata.Predef.{Int, String}
 
-import quasar.pkg.tests._
+import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.Order
+import cats.effect.IO
+import cats.effect.concurrent.Ref
+import scalaz.IMap
+import scalaz.std.anyVal._
+import scalaz.std.string._
+import shims._
 
-import org.scalacheck.Cogen
+object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
 
-trait UopGenerator {
-  implicit def arbitraryUop[A: Arbitrary: Order]: Arbitrary[Uop[A]] =
-    Arbitrary(for {
-      sz <- Gen.frequency((32, 1), (16, 2), (8, 3), (4, 4), (2, 5), (1, 0))
-      as <- Gen.listOfN(sz, arbitrary[A])
-    } yield Uop.of(as: _*))
+abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
+  val emptyStore =
+    Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_))
 
-  implicit def cogenUop[A: Cogen: Order]: Cogen[Uop[A]] = {
-    implicit val ording = Order[A].toOrdering
-    Cogen[Set[A]].contramap(_.toSortedSet)
-  }
+  val freshIndex = idxRef.modify(i => (i + 1, i + 1))
+
+  val valueA = "A"
+
+  val valueB = "B"
 }
-
-object UopGenerator extends UopGenerator

@@ -25,7 +25,7 @@ import monocle.{Iso, PPrism, Prism}
 
 import scalaz._, Scalaz._
 
-sealed trait Condition[E] extends Product with Serializable {
+sealed trait Condition[+E] extends Product with Serializable {
   def flatMap[EE](f: E => Condition[EE]): Condition[EE] =
     this match {
       case Condition.Abnormal(e) => f(e)
@@ -35,7 +35,7 @@ sealed trait Condition[E] extends Product with Serializable {
   def map[EE](f: E => EE): Condition[EE] =
     Condition.pAbnormal.modify(f)(this)
 
-  def orElse(other: => Condition[E]): Condition[E] =
+  def orElse[EE >: E](other: => Condition[EE]): Condition[EE] =
     this match {
       case Condition.Abnormal(_) => this
       case Condition.Normal()    => other

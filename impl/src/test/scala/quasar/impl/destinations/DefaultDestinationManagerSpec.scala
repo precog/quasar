@@ -141,12 +141,11 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
       }
 
       "nop with non-existent destination" >> {
-        val DestId = 1000
         val testRun = for {
           mgr <- emptyManager
-          before <- mgr.destinationOf(1000)
-          _ <- mgr.shutdownDestination(1000)
-          after <- mgr.destinationOf(1000)
+          before <- mgr.destinationOf(1)
+          _ <- mgr.shutdownDestination(1)
+          after <- mgr.destinationOf(1)
         } yield (before, after)
 
         val (before, after) = testRun.unsafeRunSync

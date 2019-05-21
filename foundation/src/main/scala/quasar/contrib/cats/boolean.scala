@@ -14,27 +14,22 @@
  * limitations under the License.
  */
 
-package quasar.qsu.mra
+package quasar.contrib.cats
 
-import slamdata.Predef.Set
+import slamdata.Predef.Boolean
 
-import quasar.pkg.tests._
+import cats.kernel.BoundedSemilattice
 
-import cats.Order
+import scalaz.@@
+import scalaz.Tags.Disjunction
+import scalaz.syntax.tag._
 
-import org.scalacheck.Cogen
+object boolean {
+  implicit def catsBooleanDisjBoundedSemilattice: BoundedSemilattice[Boolean @@ Disjunction] =
+    new BoundedSemilattice[Boolean @@ Disjunction] {
+      def combine(x: Boolean @@ Disjunction, y: Boolean @@ Disjunction) =
+        Disjunction(x.unwrap || y.unwrap)
 
-trait UopGenerator {
-  implicit def arbitraryUop[A: Arbitrary: Order]: Arbitrary[Uop[A]] =
-    Arbitrary(for {
-      sz <- Gen.frequency((32, 1), (16, 2), (8, 3), (4, 4), (2, 5), (1, 0))
-      as <- Gen.listOfN(sz, arbitrary[A])
-    } yield Uop.of(as: _*))
-
-  implicit def cogenUop[A: Cogen: Order]: Cogen[Uop[A]] = {
-    implicit val ording = Order[A].toOrdering
-    Cogen[Set[A]].contramap(_.toSortedSet)
-  }
+      val empty = Disjunction(false)
+    }
 }
-
-object UopGenerator extends UopGenerator

@@ -23,6 +23,7 @@ import quasar.common.effect.NameGenerator
 import quasar.common.JoinType
 import quasar.contrib.scalaz.MonadReader_
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
@@ -61,6 +62,7 @@ import quasar.qsu.mra.JoinKey
 
 import cats.data.NonEmptySet
 import cats.syntax.reducible._
+import cats.syntax.set._
 
 import iotaz.CopK
 
@@ -263,7 +265,7 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
         case QSU.QSAutoJoin(left, right, autojoin, combiner) =>
           val t = func.Constant[JoinSide](EJson.bool(true))
 
-          val condition = autojoin.keys.toList.toNel.fold(t.point[F]) { jks =>
+          val condition = autojoin.keys.toSortedSet.toNes.fold(t.point[F]) { jks =>
             val mkEq = eqCond(left.root, right.root)
 
             val mkConj =
@@ -272,7 +274,8 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
                 .value
 
             val cond =
-              jks.foldMapRight1(mkConj)((l, r) => (mkConj(l) |@| r)(func.Or(_, _)))
+              jks.reduceRightTo(mkConj)((l, r0) => r0.map(r => (mkConj(l) |@| r)(func.Or(_, _))))
+                .value
 
             if (autojoin.onUndefined === OnUndefined.Emit)
               cond.map(func.IfUndefined(_, t))

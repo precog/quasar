@@ -23,7 +23,7 @@ import cats.effect.concurrent.Ref
 import fs2.Stream
 import scalaz.{IMap, Order}
 
-/** An indexed store backed by a map held in a Ref */
+/** An indexed store backed by a map held in a Ref, for testing */
 object RefIndexedStore {
   def apply[I: Order, V](ref: Ref[IO, IMap[I, V]])
       : IndexedStore[IO, I, V] =

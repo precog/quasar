@@ -14,27 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.qsu.mra
-
-import slamdata.Predef.Set
-
-import quasar.pkg.tests._
+package quasar.contrib.cats.data
 
 import cats.Order
+import cats.data.NonEmptySet
+import cats.instances.sortedSet._
 
-import org.scalacheck.Cogen
-
-trait UopGenerator {
-  implicit def arbitraryUop[A: Arbitrary: Order]: Arbitrary[Uop[A]] =
-    Arbitrary(for {
-      sz <- Gen.frequency((32, 1), (16, 2), (8, 3), (4, 4), (2, 5), (1, 0))
-      as <- Gen.listOfN(sz, arbitrary[A])
-    } yield Uop.of(as: _*))
-
-  implicit def cogenUop[A: Cogen: Order]: Cogen[Uop[A]] = {
-    implicit val ording = Order[A].toOrdering
-    Cogen[Set[A]].contramap(_.toSortedSet)
-  }
+object nonEmptySet {
+  implicit def catsNonEmptySetOrder[A: Order]: Order[NonEmptySet[A]] =
+    Order.by(_.toSortedSet)
 }
-
-object UopGenerator extends UopGenerator

@@ -34,7 +34,7 @@ object ProvImplSpec extends {
   val prov: Provenance.Aux[Char, Int, Boolean, Uop[Identities[Dim[Char, Int, Boolean]]]] =
     ProvImpl[Char, Int, Boolean]
 
-  val params = Parameters(maxSize = 6, workers = 2)
+  val params = Parameters(maxSize = 8, workers = 2)
 
 }   with ProvenanceSpec[Char, Int, Boolean]
     with UopGenerator

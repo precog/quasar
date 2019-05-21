@@ -16,14 +16,17 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.{Boolean, List}
+import slamdata.Predef.{Boolean, Int, List}
 
-import cats.{Eq, Order, Show}
+import quasar.contrib.cats.data.nonEmptySet._
+
+import scala.collection.immutable.SortedSet
+
+import cats.{Order, Show}
 import cats.data.NonEmptySet
 import cats.kernel.{BoundedSemilattice, CommutativeMonoid}
-import cats.instances.list._
-import cats.syntax.eq._
 import cats.syntax.functor._
+import cats.syntax.order._
 import cats.syntax.show._
 
 import scalaz.@@
@@ -35,7 +38,7 @@ final class JoinKeys[S, V] private (protected val uop: Uop[NonEmptySet[JoinKey[S
   def ∧ (that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
     and(that)
 
-  def ∨ (that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
+  def ∨ (that: JoinKeys[S, V]): JoinKeys[S, V] =
     or(that)
 
   def and(that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
@@ -47,21 +50,24 @@ final class JoinKeys[S, V] private (protected val uop: Uop[NonEmptySet[JoinKey[S
   def mapKeys[T: Order, W: Order](f: JoinKey[S, V] => JoinKey[T, W]): JoinKeys[T, W] =
     new JoinKeys(uop.map(_.map(f)))
 
-  def or(that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): JoinKeys[S, V] =
+  def or(that: JoinKeys[S, V]): JoinKeys[S, V] =
     new JoinKeys(uop ∨ that.uop)
 
   def toList: List[NonEmptySet[JoinKey[S, V]]] =
     uop.toList
 
-  def === (that: JoinKeys[S, V])(implicit S: Order[S], V: Order[V]): Boolean =
-    uop === that.uop
+  def toSortedSet: SortedSet[NonEmptySet[JoinKey[S, V]]] =
+    uop.toSortedSet
+
+  def compare(that: JoinKeys[S, V])(implicit sord: Order[S], vord: Order[V]): Int =
+    uop.compare(that.uop)
 }
 
 object JoinKeys extends JoinKeysInstances {
   def conj[S: Order, V: Order](k: JoinKey[S, V], ks: JoinKey[S, V]*): JoinKeys[S, V] =
     new JoinKeys(Uop.one(NonEmptySet.of(k, ks: _*)))
 
-  def empty[S, V]: JoinKeys[S, V] =
+  def empty[S: Order, V: Order]: JoinKeys[S, V] =
     new JoinKeys(Uop.empty)
 
   def one[S: Order, V: Order](k: JoinKey[S, V]): JoinKeys[S, V] =
@@ -86,9 +92,9 @@ sealed abstract class JoinKeysInstances {
         Disjunction(x.unwrap ∨ y.unwrap)
     }
 
-  implicit def equal[S: Order, V: Order]: Eq[JoinKeys[S, V]] =
-    Eq.instance(_ === _)
+  implicit def order[S: Order, V: Order]: Order[JoinKeys[S, V]] =
+    Order.from(_ compare _)
 
   implicit def show[S: Show, V: Show]: Show[JoinKeys[S, V]] =
-    Show.show(jks => "JoinKeys" + jks.toList.show)
+    Show.show(jks => "JoinKeys" + jks.toSortedSet.toIterator.map(_.show).mkString("(", ", ", ")"))
 }

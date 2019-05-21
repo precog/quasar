@@ -21,12 +21,11 @@ import slamdata.Predef._
 import quasar.{NonTerminal, RenderTree, RenderedTree, Terminal}
 import quasar.RenderTree.ops._
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.immutable.SortedSet
 
-import cats.{Eq, Foldable, Show}
+import cats.{Foldable, Order, Show}
+import cats.instances.sortedSet._
 import cats.kernel.{BoundedSemilattice, CommutativeMonoid, CommutativeSemigroup, Semigroup}
-import cats.instances.list._
-import cats.syntax.eq._
 import cats.syntax.foldable._
 import cats.syntax.semigroup._
 import cats.syntax.show._
@@ -36,51 +35,45 @@ import scalaz.Tags.{Conjunction, Disjunction}
 import scalaz.syntax.tag._
 
 /** A distinct union of products. */
-final class Uop[A] private (val toList: List[A]) {
-  import Uop.{distinctE, fromFoldable}
+final class Uop[A] private (val toSortedSet: SortedSet[A]) {
+  import Uop.emptySet
 
   /** Alias for `and`. */
-  def ∧ (that: Uop[A])(implicit asg: Semigroup[A], aeq: Eq[A]): Uop[A] =
+  def ∧ (that: Uop[A])(implicit asg: Semigroup[A], aord: Order[A]): Uop[A] =
     and(that)
 
   /** Alias for `or`. */
-  def ∨ (that: Uop[A])(implicit A: Eq[A]): Uop[A] =
+  def ∨ (that: Uop[A]): Uop[A] =
     or(that)
 
   /** The product of two `Uop`, distributing over the union. */
-  def and(that: Uop[A])(implicit asg: Semigroup[A], aeq: Eq[A]): Uop[A] =
-    if (isEmpty) {
+  def and(that: Uop[A])(implicit asg: Semigroup[A], aord: Order[A]): Uop[A] =
+    if (isEmpty)
       that
-    } else if (that.isEmpty) {
+    else if (that.isEmpty)
       this
-    } else {
-      val as = for {
-        thiss <- toList
-        thats <- that.toList
-      } yield thiss |+| thats
-
-      as match {
-        case a :: Nil => Uop.one(a)
-        case other => fromFoldable(other)
-      }
-    }
+    else
+      new Uop(that.toSortedSet.foldLeft(emptySet[A]) { (as, thats) =>
+        as ++ toSortedSet.map(_ |+| thats)
+      })
 
   def isEmpty: Boolean =
-    toList.isEmpty
+    toSortedSet.isEmpty
 
-  def map[B: Eq](f: A => B): Uop[B] =
-    new Uop(distinctE(toList map f))
+  def map[B: Order](f: A => B): Uop[B] =
+    new Uop(toSortedSet.foldLeft(Uop.emptySet[B])((bs, a) => bs + f(a)))
 
   /** The union of two `Uop`. */
-  def or(that: Uop[A])(implicit A: Eq[A]): Uop[A] =
-    if (isEmpty) {
+  def or(that: Uop[A]): Uop[A] =
+    if (isEmpty)
       that
-    } else if (that.isEmpty) {
+    else if (that.isEmpty)
       this
-    } else {
-      val ts = that.toList.filterNot(a => toList.exists(_ === a))
-      new Uop(ts ::: toList)
-    }
+    else
+      new Uop(toSortedSet.union(that.toSortedSet))
+
+  def toList: List[A] =
+    toSortedSet.toList
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   override def toString: String = {
@@ -90,32 +83,26 @@ final class Uop[A] private (val toList: List[A]) {
 }
 
 object Uop extends UopInstances {
-  def empty[A]: Uop[A] =
-    new Uop(Nil)
+  def empty[A: Order]: Uop[A] =
+    new Uop(emptySet[A])
 
-  def fromFoldable[F[_]: Foldable, A: Eq](fa: F[A]): Uop[A] =
-    new Uop(distinctE(fa))
+  def fromFoldable[F[_]: Foldable, A: Order](fa: F[A]): Uop[A] =
+    new Uop(fa.foldLeft(emptySet[A])(_ + _))
 
-  def of[A: Eq](as: A*): Uop[A] =
-    fromFoldable(as.toList)
+  def of[A: Order](as: A*): Uop[A] =
+    new Uop(emptySet[A] ++ as)
 
-  def one[A](a: A): Uop[A] =
-    new Uop(List(a))
+  def one[A: Order](a: A): Uop[A] =
+    new Uop(emptySet[A] + a)
 
   ////
 
-  @SuppressWarnings(Array("org.wartremover.warts.MutableDataStructures"))
-  private def distinctE[F[_]: Foldable, A: Eq](fa: F[A]): List[A] =
-    fa.foldLeft(ListBuffer[A]()) { (as, a) =>
-      if (as.exists(_ === a))
-        as
-      else
-        as :+ a
-    }.toList
+  private def emptySet[A](implicit A: Order[A]): SortedSet[A] =
+    SortedSet.empty[A](A.toOrdering)
 }
 
 sealed abstract class UopInstances {
-  implicit def conjCommutativeMonoid[A: CommutativeSemigroup: Eq]: CommutativeMonoid[Uop[A] @@ Conjunction] =
+  implicit def conjCommutativeMonoid[A: CommutativeSemigroup: Order]: CommutativeMonoid[Uop[A] @@ Conjunction] =
     new CommutativeMonoid[Uop[A] @@ Conjunction] {
       val empty = Conjunction(Uop.empty[A])
 
@@ -123,7 +110,7 @@ sealed abstract class UopInstances {
         Conjunction(x.unwrap ∧ y.unwrap)
     }
 
-  implicit def disjBoundedSemilattice[A: Eq]: BoundedSemilattice[Uop[A] @@ Disjunction] =
+  implicit def disjBoundedSemilattice[A: Order]: BoundedSemilattice[Uop[A] @@ Disjunction] =
     new BoundedSemilattice[Uop[A] @@ Disjunction] {
       val empty = Disjunction(Uop.empty[A])
 
@@ -131,8 +118,8 @@ sealed abstract class UopInstances {
         Disjunction(x.unwrap ∨ y.unwrap)
     }
 
-  implicit def equal[A: Eq]: Eq[Uop[A]] =
-    Eq.by(uop => AsSet(uop.toList))
+  implicit def order[A: Order]: Order[Uop[A]] =
+    Order.by(_.toSortedSet)
 
   implicit def renderTree[A: RenderTree]: RenderTree[Uop[A]] =
     RenderTree make { uop =>

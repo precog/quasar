@@ -16,7 +16,7 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.List
+import slamdata.Predef.Set
 
 import quasar.pkg.tests._
 
@@ -42,8 +42,10 @@ trait JoinKeysGenerator {
     } yield cs.foldMap(c => Disjunction(JoinKeys.conj(c.head, c.tail: _*))).unwrap)
   }
 
-  implicit def cogenJoinKeys[S: Cogen, V: Cogen]: Cogen[JoinKeys[S, V]] =
-    Cogen[List[NonEmptyList[JoinKey[S, V]]]].contramap(_.toList.map(_.toNonEmptyList))
+  implicit def cogenJoinKeys[S: Cogen: Order, V: Cogen: Order]: Cogen[JoinKeys[S, V]] = {
+    implicit val ording = Order[NonEmptyList[JoinKey[S, V]]].toOrdering
+    Cogen[Set[NonEmptyList[JoinKey[S, V]]]].contramap(_.toSortedSet.map(_.toNonEmptyList))
+  }
 }
 
 object JoinKeysGenerator extends JoinKeyGenerator

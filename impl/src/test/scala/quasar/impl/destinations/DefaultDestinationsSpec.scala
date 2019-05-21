@@ -18,7 +18,7 @@ package quasar.impl.destinations
 
 import slamdata.Predef.{Stream => _, _}
 
-import quasar.Condition
+import quasar.{Condition, ConditionMatchers}
 import quasar.api.destination.{DestinationError, DestinationMeta, DestinationName, DestinationRef, DestinationType, Destinations}
 import quasar.connector.{Destination, DestinationModule, ResourceError}
 import quasar.contrib.scalaz.MonadError_
@@ -40,14 +40,14 @@ import scalaz.syntax.unzip._
 import scalaz.{IMap, ISet}
 import shims._
 
-object DefaultDestinationsSpec extends quasar.Qspec {
+object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
   implicit val cs = IO.contextShift(global)
   implicit val tmr = IO.timer(global)
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
   def freshId(ref: Ref[IO, Int]): IO[Int] =
-    ref.get.map(_ + 1)
+    ref.modify(i => (i + 1, i + 1))
 
   val mockModules: IMap[DestinationType, DestinationModule] =
     IMap(MockDestinationModule.destinationType -> MockDestinationModule)
@@ -90,7 +90,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
 
         val (res, found) = testRun.unsafeRunSync
 
-        res.toEither must beRight
+        res must be_\/-
         found must beSome
       }
 
@@ -103,8 +103,8 @@ object DefaultDestinationsSpec extends quasar.Qspec {
 
         val (original, duplicate) = testRun.unsafeRunSync
 
-        original.toEither must beRight
-        duplicate.toEither must beLeft(
+        original must be_\/-
+        duplicate must be_-\/(
           DestinationError.destinationNameExists(DestinationName("foo-mock")))
       }
 
@@ -117,7 +117,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
           addResult <- dests.addDestination(unknownRef)
         } yield addResult
 
-        testRun.unsafeRunSync.toEither must beLeft(
+        testRun.unsafeRunSync must be_-\/(
           DestinationError.destinationUnsupported(unknownType, ISet.singleton(MockDestinationType)))
       }
     }
@@ -139,9 +139,9 @@ object DefaultDestinationsSpec extends quasar.Qspec {
 
         val sanitize = DestinationRef.config.set(Json.jString("sanitized"))
 
-        beforeReplace.toEither must beRight(sanitize(testRef))
-        replaceResult must_== Condition.normal()
-        afterReplace.toEither must beRight(sanitize(newRef))
+        beforeReplace must be_\/-(sanitize(testRef))
+        replaceResult must beNormal
+        afterReplace must be_\/-(sanitize(newRef))
       }
 
       "shuts down replaced destination" >> {
@@ -160,7 +160,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
         val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
 
         beforeReplace must_== List()
-        replaceResult must_== Condition.normal()
+        replaceResult must beNormal
         afterReplace must_== List(1)
       }
     }
@@ -172,7 +172,7 @@ object DefaultDestinationsSpec extends quasar.Qspec {
           res <- dests.destinationStatus(42)
         } yield res
 
-        testRun.unsafeRunSync.toEither must beLeft(DestinationError.destinationNotFound(42))
+        testRun.unsafeRunSync must be_-\/(DestinationError.destinationNotFound(42))
       }
 
       "return a normal condition when no errors are present" >> {
@@ -181,23 +181,23 @@ object DefaultDestinationsSpec extends quasar.Qspec {
           res <- dests.destinationStatus(1)
         } yield res
 
-        testRun.unsafeRunSync.toEither must beRight(Condition.normal[Exception]())
+        testRun.unsafeRunSync must be_\/-(beNormal[Exception])
       }
 
       "returns error for destinations with errors" >> {
-        val ex = new RuntimeException("oh noes")
+        val ex = new Exception("oh noes")
         val testRun = for {
           dests <- mkDestinations(IMap(1 -> testRef), IMap.empty, IMap(1 -> ex))
           res <- dests.destinationStatus(1)
         } yield res
 
-        testRun.unsafeRunSync.toEither must beRight(Condition.abnormal(ex))
+        testRun.unsafeRunSync must be_\/-(beAbnormal(ex))
       }
     }
 
     "destination metadata" >> {
       "includes exception when a destination has errored" >> {
-        val ex = new RuntimeException("oh noes")
+        val ex = new Exception("oh noes")
 
         val testRun = for {
           dests <- mkDestinations(IMap(1 -> testRef), IMap.empty, IMap(1 -> ex))
@@ -223,8 +223,8 @@ object DefaultDestinationsSpec extends quasar.Qspec {
 
         val (removed, retrieved) = testRun.unsafeRunSync
 
-        removed must_== Condition.normal()
-        retrieved.toEither must beLeft(DestinationError.destinationNotFound(10))
+        removed must beNormal
+        retrieved must be_-\/(DestinationError.destinationNotFound(10))
       }
     }
 

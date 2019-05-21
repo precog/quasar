@@ -24,7 +24,8 @@ import scala.Predef.implicitly
 
 import cats.Eq
 import cats.instances.int._
-import cats.kernel.laws.discipline.{BoundedSemilatticeTests, CommutativeMonoidTests, EqTests}
+import cats.instances.option._
+import cats.kernel.laws.discipline.{BoundedSemilatticeTests, CommutativeMonoidTests, OrderTests}
 
 import org.scalacheck.Arbitrary
 
@@ -57,7 +58,7 @@ object UopSpec extends Qspec
   implicit def DisjEq: Eq[Uop[Int] @@ Disjunction] =
     Disjunction.subst(Eq[Uop[Int]])
 
-  checkAll("Eq[Uop[Int]]", EqTests[Uop[Int]].eqv)
+  checkAll("Order[Uop[Int]]", OrderTests[Uop[Int]].order)
   checkAll("CommutativeMonoid[Uop[Int] @@ Conjunction]", CommutativeMonoidTests[Uop[Int] @@ Conjunction].commutativeMonoid)
   checkAll("BoundedSemilattice[Uop[Int] @@ Disjunction]", BoundedSemilatticeTests[Uop[Int] @@ Disjunction].boundedSemilattice)
 }

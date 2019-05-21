@@ -18,11 +18,13 @@ package quasar.qsu.mra
 
 import slamdata.Predef.{None, Option, Some}
 
+import quasar.contrib.cats.boolean._
 import quasar.qscript.OnUndefined
 
 import cats.{Applicative, Order}
 import cats.data.NonEmptyList
 import cats.instances.list._
+import cats.instances.set._
 import cats.instances.tuple._
 import cats.syntax.eq._
 import cats.syntax.foldable._
@@ -48,7 +50,6 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
 
   def autojoin(l: P, r: P): AutoJoin[S, V] = {
     import JoinKeys._
-    import scalaz.std.anyVal._
     import shims.monoidToCats
 
     def join(x: Dim[S, V, T], y: Dim[S, V, T]): Option[JoinKeys[S, V] @@ Conjunction] =
@@ -69,12 +70,12 @@ trait ProvImpl[S, V, T] extends Provenance[S, V, T] {
       })
 
     val joins = for {
-      lids <- l.toList
-      rids <- r.toList
+      lids <- l.toSortedSet
+      rids <- r.toSortedSet
     } yield lids.zipWithDefined(rids)(join)
 
     val (Disjunction(keys), Disjunction(shouldEmit)) =
-      joins foldMap {
+      joins unorderedFoldMap {
         case Conjunction(jks) => (Disjunction(jks), Disjunction(jks.isEmpty))
       }
 

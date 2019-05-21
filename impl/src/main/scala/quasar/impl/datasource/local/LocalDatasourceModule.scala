@@ -16,18 +16,20 @@
 
 package quasar.impl.datasource.local
 
-import quasar.Disposable
-import quasar.api.datasource.{DatasourceError, DatasourceType}, DatasourceError._
+import quasar.api.datasource.DatasourceType
+import quasar.api.datasource.DatasourceError.{
+  InitializationError,
+  malformedConfiguration
+}
 import quasar.concurrent.BlockingContext
 import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
 
+import scala.util.Either
+
 import argonaut.Json
 import cats.effect._
-import scalaz.\/
-import scalaz.syntax.applicative._
-import shims._
 
 object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
@@ -35,18 +37,19 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
     BlockingContext.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
+
   def sanitizeConfig(config: Json): Json = config
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, DS[F]]] = {
+      : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {
       lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
         config, "Failed to decode LocalDatasource config: ")((c, d) => malformedConfiguration((LocalType, c, d)))
       root <- validatePath(lc.rootDir, config, "Invalid path: ")((c, d) => malformedConfiguration((LocalType, c, d)))
-    } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool).point[Disposable[F, ?]]
+    } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool)
 
-    ds.run
+    Resource.liftF(ds.value)
   }
 }

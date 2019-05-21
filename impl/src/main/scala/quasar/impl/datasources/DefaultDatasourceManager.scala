@@ -17,9 +17,10 @@
 package quasar.impl.datasources
 
 import slamdata.Predef._
-import quasar.{Condition, Disposable, RenderTreeT}
+
+import quasar.{Condition, RenderTreeT}
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
-import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported}
+import quasar.api.datasource.DatasourceError.{CreateError, DatasourceUnsupported, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.connector.{MonadResourceErr, QueryResult}
 import quasar.contrib.scalaz._
@@ -33,7 +34,8 @@ import scala.concurrent.ExecutionContext
 
 import argonaut.Json
 import argonaut.Argonaut.jEmptyObject
-import cats.ApplicativeError
+
+import cats.{ApplicativeError, MonadError}
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
 import cats.effect.concurrent.Ref
 import cats.effect.syntax.bracket._
@@ -47,7 +49,7 @@ import shims._
 final class DefaultDatasourceManager[
     I: Order,
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-    F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: MonadResourceErr: Timer,
+    F[_]: ConcurrentEffect: ContextShift: MonadCreateErr: MonadPlannerErr: MonadResourceErr: Timer,
     G[_],
     R,
     P <: ResourcePathType] private (
@@ -66,16 +68,15 @@ final class DefaultDatasourceManager[
   def initDatasource(datasourceId: I, ref: DatasourceRef[Json])
       : F[Condition[CreateError[Json]]] = {
 
-    def createDatasource(module: DatasourceModule)
-        : EitherT[F, CreateError[Json], Disposable[F, MDS]] =
+    def createDatasource(module: DatasourceModule): Resource[F, MDS] =
       module match {
         case DatasourceModule.Lightweight(lw) =>
-          EitherT(handleLinkageError(module.kind, lw.lightweightDatasource[F](ref.config)))
-            .bimap(ie => ie: CreateError[Json], _.map(ManagedDatasource.lightweight[T](_)))
+          handleInitErrors(module.kind, lw.lightweightDatasource[F](ref.config))
+            .map(ManagedDatasource.lightweight[T](_))
 
         case DatasourceModule.Heavyweight(hw) =>
-          EitherT(handleLinkageError(module.kind, hw.heavyweightDatasource[T, F](ref.config)))
-            .bimap(ie => ie: CreateError[Json], _.map(ManagedDatasource.heavyweight(_)))
+          handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config))
+            .map(ManagedDatasource.heavyweight(_))
       }
 
     val inited = for {
@@ -85,16 +86,15 @@ final class DefaultDatasourceManager[
         OptionT(modules.lookup(ref.kind).point[F])
           .toRight[CreateError[Json]](DatasourceUnsupported(ref.kind, sup))
 
-      mds <- createDatasource(mod)
+      (mds, dispose) <-
+        EitherT(MonadError_[F, CreateError[Json]].attempt(createDatasource(mod).allocated))
 
-      ds <- EitherT.rightT(onCreate(datasourceId, mds.unsafeValue) onError {
-        case _ => mds.dispose
+      ds <- EitherT.rightT(onCreate(datasourceId, mds) onError {
+        case _ => dispose
       })
 
-      dds = Disposable(ds, mds.dispose)
-
       _ <- EitherT.rightT(modifyAndShutdown { r =>
-        (r.insert(datasourceId, dds), r.lookup(datasourceId))
+        (r.insert(datasourceId, (ds, dispose)), r.lookup(datasourceId))
       })
     } yield ()
 
@@ -102,7 +102,7 @@ final class DefaultDatasourceManager[
   }
 
   def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R, P]]] =
-    running.get.map(_.lookup(datasourceId).map(_.unsafeValue))
+    running.get.map(_.lookup(datasourceId).map(_._1))
 
   def sanitizedRef(ref: DatasourceRef[Json]): DatasourceRef[Json] =
     modules.lookup(ref.kind)
@@ -119,16 +119,17 @@ final class DefaultDatasourceManager[
 
   private val configL = DatasourceRef.config[Json]
 
-  private def modifyAndShutdown(f: Running => (Running, Option[Disposable[F, ManagedDatasource[T, F, G, R, P]]]))
+  private def modifyAndShutdown(
+      f: Running => (Running, Option[(ManagedDatasource[T, F, G, R, P], F[Unit])]))
       : F[Unit] =
-    running.modify(f).flatMap(_.traverse_(_.dispose))
+    running.modify(f).flatMap(_.traverse_(_._2))
 }
 
 object DefaultDatasourceManager {
   type Modules = IMap[DatasourceType, DatasourceModule]
   type MDS[T[_[_]], F[_], P <: ResourcePathType] = ManagedDatasource[T, F, Stream[F, ?], QueryResult[F], P]
   type Running[I, T[_[_]], F[_], G[_], R, P <: ResourcePathType] =
-    IMap[I, Disposable[F, ManagedDatasource[T, F, G, R, P]]]
+    IMap[I, (ManagedDatasource[T, F, G, R, P], F[Unit])]
 
   final class Builder[
       I: Order,
@@ -144,8 +145,8 @@ object DefaultDatasourceManager {
         ec: ExecutionContext)
         : Resource[F, DatasourceManager[I, Json, T, F, G, R, P]] = {
 
-      val init: F[(DefaultDatasourceManager[I, T, F, G, R, P], F[ISet[I]])] = for {
-        bases <- configured traverse { ref =>
+      val bases =
+        configured map { ref =>
           modules.lookup(ref.kind) match {
             case Some(mod) =>
               lazyDatasource[T, F](mod, ref)
@@ -155,15 +156,19 @@ object DefaultDatasourceManager {
                 ref.kind,
                 DatasourceUnsupported(ref.kind, modules.keySet))
 
-              ManagedDatasource.lightweight[T](ds).point[Disposable[F, ?]].point[F]
+              ManagedDatasource.lightweight[T](ds).point[Resource[F, ?]]
           }
         }
 
+      val init = for {
         mapped <- bases.toList traverse {
-          case (id, mds) =>
-            onCreate(id, mds.unsafeValue)
-              .map(ds => (id, mds.as(ds)))
-              .onError { case _ => mds.dispose }
+          case (id, res) =>
+            res.allocated flatMap {
+              case (mds, dispose) =>
+                onCreate(id, mds)
+                  .map(ds => (id, (ds, dispose)))
+                  .onError { case _ => dispose }
+            }
         }
 
         running <- Ref[F].of(IMap.fromList(mapped))
@@ -206,27 +211,37 @@ object DefaultDatasourceManager {
       module: DatasourceModule,
       ref: DatasourceRef[Json])(
       implicit ec: ExecutionContext)
-      : F[Disposable[F, MDS[T, F, ResourcePathType.Physical]]] =
+      : Resource[F, MDS[T, F, ResourcePathType.Physical]] =
     module match {
       case DatasourceModule.Lightweight(lw) =>
-        val mklw = MonadError_[F, CreateError[Json]] unattempt {
-          handleLinkageError(ref.kind, lw.lightweightDatasource[F](ref.config))
-            .map(_.leftMap(ie => ie: CreateError[Json]))
-        }
+        val mklw =
+          handleInitErrors(ref.kind, lw.lightweightDatasource[F](ref.config))
 
-        ByNeedDatasource(ref.kind, mklw)
-          .map(_.map(ManagedDatasource.lightweight[T](_)))
+        ByNeedDatasource(ref.kind, mklw).map(ManagedDatasource.lightweight[T](_))
 
       case DatasourceModule.Heavyweight(hw) =>
-        val mkhw = MonadError_[F, CreateError[Json]] unattempt {
-          handleLinkageError(ref.kind, hw.heavyweightDatasource[T, F](ref.config))
-            .map(_.leftMap(ie => ie: CreateError[Json]))
-        }
+        val mkhw =
+          handleInitErrors(ref.kind, hw.heavyweightDatasource[T, F](ref.config))
 
-        ByNeedDatasource(ref.kind, mkhw)
-          .map(_.map(ManagedDatasource.heavyweight(_)))
+        ByNeedDatasource(ref.kind, mkhw).map(ManagedDatasource.heavyweight(_))
     }
 
   private def handleLinkageError[F[_]: ApplicativeError[?[_], Throwable], A](kind: DatasourceType, fa: => F[A]): F[A] =
     linkDatasource(kind, fa)
+
+  private def handleInitErrors[F[_]: MonadCreateErr: MonadError[?[_], Throwable], A](
+      kind: DatasourceType,
+      res: => Resource[F, Either[InitializationError[Json], A]])
+      : Resource[F, A] = {
+
+    import quasar.contrib.cats.monadError.monadError_CatsMonadError
+
+    implicit val merr: MonadError[F, CreateError[Json]] =
+      monadError_CatsMonadError[F, CreateError[Json]](
+        MonadError[F, Throwable], MonadError_[F, CreateError[Json]])
+
+    val rmerr = MonadError[Resource[F, ?], CreateError[Json]]
+
+    rmerr.rethrow(rmerr.map(handleLinkageError(kind, res))(_.leftMap(ie => ie: CreateError[Json])))
+  }
 }

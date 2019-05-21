@@ -25,11 +25,11 @@ import quasar.connector.{Destination, DestinationModule, MonadResourceErr, Resul
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
+import cats.syntax.either._
 import eu.timepit.refined.auto._
 import fs2.Stream
 import scalaz.syntax.applicative._
-import scalaz.syntax.either._
-import scalaz.{\/, Applicative, NonEmptyList}
+import scalaz.{Applicative, NonEmptyList}
 import shims._
 
 object MockDestinationModule extends DestinationModule {
@@ -38,9 +38,9 @@ object MockDestinationModule extends DestinationModule {
     Json.jString("sanitized")
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
-      : F[InitializationError[Json] \/ Resource[F, Destination[F]]] =
+      : Resource[F, Either[InitializationError[Json], Destination[F]]] =
     (new MockDestination[F]: Destination[F])
-      .point[Resource[F, ?]].right[InitializationError[Json]].point[F]
+      .asRight[InitializationError[Json]].point[Resource[F, ?]]
 }
 
 class MockDestination[F[_]: Applicative] extends Destination[F] {

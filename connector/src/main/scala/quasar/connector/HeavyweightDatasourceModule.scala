@@ -16,19 +16,19 @@
 
 package quasar.connector
 
-import quasar.{Disposable, RenderTreeT}
+import quasar.RenderTreeT
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource.ResourcePathType
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import scala.concurrent.ExecutionContext
+import scala.util.Either
 
 import argonaut.Json
-import cats.effect.{ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource}
 import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
-import scalaz.\/
 
 trait HeavyweightDatasourceModule {
   def kind: DatasourceType
@@ -40,5 +40,5 @@ trait HeavyweightDatasourceModule {
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
       config: Json)(
       implicit ec: ExecutionContext)
-      : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
+      : Resource[F, Either[InitializationError[Json], Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
 }

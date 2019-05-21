@@ -298,7 +298,7 @@ lazy val impl = project
       "org.typelevel"  %% "jawn-util"      % jawnVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "5.2.0"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "5.2.1"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

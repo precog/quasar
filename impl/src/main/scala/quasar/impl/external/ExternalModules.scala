@@ -47,9 +47,10 @@ object ExternalModules extends Logging {
 
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def apply[F[_]: ConcurrentEffect: ContextShift: Timer](
-    config: ExternalConfig,
-    blockingPool: BlockingContext)
-      : Stream[F, (ClassName, ClassLoader, PluginType)] = config match {
+      config: ExternalConfig,
+      blockingPool: BlockingContext)
+      : Stream[F, (ClassName, ClassLoader, PluginType)] =
+    config match {
       case PluginDirectory(directory) =>
         Stream.eval(ConcurrentEffect[F].delay((Files.exists(directory), Files.isDirectory(directory)))) flatMap {
           case (true, true) =>
@@ -97,8 +98,8 @@ object ExternalModules extends Logging {
   ////
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
-    pluginFile: Path,
-    blockingPool: BlockingContext)
+      pluginFile: Path,
+      blockingPool: BlockingContext)
       : Stream[F, (ClassName, ClassLoader, PluginType)] =
     for {
       plugin <- readPlugin(pluginFile, blockingPool)
@@ -138,8 +139,8 @@ object ExternalModules extends Logging {
     } yield (ClassName(moduleClass), classLoader, pluginType)
 
   private def readPlugin[F[_]: ContextShift: Effect: Timer](
-    pluginFile: Path,
-    blockingPool: BlockingContext)
+      pluginFile: Path,
+      blockingPool: BlockingContext)
       : Stream[F, Plugin] =
     for {
       js <-

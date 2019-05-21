@@ -5,7 +5,7 @@ object Versions {
   val argonautVersion     = "6.2.3"
   val catsVersion         = "1.6.0"
   val catsEffectVersion   = "1.3.0"
-  val disciplineVersion   = "0.9.0"
+  val disciplineVersion   = "0.11.1"
   val jawnVersion         = "0.14.2"
   val jawnfs2Version      = "0.14.2"
   val matryoshkaVersion   = "0.18.3"

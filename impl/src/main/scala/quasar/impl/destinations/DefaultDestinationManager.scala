@@ -31,8 +31,9 @@ import cats.effect.concurrent.Ref
 import cats.effect.{ConcurrentEffect, ContextShift, Timer}
 import scalaz.std.option._
 import scalaz.syntax.monad._
+import scalaz.syntax.std.either._
 import scalaz.syntax.unzip._
-import scalaz.{EitherT, IMap, ISet, OptionT, Order, Traverse}
+import scalaz.{EitherT, IMap, ISet, OptionT, Order}
 import shims._
 
 class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer] (
@@ -44,22 +45,21 @@ class DefaultDestinationManager[I: Order, F[_]: ConcurrentEffect: ContextShift: 
       : F[Condition[CreateError[Json]]] =
     (for {
       supported <- EitherT.rightT(supportedDestinationTypes)
-      mod0 = OptionT(
-        Traverse[Option].sequence(
-          modules.lookup(ref.kind).map(m =>
-            linkDestination(ref.kind, m.destination[F](ref.config)))))
 
-      mod <- mod0.toRight(
-        DestinationError.destinationUnsupported[CreateError[Json]](ref.kind, supported)) >>= (EitherT.either(_))
+      mod <- EitherT.fromDisjunction[F](
+        modules.lookup(ref.kind)
+          .map(m => linkDestination(ref.kind, m.destination[F](ref.config)))
+          .toRight(DestinationError.destinationUnsupported[CreateError[Json]](ref.kind, supported))
+          .disjunction)
 
       runningNow <- EitherT.rightT(running.get)
       _ <- EitherT.rightT(runningNow.lookup(destinationId).fold(().point[F]) { case (_, shutdown) => shutdown })
 
-      added0 = mod.allocated >>= {
-        case (m, disposeM) =>
-          running.update(r => r.insert(destinationId, (m, disposeM)))
-      }
-      added <- EitherT.rightT(added0)
+      (dest0, disposeM) <- EitherT.rightT(mod.allocated)
+      dest <- EitherT.either[F, CreateError[Json], Destination[F]](dest0.disjunction)
+
+      added <- EitherT.rightT(
+        running.update(r => r.insert(destinationId, (dest, disposeM))))
     } yield added).run.map(Condition.disjunctionIso.reverseGet(_))
 
   def destinationOf(destinationId: I): F[Option[Destination[F]]] =

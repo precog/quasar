@@ -17,12 +17,11 @@
 package quasar.impl.datasource
 
 import slamdata.Predef._
-import quasar.Disposable
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
 import quasar.connector.Datasource
 
-import cats.effect.Async
+import cats.effect.{Async, Resource}
 import cats.effect.concurrent.MVar
 import cats.syntax.applicative._
 import cats.syntax.apply._
@@ -32,7 +31,7 @@ import ByNeedDatasource.NeedState
 
 final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
     datasourceType: DatasourceType,
-    mvar: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]])(
+    mvar: MVar[F, NeedState[F, (Datasource[F, G, Q, R, P], F[Unit])]])(
     implicit F: Async[F])
     extends Datasource[F, G, Q, R, P] {
 
@@ -58,8 +57,8 @@ final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
         case NeedState.Uninitialized(init) =>
           initAndGet
 
-        case NeedState.Initialized(ds) =>
-          ds.unsafeValue.pure[F]
+        case NeedState.Initialized((ds, _)) =>
+          ds.pure[F]
       }
     } yield ds
 
@@ -69,14 +68,14 @@ final class ByNeedDatasource[F[_], G[_], Q, R, P <: ResourcePathType] private (
         val doInit = for {
           ds <- init
           _  <- mvar.put(NeedState.Initialized(ds))
-        } yield ds.unsafeValue
+        } yield ds._1
 
         F.handleErrorWith(doInit) { e =>
           mvar.put(s) *> F.raiseError(e)
         }
 
-      case Some(s @ NeedState.Initialized(ds)) =>
-        mvar.put(s).as(ds.unsafeValue)
+      case Some(s @ NeedState.Initialized((ds, _))) =>
+        mvar.put(s).as(ds)
 
       case None =>
         getDatasource
@@ -93,17 +92,19 @@ object ByNeedDatasource {
 
   def apply[F[_]: Async, G[_], Q, R, P <: ResourcePathType](
       kind: DatasourceType,
-      init: F[Disposable[F, Datasource[F, G, Q, R, P]]])
-      : F[Disposable[F, Datasource[F, G, Q, R, P]]] = {
+      init: Resource[F, Datasource[F, G, Q, R, P]])
+      : Resource[F, Datasource[F, G, Q, R, P]] = {
 
-    def dispose(m: MVar[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]]): F[Unit] =
+    def dispose(m: MVar[F, NeedState[F, (Datasource[F, G, Q, R, P], F[Unit])]]): F[Unit] =
       m.take flatMap {
-        case NeedState.Initialized(ds) => ds.dispose
+        case NeedState.Initialized((_, dispose)) => dispose
         case _ => ().pure[F]
       }
 
-    MVar.uncancelableOf[F, NeedState[F, Disposable[F, Datasource[F, G, Q, R, P]]]](
-      NeedState.Uninitialized(init))
-      .map(mv => Disposable(new ByNeedDatasource(kind, mv), dispose(mv)))
+    val mvar =
+      MVar.uncancelableOf[F, NeedState[F, (Datasource[F, G, Q, R, P], F[Unit])]](
+        NeedState.Uninitialized(init.allocated))
+
+    Resource(mvar.map(mv => (new ByNeedDatasource(kind, mv), dispose(mv))))
   }
 }

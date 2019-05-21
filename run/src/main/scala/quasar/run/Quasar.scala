@@ -44,7 +44,7 @@ import scala.concurrent.ExecutionContext
 import argonaut.Json
 import argonaut.JsonScalaz._
 import cats.Functor
-import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.syntax.functor._
 import fs2.Stream
 import matryoshka.data.Fix
@@ -72,7 +72,7 @@ object Quasar extends Logging {
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
       qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], R],
-      preparationsManager: QueryEvaluator[F, SqlQuery, R] => Stream[F, PreparationsManager[F, UUID, SqlQuery, R]],
+      preparationsManager: QueryEvaluator[F, SqlQuery, R] => Resource[F, PreparationsManager[F, UUID, SqlQuery, R]],
       lookupTableData: UUID => F[Option[R]],
       lookupTableSchema: UUID => F[Option[S]])(
       datasourceModules: List[DatasourceModule],
@@ -80,12 +80,15 @@ object Quasar extends Logging {
       sstEvalConfig: SstEvalConfig)(
       implicit
       ec: ExecutionContext)
-      : Stream[F, Quasar[F, R, S]] = {
+      : Resource[F, Quasar[F, R, S]] = {
 
     for {
-      configured <- datasourceRefs.entries.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _)
+      configured <-
+        Resource.liftF(
+          datasourceRefs.entries
+            .compile.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _))
 
-      _ <- Stream.eval(Sync[F] delay {
+      _ <- Resource.liftF(Sync[F] delay {
         datasourceModules.groupBy(_.kind) foreach {
           case (kind, sources) =>
             if (sources.length > 1) {
@@ -94,17 +97,17 @@ object Quasar extends Logging {
         }
       })
 
-      (dsErrors, onCondition) <- Stream.eval(DefaultDatasourceErrors[F, UUID])
+      (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
       moduleMap = IMap.fromList(datasourceModules.map(ds => ds.kind -> ds))
 
       dsManager <-
-        Stream.resource(DefaultDatasourceManager.Builder[UUID, Fix, F]
+        DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, configured))
+          .build(moduleMap, configured)
 
-      freshUUID = ConcurrentEffect[F].delay(UUID.randomUUID)
+      freshUUID = Sync[F].delay(UUID.randomUUID)
 
       resourceSchema = SimpleCompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
 

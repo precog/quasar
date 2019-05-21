@@ -18,12 +18,11 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{ConditionMatchers, Disposable, RenderTreeT, ScalarStages}
+import quasar.{ConditionMatchers, RenderTreeT, ScalarStages}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.connector._
-import quasar.connector.LightweightDatasourceModule.DS
 import quasar.connector.ParsableType.JsonVariant
 import quasar.contrib.fs2.stream._
 import quasar.contrib.scalaz.MonadError_
@@ -40,7 +39,7 @@ import argonaut.JsonScalaz._
 import argonaut.Argonaut.{jEmptyObject, jString}
 
 import cats.Applicative
-import cats.effect.{ConcurrentEffect, ContextShift, IO, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.effect.concurrent.Ref
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
@@ -52,8 +51,7 @@ import fs2.Stream
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 import matryoshka.data.Fix
 
-import scalaz.{\/, IMap, Show}
-import scalaz.syntax.either._
+import scalaz.{IMap, Show}
 import scalaz.syntax.traverse._
 import scalaz.std.anyVal._
 import scalaz.std.list._
@@ -65,6 +63,8 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
 
   type Mgr = DatasourceManager[Int, Json, Fix, IO, Stream[IO, ?], QueryResult[IO], ResourcePathType.Physical]
   type Disposes = Ref[IO, List[DatasourceType]]
+
+  type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
 
   final case class PlannerErrorException(pe: PlannerError)
       extends Exception(pe.message)
@@ -120,11 +120,10 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
         config: Json)(
         implicit ec: ExecutionContext)
-        : F[InitializationError[Json] \/ Disposable[F, DS[F]]] =
-      Disposable(
-        mkDatasource[F, InterpretedRead[ResourcePath], ResourcePathType.Physical](kind),
-        ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))
-        .right.pure[F]
+        : Resource[F, R[F, InterpretedRead[ResourcePath]]] =
+      Resource((
+        Right(mkDatasource[F, InterpretedRead[ResourcePath], ResourcePathType.Physical](kind)) : R[F, InterpretedRead[ResourcePath]],
+        ConcurrentEffect[F].liftIO(disposes.update(kind :: _))).pure[F])
   }
 
   def heavyMod(disposes: Disposes) = new HeavyweightDatasourceModule {
@@ -137,11 +136,10 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
         F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
         config: Json)(
         implicit ec: ExecutionContext)
-        : F[InitializationError[Json] \/ Disposable[F, Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]] =
-      Disposable(
-        mkDatasource[F, T[QScriptEducated[T, ?]], ResourcePathType.Physical](kind),
-        ConcurrentEffect[F].liftIO(disposes.update(kind :: _)))
-        .right.pure[F]
+        : Resource[F, R[F, T[QScriptEducated[T, ?]]]] =
+      Resource((
+        Right(mkDatasource[F, T[QScriptEducated[T, ?]], ResourcePathType.Physical](kind)) : R[F, T[QScriptEducated[T, ?]]],
+        ConcurrentEffect[F].liftIO(disposes.update(kind :: _))).pure[F])
   }
 
   def modules(disposes: Disposes): DefaultDatasourceManager.Modules = {

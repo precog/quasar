@@ -18,7 +18,10 @@ package quasar.contrib.scalaz
 
 import slamdata.Predef._
 
+import cats.{MonadError => CMonadError}
+
 import monocle.Prism
+
 import scalaz._, Scalaz._
 import scalaz.Liskov._
 
@@ -81,6 +84,12 @@ object MonadError_ extends MonadError_Instances {
 }
 
 sealed abstract class MonadError_Instances extends MonadError_Instances0 {
+  implicit def catsMonadErrorMonadError_[F[_], E](implicit F: CMonadError[F, E]): MonadError_[F, E] =
+    new MonadError_[F, E] {
+      def raiseError[A](e: E): F[A] = F.raiseError(e)
+      def handleError[A](fa: F[A])(f: E => F[A]): F[A] = F.handleErrorWith(fa)(f)
+    }
+
   implicit def kleisliMonadError_[F[_], E, R](implicit F: MonadError_[F, E]): MonadError_[Kleisli[F, R, ?], E] =
     new MonadError_[Kleisli[F, R, ?], E] {
       def raiseError[A](e: E) =

@@ -27,13 +27,19 @@ import quasar.fp.ski.ι
 import java.nio.file.{Paths, Path => JPath}
 
 import argonaut.{DecodeJson, Json}
+
+import cats.data.EitherT
 import cats.effect.Sync
+import cats.syntax.applicative._
+
 import eu.timepit.refined.auto._
+
 import pathy.Path
-import scalaz.{\/, EitherT}
-import scalaz.syntax.applicative._
+
+import scalaz.\/
 import scalaz.syntax.foldable._
-import shims._
+
+import shims.monadToScalaz
 
 package object local {
   val LocalType = DatasourceType("local", 1L)
@@ -43,7 +49,7 @@ package object local {
 
   def toNio[F[_]: Sync](root: JPath, rp: ResourcePath): F[JPath] =
     Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
-      if (n.isEmpty) p.point[F]
+      if (n.isEmpty) p.pure[F]
       else MonadError_[F, Throwable].unattempt_(\/.fromTryCatchNonFatal(p.resolve(n)))
     }
 
@@ -51,7 +57,7 @@ package object local {
     config: Json,
     errorPrefix: String)(onError: (Json, String) => B)
       : EitherT[F, B, A] =
-    EitherT.fromEither(config.as[A].toEither.point[F])
+    EitherT.fromEither(config.as[A].toEither)
       .leftMap[B] {
         case (s, _) => onError(config, errorPrefix + s)
       }
@@ -61,6 +67,6 @@ package object local {
     config: Json,
     errorPrefix: String)(onError: (Json, String) => B)
       : EitherT[F, B, JPath] =
-    EitherT.fromEither(Sync[F].attempt(Sync[F].delay(Paths.get(path))))
+    EitherT(Sync[F].attempt(Sync[F].delay(Paths.get(path))))
       .leftMap[B](t => onError(config, errorPrefix + t.getMessage))
 }

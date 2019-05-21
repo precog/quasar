@@ -22,7 +22,7 @@ import quasar.Condition
 import quasar.api.QueryEvaluator
 import quasar.api.table.PreparationEvent
 
-import cats.effect.{Concurrent, ConcurrentEffect}
+import cats.effect.{Concurrent, ConcurrentEffect, Resource}
 
 import fs2.Stream
 import fs2.concurrent.{Queue, SignallingRef}
@@ -173,21 +173,22 @@ object PreparationsManager {
       maxConcurrency: Int = 10,   // it's a good idea to keep this equal to maxStreams (different values are sometimes useful for testing)
       maxNotifications: Int = 10)(
       runToStore: (I, R) => F[Stream[F, Unit]])(
-      implicit ec: ExecutionContext): Stream[F, PreparationsManager[F, I, Q, R]] = {
-
-    for {
-      q <-
-        Stream.eval(Queue.bounded[F, Stream[F, Nothing]](maxStreams))
+      implicit ec: ExecutionContext)
+      : Resource[F, PreparationsManager[F, I, Q, R]] = {
+    val pmStream = for {
+      q <- Stream.eval(Queue.bounded[F, Stream[F, Nothing]](maxStreams))
 
       notificationsQ <-
         Stream.eval(Queue.bounded[F, Option[PreparationEvent[I]]](maxNotifications))
 
       emit = Stream(new PreparationsManager[F, I, Q, R](evaluator, notificationsQ, q.enqueue1(_))(runToStore))
 
-      back <- emit.concurrently(q.dequeue.parJoin(maxConcurrency)) onComplete {
-        Stream.eval_(notificationsQ.enqueue1(None))
+      pm <- emit.concurrently(q.dequeue.parJoin(maxConcurrency)) onFinalize {
+        notificationsQ.enqueue1(None)
       }
-    } yield back
+    } yield pm
+
+    pmStream.compile.resource.lastOrError
   }
 
   private final case class Preparation[F[_]](

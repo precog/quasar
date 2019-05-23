@@ -19,7 +19,6 @@ package quasar.contrib
 import slamdata.Predef._
 import quasar.fp.ski._
 
-import java.io.{File => JFile}
 import java.net.{URLDecoder, URLEncoder}
 
 import argonaut._
@@ -27,7 +26,6 @@ import monocle.Prism
 import _root_.pathy.Path, Path._
 import _root_.pathy.argonaut._
 import _root_.scalaz._, Scalaz._
-import _root_.scalaz.concurrent.Task
 
 package object pathy {
   type AbsPath[T] = Path[Abs,T,Sandboxed]
@@ -51,31 +49,6 @@ package object pathy {
 
   def pathName(p: APath): Option[PathSegment] =
     refineType(p).fold(x => dirName(x) map liftDirName, x => some(fileName(x)))
-
-  object ADir {
-
-    def fromFile(file: JFile): OptionT[Task, ADir] = {
-      val back = Task delay {
-        val check = file.exists() && file.isDirectory()
-        // trailing '/' is significant!  yay, pathy...
-        posixCodec.parseAbsDir(file.getAbsolutePath + "/").map(unsafeSandboxAbs).filter(_ => check)
-      }
-
-      OptionT(back)
-    }
-  }
-
-  object AFile {
-
-    def fromFile(file: JFile): OptionT[Task, AFile] = {
-      val back = Task delay {
-        val check = file.exists() && file.isFile()
-        posixCodec.parseAbsFile(file.getAbsolutePath).map(unsafeSandboxAbs).filter(_ => check)
-      }
-
-      OptionT(back)
-    }
-  }
 
   object APath {
     import PosixCodecJson._

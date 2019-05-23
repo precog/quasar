@@ -27,10 +27,10 @@ import scalaz.std.option._
 import scalaz.syntax.applicative._
 import scalaz.syntax.plusEmpty._
 
-final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R] private (
+final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: ResourcePathType] private (
     val kind: DatasourceType,
     emptyResult: R)
-    extends Datasource[F, G, Q, R] {
+    extends Datasource[F, G, Q, R, P] {
 
   def evaluate(q: Q): F[R] =
     emptyResult.pure[F]
@@ -39,17 +39,17 @@ final class EmptyDatasource[F[_]: Applicative, G[_]: PlusEmpty, Q, R] private (
     false.pure[F]
 
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, P)]]] =
     ResourcePath.root
       .getOption(prefixPath)
-      .as(mempty[G, (ResourceName, ResourcePathType)])
+      .as(mempty[G, (ResourceName, P)])
       .pure[F]
 }
 
 object EmptyDatasource {
-  def apply[F[_]: Applicative, G[_]: PlusEmpty, Q, R](
+  def apply[F[_]: Applicative, G[_]: PlusEmpty, Q, R, P <: ResourcePathType](
       kind: DatasourceType,
       emptyResult: R)
-      : Datasource[F, G, Q, R] =
-    new EmptyDatasource[F, G, Q, R](kind, emptyResult)
+      : Datasource[F, G, Q, R, P] =
+    new EmptyDatasource[F, G, Q, R, P](kind, emptyResult)
 }

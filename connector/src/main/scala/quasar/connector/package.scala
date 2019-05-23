@@ -19,6 +19,7 @@ package quasar
 import quasar.contrib.scalaz.MonadError_
 
 package object connector {
+
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 
   def MonadResourceErr[F[_]](implicit ev: MonadResourceErr[F])

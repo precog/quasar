@@ -21,6 +21,7 @@ import slamdata.Predef.{List, None, Option, Some, Unit}
 import quasar.Condition
 import quasar.api.datasource.{DatasourceRef, DatasourceType}
 import quasar.api.datasource.DatasourceError._
+import quasar.api.resource.ResourcePathType
 import quasar.contrib.scalaz.{MonadState_, MonadTell_}
 import quasar.fp.ski.κ
 import quasar.impl.datasource.EmptyDatasource
@@ -39,7 +40,7 @@ final class MockDatasourceManager[I: Order, C, T[_[_]], F[_]: Monad, G[_]: PlusE
     implicit
     initd: MonadInit[F, I],
     sdown: MonadShutdown[F, I])
-    extends DatasourceManager[I, C, T, F, G, R] {
+    extends DatasourceManager[I, C, T, F, G, R, ResourcePathType] {
 
   def initDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[CreateError[C]]] =
@@ -60,10 +61,10 @@ final class MockDatasourceManager[I: Order, C, T[_[_]], F[_]: Monad, G[_]: PlusE
         DatasourceUnsupported(ref.kind, supportedTypes))
         .point[F]
 
-  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R]]] =
+  def managedDatasource(datasourceId: I): F[Option[ManagedDatasource[T, F, G, R, ResourcePathType]]] =
     initd.gets(_.member(datasourceId)) map { exists =>
       supportedTypes.findMin.filter(κ(exists)) map { kind =>
-        ManagedDatasource.lightweight[T][F, G, R](EmptyDatasource(kind, emptyResult))
+        ManagedDatasource.lightweight[T][F, G, R, ResourcePathType](EmptyDatasource(kind, emptyResult))
       }
     }
 
@@ -92,6 +93,6 @@ object MockDatasourceManager {
       implicit
       MI: MonadInit[F, I],
       MS: MonadShutdown[F, I])
-      : DatasourceManager[I, C, T, F, G, R] =
+      : DatasourceManager[I, C, T, F, G, R, ResourcePathType] =
     new MockDatasourceManager[I, C, T, F, G, R](supportedTypes, initErrors, sanitize, emptyResult)
 }

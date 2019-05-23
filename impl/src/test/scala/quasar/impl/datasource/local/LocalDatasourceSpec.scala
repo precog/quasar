@@ -19,25 +19,21 @@ package quasar.impl.datasource.local
 import slamdata.Predef._
 
 import cats.effect.IO
-
 import fs2.Stream
-
 import java.nio.file.Paths
-
 import scala.concurrent.ExecutionContext
-
 import quasar.ScalarStages
-import quasar.api.resource.{ResourceName, ResourcePath}
+import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Datasource, QueryResult, ResourceError, DatasourceSpec}
+import quasar.connector.{Datasource, DatasourceSpec, QueryResult, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.InterpretedRead
 
 import shims._
 
 abstract class LocalDatasourceSpec
-    extends DatasourceSpec[IO, Stream[IO, ?]] {
+    extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType.Physical] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
@@ -45,7 +41,7 @@ abstract class LocalDatasourceSpec
   implicit val tmr = IO.timer(ExecutionContext.Implicits.global)
 
   override def datasource
-      : Datasource[IO, Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO]]
+      : Datasource[IO, Stream[IO, ?], InterpretedRead[ResourcePath], QueryResult[IO], ResourcePathType.Physical]
 
   val nonExistentPath =
     ResourcePath.root() / ResourceName("non") / ResourceName("existent")

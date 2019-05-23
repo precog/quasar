@@ -29,7 +29,7 @@ import quasar.fp.ski.{ι, κ}
 import quasar.fp._
 import quasar.qscript._
 import quasar.qscript.RecFreeS._
-import quasar.qscript.provenance.JoinKeys
+import quasar.qsu.mra.AutoJoin
 
 import matryoshka.{Hole => _, birecursiveIso => _, _} // {delayEqual, equalTEqual, delayShow, showTShow, BirecursiveT, Delay, Embed, EqualT, ShowT}
 import matryoshka.data._
@@ -44,6 +44,8 @@ import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 import scalaz.syntax.std.option._
+
+import shims.{showToCats, showToScalaz}
 
 sealed trait QScriptUniform[T[_[_]], A] extends Product with Serializable
 
@@ -234,7 +236,7 @@ object QScriptUniform {
   final case class QSAutoJoin[T[_[_]], A](
     left: A,
     right: A,
-    keys: JoinKeys[IdAccess],
+    keys: AutoJoin[T[EJson], IdAccess],
     combiner: JoinFunc[T]) extends QScriptUniform[T, A]
 
   final case class GroupBy[T[_[_]], A](
@@ -550,8 +552,8 @@ object QScriptUniform {
         case Map(a, fm) => (a, fm)
       } { case (a, fm) => Map(a, fm) }
 
-    def qsAutoJoin[A]: Prism[QScriptUniform[A], (A, A, JoinKeys[IdAccess], JoinFunc)] =
-      Prism.partial[QScriptUniform[A], (A, A, JoinKeys[IdAccess], JoinFunc)] {
+    def qsAutoJoin[A]: Prism[QScriptUniform[A], (A, A, AutoJoin[T[EJson], IdAccess], JoinFunc)] =
+      Prism.partial[QScriptUniform[A], (A, A, AutoJoin[T[EJson], IdAccess], JoinFunc)] {
         case QSAutoJoin(l, r, ks, c) => (l, r, ks, c)
       } { case (l, r, ks, c) => QSAutoJoin(l, r, ks, c) }
 
@@ -702,8 +704,8 @@ object QScriptUniform {
         case(src, f) => (src, RecFreeS.roll(mfc(f.as(recFunc.Hole))))
       })
 
-    def qsAutoJoin: Prism[A, F[(A, A, JoinKeys[IdAccess], JoinFunc)]] = {
-      type G[A] = (A, A, JoinKeys[IdAccess], JoinFunc)
+    def qsAutoJoin: Prism[A, F[(A, A, AutoJoin[T[EJson], IdAccess], JoinFunc)]] = {
+      type G[A] = (A, A, AutoJoin[T[EJson], IdAccess], JoinFunc)
       composeLifting[G](O.qsAutoJoin[A])
     }
 

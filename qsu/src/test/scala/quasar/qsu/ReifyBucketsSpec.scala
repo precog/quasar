@@ -20,16 +20,20 @@ import slamdata.Predef.{List, Long, Nil}
 
 import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.ExcludeId
+import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
+import quasar.qsu.mra.ProvImpl
 
 import matryoshka.{delayEqual, Embed}
 import matryoshka.data.Fix
 import matryoshka.data.{freeEqual, freeRecursive}
 import matryoshka.patterns.CoEnv
+
 import scalaz.{\/, -\/, \/-, EitherT, State}
+
+import shims.{eqToScalaz, orderToCats, orderToScalaz}
 
 object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   import QSUGraph.Extractors._
@@ -39,10 +43,11 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   val qsu = QScriptUniform.DslT[Fix]
   val func = construction.Func[Fix]
   val recFunc = construction.RecFunc[Fix]
+  val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
 
   def reifyBuckets(qsu: Fix[QScriptUniform]): PlannerError \/ QSUGraph =
-    ApplyProvenance[Fix, EitherT[State[Long, ?], PlannerError, ?]](QSUGraph.fromTree(qsu))
-      .flatMap(ReifyBuckets[Fix, EitherT[State[Long, ?], PlannerError, ?]])
+    ApplyProvenance[Fix, EitherT[State[Long, ?], PlannerError, ?]](qprov, QSUGraph.fromTree(qsu))
+      .flatMap(ReifyBuckets[Fix, EitherT[State[Long, ?], PlannerError, ?]](qprov))
       .map(_.graph)
       .run.eval(0)
 

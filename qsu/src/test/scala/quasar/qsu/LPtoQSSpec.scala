@@ -24,9 +24,10 @@ import quasar.api.resource.ResourcePath
 import quasar.common.PhaseResults
 import quasar.common.data.Data
 import quasar.contrib.matryoshka._
-import quasar.ejson.{EJson, Fixed}
-import quasar.fp._
 import quasar.contrib.iota._
+import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
+import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan, LogicalPlanHelpers}
 import quasar.qscript.construction
 import quasar.qscript.{educatedToTotal, HoleF, LeftShift, PlannerError, ReduceFuncs, ReduceIndex}
@@ -46,6 +47,8 @@ import Path.{Sandboxed, file}
 
 import scalaz.{\/-, -\/, EitherT, Equal, Free, Need, StateT, WriterT}
 import scalaz.syntax.show._
+
+import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 
 object LPtoQSSpec extends Qspec with LogicalPlanHelpers with QSUTTypes[Fix] {
   type F[A] = WriterT[EitherT[StateT[Need, Long, ?], PlannerError, ?], PhaseResults, A]

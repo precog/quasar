@@ -18,7 +18,7 @@ package quasar.api.resource
 
 import slamdata.Predef.{Boolean, Int, Product, Serializable, Some}
 
-import scalaz.{Enum, Show}
+import scalaz.{Enum, Order,  Show}
 import scalaz.std.anyVal._
 import scalaz.syntax.order._
 
@@ -29,6 +29,7 @@ sealed trait ResourcePathType extends Product with Serializable {
       case ResourcePathType.Prefix => true
       case ResourcePathType.PrefixResource => true
       case ResourcePathType.LeafResource => false
+      case ResourcePathType.AggregateResource => false
     }
 
   def isResource: Boolean =
@@ -36,24 +37,29 @@ sealed trait ResourcePathType extends Product with Serializable {
       case ResourcePathType.Prefix => false
       case ResourcePathType.PrefixResource => true
       case ResourcePathType.LeafResource => true
+      case ResourcePathType.AggregateResource => true
     }
 }
 
 object ResourcePathType extends ResourcePathTypeInstances {
+  sealed trait Physical extends ResourcePathType
   /** The path does not refer to a resource, but is a prefix of one or more paths. */
-  case object Prefix extends ResourcePathType
+  case object Prefix extends Physical
   /** The path refers to a resource and is a prefix of one or more paths. */
-  case object PrefixResource extends ResourcePathType
+  case object PrefixResource extends Physical
   /** The path refers to a resource and is not a prefix of any other paths. */
-  case object LeafResource extends ResourcePathType
+  case object LeafResource extends Physical
 
-  val leafResource: ResourcePathType =
+  /** The path refers to a resource that is aggregating other resources */
+  case object AggregateResource extends ResourcePathType
+
+  val leafResource: Physical =
     LeafResource
 
-  val prefixResource: ResourcePathType =
+  val prefixResource: Physical =
     PrefixResource
 
-  val prefix: ResourcePathType =
+  val prefix: Physical =
     Prefix
 }
 
@@ -65,29 +71,34 @@ sealed abstract class ResourcePathTypeInstances {
 
       def pred(t: ResourcePathType) =
         t match {
-          case ResourcePathType.Prefix => ResourcePathType.LeafResource
+          case ResourcePathType.Prefix => ResourcePathType.AggregateResource
           case ResourcePathType.PrefixResource => ResourcePathType.Prefix
           case ResourcePathType.LeafResource => ResourcePathType.PrefixResource
+          case ResourcePathType.AggregateResource => ResourcePathType.LeafResource
         }
 
       def succ(t: ResourcePathType) =
         t match {
           case ResourcePathType.Prefix => ResourcePathType.PrefixResource
           case ResourcePathType.PrefixResource => ResourcePathType.LeafResource
-          case ResourcePathType.LeafResource => ResourcePathType.Prefix
+          case ResourcePathType.LeafResource => ResourcePathType.AggregateResource
+          case ResourcePathType.AggregateResource => ResourcePathType.Prefix
         }
 
       override val min = Some(ResourcePathType.Prefix)
 
-      override val max = Some(ResourcePathType.LeafResource)
+      override val max = Some(ResourcePathType.AggregateResource)
 
       private def toInt(t: ResourcePathType): Int =
         t match {
           case ResourcePathType.Prefix => 0
           case ResourcePathType.PrefixResource => 1
           case ResourcePathType.LeafResource => 2
+          case ResourcePathType.AggregateResource => 3
         }
     }
+
+  implicit val orderPhysical: Order[ResourcePathType.Physical] = enum.contramap(x => x)
 
   implicit val show: Show[ResourcePathType] =
     Show.showFromToString

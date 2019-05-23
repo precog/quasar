@@ -18,7 +18,7 @@ package quasar.connector.datasource
 
 import quasar.RenderTreeT
 import quasar.common.PhaseResultTell
-import quasar.connector.{Datasource, QScriptEvaluator}
+import quasar.connector.{PhysicalDatasource, QScriptEvaluator}
 import quasar.qscript.{MonadPlannerErr, QScriptEducated}
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -31,4 +31,4 @@ abstract class HeavyweightDatasource[
     G[_],
     R]
     extends QScriptEvaluator[T, F, R]
-    with Datasource[F, G, T[QScriptEducated[T, ?]], R]
+    with PhysicalDatasource[F, G, T[QScriptEducated[T, ?]], R]

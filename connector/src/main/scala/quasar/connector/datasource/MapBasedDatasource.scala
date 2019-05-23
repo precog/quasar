@@ -19,14 +19,15 @@ package quasar.connector.datasource
 import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector.{Datasource, MonadResourceErr, ResourceError}
+import quasar.connector.{MonadResourceErr, PhysicalDatasource, ResourceError}
 
-import scalaz.{Applicative, ApplicativePlus, ICons, IList, IMap, INil, ISet, Scalaz}, Scalaz._
+import scalaz.{Applicative, ApplicativePlus, ICons, IList, IMap, INil, ISet, Scalaz}
+import Scalaz._
 
 final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: ApplicativePlus, R] private(
     val kind: DatasourceType,
     content: IMap[ResourcePath, F[R]])
-    extends Datasource[F, G, ResourcePath, R] {
+    extends PhysicalDatasource[F, G, ResourcePath, R] {
 
   import ResourceError._
 
@@ -41,7 +42,7 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
     content.member(path).point[F]
 
   def prefixedChildPaths(prefixPath: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, ResourcePathType.Physical)]]] =
     prefixedChildPaths0(prefixPath).point[F]
 
   ////
@@ -72,9 +73,9 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
     }
 
   private def prefixedChildPaths0(pfx: ResourcePath)
-      : Option[G[(ResourceName, ResourcePathType)]] =
+      : Option[G[(ResourceName, ResourcePathType.Physical)]] =
     if (!prefixes.contains(pfx))
-      if (content.keySet.contains(pfx)) some(mempty[G, (ResourceName, ResourcePathType)])
+      if (content.keySet.contains(pfx)) some(mempty[G, (ResourceName, ResourcePathType.Physical)])
       else None
     else {
       val childResources = children(content.keySet, pfx)
@@ -86,7 +87,7 @@ final class MapBasedDatasource[F[_]: Applicative: MonadResourceErr, G[_]: Applic
         (childPrefixes \\ both).map((_, ResourcePathType.prefix))
 
       res.foldLeft(
-        ApplicativePlus[G].empty[(ResourceName, ResourcePathType)]) {
+        ApplicativePlus[G].empty[(ResourceName, ResourcePathType.Physical)]) {
         case (acc, p) =>
           ApplicativePlus[G].plus(acc, p.pure[G])
         }.some
@@ -104,7 +105,7 @@ object MapBasedDatasource {
         F0: Applicative[F],
         F1: MonadResourceErr[F],
         G0: ApplicativePlus[G])
-        : Datasource[F, G, ResourcePath, R] =
+        : PhysicalDatasource[F, G, ResourcePath, R] =
       new MapBasedDatasource[F, G, R](kind, content)
   }
 
@@ -118,7 +119,7 @@ object MapBasedDatasource {
         F0: Applicative[F],
         F1: MonadResourceErr[F],
         G0: ApplicativePlus[G])
-    : Datasource[F, G, ResourcePath, R] =
+        : PhysicalDatasource[F, G, ResourcePath, R] =
       new MapBasedDatasource[F, G, R](kind, content.map(_.point[F]))
   }
 

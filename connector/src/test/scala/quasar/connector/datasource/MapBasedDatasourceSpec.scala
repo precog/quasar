@@ -30,7 +30,7 @@ import scalaz.IMap
 import scalaz.std.list._
 import shims._
 
-object MapBasedDatasourceSpec extends DatasourceSpec[IO, List] {
+object MapBasedDatasourceSpec extends DatasourceSpec[IO, List, ResourcePathType.Physical] {
 
   implicit val ioMonadResourceErr: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)

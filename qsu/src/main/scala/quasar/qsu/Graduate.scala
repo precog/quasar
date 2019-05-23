@@ -23,6 +23,7 @@ import quasar.common.effect.NameGenerator
 import quasar.common.JoinType
 import quasar.contrib.scalaz.MonadReader_
 import quasar.ejson.EJson
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
 import quasar.fp.ski.κ
@@ -38,6 +39,7 @@ import quasar.qscript.{
   JoinSide,
   Map,
   MonadPlannerErr,
+  OnUndefined,
   QCE,
   QScriptEducated,
   Read,
@@ -53,17 +55,23 @@ import quasar.qscript.{
   Unreferenced
 }
 import quasar.qscript.PlannerError.InternalError
-import quasar.qscript.provenance.JoinKey
 import quasar.qsu.{QScriptUniform => QSU}
 import quasar.qsu.QSUGraph.QSUPattern
 import quasar.qsu.ReifyIdentities.ResearchedQSU
+import quasar.qsu.mra.JoinKey
+
+import cats.data.NonEmptySet
+import cats.syntax.reducible._
+import cats.syntax.set._
+
+import iotaz.CopK
 
 import matryoshka.{Corecursive, BirecursiveT, CoalgebraM, Recursive, ShowT}
 import matryoshka.data._
 import matryoshka.patterns.CoEnv
-import scalaz.{~>, -\/, \/-, \/, Const, Monad, NonEmptyList, NaturalTransformation, ReaderT}
+
+import scalaz.{~>, -\/, \/-, \/, Const, Monad, NaturalTransformation, ReaderT}
 import scalaz.Scalaz._
-import iotaz.CopK
 
 final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
 
@@ -168,12 +176,22 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
           : F[FreeMapA[B]] =
         MR.asks(_.resolveAccess[A, B](name, fa)(f)(ex))
 
-      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[IdAccess] => F[JoinFunc] = {
-        case JoinKey(l, r) =>
+      def eqCond(lroot: Symbol, rroot: Symbol): JoinKey[T[EJson], IdAccess] => F[JoinFunc] = {
+        case JoinKey.Dynamic(l, r) =>
           for {
             lside <- resolveAccess(func.Hole as Access.id(l, lroot))(_.left)(κ(lroot))
             rside <- resolveAccess(func.Hole as Access.id(r, rroot))(_.left)(κ(rroot))
           } yield func.Eq(lside >> func.LeftSide, rside >> func.RightSide)
+
+        case JoinKey.StaticL(s, r) =>
+          resolveAccess(func.Hole as Access.id(r, rroot))(_.left)(κ(rroot)) map { rside =>
+            func.Eq(func.Constant(s), rside >> func.RightSide)
+          }
+
+        case JoinKey.StaticR(l, s) =>
+          resolveAccess(func.Hole as Access.id(l, lroot))(_.left)(κ(lroot)) map { lside =>
+            func.Eq(lside >> func.LeftSide, func.Constant(s))
+          }
       }
 
       qsu match {
@@ -244,19 +262,25 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
         case QSU.Unreferenced() =>
           QCE(Unreferenced[T, QSUGraph]()).point[F]
 
-        case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
-          val condition = joinKeys.keys.toNel.fold(func.Constant[JoinSide](EJson.bool(true)).point[F]) { jks =>
+        case QSU.QSAutoJoin(left, right, autojoin, combiner) =>
+          val t = func.Constant[JoinSide](EJson.bool(true))
+
+          val condition = autojoin.keys.toSortedSet.toNes.fold(t.point[F]) { jks =>
             val mkEq = eqCond(left.root, right.root)
 
-            val mkIsect =
-              (_: NonEmptyList[JoinKey[IdAccess]])
-                .foldMapRight1(mkEq)((l, r) => (mkEq(l) |@| r)(func.Or(_, _)))
-
             val mkConj =
-              (_: NonEmptyList[NonEmptyList[JoinKey[IdAccess]]])
-                .foldMapRight1(mkIsect)((l, r) => (mkIsect(l) |@| r)(func.And(_, _)))
+              (_: NonEmptySet[JoinKey[T[EJson], IdAccess]])
+                .reduceRightTo(mkEq)((l, r) => r.map(jf => (mkEq(l) |@| jf)(func.And(_, _))))
+                .value
 
-            jks.foldMapRight1(mkConj)((l, r) => (mkConj(l) |@| r)(func.Or(_, _)))
+            val cond =
+              jks.reduceRightTo(mkConj)((l, r0) => r0.map(r => (mkConj(l) |@| r)(func.Or(_, _))))
+                .value
+
+            if (autojoin.onUndefined === OnUndefined.Emit)
+              cond.map(func.IfUndefined(_, t))
+            else
+              cond
           }
 
           (mergeSources[F](left, right) |@| condition) {

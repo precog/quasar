@@ -51,9 +51,11 @@ final class DefaultDatasources[
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     errors: DatasourceErrors[F, I],
-    manager: DatasourceManager[I, C, T, F, Stream[F, ?], R],
+    manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, ResourcePathType],
     schema: ResourceSchema[F, S, (ResourcePath, R)])
     extends Datasources[F, Stream[F, ?], I, C, S] {
+
+  type PathType = ResourcePathType
 
   def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] =
     for {
@@ -193,7 +195,7 @@ final class DefaultDatasources[
 
   private def withDatasource[E >: ExistentialError[I] <: DatasourceError[I, C], A](
       datasourceId: I)(
-      f: ManagedDatasource[T, F, Stream[F, ?], R] => F[A])
+      f: ManagedDatasource[T, F, Stream[F, ?], R, ResourcePathType] => F[A])
       : F[E \/ A] =
     manager.managedDatasource(datasourceId) flatMap {
       case Some(ds) =>
@@ -213,7 +215,7 @@ object DefaultDatasources {
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       errors: DatasourceErrors[F, I],
-      manager: DatasourceManager[I, C, T, F, Stream[F, ?], R],
+      manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, ResourcePathType],
       schema: ResourceSchema[F, S, (ResourcePath, R)])
       : Datasources[F, Stream[F, ?], I, C, S] =
     new DefaultDatasources(freshId, refs, errors, manager, schema)

@@ -35,6 +35,8 @@ import java.lang.{
 
 import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.applicativeError._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 import fs2.Stream
 import org.slf4s.Logging
 
@@ -43,7 +45,7 @@ object ExternalDatasources extends Logging {
       config: ExternalConfig,
       blockingPool: BlockingContext)(
       implicit F: ConcurrentEffect[F])
-      : Stream[F, List[DatasourceModule]] = {
+      : F[List[DatasourceModule]] = {
     val datasourceModuleStream: Stream[F, DatasourceModule] =
       ExternalModules(config, blockingPool)
         .filter {
@@ -56,9 +58,9 @@ object ExternalDatasources extends Logging {
         .flatMap((loadDatasourceModule[F](_, _)).tupled)
 
     for {
-      _ <- ExternalModules.infoStream[F]("Loading datasources")
-      ds <- datasourceModuleStream.fold(List.empty[DatasourceModule])((m, d) => d :: m)
-      _ <- ExternalModules.infoStream[F](s"Loaded ${ds.length} datasource(s)")
+      _ <- ConcurrentEffect[F].delay(log.info("Loading datasources"))
+      ds <- datasourceModuleStream.compile.toList
+      _ <- ConcurrentEffect[F].delay(log.info(s"Loaded ${ds.length} datasource(s)"))
     } yield ds
   }
 

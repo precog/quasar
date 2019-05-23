@@ -16,11 +16,11 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Stream => _, Seq => _, _}
+import slamdata.Predef.{Seq => _, Stream => _, _}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._
-import quasar.connector._
+import quasar.connector._, LightweightDatasourceModule.DS
 import quasar.connector.ResourceError._
 import quasar.connector.datasource.LightweightDatasource
 import quasar.contrib.fs2.convert
@@ -64,8 +64,8 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
   def pathIsResource(path: ResourcePath): F[Boolean] =
     toNio[F](root, path) >>= isCandidate
 
-  def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType)]]] = {
-    def withType(jp: JPath): F[(ResourceName, ResourcePathType)] =
+  def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType.Physical)]]] = {
+    def withType(jp: JPath): F[(ResourceName, ResourcePathType.Physical)] =
       isCandidate(jp)
         .map(_.fold(ResourcePathType.leafResource, ResourcePathType.prefix))
         .strengthL(toResourceName(jp))
@@ -102,6 +102,6 @@ object EvaluableLocalDatasource {
       dsType: DatasourceType,
       root: JPath)(
       queryResult: InterpretedRead[JPath] => QueryResult[F])
-      : Datasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F]] =
+      : DS[F] =
     new EvaluableLocalDatasource[F](dsType, root, queryResult)
 }

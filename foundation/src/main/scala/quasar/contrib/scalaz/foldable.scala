@@ -19,7 +19,6 @@ package quasar.contrib.scalaz
 import slamdata.Predef._
 
 import scalaz._, Scalaz._
-import scalaz.stream._
 
 final class FoldableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Foldable[F]) {
 
@@ -29,10 +28,6 @@ final class FoldableOps[F[_], A] private[scalaz] (self: F[A])(implicit F0: Folda
     */
   def equalsAsSets(other: F[A])(implicit A: Equal[A]): Boolean =
     self.all(other element _) && other.all(self element _)
-
-  /** The pure `Process` of the values in this `Foldable`. */
-  final def toProcess: Process0[A] =
-    self.foldRight[Process0[A]](Process.halt)((a, p) => Process.emit(a) ++ p)
 }
 
 trait ToFoldableOps {

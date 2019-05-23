@@ -34,16 +34,21 @@ import matryoshka.data.free._
 import matryoshka.patterns.CoEnv
 import matryoshka.{BirecursiveT, Embed, EqualT, ShowT, delayEqual}
 
-import scalaz.{-\/, \/-, Monad}
+import scalaz.{-\/, \/-, Equal, Monad}
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
 import scala.collection
 import scala.sys
 
-final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] private () extends Minimizer[T] {
+sealed abstract class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
+    extends Minimizer[T]
+    with MraPhase[T] {
+
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
+
+  implicit def PEqual: Equal[P]
 
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
@@ -58,13 +63,14 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case QSFilter(src, predicate) =>
       // this is where we do the actual rewriting
       def rebuild(src: QSUGraph, fm: FreeMap): G[QSUGraph] = {
         updateGraph[T, G](
+          qprov,
           QSU.Map(src.root, rewriteFilter(predicate.linearize, fm).asRec)).map(_ :++ src)
       }
 
@@ -76,7 +82,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
           src.point[G]
         } else {
           // this case should never happen
-          updateGraph[T, G](QSU.Map(src.root, fm.asRec)) map { rewritten =>
+          updateGraph[T, G](qprov, QSU.Map(src.root, fm.asRec)) map { rewritten =>
             rewritten :++ src
           }
         }
@@ -86,7 +92,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
   }
 
   def apply[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
@@ -105,7 +111,7 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
 
     val collapsed = fm.asRec.flatMap(fms)
 
-    updateGraph[T, G](QSU.Map(singleSource.root, collapsed)) map { g =>
+    updateGraph[T, G](qprov, QSU.Map(singleSource.root, collapsed)) map { g =>
       val back = g :++ singleSource
       Some((back, back))
     }
@@ -135,8 +141,12 @@ final class FilterToCond[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT] priv
 }
 
 object FilterToCond {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]: FilterToCond[T] =
-    new FilterToCond[T]
-
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT](
+      qp: QProv[T])(implicit P: Equal[qp.P])
+      : Minimizer.Aux[T, qp.P] =
+    new FilterToCond[T] {
+      val qprov: qp.type = qp
+      val PEqual = P
+    }
 }
 

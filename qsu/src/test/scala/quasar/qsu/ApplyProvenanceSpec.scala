@@ -19,13 +19,13 @@ package quasar.qsu
 import slamdata.Predef.{Map => SMap, _}
 
 import quasar.{IdStatus, Qspec, Type}, IdStatus.{ExcludeId, IncludeId}
+import quasar.common.JoinType
+import quasar.contrib.iota._
 import quasar.contrib.pathy.AFile
-import quasar.ejson
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.contrib.iota._
 import quasar.qscript.{
   construction,
   LeftSide,
@@ -35,19 +35,27 @@ import quasar.qscript.{
   RightSide
 }
 import quasar.qscript.MapFuncsCore.RecIntLit
-import quasar.qscript.provenance.Dimensions
+import quasar.qsu.mra.ProvImpl
+
+import cats.instances.list._
 
 import matryoshka._
 import matryoshka.data.Fix
+
 import org.specs2.matcher.{Expectable, Matcher, MatchResult}
+
 import pathy.Path, Path.{file, Sandboxed}
-import scalaz.{\/, Cofree, IList, NonEmptyList}
+
+import scalaz.{\/, Cofree}
 import scalaz.syntax.apply._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.map._
+import scalaz.std.tuple._
+
+import shims.{eqToScalaz, orderToCats, orderToScalaz, showToCats, showToScalaz}
 
 object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
 
@@ -63,15 +71,59 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
   val func = construction.Func[Fix]
   val recFunc = construction.RecFunc[Fix]
 
-  val app = ApplyProvenance[Fix, F] _
-  val qprov = QProv[Fix]
+  val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
+  val B = Bucketing(qprov)
+  val app = ApplyProvenance[Fix, F](qprov, _: QSUGraph)
+
+  import qprov.syntax._
+
   type P = qprov.P
-  val P = qprov.prov
+  val P = qprov.empty
+
+  implicit class QProvHelpers(p: P) {
+    def prjPath(name: String): P =
+      p.projectStatic(J.str(name), IdType.Dataset)
+
+    def infRow(id: Symbol): P =
+      p.inflateExtend(IdAccess.identity(id), IdType.Dataset)
+
+    def infBuk(id: Symbol, idx: Int): P =
+      p.inflateSubmerge(IdAccess.bucket(id, idx), IdType.Expr)
+
+    def infGrp(id: Symbol, idx: Int): P =
+      p.inflateSubmerge(IdAccess.groupKey(id, idx), IdType.Expr)
+
+    def infMap(id: Symbol): P =
+      p.inflateExtend(IdAccess.identity(id), IdType.Map)
+
+    def cnjMap(id: Symbol): P =
+      p.inflateConjoin(IdAccess.identity(id), IdType.Map)
+
+    def infArr(id: Symbol): P =
+      p.inflateExtend(IdAccess.identity(id), IdType.Array)
+
+    def cnjArr(id: Symbol): P =
+      p.inflateConjoin(IdAccess.identity(id), IdType.Array)
+
+    def injMap(key: String): P =
+      p.injectStatic(J.str(key), IdType.Map)
+
+    def injArr(idx: Int): P =
+      p.injectStatic(J.int(idx), IdType.Array)
+
+    def prjMap(key: String): P =
+      p.projectStatic(J.str(key), IdType.Map)
+
+    def prjArr(idx: Int): P =
+      p.projectStatic(J.int(idx), IdType.Array)
+  }
 
   val root = Path.rootDir[Sandboxed]
   val afile: AFile = root </> file("foobar")
+  val FooBar: P = P.prjPath("foobar")
 
-  import P.implicits._
+  def funcDims[A](fm: FreeMapA[A])(f: A => P): Option[P] =
+    computeFuncDims(qprov, fm)(f)
 
   "provenance application" should {
 
@@ -82,13 +134,9 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         qsu.map('name0,
           (qsu.read('name1, (afile, ExcludeId)), fm))
 
-      val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> Dimensions.origin(
-          P.value(IdAccess.identity('name1)),
-          P.prjPath(J.str("foobar"))),
-        'name1 -> Dimensions.origin(
-          P.value(IdAccess.identity('name1)),
-          P.prjPath(J.str("foobar"))))
+      val dims: SMap[Symbol, P] = SMap(
+        'name0 -> FooBar.infRow('name1),
+        'name1 -> FooBar.infRow('name1))
 
       tree must haveDimensions(dims)
     }
@@ -109,84 +157,14 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
             fm1)),
           fm2))
 
-      val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> Dimensions.origin(
-          P.value(IdAccess.identity('name0)),
-          P.prjPath(J.str("foobar"))),
-        'name1 -> Dimensions.origin(
-          P.thenn(
-            P.both(
-              P.thenn(
-                P.injValue(J.str("A")),
-                P.prjValue(J.str("X"))),
-              P.thenn(
-                P.injValue(J.str("B")),
-                P.prjValue(J.str("Y")))),
-            P.value(IdAccess.identity('name0))),
-          P.prjPath(J.str("foobar"))),
-        'name2 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("Y")),
-            P.value(IdAccess.identity('name0))),
-          P.prjPath(J.str("foobar"))))
-
-      tree must haveDimensions(dims)
-    }
-
-    "produce provenance for map involving a union" in {
-      val fm1: RecFreeMap =
-        recFunc.StaticMapS(
-          "x" -> recFunc.IfUndefined(
-            recFunc.ProjectKeyS(recFunc.Hole, "a"),
-            recFunc.ProjectKeyS(recFunc.Hole, "b")),
-          "y" -> recFunc.ProjectKeyS(recFunc.Hole, "c"))
-
-      val fm2: RecFreeMap =
-        recFunc.Add(
-          recFunc.ProjectKeyS(recFunc.Hole, "x"),
-          recFunc.ProjectKeyS(recFunc.Hole, "y"))
-
-      val tree: Cofree[QSU, Symbol] =
-        qsu.map('name0, (
-          qsu.map('name1, (
-            qsu.read('name2, (afile, ExcludeId)),
-            fm1)),
-          fm2))
-
-      val dims: SMap[Symbol, QDims] = SMap(
-        'name0 -> Dimensions(IList(
-          NonEmptyList(
-            P.thenn(
-              P.both(
-                P.prjValue(J.str("a")),
-                P.prjValue(J.str("c"))),
-              P.value(IdAccess.identity('name2))),
-            P.prjPath(J.str("foobar"))),
-          NonEmptyList(
-            P.thenn(
-              P.both(
-                P.prjValue(J.str("b")),
-                P.prjValue(J.str("c"))),
-              P.value(IdAccess.identity('name2))),
-            P.prjPath(J.str("foobar"))))),
-        'name1 -> Dimensions(IList(
-          NonEmptyList(
-            P.thenn(
-              P.both(
-                P.thenn(P.injValue(J.str("x")), P.prjValue(J.str("a"))),
-                P.thenn(P.injValue(J.str("y")), P.prjValue(J.str("c")))),
-              P.value(IdAccess.identity('name2))),
-            P.prjPath(J.str("foobar"))),
-          NonEmptyList(
-            P.thenn(
-              P.both(
-                P.thenn(P.injValue(J.str("x")), P.prjValue(J.str("b"))),
-                P.thenn(P.injValue(J.str("y")), P.prjValue(J.str("c")))),
-              P.value(IdAccess.identity('name2))),
-            P.prjPath(J.str("foobar"))))),
-        'name2 -> Dimensions.origin(
-          P.value(IdAccess.identity('name2)),
-          P.prjPath(J.str("foobar"))))
+      val dims: SMap[Symbol, P] = SMap(
+        'name0 -> FooBar.infRow('name0),
+        'name1 ->
+          (FooBar.infRow('name0).prjMap("X").injMap("A") ∧
+            FooBar.infRow('name0).prjMap("Y").injMap("B")),
+        'name2 ->
+          (FooBar.infRow('name0).prjMap("X") ∧
+            FooBar.infRow('name0).prjMap("Y")))
 
       tree must haveDimensions(dims)
     }
@@ -204,141 +182,11 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           ReduceFuncs.Sum(())))
 
       tree must haveDimensions(SMap(
-        'n4 -> Dimensions.origin(
-          P.value(IdAccess.bucket('n4, 1)),
-          P.value(IdAccess.bucket('n4, 0)),
-          P.prjPath(J.str("foobar"))),
-        'n3 -> Dimensions.origin(
-          P.prjValue(J.str("pop")) ≺: P.value(IdAccess.identity('n2)),
-          P.value(IdAccess.groupKey('n2, 1)),
-          P.value(IdAccess.groupKey('n2, 0)),
-          P.prjPath(J.str("foobar"))),
-        'n2 -> Dimensions.origin(
-          P.value(IdAccess.identity('n2)),
-          P.value(IdAccess.groupKey('n2, 1)),
-          P.value(IdAccess.groupKey('n2, 0)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.value(IdAccess.groupKey('n1, 0)),
-          P.prjPath(J.str("foobar"))),
-        'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.prjPath(J.str("foobar")))
-      ))
-    }
-
-    "compute provenance for squash" >> {
-      val tree =
-        qsu.dimEdit('n0, (
-          qsu.map('n1, (
-            qsu.read('n2, (afile, ExcludeId)),
-            recFunc.Add(
-              recFunc.Constant(J.int(7)),
-              recFunc.ProjectKeyS(recFunc.Hole, "bar")))),
-          DTrans.Squash[Fix]()))
-
-      tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.thenn(
-            P.thenn(
-              P.prjValue(J.str("bar")),
-              P.value(IdAccess.identity('n2))),
-            P.prjPath(J.str("foobar")))),
-        'n1 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("bar")),
-            P.value(IdAccess.identity('n2))),
-          P.prjPath(J.str("foobar"))),
-        'n2 -> Dimensions.origin(
-          P.value(IdAccess.identity('n2)),
-          P.prjPath(J.str("foobar")))
-      ))
-    }
-
-    //      Read
-    //        |
-    //    Transpose
-    //     /     \
-    // DimEdit    Map
-    //   |         |
-    // QSFilter    |
-    //   \        /
-    //   AutoJoin2
-    //        |
-    //     DimEdit
-    "compute provenance for graph branch with squash" >> {
-      val root =
-        qsu.transpose('n1, (
-          qsu.read('n0, (afile, ExcludeId)),
-          QScriptUniform.Retain.Identities,
-          Rotation.FlattenMap))
-
-      val tree =
-        qsu.dimEdit('n6, (
-          qsu._autojoin2('n5, (
-            qsu.qsFilter('n4, (
-              qsu.dimEdit('n3, (
-                root,
-                DTrans.Squash[Fix]())),
-              recFunc.Gt(recFunc.Hole, recFunc.Constant(ejson.Fixed[Fix[EJson]].int(42))))),
-            qsu.map('n2, (
-              root,
-              recFunc.ProjectKeyS(recFunc.Hole, "baz"))),
-            func.ConcatMaps(func.LeftSide, func.RightSide))),
-          DTrans.Squash[Fix]()))
-
-      tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.value(IdAccess.identity('n0))),
-          P.prjPath(J.str("foobar"))),
-        'n2 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("baz")),
-            P.thenn(
-              P.value(IdAccess.identity('n1)),
-              P.value(IdAccess.identity('n0)))),
-          P.prjPath(J.str("foobar"))),
-        'n3 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.thenn(
-              P.value(IdAccess.identity('n0)),
-              P.prjPath(J.str("foobar"))))),
-        'n4 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.thenn(
-              P.value(IdAccess.identity('n0)),
-              P.prjPath(J.str("foobar"))))),
-        'n5 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("baz")),
-            P.thenn(
-              P.value(IdAccess.identity('n1)),
-              P.value(IdAccess.identity('n0)))),
-          P.thenn(
-            P.value(IdAccess.identity('n1)),
-            P.thenn(
-              P.value(IdAccess.identity('n0)),
-              P.prjPath(J.str("foobar"))))),
-        'n6 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("baz")),
-            P.thenn(
-              P.value(IdAccess.identity('n1)),
-              P.thenn(
-                P.value(IdAccess.identity('n0)),
-                P.thenn(
-                  P.value(IdAccess.identity('n1)),
-                    P.thenn(
-                      P.value(IdAccess.identity('n0)),
-                      P.prjPath(J.str("foobar"))))))))
+        'n4 -> FooBar.infRow('n2).infBuk('n4, 0).infBuk('n4, 1).prjMap("pop").reduce,
+        'n3 -> FooBar.infRow('n2).infGrp('n2, 0).infGrp('n2, 1).prjMap("pop"),
+        'n2 -> FooBar.infRow('n2).infGrp('n2, 0).infGrp('n2, 1),
+        'n1 -> FooBar.infRow('n1).infGrp('n1, 0),
+        'n0 -> FooBar.infRow('n0)
       ))
     }
   }
@@ -355,14 +203,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           Rotation.FlattenArray))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.thenn(
-            P.value(IdAccess.identity('n0)),
-            P.value(IdAccess.identity('n1))),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar")))
+        'n0 -> FooBar.infRow('n1).cnjArr('n0),
+        'n1 -> FooBar.infRow('n1)
       ))
     }
 
@@ -377,13 +219,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar")))
+        'n0 -> FooBar.infRow('n1).infArr('n0),
+        'n1 -> FooBar.infRow('n1)
       ))
     }
 
@@ -398,17 +235,10 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.thenn(
-            P.both(
-              P.injValue(J.int(0)),
-              P.injValue(J.int(1))),
-            P.value(IdAccess.identity('n0))),
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar")))
+        'n0 ->
+          (FooBar.infRow('n1).infArr('n0).injArr(0) ∧
+            FooBar.infRow('n1).infArr('n0).injArr(1)),
+        'n1 -> FooBar.infRow('n1)
       ))
     }
 
@@ -423,15 +253,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.thenn(
-            P.prjValue(J.str("k")),
-            P.value(IdAccess.identity('n1))),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar")))
+        'n0 -> FooBar.infRow('n1).prjMap("k").infArr('n0),
+        'n1 -> FooBar.infRow('n1)
       ))
     }
 
@@ -446,15 +269,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.thenn(
-            P.prjValue(J.str("k")),
-            P.value(IdAccess.identity('n0))),
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar")))
+        'n0 -> FooBar.infRow('n1).infArr('n0).prjMap("k"),
+        'n1 -> FooBar.infRow('n1)
       ))
     }
 
@@ -469,13 +285,8 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
-        'n0 -> Dimensions.origin(
-          P.value(IdAccess.identity('n0)),
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar"))),
-        'n1 -> Dimensions.origin(
-          P.value(IdAccess.identity('n1)),
-          P.prjPath(J.str("foobar")))
+        'n0 -> FooBar.infRow('n1).infArr('n0),
+        'n1 -> FooBar.infRow('n1)
       ))
     }
   }
@@ -512,30 +323,122 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
     }
   }
 
-  "MapFunc provenance" >> {
-    val rdims =
-      qprov.lshift(IdAccess.identity('a), qprov.projectPath(J.str("data"), qprov.empty))
+  "ThetaJoin provenance" >> {
+    "should be joined when a subset of branches are referenced" >> {
+      val otherfile: AFile = root </> file("other")
+      val Other: P = P.prjPath("other")
 
-    val topDim = Dimensions.topDimension[P]
+      val n2 =
+        qsu.map('n2, (
+          qsu.read('n0, (afile, ExcludeId)),
+          recFunc.ProjectKeyS(recFunc.Hole, "B")))
+
+      val n3 =
+        qsu.map('n3, (
+          qsu.read('n1, (otherfile, ExcludeId)),
+          recFunc.ProjectKeyS(recFunc.Hole, "A")))
+
+      val n4 =
+        qsu.thetaJoin('n4, (
+          n2, n3,
+          func.Eq(
+            func.ProjectKeyS(func.LeftSide, "id"),
+            func.ProjectKeyS(func.RightSide, "id")),
+          JoinType.Inner,
+          func.ProjectKeyS(func.RightSide, "C")))
+
+      val p0 = FooBar.infRow('n0)
+      val p1 = Other.infRow('n1)
+      val p2 = p0.prjMap("B")
+      val p3 = p1.prjMap("A")
+      val p4 = (p2 ∧ p3).prjMap("C")
+
+      val dims = SMap(
+        'n0 -> p0,
+        'n1 -> p1,
+        'n2 -> p2,
+        'n3 -> p3,
+        'n4 -> p4)
+
+      n4 must haveDimensions(dims)
+    }
+  }
+
+  "Union provenance" >> {
+    "should be affected independently by FreeMaps" in {
+      val r =
+        qsu.read('n1, (afile, ExcludeId))
+
+      val shiftX =
+        qsu.leftShift('n0, (
+          r,
+          recFunc.ProjectKeyS(recFunc.Hole, "x"),
+          ExcludeId,
+          OnUndefined.Omit,
+          RightTarget[Fix],
+          Rotation.ShiftArray))
+
+      val shiftY =
+        qsu.leftShift('n2, (
+          r,
+          recFunc.ProjectKeyS(recFunc.Hole, "y"),
+          ExcludeId,
+          OnUndefined.Omit,
+          RightTarget[Fix],
+          Rotation.ShiftMap))
+
+      val fm: RecFreeMap =
+        recFunc.Add(
+          recFunc.ProjectKeyS(recFunc.Hole, "a"),
+          recFunc.ProjectKeyS(recFunc.Hole, "b"))
+
+      val tree: Cofree[QSU, Symbol] =
+        qsu.map('n4, (
+          qsu.union('n3, (shiftX, shiftY)),
+          fm))
+
+      val pR = FooBar.infRow('n1)
+
+      val pX = pR.prjMap("x").infArr('n0)
+      val pY = pR.prjMap("y").infMap('n2)
+
+      val p3 = pX ∨ pY
+
+      val p4 =
+        (pX.prjMap("a") ∧ pX.prjMap("b")) ∨ (pY.prjMap("a") ∧ pY.prjMap("b"))
+
+      val dims: SMap[Symbol, P] = SMap(
+        'n0 -> pX,
+        'n1 -> pR,
+        'n2 -> pY,
+        'n3 -> p3,
+        'n4 -> p4)
+
+      tree must haveDimensions(dims)
+    }
+  }
+
+  "MapFunc provenance" >> {
+    val rdims = P.prjPath("data").infRow('a)
 
     "make map injects" >> {
-      val res = computeFuncDims(func.MakeMapS("k", func.Hole))(κ(rdims))
-      res must_= Some(qprov.injectStatic(J.str("k"), rdims))
+      val res = funcDims(func.MakeMapS("k", func.Hole))(κ(rdims))
+      res must_= Some(rdims.injMap("k"))
     }
 
     "make array injects" >> {
-      val res = computeFuncDims(func.MakeArray(func.Hole))(κ(rdims))
-      res must_= Some(qprov.injectStatic(J.int(0), rdims))
+      val res = funcDims(func.MakeArray(func.Hole))(κ(rdims))
+      res must_= Some(rdims.injArr(0))
     }
 
     "project key projects" >> {
-      val res = computeFuncDims(func.ProjectKeyS(func.Hole, "k"))(κ(rdims))
-      res must_= Some(qprov.projectStatic(J.str("k"), rdims))
+      val res = funcDims(func.ProjectKeyS(func.Hole, "k"))(κ(rdims))
+      res must_= Some(rdims.prjMap("k"))
     }
 
     "project index projects" >> {
-      val res = computeFuncDims(func.ProjectIndexI(func.Hole, 1))(κ(rdims))
-      res must_= Some(qprov.projectStatic(J.int(1), rdims))
+      val res = funcDims(func.ProjectIndexI(func.Hole, 1))(κ(rdims))
+      res must_= Some(rdims.prjArr(1))
     }
 
     "concat map joins" >> {
@@ -544,165 +447,88 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         func.MakeMapS("k2", func.Hole))
 
 
-      val exp = qprov.join(
-        qprov.injectStatic(J.str("k1"), rdims),
-        qprov.injectStatic(J.str("k2"), rdims))
+      val exp = rdims.injMap("k1") ∧ rdims.injMap("k2")
 
-      computeFuncDims(fm)(κ(rdims)) must_= Some(exp)
+      funcDims(fm)(κ(rdims)) must_= Some(exp)
     }
 
     "concat array joins, updating rhs injects" >> {
-      val l = qprov.injectStatic(J.int(0), rdims)
-      val r = qprov.injectStatic(J.int(0), rdims)
+      val l = rdims.injArr(0)
+      val r = rdims.injArr(0)
 
       val mf = func.ConcatArrays(func.LeftSide, func.RightSide)
 
-      val res = computeFuncDims(mf) {
+      val res = funcDims(mf) {
         case LeftSide => l
         case RightSide => r
       }
 
-      val exp = topDim.modify(d =>
-        (P.injValue(J.int(0)) ≺: d) ∧ (P.injValue(J.int(1)) ≺: d))(rdims)
+      val exp =
+        rdims.injArr(0) ∧ rdims.injArr(1)
 
       res must_= Some(exp)
     }.pendingUntilFixed("ch1487")
 
     "concat array where lhs is not static makes rhs existential" >> {
-      val l = qprov.injectDynamic(rdims)
-      val r = qprov.injectStatic(J.int(0), rdims)
+      val l = rdims.injectDynamic
+      val r = rdims.injArr(0)
 
       val mf = func.ConcatArrays(func.LeftSide, func.RightSide)
 
-      val res = computeFuncDims(mf) {
+      val res = funcDims(mf) {
         case LeftSide => l
         case RightSide => r
       }
 
-      res.exists(topDim all {
-        case P.both(P.thenn(P.fresh(_), _), P.thenn(P.fresh(_), _)) => true
-        case _ => false
-      }) must beTrue
+      val sid = (J.int(0), IdType.Array)
+
+      res.exists(_.foldMapScalarIds((s, t) => List((s, t))).exists(_ ≟ sid)) must beFalse
     }.pendingUntilFixed("ch1487")
 
     "concat array where lhs is static and rhs isn't joins" >> {
-      val l = qprov.injectStatic(J.int(0), rdims)
-      val r = qprov.injectDynamic(rdims)
+      val l = rdims.injArr(0)
+      val r = rdims.injectDynamic
 
       val mf = func.ConcatArrays(func.LeftSide, func.RightSide)
 
-      val res = computeFuncDims(mf) {
+      val res = funcDims(mf) {
         case LeftSide => l
         case RightSide => r
       }
 
-      res.exists(topDim all {
-        case P.thenn(P.both(P.injValue(J.int(i)), P.fresh(_)), _) if i == 0 => true
-        case _ => false
-      }) must beTrue
+      val sid = (J.int(0), IdType.Array)
+
+      res.exists(_.foldMapScalarIds((s, t) => List((s, t))).exists(_ ≟ sid)) must beTrue
     }
 
     "delete key" >> {
       "identity when key is static" >> {
-        computeFuncDims(func.DeleteKeyS(func.Hole, "k"))(κ(rdims)) must_= Some(rdims)
+        funcDims(func.DeleteKeyS(func.Hole, "k"))(κ(rdims)) must_= Some(rdims)
       }
 
       "join when key is dynamic" >> {
-        val l = qprov.projectStatic(J.str("obj"), rdims)
-        val r = qprov.projectStatic(J.str("keyName"), rdims)
+        val l = rdims.prjMap("obj")
+        val r = rdims.prjMap("keyName")
 
         val mf = func.DeleteKey(
           func.ProjectKeyS(func.Hole, "obj"),
           func.ProjectKeyS(func.Hole, "keyName"))
 
-        computeFuncDims(mf)(κ(rdims)) must_= Some(qprov.join(l, r))
+        funcDims(mf)(κ(rdims)) must_= Some(l ∧ r)
       }
-    }
-
-    "if undefined unions" >> {
-      val fm = func.IfUndefined(
-        func.ProjectKeyS(func.Hole, "a"),
-        func.ProjectKeyS(func.Hole, "b"))
-
-      val exp = qprov.union(
-        qprov.projectStatic(J.str("a"), rdims),
-        qprov.projectStatic(J.str("b"), rdims))
-
-      computeFuncDims(fm)(κ(rdims)) must_= Some(exp)
-    }
-
-    "filtering cond is identity" >> {
-      val t = func.Cond(
-        func.Eq(
-          func.ProjectKeyS(func.Hole, "a"),
-          func.ProjectKeyS(func.Hole, "b")),
-        func.Hole,
-        func.Undefined)
-
-      val f = func.Cond(
-        func.Eq(
-          func.ProjectKeyS(func.Hole, "a"),
-          func.ProjectKeyS(func.Hole, "b")),
-        func.Undefined,
-        func.Hole)
-
-      computeFuncDims(t)(κ(rdims)) must_= Some(rdims)
-      computeFuncDims(f)(κ(rdims)) must_= Some(rdims)
-    }
-
-    "two-branch cond is union" >> {
-      val c = func.Cond(
-        func.Eq(
-          func.ProjectKeyS(func.Hole, "a"),
-          func.ProjectKeyS(func.Hole, "b")),
-        func.Hole,
-        func.ProjectKeyS(func.Hole, "c"))
-
-      val exp = qprov.union(
-        rdims,
-        qprov.projectStatic(J.str("c"), rdims))
-
-      computeFuncDims(c)(κ(rdims)) must_= Some(exp)
-    }
-
-    "filtering guard is identity" >> {
-      val lg = func.Guard(
-        func.ProjectKeyS(func.Hole, "a"),
-        Type.Str,
-        func.Hole,
-        func.Undefined)
-
-      val rg = func.Guard(
-        func.ProjectKeyS(func.Hole, "a"),
-        Type.Str,
-        func.Undefined,
-        func.Hole)
-
-      computeFuncDims(lg)(κ(rdims)) must_= Some(rdims)
-      computeFuncDims(rg)(κ(rdims)) must_= Some(rdims)
-    }
-
-    "two branch guard is union" >> {
-      val g = func.Guard(
-        func.ProjectKeyS(func.Hole, "a"),
-        Type.Str,
-        func.ProjectKeyS(func.Hole, "a"),
-        func.ProjectKeyS(func.Hole, "b"))
-
-      val exp = qprov.union(
-        qprov.projectStatic(J.str("a"), rdims),
-        qprov.projectStatic(J.str("b"), rdims))
-
-      computeFuncDims(g)(κ(rdims)) must_= Some(exp)
     }
 
     "typecheck is identity" >> {
       val fm = func.Typecheck(func.Hole, Type.Top)
-      computeFuncDims(fm)(κ(rdims)) must_= Some(rdims)
+      funcDims(fm)(κ(rdims)) must_= Some(rdims)
     }
 
     "undefined is empty" >> {
-      computeFuncDims(func.Undefined)(κ(rdims)) must beNone
+      funcDims(func.Undefined)(κ(rdims)) must beNone
+    }
+
+    "constant is empty" >> {
+      funcDims(func.Constant(J.str("nope")))(κ(rdims)) must beNone
     }
 
     "default is to join" >> {
@@ -710,16 +536,14 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         func.ProjectKeyS(func.Hole, "x"),
         func.ProjectKeyS(func.Hole, "y"))
 
-      val exp = qprov.join(
-        qprov.projectStatic(J.str("x"), rdims),
-        qprov.projectStatic(J.str("y"), rdims))
+      val exp = rdims.prjMap("x") ∧ rdims.prjMap("y")
 
-      computeFuncDims(fm)(κ(rdims)) must_= Some(exp)
+      funcDims(fm)(κ(rdims)) must_= Some(exp)
     }
   }
 
   // checks the expected dimensions
-  def haveDimensions(expected: SMap[Symbol, QDims])
+  def haveDimensions(expected: SMap[Symbol, P])
       : Matcher[Cofree[QSU, Symbol]] =
     new Matcher[Cofree[QSU, Symbol]] {
       def apply[S <: Cofree[QSU, Symbol]](s: Expectable[S]): MatchResult[S] = {
@@ -727,13 +551,13 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
         val (renames, inputGraph): (QSUGraph.Renames, QSUGraph) =
           QSUGraph.fromAnnotatedTree[Fix](s.value.map(Some(_)))
 
-        val expectedDims: SMap[Symbol, QDims] =
+        val expectedDims: SMap[Symbol, P] =
           expected.map { case (k, v) =>
-            val newP = renames.foldLeft(v)((p, t) => qprov.rename(t._1, t._2, p))
+            val newP = renames.foldLeft(v)((p, t) => B.rename(t._1, t._2, p))
             (renames(k), newP)
           }
 
-        val actual: PlannerError \/ AuthenticatedQSU[Fix] = app(inputGraph)
+        val actual: PlannerError \/ AuthenticatedQSU[Fix, P] = app(inputGraph)
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>

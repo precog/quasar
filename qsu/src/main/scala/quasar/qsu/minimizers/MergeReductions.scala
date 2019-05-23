@@ -35,11 +35,17 @@ import slamdata.Predef._
 
 import matryoshka.{delayEqual, BirecursiveT, EqualT, ShowT}
 import matryoshka.data.free._
-import scalaz.{Free, Monad, Scalaz}, Scalaz._
 
-final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () extends Minimizer[T] {
+import scalaz.{Equal, Free, Monad, Scalaz}, Scalaz._
+
+sealed abstract class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT]
+    extends Minimizer[T]
+    with MraPhase[T] {
+
   import MinimizeAutoJoins._
   import QSUGraph.Extractors._
+
+  implicit def PEqual: Equal[P]
 
   private val func = construction.Func[T]
   private val recFunc = construction.RecFunc[T]
@@ -52,7 +58,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
   }
 
   def extract[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])] = qgraph match {
 
     case qgraph @ QSReduce(src, buckets, reducers, repair) =>
@@ -65,7 +71,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
         val buckets2 = buckets.map(_.flatMap(rewriteBucket))
         val reducers2 = reducers.map(_.map(_.flatMap(κ(fm))))
 
-        updateGraph[T, G](QSU.QSReduce(src.root, buckets2, reducers2, repair)) map { rewritten =>
+        updateGraph[T, G](qprov, QSU.QSReduce(src.root, buckets2, reducers2, repair)) map { rewritten =>
           qgraph.overwriteAtRoot(rewritten.vertices(rewritten.root)) :++ rewritten :++ src
         }
       }
@@ -75,7 +81,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def apply[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph,
       source: QSUGraph,
       candidates: List[QSUGraph],
@@ -133,7 +139,7 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 
       val redPat = QSU.QSReduce[T, Symbol](source.root, buckets, reducers, repair)
 
-      updateGraph[T, G](redPat) map { rewritten =>
+      updateGraph[T, G](qprov, redPat) map { rewritten =>
         val back = qgraph.overwriteAtRoot(QSU.Map[T, Symbol](rewritten.root, adjustedFM)) :++ rewritten
 
         Some((rewritten, back))
@@ -145,6 +151,11 @@ final class MergeReductions[T[_[_]]: BirecursiveT: EqualT: ShowT] private () ext
 }
 
 object MergeReductions {
-  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT]: MergeReductions[T] =
-    new MergeReductions[T]
+  def apply[T[_[_]]: BirecursiveT: EqualT: ShowT](
+      qp: QProv[T])(implicit P: Equal[qp.P])
+      : Minimizer.Aux[T, qp.P] =
+    new MergeReductions[T] {
+      val qprov: qp.type = qp
+      val PEqual = P
+    }
 }

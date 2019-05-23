@@ -43,4 +43,13 @@ final class ResourcePathSpec extends quasar.Qspec {
   "uncons root" >> {
     ResourcePath.root().uncons must beNone
   }
+
+  "unsnoc" >> prop { (x: ResourceName, y: ResourceName) =>
+    val p = ResourcePath.root() / x / y
+    p.unsnoc must_= Some((ResourcePath.root() / x, y))
+  }
+
+  "unsnoc root" >> {
+    ResourcePath.root().unsnoc must beNone
+  }
 }

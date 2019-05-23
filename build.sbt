@@ -55,7 +55,7 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4"))
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -111,10 +111,8 @@ lazy val foundation = project
     buildInfoPackage := "quasar.build",
 
     libraryDependencies ++= Seq(
-      "com.slamdata"               %% "slamdata-predef"           % "0.0.4",
+      "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
-      "org.scalaz"                 %% "scalaz-concurrent"         % scalazVersion,
-      "org.scalaz.stream"          %% "scalaz-stream"             % scalazStreamVersion,
       "com.codecommit"             %% "shims"                     % "1.7.0",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
@@ -132,7 +130,7 @@ lazy val foundation = project
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
       "com.propensive"             %% "contextual"                % "1.0.1",
-      "io.frees"                   %% "iotaz-core"                % "0.3.8",
+      "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
@@ -141,7 +139,7 @@ lazy val foundation = project
       "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
       "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
       "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.0"                              % Test))
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.2"                              % Test))
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
@@ -230,7 +228,7 @@ lazy val sql = project
   .settings(
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.6"))
+      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.7"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
@@ -246,7 +244,11 @@ lazy val qsu = project
   .dependsOn(qscript % BothScopes)
   .settings(commonSettings)
   .settings(
-    libraryDependencies += "org.slf4s" %% "slf4s-api" % slf4sVersion)
+    libraryDependencies ++= Seq(
+      "org.slf4s" %% "slf4s-api" % slf4sVersion,
+      "org.typelevel" %% "cats-laws"        % catsVersion       % Test,
+      "org.typelevel" %% "cats-kernel-laws" % catsVersion       % Test,
+      "org.typelevel" %% "discipline"       % disciplineVersion % Test))
   .settings(scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, 12)) => Seq("-Ypatmat-exhaust-depth", "40")
@@ -298,7 +300,7 @@ lazy val impl = project
       "io.atomix"       % "atomix-gossip"  % atomixVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "5.0.3"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "5.2.1"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

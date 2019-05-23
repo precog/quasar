@@ -26,18 +26,24 @@ import scalaz.Monad
 trait Minimizer[T[_[_]]] extends QSUTTypes[T] {
   import MinimizeAutoJoins.MinStateM
 
+  type P
+
   def couldApplyTo(candidates: List[QSUGraph]): Boolean
 
   def extract[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])]
 
   // the first component of the tuple is the rewrite target on any provenance association
   // the second component is the root of the resulting graph
   def apply[
-      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, ?[_]]](
+      G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
       fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]]
+}
+
+object Minimizer {
+  type Aux[T[_[_]], P0] = Minimizer[T] { type P = P0 }
 }

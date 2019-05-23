@@ -22,7 +22,7 @@ import quasar.Condition
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
-import quasar.api.resource.ResourcePath
+import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.contrib.cats.stateT._
 import quasar.contrib.cats.writerT._
 import quasar.contrib.cats.effect.stateT.catsStateTEffect
@@ -33,7 +33,6 @@ import quasar.impl.storage.PureIndexedStore
 import DefaultDatasourcesSpec._
 
 import java.io.IOException
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
 
@@ -42,24 +41,20 @@ import cats.effect.IO
 import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
-
 import eu.timepit.refined.auto._
-
 import fs2.Stream
-
 import matryoshka.data.Fix
-
 import monocle.macros.Lenses
-
-import scalaz.{-\/, \/-, IMap, ISet, Monoid}
+import scalaz.{-\/, IMap, ISet, Monoid, \/-}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.syntax.std.option._
-
 import shims._
 
 final class DefaultDatasourcesSpec
     extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
+
+  type PathType = ResourcePathType
 
   val monadIdx: MonadState_[DefaultM, Int] =
     MonadState_.zoom[DefaultM](DefaultState.idx)

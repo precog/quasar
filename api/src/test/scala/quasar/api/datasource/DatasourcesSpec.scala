@@ -32,7 +32,7 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import eu.timepit.refined.auto._
 import org.specs2.matcher.Matcher
-import scalaz.{\/, Equal, IMap, Order, Show}
+import scalaz.{Equal, IMap, Order, Show, \/}
 import scalaz.syntax.equal._
 import scalaz.syntax.foldable._
 import scalaz.std.list._

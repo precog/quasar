@@ -78,6 +78,9 @@ sealed trait ResourcePath extends Product with Serializable {
 
   def uncons: Option[(ResourceName, ResourcePath)] =
     ResourcePath.leaf.getOption(this).map(ResourcePath.unconsLeaf)
+
+  def unsnoc: Option[(ResourcePath, ResourceName)] =
+    ResourcePath.leaf.getOption(this).map(ResourcePath.unsnocLeaf)
 }
 
 object ResourcePath extends ResourcePathInstances {
@@ -125,6 +128,10 @@ object ResourcePath extends ResourcePathInstances {
 
     (ResourceName(n), p)
   }
+
+  def unsnocLeaf(file: AFile): (ResourcePath, ResourceName) =
+    (parentDir(file).map(fromPath(_)).getOrElse(ResourcePath.root()), ResourceName(fileName(file).value))
+
 }
 
 sealed abstract class ResourcePathInstances {

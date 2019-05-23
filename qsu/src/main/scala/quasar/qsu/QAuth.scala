@@ -24,6 +24,9 @@ import quasar.qscript.{FreeMap, MonadPlannerErr, PlannerError}, PlannerError.Int
 
 import matryoshka._
 import matryoshka.data.free._
+
+import monocle.macros.Lenses
+
 import scalaz.{Applicative, Equal, Monoid, Show}
 import scalaz.std.anyVal._
 import scalaz.std.list._
@@ -32,35 +35,36 @@ import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.std.option._
 
-final case class QAuth[T[_[_]]](
-    dims: Map[Symbol, QDims[T]],
+@Lenses
+final case class QAuth[T[_[_]], P](
+    dims: Map[Symbol, P],
     groupKeys: Map[(Symbol, Int), FreeMap[T]]) {
 
-  def ++ (other: QAuth[T]): QAuth[T] =
+  def ++ (other: QAuth[T, P]): QAuth[T, P] =
     QAuth(dims ++ other.dims, groupKeys ++ other.groupKeys)
 
-  def addDims(vertex: Symbol, qdims: QDims[T]): QAuth[T] =
+  def addDims(vertex: Symbol, qdims: P): QAuth[T, P] =
     copy(dims = dims + (vertex -> qdims))
 
-  def addGroupKey(vertex: Symbol, idx: Int, key: FreeMap[T]): QAuth[T] =
+  def addGroupKey(vertex: Symbol, idx: Int, key: FreeMap[T]): QAuth[T, P] =
     copy(groupKeys = groupKeys + ((vertex, idx) -> key))
 
   /** Duplicates all group keys for `src` to `target`. */
-  def duplicateGroupKeys(src: Symbol, target: Symbol): QAuth[T] = {
+  def duplicateGroupKeys(src: Symbol, target: Symbol): QAuth[T, P] = {
     val srcKeys = groupKeys filterKeys { case (s, _) => s === src }
     val tgtKeys = srcKeys map { case ((_, i), v) => ((target, i), v) }
 
     copy(groupKeys = groupKeys ++ tgtKeys)
   }
 
-  def filterVertices(p: Symbol => Boolean): QAuth[T] =
+  def filterVertices(p: Symbol => Boolean): QAuth[T, P] =
     QAuth(dims.filterKeys(p), groupKeys.filterKeys { case (s, _) => p(s) })
 
-  def lookupDims(vertex: Symbol): Option[QDims[T]] =
+  def lookupDims(vertex: Symbol): Option[P] =
     dims get vertex
 
-  def lookupDimsE[F[_]: Applicative: MonadPlannerErr](vertex: Symbol): F[QDims[T]] =
-    lookupDims(vertex) getOrElseF MonadPlannerErr[F].raiseError[QDims[T]] {
+  def lookupDimsE[F[_]: Applicative: MonadPlannerErr](vertex: Symbol): F[P] =
+    lookupDims(vertex) getOrElseF MonadPlannerErr[F].raiseError[P] {
       InternalError(s"Dimensions for $vertex not found.", None)
     }
 
@@ -71,34 +75,21 @@ final case class QAuth[T[_[_]]](
     lookupGroupKey(vertex, idx) getOrElseF MonadPlannerErr[F].raiseError[FreeMap[T]] {
       InternalError(s"GroupKey[$idx] for $vertex not found.", None)
     }
-
-  def renameRefs
-      (target: Symbol, replacement: Symbol)
-      (implicit T0: BirecursiveT[T], T1: EqualT[T])
-      : QAuth[T] = {
-
-    val qp = QProv[T]
-    val supDims = dims.mapValues(qp.rename(target, replacement, _))
-
-    QAuth(supDims, groupKeys)
-  }
 }
 
 object QAuth extends QAuthInstances {
-  def empty[T[_[_]]]: QAuth[T] =
+  def empty[T[_[_]], P]: QAuth[T, P] =
     QAuth(Map(), Map())
 }
 
 sealed abstract class QAuthInstances {
-  implicit def monoid[T[_[_]]]: Monoid[QAuth[T]] =
-    Monoid.instance(_ ++ _, QAuth.empty[T])
+  implicit def monoid[T[_[_]], P]: Monoid[QAuth[T, P]] =
+    Monoid.instance(_ ++ _, QAuth.empty[T, P])
 
-  implicit def equal[T[_[_]]: BirecursiveT: EqualT]: Equal[QAuth[T]] = {
-    implicit val eqP: Equal[QProv.P[T]] = QProv[T].prov.implicits.provEqual
+  implicit def equal[T[_[_]]: BirecursiveT: EqualT, P: Equal]: Equal[QAuth[T, P]] =
     Equal.equalBy(qa => (qa.dims, qa.groupKeys))
-  }
 
-  implicit def show[T[_[_]]: ShowT]: Show[QAuth[T]] =
+  implicit def show[T[_[_]]: ShowT, P: Show]: Show[QAuth[T, P]] =
     Show.shows { case QAuth(dims, keys) =>
       "QAuth\n" +
       "=====\n" +

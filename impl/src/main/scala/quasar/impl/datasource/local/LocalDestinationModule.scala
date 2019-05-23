@@ -16,29 +16,35 @@
 
 package quasar.impl.datasource.local
 
-import quasar.api.datasource.DatasourceError.InitializationError
+import quasar.api.destination.DestinationError.{
+  InitializationError,
+  malformedConfiguration
+}
 import quasar.concurrent.BlockingContext
 import quasar.connector.{Destination, DestinationModule, MonadResourceErr}
 
+import scala.util.Either
+
 import argonaut.Json
 import cats.effect.{ContextShift, ConcurrentEffect, Resource, Timer}
-import scalaz.\/
-import scalaz.syntax.applicative._
-import shims._
 
 trait LocalDestinationModule extends DestinationModule {
-  val blockingPool: BlockingContext
+  def blockingPool: BlockingContext
 
   val destinationType = LocalDestinationType
+
   def sanitizeDestinationConfig(config: Json): Json = config
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
     config: Json)
-      : F[InitializationError[Json] \/ Resource[F, Destination[F]]] =
-    (for {
-      ld <- attemptConfig[F, LocalDestinationConfig](config, "Failed to decode LocalDestination config: ")
-      root <- validatePath(ld.rootDir, config, "Invalid destination path: ")
+      : Resource[F, Either[InitializationError[Json], Destination[F]]] = {
+    val dest = for {
+      ld <- attemptConfig[F, LocalDestinationConfig, InitializationError[Json]](
+        config, "Failed to decode LocalDestination config: ")((c, d) => malformedConfiguration((destinationType, c, d)))
+      root <- validatePath(
+        ld.rootDir, config, "Invalid destination path: ")((c, d) => malformedConfiguration((destinationType, c, d)))
+    } yield LocalDestination[F](root, blockingPool): Destination[F]
 
-      dest: Destination[F] = LocalDestination[F](root, blockingPool)
-    } yield dest.point[Resource[F, ?]]).run
+    Resource.liftF(dest.value)
+  }
 }

@@ -62,7 +62,6 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   type QSU[A] = QScriptUniform[A]
   type QSE[A] = QScriptEducated[A]
 
-  val researched = ReifyIdentities[Fix, F] _
   val grad = Graduate[Fix, F] _
 
   val qsu = QScriptUniform.DslT[Fix]
@@ -240,8 +239,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def graduateAs(expected: Fix[QSE]): Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val authd = AuthenticatedQSU[Fix](QSUGraph.fromTree[Fix](s.value), QAuth.empty)
-        val actual: PlannerError \/ Fix[QSE] = evaluate(researched(authd) >>= grad)
+        val authd = AuthenticatedQSU(QSUGraph.fromTree[Fix](s.value), QAuth.empty[Fix, Unit])
+        val actual: PlannerError \/ Fix[QSE] = evaluate(ReifyIdentities[Fix, F](authd) >>= grad)
 
         actual.bimap[MatchResult[S], MatchResult[S]](
         { err =>
@@ -261,8 +260,8 @@ object GraduateSpec extends Qspec with QSUTTypes[Fix] {
   def notGraduate: Matcher[Fix[QSU]] = {
     new Matcher[Fix[QSU]] {
       def apply[S <: Fix[QSU]](s: Expectable[S]): MatchResult[S] = {
-        val authd = AuthenticatedQSU[Fix](QSUGraph.fromTree[Fix](s.value), QAuth.empty)
-        val actual: PlannerError \/ Fix[QSE] = evaluate(researched(authd) >>= grad)
+        val authd = AuthenticatedQSU(QSUGraph.fromTree[Fix](s.value), QAuth.empty[Fix, Unit])
+        val actual: PlannerError \/ Fix[QSE] = evaluate(ReifyIdentities[Fix, F](authd) >>= grad)
 
         // TODO better equality checking for PlannerError
         actual.bimap[MatchResult[S], MatchResult[S]](

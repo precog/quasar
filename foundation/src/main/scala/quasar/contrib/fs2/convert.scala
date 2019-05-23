@@ -17,13 +17,12 @@
 package quasar.contrib.fs2
 
 import slamdata.Predef.{Boolean, None, Option, Some, Throwable, Unit}
-import quasar.Disposable
 
 import java.util.Iterator
 import java.util.stream.{Stream => JStream}
 import scala.util.{Either, Left}
 
-import cats.effect.{Concurrent, Sync}
+import cats.effect.{Concurrent, Resource, Sync}
 import cats.syntax.monadError._
 import fs2.concurrent.{NoneTerminatedQueue, Queue, SignallingRef}
 import fs2.{Chunk, Stream}
@@ -55,17 +54,14 @@ object convert {
   def fromStreamT[F[_]: Functor, A](st: StreamT[F, A]): Stream[F, A] =
     fromChunkedStreamT(st.map(Chunk.singleton(_)))
 
-  def toStreamT[F[_]: Concurrent, A](
-    s: Stream[F, A])
-      : F[Disposable[F, StreamT[F, A]]] =
-    chunkQ(s) map { case (startQ, close) =>
-      Disposable(
-        StreamT.wrapEffect(startQ.map(q =>
-          for {
-            c <- StreamT.unfoldM(q)(_.dequeue1.map(_.sequence).rethrow.map(_.strengthR(q)))
-            a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
-          } yield a)),
-        close)
+  def toStreamT[F[_]: Concurrent, A](s: Stream[F, A])
+      : Resource[F, StreamT[F, A]] =
+    Resource(chunkQ(s)) map { startQ =>
+      StreamT.wrapEffect(startQ.map(q =>
+        for {
+          c <- StreamT.unfoldM(q)(_.dequeue1.map(_.sequence).rethrow.map(_.strengthR(q)))
+          a <- StreamT.unfoldM(0)(i => (i < c.size).option((c(i), i + 1)).point[F])
+        } yield a))
     }
 
   ////
@@ -81,7 +77,7 @@ object convert {
             .attempt
             .interruptWhen(i)
             .noneTerminate
-            .to(q.enqueue)
+            .through(q.enqueue)
             .handleErrorWith(t => Stream.eval(q.enqueue1(Some(Left(t)))))
 
         _ <- F.start(enqueue.compile.drain)

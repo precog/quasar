@@ -27,10 +27,10 @@ import scalaz.Applicative
 final class FailedDatasource[
     E,
     F[_]: Applicative: MonadError_[?[_], E],
-    G[_], Q, R] private (
+    G[_], Q, R, P <: ResourcePathType] private (
     datasourceType: DatasourceType,
     error: E)
-    extends Datasource[F, G, Q, R] {
+    extends Datasource[F, G, Q, R, P] {
 
   val kind: DatasourceType = datasourceType
 
@@ -41,7 +41,7 @@ final class FailedDatasource[
     MonadError_[F, E].raiseError(error)
 
   def prefixedChildPaths(path: ResourcePath)
-      : F[Option[G[(ResourceName, ResourcePathType)]]] =
+      : F[Option[G[(ResourceName, P)]]] =
     MonadError_[F, E].raiseError(error)
 }
 
@@ -49,9 +49,9 @@ object FailedDatasource {
   def apply[
       E,
       F[_]: Applicative: MonadError_[?[_], E],
-      G[_], Q, R](
+      G[_], Q, R, P <: ResourcePathType](
       kind: DatasourceType,
       error: E)
-      : Datasource[F, G, Q, R] =
-    new FailedDatasource[E, F, G, Q, R](kind, error)
+      : Datasource[F, G, Q, R, P] =
+    new FailedDatasource[E, F, G, Q, R, P](kind, error)
 }

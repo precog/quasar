@@ -34,7 +34,7 @@ import java.nio.file.{Path => JPath}
 final class LocalDestination[F[_]: Effect: ContextShift] private (
   root: JPath,
   blockingContext: BlockingContext) extends Destination[F] {
-  val destinationKind = LocalDestinationType
+  val destinationType = LocalDestinationType
 
   def sinks: NonEmptyList[ResultSink[F]] =
     NonEmptyList(LocalCsvSink(root, blockingContext))

@@ -39,23 +39,25 @@ import scalaz._
 import scalaz.Scalaz._
 import StateT.stateTMonadState
 
-final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes[T] {
+sealed abstract class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends MraPhase[T] {
 
-  private val prov = new QProv[T]
+  implicit def PEqual: Equal[P]
+
   private val func = construction.Func[T]
   private val json = Fixed[T[EJson]]
-  private type P = prov.P
-  private type QAuthS[F[_]] = MonadState_[F, QAuth]
-  private type S = (QAuth, RevIdx)
 
-  private implicit def qauthState[F[_]: Monad]: MonadState_[StateT[F, S, ?], QAuth] =
-    MonadState_.zoom[StateT[F, S, ?]](_1[S, QAuth])
+  private type QAuthS[F[_]] = MonadState_[F, QAuth[P]]
+  private type S = (QAuth[P], RevIdx)
+
+  private implicit def qauthState[F[_]: Monad]: MonadState_[StateT[F, S, ?], QAuth[P]] =
+    MonadState_.zoom[StateT[F, S, ?]](_1[S, QAuth[P]])
 
   private implicit def revIdxState[F[_]: Monad]: MonadState_[StateT[F, S, ?], RevIdx] =
     MonadState_.zoom[StateT[F, S, ?]](_2[S, RevIdx])
 
   @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
-  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T]): F[AuthenticatedQSU[T]] =
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T, P])
+      : F[AuthenticatedQSU[T, P]] =
     aqsu.graph.rewriteM[StateT[F, S, ?]](expandShifts[StateT[F, S, ?]])
       .run((aqsu.auth, aqsu.graph.generateRevIndex))
       .map { case ((auth, _), graph) => AuthenticatedQSU(graph, auth) }
@@ -121,9 +123,9 @@ final class ExpandShifts[T[_[_]]: BirecursiveT: EqualT: ShowT] extends QSUTTypes
       commonShift = tempShift.overwriteAtRoot(tempShiftPat.copy(source = commonRoot))
 
       // compute provenance for this shift on the common source.
-      newDims <- ApplyProvenance.computeDims[T, G](commonShift)
+      newDims <- ApplyProvenance.computeDims[T, G](qprov, commonShift)
 
-      _ <- MonadState_[G, QAuth].modify(_.addDims(commonShift.root, newDims))
+      _ <- MonadState_[G, QAuth[P]].modify(_.addDims(commonShift.root, newDims))
 
       newShift = commonShift overwriteAtRoot {
         tempShiftPat.copy(
@@ -138,7 +140,15 @@ object ExpandShifts {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT,
       F[_]: Monad: NameGenerator: MonadPlannerErr](
-      qgraph: AuthenticatedQSU[T])
-      : F[AuthenticatedQSU[T]] =
-    new ExpandShifts[T].apply[F](qgraph)
+      qp: QProv[T])(qgraph: AuthenticatedQSU[T, qp.P])(
+      implicit P: Equal[qp.P])
+      : F[AuthenticatedQSU[T, qp.P]] = {
+
+    val es = new ExpandShifts[T] {
+      val qprov: qp.type = qp
+      val PEqual = P
+    }
+
+    taggedInternalError("ExpandShifts", es[F](qgraph))
+  }
 }

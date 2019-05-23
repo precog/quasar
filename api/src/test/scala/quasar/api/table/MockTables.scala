@@ -118,7 +118,7 @@ final class MockTables[F[_]: Monad: MockTables.TablesMockState]
           PreparationNotInProgress(tableId)).point[F]
 
       case None =>
-        Condition.normal().point[F]
+        Condition.normal[PreparationNotInProgress[UUID]]().point[F]
     })
 
   def cancelAllPreparations: F[Unit] = {

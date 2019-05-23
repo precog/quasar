@@ -16,16 +16,18 @@
 
 package quasar.qsu
 
+import slamdata.Predef.{Map => _, _}
+
 import quasar.{Qspec, TreeMatchers}
 import quasar.IdStatus.{ExcludeId, IdOnly}
+import quasar.contrib.iota._
 import quasar.contrib.matryoshka._
 import quasar.ejson.{EJson, Fixed}
+import quasar.ejson.implicits._
 import quasar.fp._
-import quasar.contrib.iota._
 import quasar.qscript.{construction, Hole, OnUndefined, PlannerError, SrcHole}
 import quasar.qsu.{QScriptUniform => QSU}
-import slamdata.Predef.{Map => _, _}
-import quasar.contrib.iota.{copkEqual, copkTraverse}
+import quasar.qsu.mra.ProvImpl
 
 import matryoshka._
 import matryoshka.data._
@@ -35,6 +37,8 @@ import scalaz.{\/, EitherT, Need, StateT}
 import scalaz.syntax.applicative._
 import scalaz.syntax.either._
 import scalaz.syntax.show._
+
+import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 
 import Fix._
 import QSU.Rotation
@@ -47,6 +51,7 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
   val func = construction.Func[Fix]
   val json = Fixed[Fix[EJson]]
   val recFunc = construction.RecFunc[Fix]
+  val qprov = ProvImpl[Fix[EJson], IdAccess, IdType]
 
   type F[A] = EitherT[StateT[Need, Long, ?], PlannerError, A]
 
@@ -360,9 +365,9 @@ object ExpandShiftsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
     new Matcher[QSUGraph] {
       def apply[S <: QSUGraph](s: Expectable[S]): MatchResult[S] = {
         val actual =
-          ApplyProvenance[Fix, F](s.value).flatMap(
-           ExpandShifts[Fix, F]
-          ).run.eval(0).value
+          ApplyProvenance[Fix, F](qprov, s.value)
+            .flatMap(ExpandShifts[Fix, F](qprov))
+            .run.eval(0).value
 
         val mapped = actual.toOption.flatMap(aq => pf.lift(aq.graph)) map { r =>
           result(

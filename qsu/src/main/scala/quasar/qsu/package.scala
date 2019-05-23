@@ -19,10 +19,11 @@ package quasar
 import slamdata.Predef.{Map => SMap, _}
 import quasar.common.effect.NameGenerator
 import quasar.contrib.scalaz.MonadState_
+import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript._, PlannerError.InternalError
-import quasar.qscript.provenance.Dimensions
 import quasar.qsu.QScriptUniform.ShiftTarget
+import quasar.qsu.mra.Provenance
 
 import matryoshka.{Hole => _}
 import scalaz.{Free, Functor, Show, Traverse}
@@ -32,7 +33,8 @@ import scalaz.syntax.show._
 
 package object qsu {
   type FreeAccess[T[_[_]], A] = FreeMapA[T, Access[A]]
-  type QDims[T[_[_]]] = Dimensions[QProv.P[T]]
+  type QProv[T[_[_]]] = Provenance[T[EJson], IdAccess, IdType]
+  type QProvAux[T[_[_]], P] = Provenance.Aux[T[EJson], IdAccess, IdType, P]
   type QSUVerts[T[_[_]]] = SMap[Symbol, QScriptUniform[T, Symbol]]
 
   type RevIdxM[T[_[_]], F[_]] = MonadState_[F, QSUGraph.RevIdx[T]]

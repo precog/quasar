@@ -19,10 +19,13 @@ package quasar
 import slamdata.Predef.{None, Option, Product, Serializable, Some, Unit}
 import quasar.fp.ski.κ
 
+import scala.util.{Either, Left, Right}
+
 import monocle.{Iso, PPrism, Prism}
+
 import scalaz._, Scalaz._
 
-sealed trait Condition[E] extends Product with Serializable {
+sealed trait Condition[+E] extends Product with Serializable {
   def flatMap[EE](f: E => Condition[EE]): Condition[EE] =
     this match {
       case Condition.Abnormal(e) => f(e)
@@ -32,7 +35,7 @@ sealed trait Condition[E] extends Product with Serializable {
   def map[EE](f: E => EE): Condition[EE] =
     Condition.pAbnormal.modify(f)(this)
 
-  def orElse(other: => Condition[E]): Condition[E] =
+  def orElse[EE >: E](other: => Condition[EE]): Condition[EE] =
     this match {
       case Condition.Abnormal(_) => this
       case Condition.Normal()    => other
@@ -61,6 +64,12 @@ object Condition extends ConditionInstances {
     Iso[Condition[E], E \/ Unit] {
       case Abnormal(e) => e.left
       case Normal()    => ().right
+    } (_.fold(Abnormal(_), κ(Normal())))
+
+  def eitherIso[E]: Iso[Condition[E], Either[E, Unit]] =
+    Iso[Condition[E], Either[E, Unit]] {
+      case Abnormal(e) => Left(e)
+      case Normal()    => Right(())
     } (_.fold(Abnormal(_), κ(Normal())))
 
   def optionIso[E]: Iso[Condition[E], Option[E]] =

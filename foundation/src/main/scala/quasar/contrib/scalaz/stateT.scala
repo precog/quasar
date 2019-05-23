@@ -19,7 +19,6 @@ package quasar.contrib.scalaz
 import slamdata.Predef._
 
 import scalaz._, Scalaz._
-import scalaz.concurrent.Task
 
 trait StateTInstances {
   implicit def stateTCatchable[F[_]: Catchable: Monad, S]: Catchable[StateT[F, S, ?]] =
@@ -48,15 +47,4 @@ object stateT extends StateTInstances {
     def get[F[_]: Monad, S]: StateT[F, S, S] =
       StateT[F, S, S](s => (s, s).point[F])
   }
-
-   object StateTask {
-     def modify[S](f: S => S): StateT[Task, S, Unit] =
-       StateT(s => Task.delay((f(s), ())))
-
-     def gets[S, A](f: S => A): StateT[Task, S, A] =
-       StateT(s => Task.delay((s, f(s))))
-
-     def modifyAndGets[S, A](f: S => (S, A)): StateT[Task, S, A] =
-       StateT(s => Task.delay(f(s)))
-   }
 }

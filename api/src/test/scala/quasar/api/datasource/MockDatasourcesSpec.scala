@@ -33,11 +33,11 @@ import scalaz.std.anyVal._
 import scalaz.std.list._
 import scalaz.std.string._
 import shims._
-
 import MockDatasourcesSpec._
 
 final class MockDatasourcesSpec
   extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {
+
 
   val s3: DatasourceType    = DatasourceType("s3", 1L)
   val azure: DatasourceType = DatasourceType("azure", 1L)

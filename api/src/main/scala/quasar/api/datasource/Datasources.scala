@@ -33,6 +33,8 @@ import scalaz.{\/, ISet}
 trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
   import DatasourceError._
 
+  type PathType <: ResourcePathType
+
   /** Adds the datasource described by the given `DatasourceRef` to the
     * set of datasources, returning its identifier or an error if it could
     * not be added.
@@ -62,7 +64,7 @@ trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
     * datasource implied by concatenating each name to `prefixPath`.
     */
   def prefixedChildPaths(datasourceId: I, prefixPath: ResourcePath)
-      : F[DiscoveryError[I] \/ G[(ResourceName, ResourcePathType)]]
+      : F[DiscoveryError[I] \/ G[(ResourceName, PathType)]]
 
   /** Removes the specified datasource, making its resources unavailable. */
   def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]]

@@ -22,6 +22,7 @@ import quasar.api.QueryEvaluator
 import quasar.common.{phaseM, PhaseResultTell}
 import quasar.compile.queryPlan
 import quasar.contrib.iota._
+import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.frontend.logicalplan.{LogicalPlan => LP}
 import quasar.qscript.QScriptEducated
@@ -34,6 +35,8 @@ import matryoshka._
 import org.slf4s.Logging
 import scalaz.{Monad, StateT}
 import scalaz.syntax.bind._
+
+import shims._
 
 object Sql2QueryEvaluator extends Logging {
   def apply[

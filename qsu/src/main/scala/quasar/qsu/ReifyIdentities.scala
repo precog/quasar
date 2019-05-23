@@ -34,9 +34,9 @@ import quasar.qscript.{
   ReduceFunc}
 import quasar.qscript.RecFreeS._
 import quasar.qscript.MapFuncCore.{EmptyMap, StaticMap}
-import quasar.qscript.provenance.JoinKey
 import quasar.qsu.{QScriptUniform => QSU}, QSU.ShiftTarget
 import quasar.qsu.ApplyProvenance.AuthenticatedQSU
+import quasar.qsu.mra.JoinKey
 
 import matryoshka.{BirecursiveT, ShowT}
 import monocle.{Lens, Optional}
@@ -53,7 +53,7 @@ import scalaz.Scalaz._
 final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[T] {
   import ReifyIdentities.ResearchedQSU
 
-  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T])
+  def apply[F[_]: Monad: NameGenerator: MonadPlannerErr](aqsu: AuthenticatedQSU[T, _])
       : F[ResearchedQSU[T]] =
     reifyIdentities[F](gatherReferences(aqsu.graph), aqsu)
 
@@ -106,8 +106,8 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case _ => ISet.empty
     }
 
-  private def joinKeyAccess(src: Symbol, jk: JoinKey[IdAccess]): IList[Access[Symbol]] =
-    IList(jk.left, jk.right) map { idA =>
+  private def joinKeyAccess(src: Symbol, jk: JoinKey[T[EJson], IdAccess]): List[Access[Symbol]] =
+    JoinKey.vectorIds.getAll(jk) map { idA =>
       Access.id(idA, IdAccess.symbols.headOption(idA) getOrElse src)
     }
 
@@ -139,11 +139,10 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       case QSU.QSSort(source, buckets, order) =>
         recordAccesses(g.root, bucketIdAccess(source, buckets))
 
-      case QSU.QSAutoJoin(left, right, joinKeys, combiner) =>
+      case QSU.QSAutoJoin(left, right, autojoin, combiner) =>
         val keysAccess = for {
-          conj <- joinKeys.keys
-          isect <- conj.list
-          key <- isect.list
+          conj <- autojoin.keys.toSortedSet
+          key <- conj.toNonEmptyList.toList
           keyAccess <- joinKeyAccess(g.root, key)
         } yield keyAccess
 
@@ -154,7 +153,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
 
   private def reifyIdentities[F[_]: Monad: NameGenerator: MonadPlannerErr](
       refs: References,
-      aqsu: AuthenticatedQSU[T])
+      aqsu: AuthenticatedQSU[T, _])
       : F[ResearchedQSU[T]] = {
 
     import QSUGraph.{Extractors => E}
@@ -366,7 +365,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
           } else g
         }
 
-      case g @ E.QSAutoJoin(left, right, keys, combiner) =>
+      case g @ E.QSAutoJoin(left, right, autojoin, combiner) =>
         (emitsIVMap(left) |@| emitsIVMap(right)).tupled flatMap {
           case (true, true) =>
             onNeedsIV(g) as {
@@ -377,7 +376,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                     lookupIdentities >> func.RightSide),
                   rebaseV(combiner))
 
-              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, autojoin, newCombiner))
             }
 
           case (true, false) =>
@@ -387,7 +386,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   lookupIdentities >> func.LeftSide,
                   combiner >>= (_.fold(rebaseV(func.LeftSide), func.RightSide)))
 
-              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, autojoin, newCombiner))
             }
 
           case (false, true) =>
@@ -397,7 +396,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
                   lookupIdentities >> func.RightSide,
                   combiner >>= (_.fold(func.LeftSide, rebaseV(func.RightSide))))
 
-              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, keys, newCombiner))
+              g.overwriteAtRoot(O.qsAutoJoin(left.root, right.root, autojoin, newCombiner))
             }
 
           case (false, false) =>
@@ -543,7 +542,7 @@ final class ReifyIdentities[T[_[_]]: BirecursiveT: ShowT] private () extends QSU
       Access.id[Symbol] composePrism IdAccess.groupKey.first composeLens _1
 
     // Reifies group key access.
-    def reifyGroupKeys(auth: QAuth, g: QSUGraph): G[QSUGraph] = {
+    def reifyGroupKeys(auth: QAuth[_], g: QSUGraph): G[QSUGraph] = {
 
       def referencedAssocs(indices: IList[Int], valueAccess: FreeMap)
           : G[Option[NonEmptyList[(Symbol, FreeMap)]]] =
@@ -629,10 +628,10 @@ object ReifyIdentities {
         rqsu.refs.show ++
         Cord("\n======")
       }
-}
+  }
 
   def apply[T[_[_]]: BirecursiveT: ShowT, F[_]: Monad: NameGenerator: MonadPlannerErr]
-      (aqsu: AuthenticatedQSU[T])
+      (aqsu: AuthenticatedQSU[T, _])
       : F[ResearchedQSU[T]] =
     new ReifyIdentities[T].apply[F](aqsu)
 }

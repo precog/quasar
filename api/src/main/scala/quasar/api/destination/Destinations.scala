@@ -49,6 +49,7 @@ trait Destinations[F[_], G[_], I, C] {
     */
   def destinationStatus(destinationId: I): F[ExistentialError[I] \/ Condition[Exception]]
 
+  /** Shuts down and removes a destination. */
   def removeDestination(destinationId: I): F[Condition[ExistentialError[I]]]
 
   /** Replaces the reference to the specified destination. */

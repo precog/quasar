@@ -69,7 +69,7 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
       storeRef <- Ref[IO].of(store)
       store = RefIndexedStore[Int, DestinationRef[Json]](storeRef)
       mgr <- manager(running, errors, mockModules)
-    } yield DefaultDestinations[IO, Int, Json](fId, store, mgr)
+    } yield DefaultDestinations[Int, Json, IO](fId, store, mgr)
 
   def emptyDestinations: IO[Destinations[IO, Stream[IO, ?], Int, Json]] =
     mkDestinations(IMap.empty, IMap.empty, IMap.empty)

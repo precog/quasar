@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.QueryEvaluator
 import quasar.api.datasource.{DatasourceRef, Datasources}
-import quasar.api.destination.DestinationRef
+import quasar.api.destination.{DestinationRef, Destinations}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
@@ -32,6 +32,7 @@ import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
+import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations}
 import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.{DefaultTables, PreparationsManager}
@@ -56,6 +57,7 @@ import spire.std.double._
 
 final class Quasar[F[_], R, S](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double]],
+    val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery, R, S],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
 
@@ -97,6 +99,15 @@ object Quasar extends Logging {
         }
       })
 
+      _ <- Resource.liftF(Sync[F] delay {
+        destinationModules.groupBy(_.destinationType) foreach {
+          case (kind, sources) =>
+            if (sources.length > 1) {
+              log.warn(s"Found duplicate modules for type ${kind.shows}")
+            }
+        }
+      })
+
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
       moduleMap = IMap.fromList(datasourceModules.map(ds => ds.kind -> ds))
@@ -107,7 +118,12 @@ object Quasar extends Logging {
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
           .build(moduleMap, configured)
 
+      destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
+
       freshUUID = Sync[F].delay(UUID.randomUUID)
+
+      destManager <- Resource.liftF(DefaultDestinationManager.empty[UUID, F](destModules))
+      destinations = DefaultDestinations[UUID, Json, F](freshUUID, destinationRefs, destManager)
 
       resourceSchema = SimpleCompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
 
@@ -124,7 +140,7 @@ object Quasar extends Logging {
       tables =
         DefaultTables(freshUUID, tableRefs, sqlEvaluator, prepManager, lookupTableData, lookupTableSchema)
 
-    } yield new Quasar(datasources, tables, sqlEvaluator)
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator)
   }
 
   ////

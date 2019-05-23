@@ -34,7 +34,7 @@ import scalaz.syntax.monad._
 import scalaz.{\/, Equal, IMap, ISet, OptionT, Order}
 import shims._
 
-class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
+class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
     manager: DestinationManager[I, C, F])
@@ -104,9 +104,9 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
 }
 
 object DefaultDestinations {
-  def apply[F[_]: Sync, I: Equal: Order, C](
+  def apply[I: Equal: Order, C, F[_]: Sync](
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
-    manager: DestinationManager[I, C, F]): DefaultDestinations[F, I, C] =
-    new DefaultDestinations[F, I, C](freshId, refs, manager)
+    manager: DestinationManager[I, C, F]): DefaultDestinations[I, C, F] =
+    new DefaultDestinations[I, C, F](freshId, refs, manager)
 }

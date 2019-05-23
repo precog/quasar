@@ -48,7 +48,7 @@ final class DefaultTablesSpec extends TablesSpec[IO, UUID, String, String, Strin
     PureIndexedStore[IO, UUID, String]
 
   val runToStore: (UUID, String) => IO[Stream[IO, Unit]] =
-    pTableStore.insert(_, _).map(Stream(_))
+    pTableStore.insert(_, _).flatMap(_.get).map(Stream(_))
 
   val lookup: UUID => IO[Option[String]] =
     pTableStore.lookup(_)

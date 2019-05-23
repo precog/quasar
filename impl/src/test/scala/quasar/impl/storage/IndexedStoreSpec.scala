@@ -67,7 +67,8 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
         for {
           store <- emptyStore
           i <- freshIndex
-          _ <- store.insert(i, valueA)
+          d <- store.insert(i, valueA)
+          _ <- d.get
           v <- store.lookup(i)
         } yield {
           v must_= Some(valueA)
@@ -78,9 +79,11 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
         for {
           store <- emptyStore
           i <- freshIndex
-          _ <- store.insert(i, valueA)
-          _ <- store.insert(i, valueB)
+          d1 <- store.insert(i, valueA)
+          d2 <- store.insert(i, valueB)
           v <- store.lookup(i)
+          _ <- d1.get
+          _ <- d2.get
         } yield {
           v must_= Some(valueB)
         }
@@ -91,10 +94,12 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           store <- emptyStore
 
           ia <- freshIndex
-          _ <- store.insert(ia, valueA)
+          da <- store.insert(ia, valueA)
+          _ <- da.get
 
           ib <- freshIndex
-          _ <- store.insert(ib, valueB)
+          db <- store.insert(ib, valueB)
+          _ <- db.get
 
           es <- store.entries.compile.toList
 
@@ -111,20 +116,23 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           store <- emptyStore
           i <- freshIndex
           d <- store.delete(i)
-        } yield d must beFalse
+          res <- d.get
+        } yield res must beFalse
       }
 
       "lookup no longer returns value" >>* {
         for {
           store <- emptyStore
           i <- freshIndex
-          _ <- store.insert(i, valueA)
+          da <- store.insert(i, valueA)
+          _ <- da.get
           vBefore <- store.lookup(i)
           d <- store.delete(i)
+          res <- d.get
           vAfter <- store.lookup(i)
         } yield {
           vBefore must_= Some(valueA)
-          d must beTrue
+          res must beTrue
           vAfter must beNone
         }
       }
@@ -134,21 +142,24 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           store <- emptyStore
 
           ia <- freshIndex
-          _ <- store.insert(ia, valueA)
+          da <- store.insert(ia, valueA)
+          _ <- da.get
 
           ib <- freshIndex
-          _ <- store.insert(ib, valueB)
+          db <- store.insert(ib, valueB)
+          _ <- db.get
 
           esBefore <- store.entries.compile.toList
 
           d <- store.delete(ia)
+          res <- d.get
 
           esAfter <- store.entries.compile.toList
 
           vs = List((ia, valueA), (ib, valueB))
         } yield {
           esBefore must containTheSameElementsAs(vs)
-          d must beTrue
+          res must beTrue
           esAfter must containTheSameElementsAs(vs.drop(1))
         }
       }

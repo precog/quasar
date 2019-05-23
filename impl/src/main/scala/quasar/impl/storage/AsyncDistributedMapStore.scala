@@ -19,7 +19,7 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import cats.effect._
-import cats.effect.concurrent.Deferred
+import cats.effect.concurrent.{TryableDeferred, Deferred}
 import cats.syntax.functor._
 import cats.syntax.applicative._
 import cats.syntax.apply._
@@ -33,43 +33,51 @@ import io.atomix.core.iterator.AsyncIterator
 
 import java.util.concurrent.CompletableFuture
 
-final class AsyncDistributedMapStore[F[_]: Async: ContextShift, K, V](
+final class AsyncDistributedMapStore[F[_]: ConcurrentEffect: ContextShift, K, V](
     mp: AsyncDistributedMap[K, V])
     extends IndexedStore[F, K, V] {
 
   import AsyncDistributedMapStore._
 
   def entries: Stream[F, (K, V)] = for {
-    iterator <- Stream.eval(Sync[F].delay(mp.entrySet.iterator))
+    iterator <- Stream.bracket(Sync[F].delay(mp.entrySet.iterator))(
+      (it: AsyncIterator[java.util.Map.Entry[K, V]]) => toF(it.close()) as (()))
     entry <- fromIterator[F, java.util.Map.Entry[K, V]](iterator)
   } yield (entry.getKey, entry.getValue)
 
   def lookup(k: K): F[Option[V]] =
     toF(mp get k) map (Option(_))
 
-  def insert(k: K, v: V): F[Unit] =
-    toF(mp.put(k, v)) as (())
+  def insert(k: K, v: V): F[TryableDeferred[F, Unit]] = {
+    val cf: CompletableFuture[Unit] = mp.put(k, v).thenApply((x: V) => ())
+    toDeferred(cf)
+  }
 
-  def delete(k: K): F[Boolean] =
-    toF(mp.remove(k)) map { (x: V) => !Option(x).isEmpty }
+  def delete(k: K): F[TryableDeferred[F, Boolean]] = {
+    val cf: CompletableFuture[Boolean] = mp.remove(k).thenApply((x: V) => Option(x).nonEmpty)
+    toDeferred(cf)
+  }
 }
 
 object AsyncDistributedMapStore {
-  trait IndexedStoreEvent[K, +V]
+  import IndexedStore.Event, Event._
 
-  final case class Insert[K, V](k: K, v: V) extends IndexedStoreEvent[K, V]
-  final case class Remove[K](k: K) extends IndexedStoreEvent[K, Nothing]
+  def apply[F[_]: ConcurrentEffect: ContextShift, K, V](
+      mp: AsyncDistributedMap[K, V])
+      : IndexedStore[F, K, V] =
+    new AsyncDistributedMapStore(mp)
 
-  def eventStream[F[_]: ConcurrentEffect: ContextShift, K, V](mp: AsyncDistributedMap[K, V]): Stream[F, IndexedStoreEvent[K, V]] = {
+  def eventStream[F[_]: ConcurrentEffect: ContextShift, K, V](mp: AsyncDistributedMap[K, V]): Stream[F, Event[K, V]] = {
     val F = ConcurrentEffect[F]
     def run(f: F[Unit]): Unit = F.runAsync(f)(_ => IO.unit).unsafeRunSync
-    def listener(cb: IndexedStoreEvent[K, V] => Unit): MapEventListener[K, V] = { event => event.`type` match {
+    def listener(cb: Event[K, V] => Unit): MapEventListener[K, V] = { event => event.`type` match {
       case INSERT => cb(Insert(event.key, event.newValue))
       case UPDATE => cb(Insert(event.key, event.newValue))
-      case REMOVE => cb(Remove(event.key))
+      case REMOVE => cb(Delete(event.key))
     }}
+
     for {
-      q <- Stream.eval(Queue.bounded[F, IndexedStoreEvent[K, V]](1))
+      q <- Stream.eval(Queue.circularBuffer[F, Event[K, V]](128))
       handler = listener(x => run(q.enqueue1(x)))
       _ <- Stream.eval(toF(mp addListener handler))
       res <- q.dequeue.onFinalize(toF(mp removeListener handler) as (()))
@@ -84,31 +92,28 @@ object AsyncDistributedMapStore {
     Stream.unfoldEval(iterator)(getNext)
   }
 
+  private[this] def asyncCompletableFuture[F[_]: Async, A](cf: CompletableFuture[A]): F[A] =
+    Async[F].async { (cb: (Either[Throwable, A] => Unit)) =>
+      val _ = cf.whenComplete { (res: A, t: Throwable) => cb(Option(t).toLeft(res)) }
+    }
+
   def toF[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] = {
     if (cf.isDone) cf.get.pure[F]
-    else {
-      val fa: F[A] = Async[F].async { cb: (Either[Throwable, A] => Unit) =>
-        val _ = cf.whenComplete { (res: A, t: Throwable) => {
-          val eitherResult: Either[Throwable, A] =
-            if (!Option(t).isEmpty) Left(t) else Right(res)
-          cb(eitherResult)
-        }}
-      }
-      fa productL ContextShift[F].shift
-    }
+    else asyncCompletableFuture(cf) productL ContextShift[F].shift
   }
 
-  def consume[F[_]: Concurrent, K, V](
-      stream: Stream[F, IndexedStoreEvent[K, V]],
-      store: IndexedStore[F, K, V])
-      : F[Deferred[F, Unit]] = {
-    def handleEvent(e: IndexedStoreEvent[K, V]): F[Unit] = e match {
-      case Insert(k, v) => store.insert(k, v)
-      case Remove(k) => store.delete(k) as (())
-    }
-    for {
-      d <- Deferred[F, Unit]
-      _ <- Concurrent[F].start(stream.onFinalize(d.complete(())).evalMap(handleEvent).compile.drain)
+  def toDeferred[F[_]: Concurrent: ContextShift, A](cf: CompletableFuture[A]): F[TryableDeferred[F, A]] = {
+    if (cf.isDone) for {
+      d <- Deferred.tryable[F, A]
+      _ <- d.complete(cf.get)
+    } yield d
+    else for {
+      d <- Deferred.tryable[F, A]
+      _ <- Concurrent[F].start(for {
+        a <- asyncCompletableFuture(cf)
+        _ <- d.complete(a)
+      } yield ())
+      _ <- ContextShift[F].shift
     } yield d
   }
 }

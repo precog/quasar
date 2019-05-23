@@ -93,7 +93,7 @@ final class DefaultDatasources[
       .map(_.flatMap(_ \/> DatasourceError.pathNotFound[DiscoveryError[I]](prefixPath)))
 
   def removeDatasource(datasourceId: I): F[Condition[ExistentialError[I]]] =
-    refs.delete(datasourceId).ifM(
+    refs.delete(datasourceId).flatMap(_.get).ifM(
       manager.shutdownDatasource(datasourceId).as(Condition.normal[ExistentialError[I]]()),
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](datasourceId)).point[F])
 

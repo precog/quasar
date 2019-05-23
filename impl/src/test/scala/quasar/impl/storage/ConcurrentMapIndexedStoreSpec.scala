@@ -17,32 +17,32 @@
 package quasar.impl.storage
 
 import slamdata.Predef._
-import quasar.contrib.cats.effect.stateT.catsStateTEffect
 import quasar.concurrent.BlockingContext
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
-import cats.data.StateT
-import cats.effect.{Sync, IO}
+import cats.effect.IO
+import cats.effect.concurrent.Ref
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import shims._
 import java.util.concurrent.ConcurrentHashMap
 
 final class ConcurrentMapIndexedStoreSpec extends
-    IndexedStoreSpec[StateT[IO, Int, ?], Int, String] {
-
-  type M[A] = StateT[IO, Int, A]
+    IndexedStoreSpec[IO, Int, String] {
 
   val blockingPool: BlockingContext = BlockingContext.cached("concurrent-map-indexed-store-spec")
 
-  val freshIndex: M[Int] = StateT.liftF(IO(Random.nextInt))
+  val freshIndex: IO[Int] = IO(Random.nextInt)
 
-  val commit: M[Unit] = StateT.modify { (x: Int) => x + 1 }
+  def commit(ref: Ref[IO, Int]): IO[Unit] = ref update { (x: Int) => x + 1 }
 
-  val emptyStore: M[IndexedStore[M, Int, String]] =
-    Sync[M].delay { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit, blockingPool) }
+  def mkEmptyStore(ref: Ref[IO, Int]): IO[IndexedStore[IO, Int, String]] =
+    IO { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit(ref), blockingPool) }
+
+  val emptyStore: IO[IndexedStore[IO, Int, String]] =
+    Ref[IO].of(0) flatMap ((ref: Ref[IO, Int]) => mkEmptyStore(ref))
 
   val valueA = "A"
   val valueB = "B"
@@ -50,32 +50,33 @@ final class ConcurrentMapIndexedStoreSpec extends
   "check commits works" >> {
     val expected = List(0, 1, 2, 3, 4, 4)
 
-    val stateT = for {
-      store <- emptyStore
-      initial <- StateT.get[IO, Int]
+    val io = for {
+      ref <- Ref[IO].of(0)
+      store <- mkEmptyStore(ref)
+      initial <- ref.get
 
       i1 <- freshIndex
       _ <- store.insert(i1, valueA)
-      inserted1 <- StateT.get[IO, Int]
+      inserted1 <- ref.get
 
       i2 <- freshIndex
       _ <- store.insert(i2, valueB)
-      inserted2 <- StateT.get[IO, Int]
+      inserted2 <- ref.get
 
       i3 <- freshIndex
       _ <- store.insert(i3, valueA)
-      inserted3 <- StateT.get[IO, Int]
+      inserted3 <- ref.get
 
       _ <- store.delete(i1)
-      deleted1 <- StateT.get[IO, Int]
+      deleted1 <- ref.get
 
       i4 <- freshIndex
       _ <- store.delete(i4)
-      deleted2 <- StateT.get[IO, Int]
+      deleted2 <- ref.get
 
       actual = List(initial, inserted1, inserted2, inserted3, deleted1, deleted2)
     } yield actual === expected
 
-    stateT.runA(0).unsafeRunSync
+    io.unsafeRunSync
   }
 }

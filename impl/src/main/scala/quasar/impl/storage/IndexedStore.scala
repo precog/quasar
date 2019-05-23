@@ -18,20 +18,15 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import cats.{Monad => CMonad}
-import cats.effect.{Sync, Concurrent}
-import cats.arrow.FunctionK
+import cats.effect.concurrent.TryableDeferred
 import cats.syntax.functor._
 
 import monocle.Prism
 
 import quasar.contrib.scalaz.MonadError_
-import quasar.higher.HFunctor
-import quasar.concurrent.BlockingContext
 
 import fs2.Stream
 import scalaz.{~>, Bind, Functor, InvariantFunctor, Monad, Scalaz, Applicative}, Scalaz._
-import scalaz.syntax.tag._
 
 trait IndexedStore[F[_], I, V] {
   /** All values in the store paired with their index. */
@@ -43,15 +38,26 @@ trait IndexedStore[F[_], I, V] {
   /** Associate the given value with the specified index, replaces any
     * existing association.
     */
-  def insert(i: I, v: V): F[Unit]
+  def insert(i: I, v: V): F[TryableDeferred[F, Unit]]
 
   /** Remove any value associated with the specified index, returning whether
     * it existed.
     */
-  def delete(i: I): F[Boolean]
+  def delete(i: I): F[TryableDeferred[F, Boolean]]
 }
 
 object IndexedStore extends IndexedStoreInstances {
+  sealed trait Event[K, +V] extends Product with Serializable
+  object Event {
+    final case class Insert[K, V](k: K, v: V) extends Event[K, V]
+    final case class Delete[K](k: K) extends Event[K, Nothing]
+  }
+
+  def consumeEvent[F[_]: Functor, K, V](store: IndexedStore[F, K, V], event: Event[K, V]): F[Unit] = event match {
+    case Event.Insert(k, v) => store.insert(k, v) as (())
+    case Event.Delete(k) => store.delete(k) as (())
+  }
+
   /** Transform the index of a store. */
   def xmapIndex[F[_]: Functor, I, V, J](
       s: IndexedStore[F, I, V])(
@@ -65,10 +71,10 @@ object IndexedStore extends IndexedStoreInstances {
       def lookup(j: J): F[Option[V]] =
         s.lookup(g(j))
 
-      def insert(j: J, v: V): F[Unit] =
+      def insert(j: J, v: V): F[TryableDeferred[F, Unit]] =
         s.insert(g(j), v)
 
-      def delete(j: J): F[Boolean] =
+      def delete(j: J): F[TryableDeferred[F, Boolean]] =
         s.delete(g(j))
     }
 
@@ -88,10 +94,10 @@ object IndexedStore extends IndexedStoreInstances {
       def lookup(j: J): F[Option[V]] =
         F.bind(g(j))(s.lookup)
 
-      def insert(j: J, v: V): F[Unit] =
+      def insert(j: J, v: V): F[TryableDeferred[F, Unit]] =
         F.bind(g(j))(s.insert(_, v))
 
-      def delete(j: J): F[Boolean] =
+      def delete(j: J): F[TryableDeferred[F, Boolean]] =
         F.bind(g(j))(s.delete)
     }
 
@@ -111,10 +117,10 @@ object IndexedStore extends IndexedStoreInstances {
       def lookup(i: I): F[Option[B]] =
         F.bind(s.lookup(i))(_.traverse(f))
 
-      def insert(i: I, v: B): F[Unit] =
+      def insert(i: I, v: B): F[TryableDeferred[F, Unit]] =
         F.bind(g(v))(s.insert(i, _))
 
-      def delete(i: I): F[Boolean] =
+      def delete(i: I): F[TryableDeferred[F, Boolean]] =
         s.delete(i)
     }
 
@@ -147,22 +153,11 @@ object IndexedStore extends IndexedStoreInstances {
 }
 
 sealed abstract class IndexedStoreInstances {
-  implicit def hFunctor[I, V]: HFunctor[IndexedStore[?[_], I, V]] =
-    new HFunctor[IndexedStore[?[_], I, V]] {
-      def hmap[A[_], B[_]](fa: IndexedStore[A, I, V])(f: A ~> B): IndexedStore[B, I, V] =
-        new IndexedStore[B, I, V] {
-          def entries: Stream[B, (I, V)] =
-            fa.entries.translate(λ[FunctionK[A, B]](f(_)))
-
-          def lookup(i: I): B[Option[V]] =
-            f(fa.lookup(i))
-
-          def insert(i: I, v: V): B[Unit] =
-            f(fa.insert(i, v))
-
-          def delete(i: I): B[Boolean] =
-            f(fa.delete(i))
-        }
+  private[this] def mapTryableDeferred[F[_], G[_], A](d: TryableDeferred[F, A], f: F ~> G): TryableDeferred[G, A] =
+    new TryableDeferred[G, A] {
+      override def get: G[A] = f(d.get)
+      override def complete(a: A): G[Unit] = f(d.complete(a))
+      override def tryGet: G[Option[A]] = f(d.tryGet)
     }
 
   implicit def valueInvariantFunctor[F[_]: Functor, I]: InvariantFunctor[IndexedStore[F, I, ?]] =
@@ -175,10 +170,10 @@ sealed abstract class IndexedStoreInstances {
           def lookup(i: I): F[Option[B]] =
             fa.lookup(i).map(_.map(f))
 
-          def insert(i: I, v: B): F[Unit] =
+          def insert(i: I, v: B): F[TryableDeferred[F, Unit]] =
             fa.insert(i, g(v))
 
-          def delete(i: I): F[Boolean] =
+          def delete(i: I): F[TryableDeferred[F, Boolean]] =
             fa.delete(i)
         }
     }

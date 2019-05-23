@@ -16,15 +16,21 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.None
+import slamdata.Predef._
 
-import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.{IO, ContextShift, Timer}
+import cats.effect.concurrent.{Ref, Deferred}
 import fs2.Stream
 import scalaz.{IMap, Order}
 
+import scala.concurrent.ExecutionContext
+
 /** An indexed store backed by a map held in a Ref, for testing */
 object RefIndexedStore {
+  implicit val ec: ExecutionContext = ExecutionContext.global
+  implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+  implicit val timer: Timer[IO] = IO.timer(ec)
+
   def apply[I: Order, V](ref: Ref[IO, IMap[I, V]])
       : IndexedStore[IO, I, V] =
     new IndexedStore[IO, I, V] {
@@ -34,8 +40,11 @@ object RefIndexedStore {
       def lookup(i: I) =
         ref.get.map(_.lookup(i))
 
-      def insert(i: I, v: V) =
-        ref.update(_.insert(i, v))
+      def insert(i: I, v: V) = for {
+        _ <- ref.update(_.insert(i, v))
+        d <- Deferred.tryable[IO, Unit]
+        _ <- d.complete(())
+      } yield d
 
       def delete(i: I) =
         for {
@@ -45,6 +54,8 @@ object RefIndexedStore {
           (old, m2) = r
 
           _ <- ref.set(m2)
-        } yield old.isDefined
+          d <- Deferred.tryable[IO, Boolean]
+          _ <- d.complete(old.isDefined)
+        } yield d
     }
 }

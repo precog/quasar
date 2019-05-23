@@ -80,10 +80,10 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           store <- emptyStore
           i <- freshIndex
           d1 <- store.insert(i, valueA)
-          d2 <- store.insert(i, valueB)
-          v <- store.lookup(i)
           _ <- d1.get
+          d2 <- store.insert(i, valueB)
           _ <- d2.get
+          v <- store.lookup(i)
         } yield {
           v must_= Some(valueB)
         }

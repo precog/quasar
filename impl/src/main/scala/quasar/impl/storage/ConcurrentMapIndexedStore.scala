@@ -59,8 +59,8 @@ final class ConcurrentMapIndexedStore[F[_]: Concurrent: ContextShift, K, V](
     d <- Deferred.tryable[F, Unit]
     _ <- Concurrent[F].start(evalOnPool(for {
       _ <- F.delay(mp.put(k, v))
-      _ <- d.complete(())
       _ <- commit
+      _ <- d.complete(())
     } yield ()))
   } yield d
 
@@ -68,8 +68,8 @@ final class ConcurrentMapIndexedStore[F[_]: Concurrent: ContextShift, K, V](
     d <- Deferred.tryable[F, Boolean]
     _ <- Concurrent[F].start(evalOnPool(for {
       res <- F.delay(Option(mp.remove(k)).nonEmpty)
-      _ <- d.complete(res)
       _ <- if (res) commit else F.point(())
+      _ <- d.complete(res)
     } yield ()))
   } yield d
 }

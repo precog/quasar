@@ -56,22 +56,27 @@ final class ConcurrentMapIndexedStoreSpec extends
       initial <- ref.get
 
       i1 <- freshIndex
-      _ <- store.insert(i1, valueA)
+      df <- store.insert(i1, valueA)
+      _ <- df.get
       inserted1 <- ref.get
 
       i2 <- freshIndex
-      _ <- store.insert(i2, valueB)
+      df <- store.insert(i2, valueB)
+      _ <- df.get
       inserted2 <- ref.get
 
       i3 <- freshIndex
-      _ <- store.insert(i3, valueA)
+      df <- store.insert(i3, valueA)
+      _ <- df.get
       inserted3 <- ref.get
 
-      _ <- store.delete(i1)
+      df <- store.delete(i1)
+      _ <- df.get
       deleted1 <- ref.get
 
       i4 <- freshIndex
-      _ <- store.delete(i4)
+      df <- store.delete(i4)
+      _ <- df.get
       deleted2 <- ref.get
 
       actual = List(initial, inserted1, inserted2, inserted3, deleted1, deleted2)

@@ -24,6 +24,7 @@ import quasar.api.destination.DestinationError
 import quasar.api.destination.DestinationError.{CreateError, ExistentialError}
 import quasar.contrib.scalaz.MonadState_
 
+import fs2.Stream
 import scalaz.syntax.monad._
 import scalaz.syntax.either._
 import scalaz.syntax.std.either._
@@ -31,7 +32,7 @@ import scalaz.{\/, IMap, ISet, Order, Monoid, Monad}
 import monocle.macros.Lenses
 
 class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[DestinationType])(
-  implicit F: MonadState_[F, MockDestinations.State[I, C]]) extends Destinations[F, List, I, C] {
+  implicit F: MonadState_[F, MockDestinations.State[I, C]]) extends Destinations[F, Stream[F, ?], I, C] {
   import MockDestinations._
 
   implicit val monadRunningState: MonadState_[F, IMap[I, DestinationRef[C]]] =
@@ -51,14 +52,14 @@ class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[
       _ <- R.put(newDests)
     } yield newId.right
 
-  def allDestinationMetadata: F[List[(I, DestinationMeta)]] =
+  def allDestinationMetadata: F[Stream[F, (I, DestinationMeta)]] =
     for {
       currentDests <- R.gets(_.toList)
       errs <- E.get
       metas = currentDests map {
         case (i, ref) => (i, DestinationMeta.fromOption(ref.kind, ref.name, errs.lookup(i)))
       }
-    } yield metas
+    } yield Stream.emits(metas)
 
   def destinationRef(id: I): F[ExistentialError[I] \/ DestinationRef[C]] =
     R.gets(_.lookup(id))

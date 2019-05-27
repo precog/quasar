@@ -27,7 +27,7 @@ import quasar.contrib.scalaz.MonadState_
 import scalaz.syntax.monad._
 import scalaz.syntax.either._
 import scalaz.syntax.std.either._
-import scalaz.{\/, IMap, ISet, Order, Monad}
+import scalaz.{\/, IMap, ISet, Order, Monoid, Monad}
 import monocle.macros.Lenses
 
 class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[DestinationType])(
@@ -94,7 +94,11 @@ object MockDestinations {
   @Lenses
   case class State[I, C](running: IMap[I, DestinationRef[C]], errored: IMap[I, Exception])
 
-  def empty[I, C]: State[I, C] = State(IMap.empty, IMap.empty)
+  implicit def mockDestinationStateMonoid[I: Order, C]: Monoid[State[I, C]] = new Monoid[State[I, C]] {
+    val zero = State[I, C](IMap.empty, IMap.empty)
+    def append(l: State[I, C], r: => State[I, C]): State[I, C] =
+      State(l.running union r.running, l.errored union r.errored)
+  }
 
   def apply[I: Order, C, F[_]: Monad: MonadState_[?[_], State[I, C]]](
     freshId: F[I],

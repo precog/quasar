@@ -33,7 +33,7 @@ import scalaz.{Applicative, NonEmptyList}
 import shims._
 
 object MockDestinationModule extends DestinationModule {
-  def destinationType = DestinationType("mock", 1L, 1L)
+  def destinationType = DestinationType("mock", 1L)
   def sanitizeDestinationConfig(config: Json) =
     Json.jString("sanitized")
 

@@ -36,7 +36,7 @@ import scalaz.{Cord, Equal, Order, Show}
 import shapeless.{Witness => W}
 
 @Lenses
-final case class DestinationType(name: DestinationType.Name, version: Positive, minSupportedVersion: Positive)
+final case class DestinationType(name: DestinationType.Name, version: Positive)
 
 object DestinationType extends DestinationTypeInstances {
   type NameP = MatchesRegex[W.`"[a-zA-Z0-9-]+"`.T]
@@ -48,14 +48,14 @@ object DestinationType extends DestinationTypeInstances {
 
 sealed abstract class DestinationTypeInstances {
   implicit val equal: Equal[DestinationType] =
-    Equal.equalBy(t => (t.name, t.version, t.minSupportedVersion))
+    Equal.equalBy(t => (t.name, t.version))
 
   implicit val order: Order[DestinationType] =
-    Order.orderBy(t => (t.name, t.version, t.minSupportedVersion))
+    Order.orderBy(t => (t.name, t.version))
 
   implicit val show: Show[DestinationType] =
     Show.show {
-      case DestinationType(n, v, minV) =>
-        Cord("DestinationType(") ++ n.show ++ Cord(", ") ++ v.show ++ Cord(", ") ++ minV.show ++ Cord(")")
+      case DestinationType(n, v) =>
+        Cord("DestinationType(") ++ n.show ++ Cord(", ") ++ v.show ++ Cord(")")
     }
 }

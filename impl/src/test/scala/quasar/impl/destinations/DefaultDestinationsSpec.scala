@@ -109,7 +109,7 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
       }
 
       "rejects unknown destination" >> {
-        val unknownType = DestinationType("unknown", 1L, 1L)
+        val unknownType = DestinationType("unknown", 1L)
         val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
 
         val testRun = for {

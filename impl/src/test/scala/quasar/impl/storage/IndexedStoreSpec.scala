@@ -104,8 +104,8 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
         }
       }
     }
-
     "remove" >> {
+
       "false when key does not exist" >>* {
         for {
           store <- emptyStore
@@ -113,6 +113,7 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           d <- store.delete(i)
         } yield d must beFalse
       }
+
 
       "lookup no longer returns value" >>* {
         for {

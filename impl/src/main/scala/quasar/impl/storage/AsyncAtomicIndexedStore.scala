@@ -51,7 +51,9 @@ final class AsyncAtomicIndexedStore[F[_]: Async: ContextShift, K, V](
     toF(mp.put(k, v)) as (())
 
   def delete(k: K): F[Boolean] =
-    toF(mp.remove(k)) map { (x: Versioned[V]) => Option(x).nonEmpty }
+    toF(mp.remove(k)) map { (x: Versioned[V]) =>
+      println(s"DELETE result ${x}")
+      Option(x).nonEmpty }
 }
 
 object AsyncAtomicIndexedStore {
@@ -69,9 +71,10 @@ object AsyncAtomicIndexedStore {
   def toF[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] = {
     if (cf.isDone)
       cf.get.pure[F]
-    else
-      Async[F].async { cb: (Either[Throwable, A] => Unit) =>
+    else {
+      Async[F].async { (cb: Either[Throwable, A] => Unit)  =>
         val _ = cf.whenComplete { (res: A, t: Throwable) => cb(Option(t).toLeft(res)) }
       } productL ContextShift[F].shift
+    }
   }
 }

@@ -289,14 +289,17 @@ lazy val impl = project
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-gzip"       % fs2GzipVersion.value,
-      "com.slamdata"   %% "qdata-tectonic" % qdataVersion.value,
-      "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion.value,
-      "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,
-      "org.slf4s"      %% "slf4s-api"      % slf4sVersion,
-      "org.typelevel"  %% "jawn-argonaut"  % jawnVersion,
-      "org.typelevel"  %% "jawn-util"      % jawnVersion,
-      "io.atomix"       % "atomix"         % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
+      "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
+      "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
+      "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
+      "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
+      "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
+      "org.typelevel"  %% "jawn-argonaut"            % jawnVersion,
+      "org.typelevel"  %% "jawn-util"                % jawnVersion,
+      "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
+      "io.atomix"      % "atomix-primary-backup"     % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
+      "io.netty"       % "netty-all"                 % nettyVersion,
+      "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
       "com.fasterxml.woodstox" % "woodstox-core" % "5.2.1"))

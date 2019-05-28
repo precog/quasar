@@ -19,6 +19,7 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import cats.effect.IO
+import cats.syntax.functor._
 
 import quasar.concurrent.BlockingContext
 
@@ -53,25 +54,31 @@ final class MapDBAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String]
       .build())
     .build();
 
-  def beforeAll: Unit = atomix.start().join()
+  def beforeAll: Unit = {
+    val s = java.lang.System.currentTimeMillis()
+    atomix.start().join()
+    val e = java.lang.System.currentTimeMillis()
+    println(e - s)
+  }
   def afterAll: Unit = atomix.stop().join()
 
   def emptyStore: IO[IndexedStore[IO, String, String]] = {
     val mkMap = for {
+      a <- IO(java.lang.System.currentTimeMillis())
       mapName <- IO(java.util.UUID.randomUUID().toString)
       aMap <- IO{
         atomix.atomicMapBuilder[String, String](mapName)
-//          .withCacheEnabled
-//          .withCacheSize(1)
           .build()
           .async()
       }
+
       db <- IO(DBMaker.fileDB(Paths.get(mapName ++ ".db").toFile)
         .checksumHeaderBypass
-//        .transactionEnable
+        .transactionEnable
         .closeOnJvmShutdown
         .fileLockDisable
         .make)
+
       mMap <- IO{
         db.hashMap("map")
           .keySerializer(Serializer.STRING)
@@ -79,14 +86,24 @@ final class MapDBAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String]
           .createOrOpen
 
       }
-      map <- MapDBAsyncAtomicMap[IO, String, String](aMap, mMap, pool, (() => db.commit()))
-    } yield (atomix, map)
+      map <- MapDBAsyncAtomicMap[IO, String, String](aMap, mMap, pool)
+
+      _ <- IO(println(b - a))
+    } yield (atomix, db, aMap, map)
     mkMap flatMap {
-      case (_, None) =>
+      case (_, _, _, None) =>
         emptyStore
-      case (atomix, Some(m)) => IO(AsyncAtomicIndexedStore[IO, String, String](m))
+      case (atomix, db, aMap, Some(m)) => for {
+        allocated <- IndexedStore.hookedResource(
+          AsyncAtomicIndexedStore[IO, String, String](m),
+          IO(db.commit),
+          ((x: IndexedStore[IO, String, String]) => clear(aMap))).allocated
+      } yield allocated._1
     }
   }
+
+  private def clear(aMap: AsyncAtomicMap[String, String]): IO[Unit] = IO.unit
+//    AsyncAtomicIndexedStore.toF[IO, java.lang.Void](aMap.delete) as (())
 
   val valueA = "A"
   val valueB = "B"

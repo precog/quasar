@@ -45,8 +45,7 @@ import org.mapdb._
 final class MapDBAsyncAtomicMap[K, V](
     backing: AsyncAtomicMap[K, V],
     mapdb: HTreeMap[K, Versioned[V]],
-    executor: Executor,
-    commitDB: => Unit)
+    executor: Executor)
     extends DelegatingAsyncPrimitive[AsyncAtomicMap[K, V]](backing)
     with AsyncAtomicMap[K, V] {
 
@@ -89,13 +88,16 @@ final class MapDBAsyncAtomicMap[K, V](
     CompletableFuture.supplyAsync(() => new java.lang.Integer(mapdb.size), executor)
 
   override def containsKey(k: K): CompletableFuture[java.lang.Boolean] =
-    delegate.containsKey(k)
+    CompletableFuture.supplyAsync(() => new java.lang.Boolean(mapdb.containsKey(k)), executor)
+//    delegate.containsKey(k)
 
   override def containsValue(v: V): CompletableFuture[java.lang.Boolean] =
-    delegate.containsValue(v)
+    CompletableFuture.supplyAsync(() => new java.lang.Boolean(mapdb.containsValue(v)), executor)
+//    delegate.containsValue(v)
 
   override def get(k: K): CompletableFuture[Versioned[V]] =
-    delegate.get(k)
+    CompletableFuture.supplyAsync(() => mapdb.get(k), executor)
+//    delegate.get(k)
 
   override def getAllPresent(ks: java.lang.Iterable[K]): CompletableFuture[JMap[K, Versioned[V]]] =
     delegate.getAllPresent(ks)
@@ -108,35 +110,29 @@ final class MapDBAsyncAtomicMap[K, V](
 
   override def put(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
     delegate.put(k, v, ttl) thenCompose { vv =>
-      delegate.get(k) thenApply { r =>
-        val res = mapdb.put(k, r)
-        commitDB
-        res
+      delegate.get(k) thenCompose { r =>
+        CompletableFuture.supplyAsync(() => mapdb.put(k, r), executor) thenApply { res =>
+          res
+        }
       }
     }
 
   override def putAndGet(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
     delegate.putAndGet(k, v, ttl) thenApply { vv =>
-      val res = mapdb.put(k, vv)
-      commitDB
-      res
+      mapdb.put(k, vv)
     }
 
   override def remove(k: K): CompletableFuture[Versioned[V]] =
-    delegate.remove(k) thenApply { vv =>
-      println(s"vv ::: ${vv}")
-      println(s"in mapdb ::: ${mapdb.get(k)}")
-      val res = mapdb.remove(k)
-      println(s"res ::: ${res}")
-      commitDB
-      vv
+    delegate.remove(k) thenCompose { vv =>
+      CompletableFuture.supplyAsync(() => mapdb.remove(k), executor) thenApply { res =>
+        vv
+      }
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def clear(): CompletableFuture[java.lang.Void] =
     delegate.clear().thenApply { vv =>
       mapdb.clear()
-      commitDB
       null
     }
 
@@ -156,12 +152,10 @@ final class MapDBAsyncAtomicMap[K, V](
         case None =>
           delegate.get(k) thenApply { r =>
             mapdb.put(k, r)
-            commitDB
             null
           }
         case Some(a) =>
           mapdb.put(k, a)
-          commitDB
           CompletableFuture.completedFuture(a)
       }
     }
@@ -170,7 +164,6 @@ final class MapDBAsyncAtomicMap[K, V](
     delegate.remove(k, v) thenApply { r =>
       if (r.booleanValue) {
         val res = mapdb.remove(k, v)
-        commitDB
         new java.lang.Boolean(res)
       }
       else java.lang.Boolean.FALSE
@@ -180,7 +173,6 @@ final class MapDBAsyncAtomicMap[K, V](
     delegate.remove(k, version) thenApply { r =>
       if (r.booleanValue) {
         val res = mapdb.remove(k)
-        commitDB
         new java.lang.Boolean(Option(res).nonEmpty)
       }
       else java.lang.Boolean.FALSE
@@ -190,7 +182,6 @@ final class MapDBAsyncAtomicMap[K, V](
     delegate.replace(k, v) thenCompose { vv =>
       delegate.get(k) thenApply { newV =>
         val res = mapdb.put(k, newV)
-        commitDB
         res
       }
     }
@@ -199,7 +190,6 @@ final class MapDBAsyncAtomicMap[K, V](
     delegate.replace(k, v, newV) thenCompose { r =>
       if (r.booleanValue) delegate.get(k) thenApply { vv =>
         mapdb.put(k, vv)
-        commitDB
         java.lang.Boolean.TRUE
       }
       else CompletableFuture.completedFuture(java.lang.Boolean.FALSE)
@@ -209,7 +199,6 @@ final class MapDBAsyncAtomicMap[K, V](
     delegate.replace(k, oldVersion, v) thenCompose { r =>
       if (r.booleanValue) delegate.get(k) thenApply { v =>
         mapdb.put(k, v)
-        commitDB
         java.lang.Boolean.TRUE
       }
       else CompletableFuture.completedFuture(java.lang.Boolean.FALSE)
@@ -245,7 +234,6 @@ final class MapDBAsyncAtomicMap[K, V](
     new BlockingAtomicMap[K, V](this, timeout.toMillis)
 
   override def delete(): CompletableFuture[java.lang.Void] = {
-    commitDB
     delegate.removeListener(updater) thenCompose { x => delegate.delete() }
   }
 }
@@ -254,11 +242,10 @@ object MapDBAsyncAtomicMap {
   def apply[F[_]: Async: ContextShift, K, V](
       async: AsyncAtomicMap[K, V],
       mapdb: HTreeMap[K, Versioned[V]],
-      blockingPool: BlockingContext,
-      commit: => Unit)
+      blockingPool: BlockingContext)
       : F[Option[AsyncAtomicMap[K, V]]] = {
     val executor = new Executor { def execute(r: java.lang.Runnable) = blockingPool.unwrap.execute(r) }
-    val delegate = new MapDBAsyncAtomicMap(async, mapdb, executor, commit)
+    val delegate = new MapDBAsyncAtomicMap(async, mapdb, executor)
     AsyncAtomicIndexedStore.toF(delegate.initialize) map { (ok: Boolean) =>
       if (ok) Some(delegate) else None
     }

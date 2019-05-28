@@ -75,9 +75,9 @@ class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[
     }
 
   def removeDestination(id: I): F[Condition[ExistentialError[I]]] =
-    R.gets(_.lookup(id).fold(
-      Condition.abnormal(DestinationError.destinationNotFound(id)))(_ =>
-      Condition.normal()))
+    R.gets(_.lookup(id)) >>= (_.fold(
+      Condition.abnormal(DestinationError.destinationNotFound(id)).point[F])(_ =>
+      R.modify(_ - id) *> Condition.normal[ExistentialError[I]]().point[F]))
 
   def replaceDestination(id: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     R.gets(_.lookup(id)) >>= (_.fold(

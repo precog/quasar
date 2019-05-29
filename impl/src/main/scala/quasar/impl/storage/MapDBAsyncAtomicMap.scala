@@ -23,7 +23,7 @@ import cats.effect._
 
 import io.atomix.core.collection.AsyncDistributedCollection
 import io.atomix.core.map.{AtomicMap, AsyncAtomicMap, AtomicMapEventListener, AtomicMapEvent}
-import io.atomix.core.map.impl.{BlockingAtomicMap, MapUpdate}
+import io.atomix.core.map.impl.{BlockingAtomicMap, MapUpdate, AtomicMapClient}
 import io.atomix.core.set.AsyncDistributedSet
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.impl.DelegatingAsyncPrimitive
@@ -68,26 +68,27 @@ final class MapDBAsyncAtomicMap[K, V](
   private def cf[A](sup: Supplier[A]): CompletableFuture[A] =
     CompletableFuture.supplyAsync(sup, executor)
 
-  def initialize: CompletableFuture[Boolean] = {
-    val updates: java.util.List[MapUpdate[K, V]] =
-      cache.entrySet.stream map[MapUpdate[K, V]] { e =>
-        MapUpdate
-          .builder[K, V]
-          .withType(MapUpdate.Type.PUT_IF_VERSION_MATCH)
-          .withKey(e.getKey)
-          .withValue(e.getValue.value)
-          .withVersion(e.getValue.version)
-          .build
-      } collect(Collectors.toList())
+  def initialize: CompletableFuture[Boolean] =
+    if (cache.size < 1) CompletableFuture.completedFuture(true)
+    else {
+      val updates: java.util.List[MapUpdate[K, V]] =
+        cache.entrySet.stream map[MapUpdate[K, V]] { e =>
+          MapUpdate
+            .builder[K, V]
+            .withType(MapUpdate.Type.PUT_IF_VERSION_MATCH)
+            .withKey(e.getKey)
+            .withValue(e.getValue.value)
+            .withVersion(e.getValue.version)
+            .build
+        } collect(Collectors.toList())
 
-    val transactionId = TransactionId.from(java.util.UUID.randomUUID().toString())
-    val transaction = new TransactionLog(transactionId, 0L, updates)
-
-    prepare(transaction) thenCompose { r =>
-      if (r.booleanValue) commit(transactionId) thenApply { k => true }
-      else CompletableFuture.completedFuture(false)
+      val transactionId = TransactionId.from(java.util.UUID.randomUUID().toString())
+      val transaction = new TransactionLog(transactionId, 1L, updates)
+      prepare(transaction) thenCompose { r =>
+        if (r.booleanValue) commit(transactionId) thenApply { k => true }
+        else CompletableFuture.completedFuture(false)
+      }
     }
-  }
 
   override def size(): CompletableFuture[java.lang.Integer] =
     cf(() => new java.lang.Integer(cache.size))
@@ -99,7 +100,7 @@ final class MapDBAsyncAtomicMap[K, V](
     cf(() => new java.lang.Boolean(cache.containsValue(v)))
 
   override def get(k: K): CompletableFuture[Versioned[V]] =
-    cf(() => cache.get(k))
+    delegate.get(k)
 
   override def getAllPresent(ks: java.lang.Iterable[K]): CompletableFuture[JMap[K, Versioned[V]]] =
     delegate.getAllPresent(ks)
@@ -110,13 +111,15 @@ final class MapDBAsyncAtomicMap[K, V](
   override def computeIf(k: K, p: Predicate[_ >: V], remap: BiFunction[_ >: K, _ >: V, _ <: V]): CompletableFuture[Versioned[V]] =
     delegate.computeIf(k, p, remap)
 
-  override def put(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
-    delegate.put(k, v, ttl) thenCompose { prevVal =>
-      delegate.get(k) thenCompose { newVal => cf { () =>
-        cache.put(k, newVal)
-        prevVal
-      }}
+  override def put(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] = {
+    delegate.put(k, v, ttl) thenApply { oldValue =>
+      cache.put(k, Option(oldValue) match {
+        case None => new Versioned(v, 1, java.lang.System.currentTimeMillis())
+        case Some(oldV) => new Versioned(v, oldV.version() + 1, oldV.creationTime())
+      })
+      oldValue
     }
+  }
 
   override def putAndGet(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
     delegate.putAndGet(k, v, ttl) thenCompose { newVal => cf { () =>
@@ -124,11 +127,12 @@ final class MapDBAsyncAtomicMap[K, V](
       newVal
     }}
 
-  override def remove(k: K): CompletableFuture[Versioned[V]] =
-    delegate.remove(k) thenCompose { prevVal => cf { () =>
+  override def remove(k: K): CompletableFuture[Versioned[V]] = {
+    delegate.remove(k) thenApply { oldV =>
       cache.remove(k)
-      prevVal
-    }}
+      oldV
+    }
+  }
 
   override def clear(): CompletableFuture[java.lang.Void] =
     delegate.clear()
@@ -144,43 +148,49 @@ final class MapDBAsyncAtomicMap[K, V](
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def putIfAbsent(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
-    delegate.putIfAbsent(k, v, ttl)
+    delegate.putIfAbsent(k, v, ttl) thenApply { oldValue =>
+      cache.put(k, Option(oldValue) match {
+        case None => new Versioned(v, 1, java.lang.System.currentTimeMillis())
+        case Some(oldV) => new Versioned(v, oldV.version() + 1, oldV.creationTime())
+      })
+    }
 
   override def remove(k: K, v: V): CompletableFuture[java.lang.Boolean] =
-    delegate.remove(k, v) thenCompose { removed => cf { () =>
+    delegate.remove(k, v) thenApply { removed =>
       if (removed.booleanValue) cache.remove(k) else ()
       removed
-    }}
+    }
 
   override def remove(k: K, version: Long): CompletableFuture[java.lang.Boolean] =
-    delegate.remove(k, version) thenCompose { removed => cf { () =>
+    delegate.remove(k, version) thenApply { removed =>
       if (removed.booleanValue) cache.remove(k) else ()
       removed
-    }}
+    }
 
   override def replace(k: K, v: V): CompletableFuture[Versioned[V]] =
-    delegate.replace(k, v) thenCompose { prevVal =>
-      delegate.get(k) thenCompose { newVal => cf { () =>
-        cache.put(k, newVal)
-        prevVal
-      }}
+    delegate.replace(k, v) thenApply { prevVal =>
+      cache.put(k, Option(prevVal) match {
+        case None => new Versioned(v, 1, java.lang.System.currentTimeMillis())
+        case Some(oldV) => new Versioned(v, oldV.version() + 1, oldV.creationTime())
+      })
+      prevVal
     }
 
   override def replace(k: K, v: V, newV: V): CompletableFuture[java.lang.Boolean] =
     delegate.replace(k, v, newV) thenCompose { replaced =>
-      if (replaced.booleanValue) delegate.get(k) thenCompose { newVal => cf { () =>
+      if (replaced.booleanValue) delegate.get(k) thenApply { newVal =>
         cache.put(k, newVal)
         replaced
-      }}
+      }
       else CompletableFuture.completedFuture(replaced)
     }
 
   override def replace(k: K, oldVersion: Long, v: V): CompletableFuture[java.lang.Boolean] =
     delegate.replace(k, oldVersion, v) thenCompose { replaced =>
-      if (replaced.booleanValue) delegate.get(k) thenCompose { newVal => cf { () =>
+      if (replaced.booleanValue) delegate.get(k) thenApply { newVal =>
         cache.put(k, newVal)
         replaced
-      }}
+      }
       else CompletableFuture.completedFuture(replaced)
     }
 

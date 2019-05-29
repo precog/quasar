@@ -39,6 +39,8 @@ import java.nio.file.{Paths, Path => NPath}
 
 import org.specs2.specification._
 
+import shims._
+
 final class MapDBAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String] with AfterAll with BeforeAll{
   val pool = BlockingContext.cached("mapdb-async-atomic-map")
 //  sequential
@@ -64,7 +66,6 @@ final class MapDBAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String]
 
   def emptyStore: IO[IndexedStore[IO, String, String]] = {
     val mkMap = for {
-      a <- IO(java.lang.System.currentTimeMillis())
       mapName <- IO(java.util.UUID.randomUUID().toString)
       aMap <- IO{
         atomix.atomicMapBuilder[String, String](mapName)
@@ -87,24 +88,17 @@ final class MapDBAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String]
 
       }
       map <- MapDBAsyncAtomicMap[IO, String, String](aMap, mMap, pool)
-
-      _ <- IO(println(b - a))
-    } yield (atomix, db, aMap, map)
+    } yield (db, map)
     mkMap flatMap {
-      case (_, _, _, None) =>
+      case (_, None) =>
         emptyStore
-      case (atomix, db, aMap, Some(m)) => for {
-        allocated <- IndexedStore.hookedResource(
+      case (db, Some(m)) =>
+        IO(IndexedStore.hooked(
           AsyncAtomicIndexedStore[IO, String, String](m),
           IO(db.commit),
-          ((x: IndexedStore[IO, String, String]) => clear(aMap))).allocated
-      } yield allocated._1
+          ((x: Boolean) => if (x) IO(db.commit) else IO.unit)))
     }
   }
-
-  private def clear(aMap: AsyncAtomicMap[String, String]): IO[Unit] = IO.unit
-//    AsyncAtomicIndexedStore.toF[IO, java.lang.Void](aMap.delete) as (())
-
   val valueA = "A"
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)

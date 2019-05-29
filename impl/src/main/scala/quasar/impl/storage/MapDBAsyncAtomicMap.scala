@@ -31,9 +31,9 @@ import io.atomix.core.transaction.{TransactionId, TransactionLog}
 import io.atomix.utils.time.Versioned
 
 import java.time.Duration
-import java.util.concurrent.{CompletableFuture, Executor, ConcurrentHashMap}
+import java.util.concurrent.{CompletableFuture, Executor, ConcurrentHashMap, ConcurrentMap}
 import java.util.{Map => JMap}, JMap.Entry
-import java.util.function.{BiFunction, Consumer, Predicate}
+import java.util.function.{BiFunction, Consumer, Predicate, Supplier}
 import java.util.stream.Collectors
 
 import quasar.concurrent.BlockingContext
@@ -44,7 +44,7 @@ import org.mapdb._
 
 final class MapDBAsyncAtomicMap[K, V](
     backing: AsyncAtomicMap[K, V],
-    mapdb: HTreeMap[K, Versioned[V]],
+    cache: ConcurrentMap[K, Versioned[V]],
     executor: Executor)
     extends DelegatingAsyncPrimitive[AsyncAtomicMap[K, V]](backing)
     with AsyncAtomicMap[K, V] {
@@ -54,8 +54,10 @@ final class MapDBAsyncAtomicMap[K, V](
   private val updater: AtomicMapEventListener[K, V] = new AtomicMapEventListener[K, V] {
     def event(ev: AtomicMapEvent[K, V]) = {
       Option(ev.newValue) match {
-        case None => mapdb.remove(ev.key)
-        case Some(a) => mapdb.put(ev.key, a)
+        case None =>
+          cache.remove(ev.key)
+        case Some(a) =>
+          cache.put(ev.key, a)
       }
       listenersMap forEach { (listener, executor) => executor.execute(() => listener.event(ev)) }
     }
@@ -63,9 +65,12 @@ final class MapDBAsyncAtomicMap[K, V](
 
   delegate.addListener(updater, executor)
 
+  private def cf[A](sup: Supplier[A]): CompletableFuture[A] =
+    CompletableFuture.supplyAsync(sup, executor)
+
   def initialize: CompletableFuture[Boolean] = {
     val updates: java.util.List[MapUpdate[K, V]] =
-      mapdb.entrySet.stream map[MapUpdate[K, V]] { e =>
+      cache.entrySet.stream map[MapUpdate[K, V]] { e =>
         MapUpdate
           .builder[K, V]
           .withType(MapUpdate.Type.PUT_IF_VERSION_MATCH)
@@ -85,19 +90,16 @@ final class MapDBAsyncAtomicMap[K, V](
   }
 
   override def size(): CompletableFuture[java.lang.Integer] =
-    CompletableFuture.supplyAsync(() => new java.lang.Integer(mapdb.size), executor)
+    cf(() => new java.lang.Integer(cache.size))
 
   override def containsKey(k: K): CompletableFuture[java.lang.Boolean] =
-    CompletableFuture.supplyAsync(() => new java.lang.Boolean(mapdb.containsKey(k)), executor)
-//    delegate.containsKey(k)
+    cf(() => new java.lang.Boolean(cache.containsKey(k)))
 
   override def containsValue(v: V): CompletableFuture[java.lang.Boolean] =
-    CompletableFuture.supplyAsync(() => new java.lang.Boolean(mapdb.containsValue(v)), executor)
-//    delegate.containsValue(v)
+    cf(() => new java.lang.Boolean(cache.containsValue(v)))
 
   override def get(k: K): CompletableFuture[Versioned[V]] =
-    CompletableFuture.supplyAsync(() => mapdb.get(k), executor)
-//    delegate.get(k)
+    cf(() => cache.get(k))
 
   override def getAllPresent(ks: java.lang.Iterable[K]): CompletableFuture[JMap[K, Versioned[V]]] =
     delegate.getAllPresent(ks)
@@ -109,99 +111,77 @@ final class MapDBAsyncAtomicMap[K, V](
     delegate.computeIf(k, p, remap)
 
   override def put(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
-    delegate.put(k, v, ttl) thenCompose { vv =>
-      delegate.get(k) thenCompose { r =>
-        CompletableFuture.supplyAsync(() => mapdb.put(k, r), executor) thenApply { res =>
-          res
-        }
-      }
+    delegate.put(k, v, ttl) thenCompose { prevVal =>
+      delegate.get(k) thenCompose { newVal => cf { () =>
+        cache.put(k, newVal)
+        prevVal
+      }}
     }
 
   override def putAndGet(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
-    delegate.putAndGet(k, v, ttl) thenApply { vv =>
-      mapdb.put(k, vv)
-    }
+    delegate.putAndGet(k, v, ttl) thenCompose { newVal => cf { () =>
+      cache.put(k, newVal)
+      newVal
+    }}
 
   override def remove(k: K): CompletableFuture[Versioned[V]] =
-    delegate.remove(k) thenCompose { vv =>
-      CompletableFuture.supplyAsync(() => mapdb.remove(k), executor) thenApply { res =>
-        vv
-      }
-    }
+    delegate.remove(k) thenCompose { prevVal => cf { () =>
+      cache.remove(k)
+      prevVal
+    }}
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def clear(): CompletableFuture[java.lang.Void] =
-    delegate.clear().thenApply { vv =>
-      mapdb.clear()
-      null
-    }
+    delegate.clear()
 
   override def keySet(): AsyncDistributedSet[K] =
-    delegate.keySet
+    delegate.keySet()
 
   override def values(): AsyncDistributedCollection[Versioned[V]] =
-    delegate.values
+    delegate.values()
 
   override def entrySet(): AsyncDistributedSet[Entry[K, Versioned[V]]] =
-    delegate.entrySet
+    delegate.entrySet()
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def putIfAbsent(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
-    delegate.putIfAbsent(k, v, ttl) thenCompose { vv =>
-      Option(vv) match {
-        case None =>
-          delegate.get(k) thenApply { r =>
-            mapdb.put(k, r)
-            null
-          }
-        case Some(a) =>
-          mapdb.put(k, a)
-          CompletableFuture.completedFuture(a)
-      }
-    }
+    delegate.putIfAbsent(k, v, ttl)
 
   override def remove(k: K, v: V): CompletableFuture[java.lang.Boolean] =
-    delegate.remove(k, v) thenApply { r =>
-      if (r.booleanValue) {
-        val res = mapdb.remove(k, v)
-        new java.lang.Boolean(res)
-      }
-      else java.lang.Boolean.FALSE
-    }
+    delegate.remove(k, v) thenCompose { removed => cf { () =>
+      if (removed.booleanValue) cache.remove(k) else ()
+      removed
+    }}
 
   override def remove(k: K, version: Long): CompletableFuture[java.lang.Boolean] =
-    delegate.remove(k, version) thenApply { r =>
-      if (r.booleanValue) {
-        val res = mapdb.remove(k)
-        new java.lang.Boolean(Option(res).nonEmpty)
-      }
-      else java.lang.Boolean.FALSE
-    }
+    delegate.remove(k, version) thenCompose { removed => cf { () =>
+      if (removed.booleanValue) cache.remove(k) else ()
+      removed
+    }}
 
   override def replace(k: K, v: V): CompletableFuture[Versioned[V]] =
-    delegate.replace(k, v) thenCompose { vv =>
-      delegate.get(k) thenApply { newV =>
-        val res = mapdb.put(k, newV)
-        res
-      }
+    delegate.replace(k, v) thenCompose { prevVal =>
+      delegate.get(k) thenCompose { newVal => cf { () =>
+        cache.put(k, newVal)
+        prevVal
+      }}
     }
 
   override def replace(k: K, v: V, newV: V): CompletableFuture[java.lang.Boolean] =
-    delegate.replace(k, v, newV) thenCompose { r =>
-      if (r.booleanValue) delegate.get(k) thenApply { vv =>
-        mapdb.put(k, vv)
-        java.lang.Boolean.TRUE
-      }
-      else CompletableFuture.completedFuture(java.lang.Boolean.FALSE)
+    delegate.replace(k, v, newV) thenCompose { replaced =>
+      if (replaced.booleanValue) delegate.get(k) thenCompose { newVal => cf { () =>
+        cache.put(k, newVal)
+        replaced
+      }}
+      else CompletableFuture.completedFuture(replaced)
     }
 
   override def replace(k: K, oldVersion: Long, v: V): CompletableFuture[java.lang.Boolean] =
-    delegate.replace(k, oldVersion, v) thenCompose { r =>
-      if (r.booleanValue) delegate.get(k) thenApply { v =>
-        mapdb.put(k, v)
-        java.lang.Boolean.TRUE
-      }
-      else CompletableFuture.completedFuture(java.lang.Boolean.FALSE)
+    delegate.replace(k, oldVersion, v) thenCompose { replaced =>
+      if (replaced.booleanValue) delegate.get(k) thenCompose { newVal => cf { () =>
+        cache.put(k, newVal)
+        replaced
+      }}
+      else CompletableFuture.completedFuture(replaced)
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -241,11 +221,11 @@ final class MapDBAsyncAtomicMap[K, V](
 object MapDBAsyncAtomicMap {
   def apply[F[_]: Async: ContextShift, K, V](
       async: AsyncAtomicMap[K, V],
-      mapdb: HTreeMap[K, Versioned[V]],
+      cache: ConcurrentMap[K, Versioned[V]],
       blockingPool: BlockingContext)
       : F[Option[AsyncAtomicMap[K, V]]] = {
     val executor = new Executor { def execute(r: java.lang.Runnable) = blockingPool.unwrap.execute(r) }
-    val delegate = new MapDBAsyncAtomicMap(async, mapdb, executor)
+    val delegate = new MapDBAsyncAtomicMap(async, cache, executor)
     AsyncAtomicIndexedStore.toF(delegate.initialize) map { (ok: Boolean) =>
       if (ok) Some(delegate) else None
     }

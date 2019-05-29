@@ -48,12 +48,10 @@ final class AsyncAtomicIndexedStore[F[_]: Async: ContextShift, K, V](
     toF(mp get k) map ((v: Versioned[V]) => Option(v) map (_.value))
 
   def insert(k: K, v: V): F[Unit] =
-    toF(mp.put(k, v)) as (())
+    toF(mp.putAndGet(k, v)) as (())
 
   def delete(k: K): F[Boolean] =
-    toF(mp.remove(k)) map { (x: Versioned[V]) =>
-      println(s"DELETE result ${x}")
-      Option(x).nonEmpty }
+    toF(mp.remove(k)) map { (x: Versioned[V]) => Option(x).nonEmpty }
 }
 
 object AsyncAtomicIndexedStore {

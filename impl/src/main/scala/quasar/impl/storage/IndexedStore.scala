@@ -18,8 +18,6 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import cats.{Applicative => CApplicative}
-import cats.effect.Resource
 import cats.arrow.FunctionK
 import cats.syntax.apply._
 import cats.syntax.applicative._
@@ -144,18 +142,15 @@ object IndexedStore extends IndexedStoreInstances {
       decodeP[F, V, VV, E](mkError)(prism))(
       v => prism(v).point[F])
 
-  def hookedResource[F[_]: CApplicative, I, V](
+  def hooked[F[_]: Monad, I, V](
       store: IndexedStore[F, I, V],
-      commitHook: F[Unit],
-      close: IndexedStore[F, I, V] => F[Unit])
-      : Resource[F, IndexedStore[F, I, V]] = {
-    val delegated = new IndexedStore[F, I, V]{
-      def entries = store.entries
-      def lookup(k: I): F[Option[V]] = store.lookup(k)
-      def insert(k: I, v: V): F[Unit] = store.insert(k, v) productL commitHook
-      def delete(k: I): F[Boolean] = store.delete(k) productL commitHook
-    }
-    Resource.make(delegated.pure[F])(close)
+      updateHook: F[Unit],
+      deleteHook: Boolean => F[Unit])
+      : IndexedStore[F, I, V] = new IndexedStore[F, I, V] {
+    def entries = store.entries
+    def lookup(k: I): F[Option[V]] = store.lookup(k)
+    def insert(k: I, v: V): F[Unit] = store.insert(k, v) *> updateHook
+    def delete(k: I): F[Boolean] = store.delete(k) flatMap { x => deleteHook(x) as x }
   }
 }
 

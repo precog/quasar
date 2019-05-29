@@ -19,8 +19,8 @@ package quasar.run
 import slamdata.Predef._
 
 import quasar.api.QueryEvaluator
-import quasar.api.datasource.{DatasourceRef, Datasources}
-import quasar.api.destination.{DestinationRef, Destinations}
+import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
+import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
@@ -50,7 +50,7 @@ import cats.syntax.functor._
 import fs2.Stream
 import matryoshka.data.Fix
 import org.slf4s.Logging
-import scalaz.{IMap, ~>}
+import scalaz.{IMap, Show, ~>}
 import scalaz.syntax.show._
 import shims._
 import spire.std.double._
@@ -90,23 +90,8 @@ object Quasar extends Logging {
           datasourceRefs.entries
             .compile.fold(IMap.empty[UUID, DatasourceRef[Json]])(_ + _))
 
-      _ <- Resource.liftF(Sync[F] delay {
-        datasourceModules.groupBy(_.kind) foreach {
-          case (kind, sources) =>
-            if (sources.length > 1) {
-              log.warn(s"Found duplicate modules for type ${kind.shows}")
-            }
-        }
-      })
-
-      _ <- Resource.liftF(Sync[F] delay {
-        destinationModules.groupBy(_.destinationType) foreach {
-          case (kind, sources) =>
-            if (sources.length > 1) {
-              log.warn(s"Found duplicate modules for type ${kind.shows}")
-            }
-        }
-      })
+      _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
+      _ <- Resource.liftF(warnDuplicates[F, DestinationModule, DestinationType](destinationModules)(_.destinationType))
 
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
@@ -144,6 +129,14 @@ object Quasar extends Logging {
   }
 
   ////
+
+  private def warnDuplicates[F[_]: Sync, A, B: Show](l: List[A])(fn: A => B): F[Unit] =
+    Sync[F].delay(l.groupBy(fn) foreach {
+      case (a, grouped) =>
+        if (grouped.length > 1) {
+          log.warn(s"Found duplicate modules for type ${a.shows}")
+        }
+    })
 
   private val rec = construction.RecFunc[Fix]
 

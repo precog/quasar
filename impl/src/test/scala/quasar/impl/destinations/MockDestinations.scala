@@ -29,7 +29,8 @@ import scalaz.syntax.monad._
 import scalaz.syntax.equal._
 import scalaz.syntax.either._
 import scalaz.syntax.std.either._
-import scalaz.{\/, IMap, ISet, Order, Monoid, Monad}
+import scalaz.syntax.std.boolean._
+import scalaz.{\/, EitherT, IMap, ISet, Order, Monoid, Monad}
 import monocle.macros.Lenses
 
 class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[DestinationType])(
@@ -46,13 +47,12 @@ class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[
   val E = MonadState_[F, IMap[I, Exception]]
 
   def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I] =
-    for {
-      newId <- freshId
-      alreadyExists = R.gets(_.values.map(_.name).find(_ === ref.name).isDefined)
-      res <- alreadyExists.ifM(
-        DestinationError.destinationNameExists[CreateError[C]](ref.name).left[I].point[F],
-        R.modify(_.insert(newId, ref)) *> newId.right[CreateError[C]].point[F])
-    } yield res
+    (for {
+      _ <- uniqueName(ref)
+      _ <- EitherT.either(supported(ref))
+      newId <- EitherT.rightT(freshId)
+      _ <- EitherT.rightT(R.modify(_.insert(newId, ref)))
+    } yield newId).run
 
   def allDestinationMetadata: F[Stream[F, (I, DestinationMeta)]] =
     for {
@@ -84,13 +84,33 @@ class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[
   def replaceDestination(id: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     R.gets(_.lookup(id)) >>= (_.fold(
       Condition.abnormal(DestinationError.destinationNotFound[I, DestinationError[I, C]](id)).point[F])(_ =>
-      R.modify(_.insert(id, ref)) *> Condition.normal[DestinationError[I, C]]().point[F]))
+      (for {
+        original <- EitherT.rightT(R.get)
+        // avoid checking if it conflicts with itself
+        _ <- EitherT.rightT(R.modify(_.delete(id)))
+        _ <- uniqueName(ref)
+        // restore original state
+        _ <- EitherT.rightT(R.put(original))
+        _ <- EitherT.either(supported(ref))
+        _ <- EitherT.rightT(R.modify(_.insert(id, ref)))
+      } yield ()).run.map(Condition.disjunctionIso.reverseGet(_))))
 
   def supportedDestinationTypes: F[ISet[DestinationType]] =
     supported.point[F]
 
   def errors: F[IMap[I, Exception]] =
     E.get
+
+  private def supported(ref: DestinationRef[C]): CreateError[C] \/ Unit =
+    supported.member(ref.kind).fold(
+      ().right[CreateError[C]],
+      DestinationError.destinationUnsupported(ref.kind, supported).left[Unit])
+
+  private def uniqueName(ref: DestinationRef[C]): EitherT[F, CreateError[C], Unit] =
+    EitherT(
+      R.gets(_.values.find(_.name === ref.name)).map(_.fold(
+        DestinationError.destinationNameExists[CreateError[C]](ref.name).left[Unit])(_ =>
+        ().right[CreateError[C]])))
 }
 
 object MockDestinations {

@@ -26,6 +26,7 @@ import quasar.contrib.scalaz.MonadState_
 
 import fs2.Stream
 import scalaz.syntax.monad._
+import scalaz.syntax.equal._
 import scalaz.syntax.either._
 import scalaz.syntax.std.either._
 import scalaz.{\/, IMap, ISet, Order, Monoid, Monad}
@@ -47,10 +48,11 @@ class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[
   def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I] =
     for {
       newId <- freshId
-      currentDests <- R.get
-      newDests = currentDests.insert(newId, ref)
-      _ <- R.put(newDests)
-    } yield newId.right
+      alreadyExists = R.gets(_.values.map(_.name).find(_ === ref.name).isDefined)
+      res <- alreadyExists.ifM(
+        DestinationError.destinationNameExists[CreateError[C]](ref.name).left[I].point[F],
+        R.modify(_.insert(newId, ref)) *> newId.right[CreateError[C]].point[F])
+    } yield res
 
   def allDestinationMetadata: F[Stream[F, (I, DestinationMeta)]] =
     for {

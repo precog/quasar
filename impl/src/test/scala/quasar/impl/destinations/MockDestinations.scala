@@ -109,8 +109,8 @@ class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[
   private def uniqueName(ref: DestinationRef[C]): EitherT[F, CreateError[C], Unit] =
     EitherT(
       R.gets(_.values.find(_.name === ref.name)).map(_.fold(
-        DestinationError.destinationNameExists[CreateError[C]](ref.name).left[Unit])(_ =>
-        ().right[CreateError[C]])))
+        ().right[CreateError[C]])(_ =>
+        DestinationError.destinationNameExists[CreateError[C]](ref.name).left[Unit])))
 }
 
 object MockDestinations {

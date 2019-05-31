@@ -88,6 +88,7 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
     refs.lookup(destinationId) >>= {
       case Some(_) => (for {
         _ <- uniqueName(destinationId, ref)
+        _ <- refSupported(ref)
         _ <- liftCondition[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
         _ <- liftCondition[CreateError[C], DestinationError[I, C]](manager.initDestination(destinationId, ref))
         _ <- EitherT.rightT(refs.insert(destinationId, ref))
@@ -105,6 +106,12 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
 
   private def liftCondition[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
     EitherT(c.map(Condition.disjunctionIso.get(_)))
+
+  private def refSupported(ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
+    EitherT(supportedDestinationTypes.map(_.member(ref.kind)).ifM(
+      ().right[DestinationError[I, C]].point[F],
+      supportedDestinationTypes.map(
+        DestinationError.destinationUnsupported[DestinationError[I, C]](ref.kind, _).left[Unit])))
 
   private def uniqueName(replaceId: I, ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
     EitherT(refs.entries.filter {

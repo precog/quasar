@@ -79,6 +79,8 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
   val testRef =
     DestinationRef(MockDestinationType, DestinationName("foo-mock"), Json.jEmptyString)
 
+  val sanitize = DestinationRef.config.set(Json.jString("sanitized"))
+
   "destinations" >> {
     "add destination" >> {
       "creates and saves destinations" >> {
@@ -137,8 +139,6 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
 
         val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
 
-        val sanitize = DestinationRef.config.set(Json.jString("sanitized"))
-
         beforeReplace must be_\/-(sanitize(testRef))
         replaceResult must beNormal
         afterReplace must be_\/-(sanitize(newRef))
@@ -179,6 +179,26 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
 
         addStatus must be_\/-(1)
         replaceStatus must beNormal
+      }
+
+      "verifies support before removing the replaced destination" >> {
+        val testRef2 = DestinationRef.kind.set(DestinationType("unknown", 1337L))(testRef)
+
+        val testRun = for {
+          dests <- emptyDestinations
+          addStatus <- dests.addDestination(testRef)
+          refBeforeReplace <- dests.destinationRef(1)
+          replaceStatus <- dests.replaceDestination(1, testRef2)
+          refAfterReplace <- dests.destinationRef(1)
+        } yield (addStatus, refBeforeReplace, replaceStatus, refAfterReplace)
+
+        val (addStatus, refBeforeReplace, replaceStatus, refAfterReplace) = testRun.unsafeRunSync
+
+        addStatus must be_\/-(1)
+        refBeforeReplace must be_\/-(sanitize(testRef))
+        replaceStatus must beAbnormal(
+          DestinationError.destinationUnsupported(testRef2.kind, ISet.singleton(MockDestinationType)))
+        refAfterReplace must be_\/-(sanitize(testRef))
       }
 
       "shuts down replaced destination" >> {

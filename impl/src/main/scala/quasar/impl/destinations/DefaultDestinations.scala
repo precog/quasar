@@ -86,11 +86,11 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
 
   def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     refs.lookup(destinationId) >>= {
-      case Some(_) => (for {
-        _ <- uniqueName(destinationId, ref)
-        _ <- refSupported(ref)
-        _ <- liftCondition[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
-        _ <- liftCondition[CreateError[C], DestinationError[I, C]](manager.initDestination(destinationId, ref))
+      case Some(_) =>
+        (for {
+        _ <- uniqueName(destinationId, ref) >> refSupported(ref)
+        _ <- liftC[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
+        _ <- liftC[CreateError[C], DestinationError[I, C]](manager.initDestination(destinationId, ref))
         _ <- EitherT.rightT(refs.insert(destinationId, ref))
       } yield ()).run.map(Condition.disjunctionIso.reverseGet(_))
       case None =>
@@ -104,7 +104,7 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
   def errors: F[IMap[I, Exception]] =
     manager.errors
 
-  private def liftCondition[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
+  private def liftC[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
     EitherT(c.map(Condition.disjunctionIso.get(_)))
 
   private def refSupported(ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =

@@ -31,7 +31,7 @@ import fs2.Stream
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
-import scalaz.{\/, Equal, IMap, ISet, OptionT, Order}
+import scalaz.{\/, Equal, EitherT, IMap, ISet, OptionT, Order}
 import shims._
 
 class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
@@ -86,11 +86,12 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
 
   def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     refs.lookup(destinationId) >>= {
-      case Some(_) => for {
-        removeStatus <- removeDestination(destinationId)
-        destStatus <- manager.initDestination(destinationId, ref)
-        _ <- refs.insert(destinationId, ref)
-      } yield destStatus orElse removeStatus
+      case Some(_) => (for {
+        _ <- uniqueName(destinationId, ref)
+        _ <- liftCondition[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
+        _ <- liftCondition[CreateError[C], DestinationError[I, C]](manager.initDestination(destinationId, ref))
+        _ <- EitherT.rightT(refs.insert(destinationId, ref))
+      } yield ()).run.map(Condition.disjunctionIso.reverseGet(_))
       case None =>
         Condition.abnormal(
           DestinationError.destinationNotFound[I, DestinationError[I, C]](destinationId)).pure[F]
@@ -101,6 +102,15 @@ class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
 
   def errors: F[IMap[I, Exception]] =
     manager.errors
+
+  private def liftCondition[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
+    EitherT(c.map(Condition.disjunctionIso.get(_)))
+
+  private def uniqueName(replaceId: I, ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
+    EitherT(refs.entries.filter {
+      case (i, r) => r.name === ref.name && i =/= replaceId
+    }.compile.last.map(_.fold(().right[DestinationError[I, C]])(_ =>
+      DestinationError.destinationNameExists[DestinationError[I, C]](ref.name).left[Unit])))
 }
 
 object DefaultDestinations {

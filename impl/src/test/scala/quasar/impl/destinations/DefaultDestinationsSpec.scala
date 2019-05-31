@@ -144,6 +144,43 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
         afterReplace must be_\/-(sanitize(newRef))
       }
 
+      "verifies name uniqueness on replacement" >> {
+        val testRef2 =
+          DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
+        val testRef3 =
+          DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
+
+        val testRun = for {
+          dests <- emptyDestinations
+          addStatus1 <- dests.addDestination(testRef)
+          addStatus2 <- dests.addDestination(testRef2)
+          replaceStatus <- dests.replaceDestination(1, testRef3)
+        } yield (addStatus1, addStatus2, replaceStatus)
+
+        val (addStatus1, addStatus2, replaceStatus) = testRun.unsafeRunSync
+
+        addStatus1 must be_\/-(1)
+        addStatus2 must be_\/-(2)
+
+        replaceStatus must beAbnormal(
+          DestinationError.destinationNameExists[DestinationError[Int, Json]](testRef3.name))
+      }
+
+      "allows replacement with the same name" >> {
+        val testRef2 = DestinationRef.config.set(Json.jString("modified"))(testRef)
+
+        val testRun = for {
+          dests <- emptyDestinations
+          addStatus <- dests.addDestination(testRef)
+          replaceStatus <- dests.replaceDestination(1, testRef2)
+        } yield (addStatus, replaceStatus)
+
+        val (addStatus, replaceStatus) = testRun.unsafeRunSync
+
+        addStatus must be_\/-(1)
+        replaceStatus must beNormal
+      }
+
       "shuts down replaced destination" >> {
         def mkRunning(ref: Ref[IO, List[Int]], id: Int): IMap[Int, (Destination[IO], IO[Unit])] =
           IMap(id -> ((new MockDestination[IO], ref.set(List(id)))))

@@ -46,8 +46,13 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {
       lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
-        config, "Failed to decode LocalDatasource config: ")((c, d) => malformedConfiguration((LocalType, c, d)))
-      root <- validatePath(lc.rootDir, config, "Invalid path: ")((c, d) => malformedConfiguration((LocalType, c, d)))
+        config,
+        "Failed to decode LocalDatasource config: ")(
+        (c, d) => malformedConfiguration((LocalType, c, d)))
+
+      root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
+        malformedConfiguration((LocalType, config, d))
+      }
     } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool)
 
     Resource.liftF(ds.value)

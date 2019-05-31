@@ -36,13 +36,17 @@ trait LocalDestinationModule extends DestinationModule {
   def sanitizeDestinationConfig(config: Json): Json = config
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-    config: Json)
+      config: Json)
       : Resource[F, Either[InitializationError[Json], Destination[F]]] = {
     val dest = for {
       ld <- attemptConfig[F, LocalDestinationConfig, InitializationError[Json]](
-        config, "Failed to decode LocalDestination config: ")((c, d) => malformedConfiguration((destinationType, c, d)))
-      root <- validatePath(
-        ld.rootDir, config, "Invalid destination path: ")((c, d) => malformedConfiguration((destinationType, c, d)))
+        config,
+        "Failed to decode LocalDestination config: ")(
+        (c, d) => malformedConfiguration((destinationType, c, d)))
+
+      root <- validatedPath(ld.rootDir, "Invalid destination path: ") { d =>
+        malformedConfiguration((destinationType, config, d))
+      }
     } yield LocalDestination[F](root, blockingPool): Destination[F]
 
     Resource.liftF(dest.value)

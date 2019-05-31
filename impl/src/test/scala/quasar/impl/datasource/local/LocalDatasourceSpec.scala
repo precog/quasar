@@ -26,7 +26,7 @@ import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Datasource, DatasourceSpec, QueryResult, ResourceError}
+import quasar.connector.{Datasource, DatasourceSpec, MonadResourceErr, QueryResult, ResourceError}
 import quasar.contrib.scalaz.MonadError_
 import quasar.qscript.InterpretedRead
 
@@ -53,6 +53,22 @@ abstract class LocalDatasourceSpec
       .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.data"), ScalarStages.Id))
       .flatMap(_.data.compile.fold(0)((c, _) => c + 1))
       .map(_ must be_>(0))
+  }
+
+  "directory jail" >> {
+    val tio = ResourcePath.root() / ResourceName("..") / ResourceName("scala")
+
+    "prevents escaping root directory during discovery" >>* {
+      datasource.prefixedChildPaths(tio).map(_ must beNone)
+    }
+
+    "prevents escaping root directory during evaluation" >>* {
+      MonadResourceErr[IO]
+        .attempt(datasource.evaluate(InterpretedRead(tio, ScalarStages.Id)))
+        .map(_.toEither must beLeft.like {
+          case ResourceError.PathNotFound(p) => p must equal(tio)
+        })
+    }
   }
 }
 

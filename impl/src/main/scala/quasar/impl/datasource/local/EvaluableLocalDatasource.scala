@@ -62,7 +62,8 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
     } yield queryResult(InterpretedRead(jp, ir.stages))
 
   def pathIsResource(path: ResourcePath): F[Boolean] =
-    toNio[F](root, path) >>= isCandidate
+    resolvedResourcePath[F](root, path)
+      .flatMap(_.fold(false.pure[F])(isCandidate))
 
   def prefixedChildPaths(path: ResourcePath): F[Option[Stream[F, (ResourceName, ResourcePathType.Physical)]]] = {
     def withType(jp: JPath): F[(ResourceName, ResourcePathType.Physical)] =
@@ -83,11 +84,13 @@ final class EvaluableLocalDatasource[F[_]: ContextShift: Timer] private (
   ////
 
   private def attributesOf(resourcePath: ResourcePath): OptionT[F, (JPath, BasicFileAttributes)] =
-    OptionT(toNio[F](root, resourcePath) flatMap { jpath =>
-      F.recover(F.delay(some((jpath, Files.readAttributes(jpath, classOf[BasicFileAttributes]))))) {
+    for {
+      resolved <- OptionT(resolvedResourcePath[F](root, resourcePath))
+
+      attrs <- OptionT(F.recover(F.delay(some(Files.readAttributes(resolved, classOf[BasicFileAttributes])))) {
         case _: NoSuchFileException => none
-      }
-    })
+      })
+    } yield (resolved, attrs)
 
   private def isCandidate(jp: JPath): F[Boolean] =
     F.delay(Files.isRegularFile(jp) && !Files.isHidden(jp))

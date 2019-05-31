@@ -33,7 +33,7 @@ import scalaz.syntax.std.boolean._
 import scalaz.{\/, EitherT, IMap, ISet, Order, Monoid, Monad}
 import monocle.macros.Lenses
 
-class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[DestinationType])(
+final class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported: ISet[DestinationType])(
   implicit F: MonadState_[F, MockDestinations.State[I, C]]) extends Destinations[F, Stream[F, ?], I, C] {
   import MockDestinations._
 

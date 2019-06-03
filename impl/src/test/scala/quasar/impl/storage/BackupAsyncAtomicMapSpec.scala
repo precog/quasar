@@ -60,13 +60,15 @@ final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String
   val DefaultMapName = "default"
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] =
-    BackupStore[IO, String, String](
-      DefaultMapName,
-      new ConcurrentHashMap[String, String](),
-      pool,
-      DefaultNode,
-      List(DefaultNode),
-      DefaultPath)
+    Resource.liftF(IO(new ConcurrentHashMap[String, String]())) flatMap { backup =>
+      BackupStore[IO, String, String](
+        DefaultMapName,
+        backup,
+        pool,
+        DefaultNode,
+        List(DefaultNode),
+        DefaultPath)
+    }
 
 //  def mkAtomix(memberId: String, host: String, port: Int) =
 //    Atomix.builder()

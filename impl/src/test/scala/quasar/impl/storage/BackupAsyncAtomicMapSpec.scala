@@ -18,7 +18,7 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.syntax.functor._
 import cats.syntax.parallel._
 import cats.instances.list._
@@ -48,26 +48,41 @@ import org.specs2.specification._
 
 import shims._
 
-final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String] with AfterAll with BeforeAll{
+import AtomixSetup._
+
+final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String] with AfterAll {
   sequential
 
   val pool = BlockingContext.cached("mapdb-async-atomic-map")
 
-  def mkAtomix(memberId: String, host: String, port: Int) =
-    Atomix.builder()
-      .withMemberId(memberId)
-      .withAddress(host, port)
-      .withManagementGroup(PrimaryBackupPartitionGroup.builder("system").withNumPartitions(1).build())
-      .withPartitionGroups(PrimaryBackupPartitionGroup.builder("data").withNumPartitions(32).build())
+  val DefaultNode = NodeInfo("default", "localhost", 5000)
+  val DefaultPath = Paths.get("default.raft")
+  val DefaultMapName = "default"
 
-  val atomix: Atomix =
-    mkAtomix("member-1", "localhost", 5000).build()
+  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] =
+    BackupStore[IO, String, String](
+      DefaultMapName,
+      new ConcurrentHashMap[String, String](),
+      pool,
+      DefaultNode,
+      List(DefaultNode),
+      DefaultPath)
 
-  def beforeAll: Unit = {
-    atomix.start().join()
-  }
-  def afterAll: Unit = atomix.stop().join()
+//  def mkAtomix(memberId: String, host: String, port: Int) =
+//    Atomix.builder()
+//      .withMemberId(memberId)
+//      .withAddress(host, port)
+//      .withManagementGroup(PrimaryBackupPartitionGroup.builder("system").withNumPartitions(1).build())
+//      .withPartitionGroups(PrimaryBackupPartitionGroup.builder("data").withNumPartitions(32).build())
 
+//  val atomix: Atomix =
+//    mkAtomix("member-1", "localhost", 5000).build()
+
+  def afterAll: Unit = () //emptyStorePair.flatMap({
+//    case (_, fin) => fin
+//  }).unsafeRunSync
+
+/*
   def mkStore(
       atomix: Atomix,
       mapName: String,
@@ -93,8 +108,10 @@ final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String
         .async()
     }
   } yield BackupStore(BackupAsyncAtomicMap[IO, String, String](aMap, mMap, pool))
-
-  val emptyStore = IO(java.util.UUID.randomUUID.toString()) flatMap (mkStore(atomix, _, new ConcurrentHashMap()))
+ */
+//  val emptyStore: IO[IndexedStore[IO, String, String]] = emptyStorePair map {
+//    case (store, _) => store
+//  }
 
   val valueA = "A"
   val valueB = "B"

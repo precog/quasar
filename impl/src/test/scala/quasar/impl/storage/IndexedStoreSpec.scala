@@ -21,7 +21,7 @@ import quasar.EffectfulQSpec
 
 import scala.concurrent.ExecutionContext
 
-import cats.effect.Effect
+import cats.effect.{Effect, Resource}
 import cats.syntax.functor._
 import cats.syntax.flatMap._
 import scalaz.{Equal, Show}
@@ -32,7 +32,7 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
     extends EffectfulQSpec[F] {
 
   // Must not contain any entries.
-  def emptyStore: F[IndexedStore[F, I, V]]
+  def emptyStore: Resource[F, IndexedStore[F, I, V]]
 
   // Must return distinct values
   def freshIndex: F[I]
@@ -44,51 +44,48 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
   "indexed store" >> {
     "entries" >> {
       "empty when store is empty" >>* {
-        emptyStore
-          .flatMap(_.entries.compile.last)
+        emptyStore use { store =>
+          store.entries.compile.last
           .map(_ must beNone)
+        }
       }
     }
 
     "lookup" >> {
       "returns none when store is empty" >>* {
-        for {
-          store <- emptyStore
+        emptyStore use { store => for {
           i <- freshIndex
           v <- store.lookup(i)
         } yield {
           v must beNone
         }
-      }
+      }}
     }
 
     "insert" >> {
       "lookup returns inserted value" >>* {
-        for {
-          store <- emptyStore
+        emptyStore use { store => for {
           i <- freshIndex
           _ <- store.insert(i, valueA)
           v <- store.lookup(i)
         } yield {
           v must_= Some(valueA)
-        }
+        }}
       }
 
       "lookup returns replaced value" >>* {
-        for {
-          store <- emptyStore
+        emptyStore use { store => for {
           i <- freshIndex
           _ <- store.insert(i, valueA)
           _ <- store.insert(i, valueB)
           v <- store.lookup(i)
         } yield {
           v must_= Some(valueB)
-        }
+        }}
       }
 
       "entries returns inserted values" >>* {
-        for {
-          store <- emptyStore
+        emptyStore use { store => for {
 
           ia <- freshIndex
           _ <- store.insert(ia, valueA)
@@ -101,23 +98,21 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           vs = List((ia, valueA), (ib, valueB))
         } yield {
           es must containTheSameElementsAs(vs)
-        }
+        }}
       }
     }
     "remove" >> {
 
       "false when key does not exist" >>* {
-        for {
-          store <- emptyStore
+        emptyStore use { store => for {
           i <- freshIndex
           d <- store.delete(i)
         } yield d must beFalse
-      }
+      }}
 
 
       "lookup no longer returns value" >>* {
-        for {
-          store <- emptyStore
+        emptyStore use { store => for {
           i <- freshIndex
           _ <- store.insert(i, valueA)
           vBefore <- store.lookup(i)
@@ -127,13 +122,11 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           vBefore must_= Some(valueA)
           d must beTrue
           vAfter must beNone
-        }
+        }}
       }
 
       "entries no longer includes entry" >>* {
-        for {
-          store <- emptyStore
-
+        emptyStore use { store => for {
           ia <- freshIndex
           _ <- store.insert(ia, valueA)
 
@@ -151,7 +144,7 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
           esBefore must containTheSameElementsAs(vs)
           d must beTrue
           esAfter must containTheSameElementsAs(vs.drop(1))
-        }
+        }}
       }
     }
   }

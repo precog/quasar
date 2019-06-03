@@ -24,7 +24,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 import cats.data.StateT
-import cats.effect.IO
+import cats.effect.{Resource, IO}
 import cats.syntax.applicative._
 import scalaz.IMap
 import scalaz.std.anyVal._
@@ -36,7 +36,7 @@ final class PureIndexedStoreSpec extends
 
   val emptyStore =
     PureIndexedStore[StateT[IO, IMap[Int, String], ?], Int, String]
-      .pure[StateT[IO, IMap[Int, String], ?]]
+      .pure[Resource[StateT[IO, IMap[Int, String], ?], ?]]
 
   val freshIndex = StateT.liftF(IO(Random.nextInt()))
 

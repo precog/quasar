@@ -62,12 +62,12 @@ object AtomixSetup {
   def atomixNode(node: NodeInfo): Node =
     Node.builder().withAddress(node.host, node.port).withId(node.memberId).build()
 
-  def atomix[F[_]: Concurrent: ContextShift: MonadError[?[_], Throwable]](
+  def apply[F[_]: Concurrent: ContextShift: MonadError[?[_], Throwable]](
       thisNode: NodeInfo,
       seeds: List[NodeInfo],
       logPath: Path,
       threadPrefix: String)
-      : Resource[F, (Atomix, List[NodeInfo])] = {
+      : Resource[F, Atomix] = {
     implicit val asyncChannelGroup: AsynchronousChannelGroup =
       AsynchronousChannelProvider.provider()
         .openAsynchronousChannelGroup(8, NamedDaemonThreadFactory(threadPrefix))
@@ -99,20 +99,18 @@ object AtomixSetup {
     val fConnected: F[List[NodeInfo]] =  for {
       d <- Deferred.tryable[F, List[NodeInfo]]
       ref <- Ref.of[F, List[Option[NodeInfo]]](List[Option[NodeInfo]]())
-      runs = seeds map { x => Concurrent[F].start(mkRun(x, d, ref)) }
+      _ <- seeds traverse { x => Concurrent[F].start(mkRun(x, d, ref)) }
       res <- d.get
     } yield res
 
-    val fAtomixPair = for {
+    val fAtomix = for {
       _ <- recursiveDelete(logPath.toFile)
       connected <- fConnected
-      atomix <- mkAtomix(thisNode, connected, logPath)
+      atomix <- mkAtomix(thisNode, (thisNode :: connected), logPath)
       _ <- cfToAsync(atomix.start)
-    } yield (atomix, connected)
+    } yield atomix
 
-    Resource.make(fAtomixPair) {
-      case (atomix, _) => cfToAsync(atomix.stop) as (())
-    }
+    Resource.make(fAtomix) { atomix => Sync[F].delay(atomix.stop.join) as (()) }//cfToAsync(atomix.stop) as (())
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))

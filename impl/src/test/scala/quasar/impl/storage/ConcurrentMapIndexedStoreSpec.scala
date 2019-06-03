@@ -24,7 +24,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 import cats.data.StateT
-import cats.effect.{Sync, IO}
+import cats.effect.{Sync, IO, Resource}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import shims._
@@ -41,8 +41,8 @@ final class ConcurrentMapIndexedStoreSpec extends
 
   val commit: M[Unit] = StateT.modify { (x: Int) => x + 1 }
 
-  val emptyStore: M[IndexedStore[M, Int, String]] =
-    Sync[M].delay { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit, blockingPool) }
+  val emptyStore: Resource[M, IndexedStore[M, Int, String]] =
+    Resource.liftF(Sync[M].delay { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit, blockingPool) })
 
   val valueA = "A"
   val valueB = "B"
@@ -50,8 +50,7 @@ final class ConcurrentMapIndexedStoreSpec extends
   "check commits works" >> {
     val expected = List(0, 1, 2, 3, 4, 4)
 
-    val stateT = for {
-      store <- emptyStore
+    val stateT = emptyStore use { store => for {
       initial <- StateT.get[IO, Int]
 
       i1 <- freshIndex
@@ -74,7 +73,7 @@ final class ConcurrentMapIndexedStoreSpec extends
       deleted2 <- StateT.get[IO, Int]
 
       actual = List(initial, inserted1, inserted2, inserted3, deleted1, deleted2)
-    } yield actual === expected
+    } yield actual === expected }
 
     stateT.runA(0).unsafeRunSync
   }

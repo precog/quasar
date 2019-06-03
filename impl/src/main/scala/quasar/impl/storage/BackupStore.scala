@@ -47,13 +47,11 @@ object BackupStore {
   val InitializedFlag: String = "initialized"
 
   def apply[F[_]: Concurrent: ContextShift, K, V](
+      atomix: Atomix,
       name: String,
       backup: ConcurrentMap[K, V],
-      pool: BlockingContext,
-      thisNode: NodeInfo,
-      seeds: List[NodeInfo],
-      logPath: Path)
-      : Resource[F, IndexedStore[F, K, V]] = {
+      pool: BlockingContext)
+      : F[IndexedStore[F, K, V]] = {
 
     def backupMap(atomix: Atomix): F[BackupAsyncAtomicMap[K, V]] = Sync[F].delay {
       BackupAsyncAtomicMap[F, K, V](atomix.atomicMapBuilder[K, V](name).build().async(), backup, pool)
@@ -64,7 +62,7 @@ object BackupStore {
     def fInitializedFlag(atomix: Atomix): F[AsyncAtomicValue[Boolean]] =
       Sync[F].delay(atomix.atomicValueBuilder[Boolean](InitializedFlag).build().async())
 
-    AtomixSetup(thisNode, seeds, logPath, ThreadPrefix) evalMap { atomix => for {
+    for {
       map <- backupMap(atomix)
       store = new BackupStore(map)
       lock <- fLock(atomix)
@@ -76,6 +74,6 @@ object BackupStore {
         _ <- cfToAsync(flag.set(true))
         _ <- cfToAsync(lock.unlock())
       } yield () }
-    } yield store }
+    } yield store
   }
 }

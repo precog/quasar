@@ -55,6 +55,7 @@ object AtomixSetup {
   val SystemPartitionsNum: Int = 1
   val DataGroupName: String = "data"
   val DataPartitionsNum: Int = 32
+  val AuxGroupName: String = "aux"
 
   def nodeAddress(node: NodeInfo): InetSocketAddress =
     new InetSocketAddress(node.host, node.port)
@@ -103,14 +104,20 @@ object AtomixSetup {
       res <- d.get
     } yield res
 
-    val fAtomix = for {
+    def fAtomix: F[Atomix] = for {
       _ <- recursiveDelete(logPath.toFile)
       connected <- fConnected
       atomix <- mkAtomix(thisNode, (thisNode :: connected), logPath)
       _ <- cfToAsync(atomix.start)
-    } yield atomix
+      postConnected <- fConnected
+      result <- if (connected.length < postConnected.length / 2) for {
+        _ <- cfToAsync(atomix.stop)
+        res <- Sync[F].suspend(fAtomix)
+      } yield res
+      else Sync[F].delay(atomix)
+    } yield result
 
-    Resource.make(fAtomix) { atomix => Sync[F].delay(atomix.stop.join) as (()) }//cfToAsync(atomix.stop) as (())
+    Resource.make(fAtomix) { atomix => Sync[F].suspend(cfToAsync(atomix.stop)) as (()) }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -120,6 +127,7 @@ object AtomixSetup {
     if (file.isDirectory) {
       Option(file.listFiles()) match {
         case None =>
+          println("no files")
           delete
         case Some(xs) =>
           xs.toList.traverse(recursiveDelete(_)) *> delete
@@ -133,7 +141,17 @@ object AtomixSetup {
       connectedSeeds: List[NodeInfo],
       path: Path)
       : F[Atomix] = Sync[F].delay {
-    val nodeList: List[Node] = connectedSeeds map (atomixNode(_))
+    val nodeList: List[Node] =
+      connectedSeeds map (atomixNode(_))
+
+    val raftPartition = RaftPartitionGroup
+      .builder(DataGroupName)
+      .withMembers((connectedSeeds map (_.memberId)):_*)
+      .withStorageLevel(StorageLevel.DISK)
+      .withDataDirectory(path.toFile)
+      .withNumPartitions(DataPartitionsNum)
+      .build()
+
     Atomix.builder()
       .withMemberId(thisNode.memberId)
       .withAddress(thisNode.host, thisNode.port)
@@ -141,13 +159,7 @@ object AtomixSetup {
         .builder(SystemGroupName)
         .withNumPartitions(SystemPartitionsNum)
         .build())
-      .withPartitionGroups(RaftPartitionGroup
-        .builder(DataGroupName)
-        .withMembers((connectedSeeds map (_.memberId)):_*)
-        .withStorageLevel(StorageLevel.DISK)
-        .withDataDirectory(path.toFile)
-        .withNumPartitions(DataPartitionsNum)
-        .build())
+      .withPartitionGroups(raftPartition)
       .withMembershipProvider(BootstrapDiscoveryProvider
         .builder()
         .withNodes(nodeList:_*)

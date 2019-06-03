@@ -19,8 +19,10 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import cats.effect.{IO, Resource}
+import cats.effect.concurrent.Ref
 import cats.syntax.functor._
 import cats.syntax.parallel._
+import cats.syntax.traverse._
 import cats.instances.list._
 
 import quasar.concurrent.BlockingContext
@@ -50,74 +52,98 @@ import shims._
 
 import AtomixSetup._
 
-final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String] with AfterAll {
+final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String] {
   sequential
-
   val pool = BlockingContext.cached("mapdb-async-atomic-map")
 
-  val DefaultNode = NodeInfo("default", "localhost", 5000)
-  val DefaultPath = Paths.get("default.raft")
+  def mkNodeInfo(port: Int): NodeInfo = NodeInfo("default", "localhost", port)
+
   val DefaultMapName = "default"
+  val AtomixThreads = "atomix-check-thread"
 
-  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] =
-    Resource.liftF(IO(new ConcurrentHashMap[String, String]())) flatMap { backup =>
-      BackupStore[IO, String, String](
-        DefaultMapName,
-        backup,
-        pool,
-        DefaultNode,
-        List(DefaultNode),
-        DefaultPath)
-    }
+  val counter: Ref[IO, Int] = Ref.unsafe[IO, Int](5000)
 
-//  def mkAtomix(memberId: String, host: String, port: Int) =
-//    Atomix.builder()
-//      .withMemberId(memberId)
-//      .withAddress(host, port)
-//      .withManagementGroup(PrimaryBackupPartitionGroup.builder("system").withNumPartitions(1).build())
-//      .withPartitionGroups(PrimaryBackupPartitionGroup.builder("data").withNumPartitions(32).build())
+  val portResource: Resource[IO, Int] = Resource.liftF(counter.modify(x => (x + 1, x + 1)))
 
-//  val atomix: Atomix =
-//    mkAtomix("member-1", "localhost", 5000).build()
+  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
+    port <- portResource
+    node = mkNodeInfo(port)
+    atomix <- AtomixSetup[IO](node, List(node), Paths.get(s"default-${port}.raft"), AtomixThreads)
+    store <- Resource.liftF { for {
+      backup <- IO(new ConcurrentHashMap[String, String]())
+      result <- BackupStore[IO, String, String](atomix, DefaultMapName, backup, pool)
+    } yield result }
+  } yield store
 
-  def afterAll: Unit = () //emptyStorePair.flatMap({
-//    case (_, fin) => fin
-//  }).unsafeRunSync
-
-/*
-  def mkStore(
-      atomix: Atomix,
-      mapName: String,
-      mMap: ConcurrentHashMap[String, String])
-      : IO[BackupStore[IO, String, String]] = for {
-    aMap <- IO{
-      atomix.atomicMapBuilder[String, String](mapName)
-        .build()
-        .async()
-    }
-  } yield BackupStore(BackupAsyncAtomicMap[IO, String, String](aMap, mMap, pool))
-
-
-  def mkStore(
-      atomix: Atomix,
-      mapName: String,
-      mMap: ConcurrentHashMap[String, String],
-      boolean: Boolean)
-      : IO[BackupStore[IO, String, String]] = for {
-    aMap <- IO{
-      atomix.atomicMapBuilder[String, String](mapName)
-        .build()
-        .async()
-    }
-  } yield BackupStore(BackupAsyncAtomicMap[IO, String, String](aMap, mMap, pool))
- */
-//  val emptyStore: IO[IndexedStore[IO, String, String]] = emptyStorePair map {
-//    case (store, _) => store
-//  }
 
   val valueA = "A"
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)
+
+  private[this] def parallelResource[A](lst: List[Resource[IO, A]]): Resource[IO, List[A]] = {
+    val allocated: IO[List[(A, IO[Unit])]] = lst parTraverse { (res: Resource[IO, A]) => res.allocated }
+    val unzipped: IO[(List[A], List[IO[Unit]])] = allocated map { (lst: List[(A, IO[Unit])]) =>
+      lst.foldLeft((List[A](), List[IO[Unit]]())) {
+        case ((aAccum, ioAccum), (a, iounit)) => (a :: aAccum, iounit :: ioAccum)
+      }
+    }
+    val finalizerPar: IO[(List[A], IO[Unit])] =
+      unzipped map {
+        case (as, ios) => (as, ios.parSequence as (()))
+      }
+
+    val pairResource = Resource.make(finalizerPar) {
+      case (_, io) => io
+    }
+    pairResource map (_._1)
+  }
+
+
+  "simultaneous" >>* {
+    val portResources: Resource[IO, List[Int]] = List(portResource, portResource).sequence
+    val nodeResources: Resource[IO, List[NodeInfo]] = portResources map { (ports: List[Int]) =>
+      ports map { (port: Int) => NodeInfo(s"node-${port}", "localhost", port) }
+    }
+    val stores: Resource[IO, List[IndexedStore[IO, String, String]]] = for {
+      nodes <- nodeResources
+      parStores = nodes map { (node: NodeInfo) =>
+        AtomixSetup[IO](node, nodes, Paths.get(s"simultanesous-${node.port}.raft"), AtomixThreads) evalMap { atomix => for {
+          backup <- IO(new ConcurrentHashMap[String, String]())
+          _ <- IO(backup.put("prefilled", "prefilled"))
+          result <- BackupStore[IO, String, String](atomix, "simultaneous", backup, pool)
+        } yield result}
+      }
+      stores <- parallelResource(parStores)
+    } yield stores
+    stores use { (ss: List[IndexedStore[IO, String, String]]) => for {
+      _ <- ss(0).insert("foo", "bar")
+      foos <- ss parTraverse { s => s.lookup("foo") }
+      prefilleds <- ss parTraverse { s => s.lookup("prefilled") }
+    } yield {
+      foos === List(Some("bar"), Some("bar"))
+      prefilleds === List(Some("prefilled"), Some("prefilled"))
+    }}
+  }
+/*
+  "reconnect" >>* {
+    val portResources: Resource[IO, List[Int]] = List(portResource, portResource).sequence
+    val nodeResources: Resource[IO, List[NodeInfo]] = portResources map { (ports: List[Int]) =>
+      ports map { (port: Int) => NodeInfo(s"node-${port}", "localhost", port) }
+    }
+    val stores: Resource[IO, List[IndexedStore[IO, String, String]]] = for {
+      nodes <- nodeResources
+      parStores = nodes map { (node: NodeInfo) =>
+        AtomixSetup[IO](node, nodes, Paths.get(s"simultanesous-${node.port}.raft"), AtomixThreads) evalMap { atomix => for {
+          backup <- IO(new ConcurrentHashMap[String, String]())
+          _ <- IO(backup.put("prefilled", "prefilled"))
+          result <- BackupStore[IO, String, String](atomix, "simultaneous", backup, pool)
+        } yield result}
+      }
+      stores <- parallelResource(parStores)
+    } yield stores
+  }
+ */
+
 /*
   "restore" >>* {
     val atomix1 = mkAtomix("member-1", "localhost", 5004)

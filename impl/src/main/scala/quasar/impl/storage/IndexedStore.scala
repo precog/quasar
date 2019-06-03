@@ -20,7 +20,6 @@ import slamdata.Predef._
 
 import cats.arrow.FunctionK
 import cats.syntax.apply._
-import cats.syntax.applicative._
 
 import monocle.Prism
 

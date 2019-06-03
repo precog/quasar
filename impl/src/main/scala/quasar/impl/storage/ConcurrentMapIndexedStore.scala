@@ -23,9 +23,7 @@ import quasar.concurrent.BlockingContext
 import cats.arrow.FunctionK
 import cats.effect.{ContextShift, Sync}
 import cats.syntax.applicative._
-import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.syntax.apply._
 import fs2.Stream
 import scalaz.syntax.tag._
 

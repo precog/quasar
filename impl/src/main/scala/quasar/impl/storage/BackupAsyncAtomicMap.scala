@@ -18,12 +18,11 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import cats.syntax.functor._
 import cats.effect._
 
 import io.atomix.core.collection.AsyncDistributedCollection
 import io.atomix.core.map.{AtomicMap, AsyncAtomicMap, AtomicMapEventListener, AtomicMapEvent}
-import io.atomix.core.map.impl.{BlockingAtomicMap, MapUpdate, AtomicMapClient}
+import io.atomix.core.map.impl._
 import io.atomix.core.set.AsyncDistributedSet
 import io.atomix.primitive.PrimitiveState;
 import io.atomix.primitive.impl.DelegatingAsyncPrimitive
@@ -40,11 +39,9 @@ import quasar.concurrent.BlockingContext
 
 import scalaz.syntax.tag._
 
-import org.mapdb._
-
-final class MapDBAsyncAtomicMap[K, V](
+final class BackupAsyncAtomicMap[K, V](
     backing: AsyncAtomicMap[K, V],
-    cache: ConcurrentMap[K, Versioned[V]],
+    backup: ConcurrentMap[K, V],
     executor: Executor)
     extends DelegatingAsyncPrimitive[AsyncAtomicMap[K, V]](backing)
     with AsyncAtomicMap[K, V] {
@@ -55,9 +52,9 @@ final class MapDBAsyncAtomicMap[K, V](
     def event(ev: AtomicMapEvent[K, V]) = {
       Option(ev.newValue) match {
         case None =>
-          cache.remove(ev.key)
+          backup.remove(ev.key)
         case Some(a) =>
-          cache.put(ev.key, a)
+          backup.put(ev.key, a.value)
       }
       listenersMap forEach { (listener, executor) => executor.execute(() => listener.event(ev)) }
     }
@@ -68,17 +65,17 @@ final class MapDBAsyncAtomicMap[K, V](
   private def cf[A](sup: Supplier[A]): CompletableFuture[A] =
     CompletableFuture.supplyAsync(sup, executor)
 
-  def initialize: CompletableFuture[Boolean] =
-    if (cache.size < 1) CompletableFuture.completedFuture(true)
+  def restore: CompletableFuture[Boolean] =
+    if (backup.size < 1) CompletableFuture.completedFuture(true)
     else {
       val updates: java.util.List[MapUpdate[K, V]] =
-        cache.entrySet.stream map[MapUpdate[K, V]] { e =>
+        backup.entrySet.stream map[MapUpdate[K, V]] { e =>
           MapUpdate
             .builder[K, V]
             .withType(MapUpdate.Type.PUT_IF_VERSION_MATCH)
             .withKey(e.getKey)
-            .withValue(e.getValue.value)
-            .withVersion(e.getValue.version)
+            .withValue(e.getValue)
+            .withVersion(1L)
             .build
         } collect(Collectors.toList())
 
@@ -91,13 +88,13 @@ final class MapDBAsyncAtomicMap[K, V](
     }
 
   override def size(): CompletableFuture[java.lang.Integer] =
-    cf(() => new java.lang.Integer(cache.size))
+    cf(() => new java.lang.Integer(backup.size))
 
   override def containsKey(k: K): CompletableFuture[java.lang.Boolean] =
-    cf(() => new java.lang.Boolean(cache.containsKey(k)))
+    cf(() => new java.lang.Boolean(backup.containsKey(k)))
 
   override def containsValue(v: V): CompletableFuture[java.lang.Boolean] =
-    cf(() => new java.lang.Boolean(cache.containsValue(v)))
+    cf(() => new java.lang.Boolean(backup.containsValue(v)))
 
   override def get(k: K): CompletableFuture[Versioned[V]] =
     delegate.get(k)
@@ -113,23 +110,20 @@ final class MapDBAsyncAtomicMap[K, V](
 
   override def put(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] = {
     delegate.put(k, v, ttl) thenApply { oldValue =>
-      cache.put(k, Option(oldValue) match {
-        case None => new Versioned(v, 1, java.lang.System.currentTimeMillis())
-        case Some(oldV) => new Versioned(v, oldV.version() + 1, oldV.creationTime())
-      })
+      backup.put(k, v)
       oldValue
     }
   }
 
   override def putAndGet(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
     delegate.putAndGet(k, v, ttl) thenCompose { newVal => cf { () =>
-      cache.put(k, newVal)
+      backup.put(k, newVal.value)
       newVal
     }}
 
   override def remove(k: K): CompletableFuture[Versioned[V]] = {
     delegate.remove(k) thenApply { oldV =>
-      cache.remove(k)
+      backup.remove(k)
       oldV
     }
   }
@@ -149,49 +143,44 @@ final class MapDBAsyncAtomicMap[K, V](
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def putIfAbsent(k: K, v: V, ttl: Duration): CompletableFuture[Versioned[V]] =
     delegate.putIfAbsent(k, v, ttl) thenApply { oldValue =>
-      cache.put(k, Option(oldValue) match {
-        case None => new Versioned(v, 1, java.lang.System.currentTimeMillis())
-        case Some(oldV) => new Versioned(v, oldV.version() + 1, oldV.creationTime())
-      })
+      backup.put(k, v)
+      oldValue
     }
 
   override def remove(k: K, v: V): CompletableFuture[java.lang.Boolean] =
     delegate.remove(k, v) thenApply { removed =>
-      if (removed.booleanValue) cache.remove(k) else ()
+      if (removed.booleanValue) backup.remove(k) else ()
       removed
     }
 
   override def remove(k: K, version: Long): CompletableFuture[java.lang.Boolean] =
     delegate.remove(k, version) thenApply { removed =>
-      if (removed.booleanValue) cache.remove(k) else ()
+      if (removed.booleanValue) backup.remove(k) else ()
       removed
     }
 
   override def replace(k: K, v: V): CompletableFuture[Versioned[V]] =
     delegate.replace(k, v) thenApply { prevVal =>
-      cache.put(k, Option(prevVal) match {
-        case None => new Versioned(v, 1, java.lang.System.currentTimeMillis())
-        case Some(oldV) => new Versioned(v, oldV.version() + 1, oldV.creationTime())
-      })
+      backup.put(k, v)
       prevVal
     }
 
   override def replace(k: K, v: V, newV: V): CompletableFuture[java.lang.Boolean] =
-    delegate.replace(k, v, newV) thenCompose { replaced =>
-      if (replaced.booleanValue) delegate.get(k) thenApply { newVal =>
-        cache.put(k, newVal)
+    delegate.replace(k, v, newV) thenApply { replaced =>
+      if (replaced.booleanValue) {
+        backup.put(k, v)
         replaced
       }
-      else CompletableFuture.completedFuture(replaced)
+      else replaced
     }
 
   override def replace(k: K, oldVersion: Long, v: V): CompletableFuture[java.lang.Boolean] =
-    delegate.replace(k, oldVersion, v) thenCompose { replaced =>
-      if (replaced.booleanValue) delegate.get(k) thenApply { newVal =>
-        cache.put(k, newVal)
+    delegate.replace(k, oldVersion, v) thenApply { replaced =>
+      if (replaced.booleanValue) {
+        backup.put(k, v)
         replaced
       }
-      else CompletableFuture.completedFuture(replaced)
+      else replaced
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
@@ -228,36 +217,13 @@ final class MapDBAsyncAtomicMap[K, V](
   }
 }
 
-object MapDBAsyncAtomicMap {
+object BackupAsyncAtomicMap {
   def apply[F[_]: Async: ContextShift, K, V](
       async: AsyncAtomicMap[K, V],
-      cache: ConcurrentMap[K, Versioned[V]],
+      backup: ConcurrentMap[K, V],
       blockingPool: BlockingContext)
-      : F[Option[AsyncAtomicMap[K, V]]] = {
+      : BackupAsyncAtomicMap[K, V] = {
     val executor = new Executor { def execute(r: java.lang.Runnable) = blockingPool.unwrap.execute(r) }
-    val delegate = new MapDBAsyncAtomicMap(async, cache, executor)
-    AsyncAtomicIndexedStore.toF(delegate.initialize) map { (ok: Boolean) =>
-      if (ok) Some(delegate) else None
-    }
-  }
-
-  def versionedSerializer[A](serializer: Serializer[A]): Serializer[Versioned[A]] = new Serializer[Versioned[A]] {
-    def serialize(out: DataOutput2, a: Versioned[A]): Unit = {
-      Serializer.LONG.serialize(out, new java.lang.Long(a.creationTime))
-      Serializer.LONG.serialize(out, new java.lang.Long(a.version))
-      serializer.serialize(out, a.value)
-    }
-
-    @SuppressWarnings(Array("org.wartremover.warts.Throw"))
-    def deserialize(in: DataInput2, available: Int): Versioned[A] = {
-      if (available < 16) throw new Throwable("versioned serializer input is too small")
-      else {
-        val creationTime = Serializer.LONG.deserialize(in, 8)
-        val version = Serializer.LONG.deserialize(in, 8)
-        val a = serializer.deserialize(in, available - 16)
-        new Versioned(a, version.longValue, creationTime.longValue)
-      }
-
-    }
+    new BackupAsyncAtomicMap(async, backup, executor)
   }
 }

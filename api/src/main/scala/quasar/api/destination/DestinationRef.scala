@@ -21,11 +21,12 @@ import slamdata.Predef._
 import quasar.fp.numeric.Positive
 
 import argonaut.{DecodeJson, EncodeJson, Json}
-import monocle.{Prism, PLens}
+import eu.timepit.refined.auto._
 import monocle.macros.Lenses
-import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
+import monocle.{Prism, PLens}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
+import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
 
 @Lenses
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
@@ -51,7 +52,7 @@ object DestinationRef extends DestinationRefInstances {
       Json(
         RefNameField -> Json.jString(destRef.name.value),
         RefTypeNameField -> Json.jString(destRef.kind.name.value),
-        RefTypeVersionField -> Json.jNumber(destRef.kind.version.toString),
+        RefTypeVersionField -> Json.jNumber(destRef.kind.version),
         RefConfigField -> EncodeJson.of[C].encode(destRef.config)))
 }
 

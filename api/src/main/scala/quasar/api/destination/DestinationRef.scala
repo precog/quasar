@@ -18,12 +18,8 @@ package quasar.api.destination
 
 import slamdata.Predef._
 
-import quasar.fp.numeric.Positive
-
-import argonaut.{DecodeJson, EncodeJson, Json}
-import eu.timepit.refined.auto._
 import monocle.macros.Lenses
-import monocle.{Prism, PLens}
+import monocle.PLens
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
@@ -32,28 +28,10 @@ import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
 
 object DestinationRef extends DestinationRefInstances {
-  private val RefNameField = "name"
-  private val RefTypeNameField = "typeName"
-  private val RefTypeVersionField = "typeVersion"
-  private val RefConfigField = "config"
-
   def pConfig[C, D]: PLens[DestinationRef[C], DestinationRef[D], C, D] =
     PLens[DestinationRef[C], DestinationRef[D], C, D](
       _.config)(
       d => _.copy(config = d))
-
-  def persistJsonP[C: DecodeJson: EncodeJson]: Prism[Json, DestinationRef[C]] =
-    Prism[Json, DestinationRef[C]](json => for {
-      name <- json.field(RefNameField).flatMap(_.string).map(DestinationName(_))
-      kindTypeName <- json.field(RefTypeNameField).flatMap(_.string).flatMap(DestinationType.stringName.getOption(_))
-      kindVersion <- json.field(RefTypeVersionField).flatMap(_.number).flatMap(_.toLong).flatMap(Positive(_))
-      configDoc <- json.field(RefConfigField).flatMap(_.jdecode[C].toOption)
-    } yield DestinationRef[C](DestinationType(kindTypeName, kindVersion), name, configDoc))(destRef =>
-      Json(
-        RefNameField -> Json.jString(destRef.name.value),
-        RefTypeNameField -> Json.jString(destRef.kind.name.value),
-        RefTypeVersionField -> Json.jNumber(destRef.kind.version),
-        RefConfigField -> EncodeJson.of[C].encode(destRef.config)))
 }
 
 sealed abstract class DestinationRefInstances extends DestinationRefInstances0 {

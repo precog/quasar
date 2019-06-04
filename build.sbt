@@ -149,9 +149,7 @@ lazy val api = project
   .settings(
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro"      % monocleVersion,
-      "com.github.julien-truffaut" %% "monocle-law"        % monocleVersion % Test,
       "eu.timepit"                 %% "refined-scalaz"     % refinedVersion,
-      "org.typelevel"              %% "discipline"         % disciplineVersion % Test,
       "eu.timepit"                 %% "refined-scalacheck" % refinedVersion % Test))
   .settings(commonSettings)
   .enablePlugins(AutomateHeaderPlugin)

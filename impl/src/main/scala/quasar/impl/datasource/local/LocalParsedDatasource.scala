@@ -24,7 +24,7 @@ import quasar.connector._, LightweightDatasourceModule.DS
 import java.nio.file.{Path => JPath}
 
 import cats.effect.{ContextShift, Effect, Timer}
-import fs2.io
+import fs2.{gzip, io, Pipe}
 import jawnfs2._
 import org.typelevel.jawn.Facade
 import qdata.{QDataDecode, QDataEncode}
@@ -33,25 +33,53 @@ import scalaz.syntax.tag._
 
 object LocalParsedDatasource {
 
+  val DecompressionBufferSize: Int = 32768
+
   /* @param readChunkSizeBytes the number of bytes per chunk to use when reading files.
   */
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer, A: QDataDecode: QDataEncode](
       root: JPath,
       readChunkSizeBytes: Int,
+      format: ParsableType,
+      compressionScheme: Option[CompressionScheme],
       blockingPool: BlockingContext)
       : DS[F] = {
 
-    implicit val facade: Facade[A] = QDataFacade(isPrecise = true)
+    import ParsableType.JsonVariant
+
+    def parsedJson(
+        variant: JsonVariant,
+        precise: Boolean)
+        : Pipe[F, Byte, A] = {
+
+      implicit val facade: Facade[A] = QDataFacade(isPrecise = precise)
+
+      val parser = variant match {
+        case JsonVariant.ArrayWrapped => unwrapJsonArray[F, ByteBuffer, A]
+        case JsonVariant.LineDelimited => parseJsonStream[F, ByteBuffer, A]
+      }
+
+      _.chunks.map(_.toByteBuffer).through(parser)
+    }
 
     EvaluableLocalDatasource[F](LocalParsedType, root) { iRead =>
-      QueryResult.parsed[F, A](
-        QDataDecode[A],
+      val rawBytes =
         io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
-          .chunks
-          .map(_.toByteBuffer)
-          .parseJsonStream[A],
-        iRead.stages)
 
+      val decompressedBytes = compressionScheme match {
+        case Some(CompressionScheme.Gzip) =>
+          rawBytes.through(gzip.decompress[F](DecompressionBufferSize))
+
+        case None =>
+          rawBytes
+      }
+
+      val parsedValues = format match {
+        case ParsableType.Json(variant, isPrecise) =>
+          decompressedBytes.through(parsedJson(variant, isPrecise))
+      }
+
+      QueryResult.parsed[F, A](QDataDecode[A], parsedValues, iRead.stages)
     }
   }
 }

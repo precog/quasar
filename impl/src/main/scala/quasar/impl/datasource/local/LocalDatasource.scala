@@ -34,16 +34,19 @@ object LocalDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       root: JPath,
       readChunkSizeBytes: Int,
+      format: ParsableType,
+      compressionScheme: Option[CompressionScheme],
       blockingPool: BlockingContext)
       : DS[F] = {
 
-    import ParsableType.JsonVariant
-
     EvaluableLocalDatasource[F](LocalType, root) { iRead =>
-      QueryResult.typed(
-        ParsableType.json(JsonVariant.LineDelimited, true),
-        io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes),
-        iRead.stages)
+      val content =
+        io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
+
+      val typedResult =
+        QueryResult.typed(format, content, iRead.stages)
+
+      compressionScheme.fold(typedResult)(QueryResult.compressed(_, typedResult))
     }
   }
 }

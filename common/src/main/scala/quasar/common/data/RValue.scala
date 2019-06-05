@@ -26,7 +26,9 @@ import qdata.time.{DateTimeInterval, OffsetDate}
 import scalaz._, Scalaz._, Ordering._
 
 import java.math.MathContext.UNLIMITED
+import java.nio.charset.Charset
 import java.time._
+import java.util.{Arrays, Base64}
 
 import scala.Predef.implicitly
 import scala.reflect.ClassTag
@@ -193,6 +195,11 @@ object RValue extends RValueInstances {
     Prism.partial[RValue, DateTimeInterval] {
       case CInterval(i) => i
     } (CInterval(_))
+
+  val rBinary: Prism[RValue, Array[Byte]] =
+    Prism.partial[RValue, Array[Byte]] {
+      case CBinary(bs) => bs
+    } (CBinary(_))
 
   def toCValue(rvalue: RValue): Option[CValue] = rvalue match {
     case cvalue: CValue => Some(cvalue)
@@ -366,6 +373,7 @@ object RValue extends RValueInstances {
     case COffsetDate(ad)     => Data.OffsetDate(ad)
     case COffsetTime(ad)     => Data.OffsetTime(ad)
     case CInterval(ad)       => Data.Interval(ad)
+    case CBinary(bytes)      => Data.Str(CBinary.toBase64String(bytes))
     case CUndefined          => Data.NA
     case CNull               => Data.Null
   }
@@ -378,8 +386,8 @@ sealed abstract class RValueInstances {
   implicit val show: Show[RValue] =
     Show.showFromToString
 
-  implicit val qdataEncode: QDataEncode[RValue] = QDataRValue
-  implicit val qdataDecode: QDataDecode[RValue] = QDataRValue
+  implicit def qdataEncode: QDataEncode[RValue] = QDataRValue
+  implicit def qdataDecode: QDataDecode[RValue] = QDataRValue
 }
 
 final case class RMeta(value: RValue, meta: RObject) extends RValue
@@ -462,6 +470,7 @@ sealed trait CType extends Serializable {
     case CLocalTime      => 13
     case CLocalDate      => 14
     case CInterval       => 15
+    case CBinary         => 16
     case CArrayType(t)   => 100 + t.typeIndex
   }
 }
@@ -501,6 +510,7 @@ object CType {
     case CLocalTime           => "LocalTime"
     case CLocalDate           => "LocalDate"
     case CInterval            => "Interval"
+    case CBinary              => "Binary"
     case CUndefined           => sys.error("CUndefined cannot be serialized")
   }
 
@@ -522,6 +532,7 @@ object CType {
     case "LocalDate"      => Some(CLocalDate)
     case "LocalTime"      => Some(CLocalTime)
     case "Interval"       => Some(CInterval)
+    case "Binary"         => Some(CBinary)
     case ArrayName(elem)  => fromName(elem) collect { case tp: CValueType[_] => CArrayType(tp) }
     case _                => None
   }
@@ -788,6 +799,60 @@ final case object CInterval extends CValueType[DateTimeInterval] {
   val classTag: ClassTag[DateTimeInterval]              = implicitly[ClassTag[DateTimeInterval]]
   def readResolve()                                     = CInterval
   def order(v1: DateTimeInterval, v2: DateTimeInterval) = sys.error("todo")
+}
+
+//
+// Binary
+//
+
+final case class CBinary(value: Array[Byte]) extends CWrappedValue[Array[Byte]] {
+  val cType = CBinary
+
+  override def equals(other: Any): Boolean =
+    other match {
+      case CBinary(bytes) => Arrays.equals(value, bytes)
+      case _ => false
+    }
+
+  override lazy val hashCode: Int =
+    Arrays.hashCode(value)
+}
+
+case object CBinary extends CValueType[Array[Byte]] {
+  val classTag: ClassTag[Array[Byte]] = implicitly[ClassTag[Array[Byte]]]
+
+  def readResolve(): CValueType[Array[Byte]] = CBinary
+
+  @SuppressWarnings(Array(
+    "org.wartremover.warts.Equals",
+    "org.wartremover.warts.Return",
+    "org.wartremover.warts.While",
+    "org.wartremover.warts.Var"))
+  def order(a: Array[Byte], b: Array[Byte]): Ordering =
+    if (a.length < b.length) {
+      Ordering.LT
+    } else if (b.length < a.length) {
+      Ordering.GT
+    } else {
+      var i = 0
+
+      while (i < a.length) {
+        if (a(i) == b(i))
+          i += 1
+        else
+          return a(i) ?|? b(i)
+      }
+
+      Ordering.EQ
+    }
+
+  def fromBase64String(b64: String): Option[Array[Byte]] = {
+    def decode = Base64.getDecoder().decode(b64.getBytes(Charset.forName("utf8")))
+    \/.fromTryCatchNonFatal(decode).toOption
+  }
+
+  def toBase64String(bytes: Array[Byte]): String =
+    new String(Base64.getEncoder().encode(bytes), Charset.forName("utf8"))
 }
 
 //

@@ -53,7 +53,14 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
       root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
         malformedConfiguration((LocalType, config, d))
       }
-    } yield LocalDatasource[F](root, lc.readChunkSizeBytes, blockingPool)
+    } yield {
+      LocalDatasource[F](
+        root,
+        lc.readChunkSizeBytes,
+        lc.format,
+        lc.compressionScheme,
+        blockingPool)
+    }
 
     Resource.liftF(ds.value)
   }

@@ -26,8 +26,9 @@ import quasar.ScalarStages
 import quasar.api.resource.{ResourceName, ResourcePath, ResourcePathType}
 import quasar.common.data.RValue
 import quasar.concurrent.BlockingContext
-import quasar.connector.{Datasource, DatasourceSpec, MonadResourceErr, QueryResult, ResourceError}
+import quasar.connector._, ParsableType.JsonVariant
 import quasar.contrib.scalaz.MonadError_
+import quasar.fp.ski.κ
 import quasar.qscript.InterpretedRead
 
 import shims._
@@ -48,13 +49,6 @@ abstract class LocalDatasourceSpec
 
   def gatherMultiple[A](g: Stream[IO, A]) = g.compile.toList
 
-  "returns data from a nonempty file" >>* {
-    datasource
-      .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.data"), ScalarStages.Id))
-      .flatMap(_.data.compile.fold(0)((c, _) => c + 1))
-      .map(_ must be_>(0))
-  }
-
   "directory jail" >> {
     val tio = ResourcePath.root() / ResourceName("..") / ResourceName("scala")
 
@@ -70,18 +64,69 @@ abstract class LocalDatasourceSpec
         })
     }
   }
+
+  "returns data from a nonempty file" >>* {
+    datasource
+      .evaluate(InterpretedRead(ResourcePath.root() / ResourceName("smallZips.ldjson"), ScalarStages.Id))
+      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .map(_ must be_>(0))
+  }
 }
 
 object LocalDatasourceSpec extends LocalDatasourceSpec {
   val blockingPool = BlockingContext.cached("local-datasource-spec")
 
   def datasource =
-    LocalDatasource[IO](Paths.get("./impl/src/test/resources"), 1024, blockingPool)
+    LocalDatasource[IO](
+      Paths.get("./impl/src/test/resources"),
+      1024,
+      ParsableType.json(JsonVariant.LineDelimited, true),
+      None,
+      blockingPool)
 }
 
 object LocalParsedDatasourceSpec extends LocalDatasourceSpec {
   val blockingPool = BlockingContext.cached("local-parsed-datasource-spec")
 
   def datasource =
-    LocalParsedDatasource[IO, RValue](Paths.get("./impl/src/test/resources"), 1024, blockingPool)
+    LocalParsedDatasource[IO, RValue](
+      Paths.get("./impl/src/test/resources"),
+      1024,
+      ParsableType.json(JsonVariant.LineDelimited, true),
+      None,
+      blockingPool)
+
+  "parses array-wrapped JSON" >>* {
+    val ds =
+      LocalParsedDatasource[IO, RValue](
+        Paths.get("./impl/src/test/resources"),
+        1024,
+        ParsableType.json(JsonVariant.ArrayWrapped, true),
+        None,
+        blockingPool)
+
+    val iread =
+      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json"), ScalarStages.Id)
+
+    ds.evaluate(iread)
+      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .map(_ must_=== 100)
+  }
+
+  "decompresses gzipped resources" >>* {
+    val ds =
+      LocalParsedDatasource[IO, RValue](
+        Paths.get("./impl/src/test/resources"),
+        1024,
+        ParsableType.json(JsonVariant.ArrayWrapped, true),
+        Some(CompressionScheme.Gzip),
+        blockingPool)
+
+    val iread =
+      InterpretedRead(ResourcePath.root() / ResourceName("smallZips.json.gz"), ScalarStages.Id)
+
+    ds.evaluate(iread)
+      .flatMap(_.data.foldMap(κ(1)).compile.lastOrError)
+      .map(_ must_=== 100)
+  }
 }

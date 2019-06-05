@@ -294,6 +294,7 @@ object RValueScalarStagesInterpreter {
       case COffsetTime(_) => tpes.contains(ColumnType.OffsetTime)
       case CInterval(_) => tpes.contains(ColumnType.Interval)
 
+      case CBinary(_) => false
       case CArray(_, _) => false
       case CUndefined => false
     }

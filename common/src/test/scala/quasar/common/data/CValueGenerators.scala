@@ -43,5 +43,6 @@ object CValueGenerators {
     TimeGenerators.genOffsetDateTime.map(v => COffsetDateTime(v)),
     TimeGenerators.genOffsetDate.map(v => COffsetDate(v)),
     TimeGenerators.genOffsetTime.map(v => COffsetTime(v)),
-    TimeGenerators.genInterval.map(v => CInterval(v)))
+    TimeGenerators.genInterval.map(v => CInterval(v)),
+    arrayOf(genByte).map(CBinary(_)))
 }

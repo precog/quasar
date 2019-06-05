@@ -53,7 +53,14 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
         malformedConfiguration((LocalParsedType, config, d))
       }
-    } yield LocalParsedDatasource[F, RValue](root, lc.readChunkSizeBytes, blockingPool)
+    } yield {
+      LocalParsedDatasource[F, RValue](
+        root,
+        lc.readChunkSizeBytes,
+        lc.format,
+        lc.compressionScheme,
+        blockingPool)
+    }
 
     Resource.liftF(ds.value)
   }

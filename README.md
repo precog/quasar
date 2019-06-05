@@ -26,6 +26,29 @@ Query operations which are pushed down to the underlying data source are represe
 
 The codebase makes extremely heavy use of [Scalaz](https://github.com/scalaz/scalaz) and [Cats](https://github.com/typelevel/cats) throughout (using [shims](https://github.com/djspiewak/shims) to solve the impedance between them), and many high-level operations (such as datasets) are represented as [fs2](https://fs2.io) streams.
 
+## Local Datasource
+
+A `Datasource` implementation providing access to the filesystems local to the JVM.
+
+Configuration for the local datasource has the following JSON format
+
+```json
+{
+  "rootDir": String,
+  "format": {
+    "type": "json",
+    "variant": "array-wrapped" | "line-delimited",
+    [precise: Boolean]
+  },
+  ["readChunkSizeBytes": Number,]
+  ["compressionScheme": "gzip"]
+}
+```
+* `rootDir` an absolute path to a local directory at which to root the datasource, all paths handled by the datasource will be interpreted relative to this physical directory.
+* `format` the format of _all_ resources in the datasource, currently JSON is supported in both array-wrapped and line-delimited variants.
+* `readChunkSizeBytes` (optional) an integer indicating the chunk size to use when reading local files, the default is `1048576` (1MB). Different values may yield higher throughput depending on the filesystem.
+* `compressionScheme` (optional) whether to expect resources to be compressed, currently `gzip` is the only supported compression scheme. Omitting this option indicates uncompressed resources.
+
 ## Legal
 
 Copyright &copy; 2014 - 2019 SlamData Inc.

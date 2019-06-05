@@ -16,13 +16,77 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Int, String}
+import slamdata.Predef.{Boolean, Int, Option, String, StringContext}
 
-import argonaut.{Argonaut, DecodeJson}
+import quasar.connector.{CompressionScheme, ParsableType}
 
-final case class LocalConfig(rootDir: String, readChunkSizeBytes: Int)
+import argonaut.{DecodeJson, DecodeResult}
+
+import cats.{Eq, Show}
+import cats.instances.int._
+import cats.instances.option._
+import cats.instances.string._
+import cats.instances.tuple._
+import cats.syntax.show._
+
+import shims._
+
+final case class LocalConfig(
+    rootDir: String,
+    readChunkSizeBytes: Int,
+    format: ParsableType,
+    compressionScheme: Option[CompressionScheme])
 
 object LocalConfig {
-  implicit val decodeJson: DecodeJson[LocalConfig] =
-    Argonaut.jdecode2L(LocalConfig.apply)("rootDir", "readChunkSizeBytes")
+  /** Default to 1MB chunks when unspecified. */
+  val DefaultReadChunkSizeBytes: Int = 1048576
+
+  implicit val decodeJson: DecodeJson[LocalConfig] = {
+    import ParsableType.JsonVariant
+
+    val preciseLdjson = ParsableType.json(JsonVariant.LineDelimited, true)
+
+    implicit val decodeCompressionScheme: DecodeJson[CompressionScheme] =
+      DecodeJson(c => c.as[String] flatMap {
+        case "gzip" => DecodeResult.ok(CompressionScheme.Gzip)
+        case _ => DecodeResult.fail("CompressionScheme", c.history)
+      })
+
+    implicit val decodeJsonVariant: DecodeJson[JsonVariant] =
+      DecodeJson(c => c.as[String] flatMap {
+        case "array-wrapped" => DecodeResult.ok(JsonVariant.ArrayWrapped)
+        case "line-delimited" => DecodeResult.ok(JsonVariant.LineDelimited)
+        case _ => DecodeResult.fail("JsonVariant", c.history)
+      })
+
+    implicit val decodeParsableType: DecodeJson[ParsableType] =
+      DecodeJson(c => (c --\ "type").as[String] flatMap {
+        case "json" =>
+          for {
+            variant <- (c --\ "variant").as[JsonVariant]
+            precise <- (c --\ "precise").as[Option[Boolean]]
+          } yield ParsableType.json(variant, precise getOrElse false)
+
+        case _ => DecodeResult.fail("ParsableType", c.history)
+      })
+
+    DecodeJson(c => for {
+      rootDir <- (c --\ "rootDir").as[String]
+
+      maybeChunkSize <- (c --\ "readChunkSizeBytes").as[Option[Int]]
+      chunkSize = maybeChunkSize getOrElse DefaultReadChunkSizeBytes
+
+      maybeFormat <- (c --\ "format").as[Option[ParsableType]]
+      format = maybeFormat getOrElse preciseLdjson
+
+      compScheme <- (c --\ "compressionScheme").as[Option[CompressionScheme]]
+    } yield LocalConfig(rootDir, chunkSize, format, compScheme))
+  }
+
+  implicit val eqv: Eq[LocalConfig] =
+    Eq.by(lc => (lc.rootDir, lc.readChunkSizeBytes, lc.format, lc.compressionScheme))
+
+  implicit val show: Show[LocalConfig] =
+    Show.show(lc =>
+      s"LocalConfig(${lc.rootDir}, ${lc.readChunkSizeBytes}, ${lc.format.show}, ${lc.compressionScheme.fold("uncompressed")(_.show)}")
 }

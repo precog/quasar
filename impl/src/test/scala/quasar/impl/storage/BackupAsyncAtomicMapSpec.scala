@@ -53,20 +53,21 @@ import shims._
 import AtomixSetup._
 
 final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String] {
+  // parallel initialization of too much raft storages leads to OOM
   sequential
   val pool = BlockingContext.cached("mapdb-async-atomic-map")
 
-  def mkNodeInfo(port: Int): NodeInfo = NodeInfo("default", "localhost", port)
+  def mkNodeInfo(port: Int): NodeInfo = NodeInfo(s"node-${port}", "localhost", port)
 
   val DefaultMapName = "default"
   val AtomixThreads = "atomix-check-thread"
 
   val counter: Ref[IO, Int] = Ref.unsafe[IO, Int](5000)
 
-  val portResource: Resource[IO, Int] = Resource.liftF(counter.modify(x => (x + 1, x + 1)))
+  val newPort: IO[Int] = counter.modify(x => (x + 1, x + 1))
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
-    port <- portResource
+    port <- Resource.liftF(newPort)
     node = mkNodeInfo(port)
     atomix <- AtomixSetup[IO](node, List(node), Paths.get(s"default-${port}.raft"), AtomixThreads)
     store <- Resource.liftF { for {
@@ -100,12 +101,10 @@ final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String
 
 
   "simultaneous" >>* {
-    val portResources: Resource[IO, List[Int]] = List(portResource, portResource).sequence
-    val nodeResources: Resource[IO, List[NodeInfo]] = portResources map { (ports: List[Int]) =>
-      ports map { (port: Int) => NodeInfo(s"node-${port}", "localhost", port) }
-    }
+    val ioPorts: IO[List[Int]] = List(newPort, newPort).sequence
+    val ioNodes: IO[List[NodeInfo]] = ioPorts map { (ports: List[Int]) => ports map (mkNodeInfo(_)) }
     val stores: Resource[IO, List[IndexedStore[IO, String, String]]] = for {
-      nodes <- nodeResources
+      nodes <- Resource.liftF(ioNodes)
       parStores = nodes map { (node: NodeInfo) =>
         AtomixSetup[IO](node, nodes, Paths.get(s"simultanesous-${node.port}.raft"), AtomixThreads) evalMap { atomix => for {
           backup <- IO(new ConcurrentHashMap[String, String]())
@@ -124,25 +123,98 @@ final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String
       prefilleds === List(Some("prefilled"), Some("prefilled"))
     }}
   }
-/*
-  "reconnect" >>* {
-    val portResources: Resource[IO, List[Int]] = List(portResource, portResource).sequence
-    val nodeResources: Resource[IO, List[NodeInfo]] = portResources map { (ports: List[Int]) =>
-      ports map { (port: Int) => NodeInfo(s"node-${port}", "localhost", port) }
-    }
-    val stores: Resource[IO, List[IndexedStore[IO, String, String]]] = for {
-      nodes <- nodeResources
-      parStores = nodes map { (node: NodeInfo) =>
-        AtomixSetup[IO](node, nodes, Paths.get(s"simultanesous-${node.port}.raft"), AtomixThreads) evalMap { atomix => for {
-          backup <- IO(new ConcurrentHashMap[String, String]())
-          _ <- IO(backup.put("prefilled", "prefilled"))
-          result <- BackupStore[IO, String, String](atomix, "simultaneous", backup, pool)
-        } yield result}
+
+  "12 - _ - 2 - 12" >>* {
+    val backup1 = new ConcurrentHashMap[String, String]()
+    val backup2 = new ConcurrentHashMap[String, String]()
+    val node1: NodeInfo = (newPort map (mkNodeInfo(_))).unsafeRunSync
+    val node2: NodeInfo = (newPort map (mkNodeInfo(_))).unsafeRunSync
+    val resource1: Resource[IO, IndexedStore[IO, String, String]] =
+      AtomixSetup[IO](node1, List(node1, node2), Paths.get(s"reconnect-1.raft"), AtomixThreads) evalMap { atomix =>
+        BackupStore[IO, String, String](atomix, "reconnect", backup1, pool)
       }
-      stores <- parallelResource(parStores)
-    } yield stores
+    val resource2: Resource[IO, IndexedStore[IO, String, String]] =
+      AtomixSetup[IO](node2, List(node1, node2), Paths.get(s"reconnect-2.raft"), AtomixThreads) evalMap { atomix =>
+        BackupStore[IO, String, String](atomix, "reconnect", backup2, pool)
+      }
+
+    for {
+      _ <- parallelResource(List(resource1, resource2)) use { stores =>
+        stores(0).insert("a", "b")
+      }
+      result <- resource2 use { store2 => for {
+        _ <- store2.insert("b", "c")
+        inner <- resource1 use { store1 => for {
+          as <- List(store1, store2) parTraverse (_.lookup("a"))
+          bs <- List(store1, store2) parTraverse (_.lookup("b"))
+        } yield (as, bs) }
+      } yield inner }
+    } yield {
+      result._1 === List(Some("b"), Some("b"))
+      result._2 === List(Some("c"), Some("c"))
+    }
   }
- */
+
+  "12 - 1 - 134 - 4 - 24" >>* {
+    val backup1 = new ConcurrentHashMap[String, String]()
+    val backup2 = new ConcurrentHashMap[String, String]()
+    val backup3 = new ConcurrentHashMap[String, String]()
+    val backup4 = new ConcurrentHashMap[String, String]()
+    val node1: NodeInfo = (newPort map (mkNodeInfo(_))).unsafeRunSync
+    val node2: NodeInfo = (newPort map (mkNodeInfo(_))).unsafeRunSync
+    val node3: NodeInfo = (newPort map (mkNodeInfo(_))).unsafeRunSync
+    val node4: NodeInfo = (newPort map (mkNodeInfo(_))).unsafeRunSync
+
+    val resource1: Resource[IO, IndexedStore[IO, String, String]] =
+      AtomixSetup[IO](node1, List(node1, node2, node3, node4), Paths.get(s"reconnect-1.raft"), AtomixThreads) evalMap { atomix =>
+        BackupStore[IO, String, String](atomix, "reconnect", backup1, pool)
+      }
+    val resource2: Resource[IO, IndexedStore[IO, String, String]] =
+      AtomixSetup[IO](node2, List(node1, node2, node3, node4), Paths.get(s"reconnect-2.raft"), AtomixThreads) evalMap { atomix =>
+        BackupStore[IO, String, String](atomix, "reconnect", backup2, pool)
+      }
+    val resource3: Resource[IO, IndexedStore[IO, String, String]] =
+      AtomixSetup[IO](node3, List(node1, node2, node3, node4), Paths.get(s"reconnect-3.raft"), AtomixThreads) evalMap { atomix =>
+        println("RESOURCE 3")
+        BackupStore[IO, String, String](atomix, "reconnect", backup3, pool)
+      }
+    val resource4: Resource[IO, IndexedStore[IO, String, String]] =
+      AtomixSetup[IO](node4, List(node1, node2, node3, node4), Paths.get(s"reconnect-4.raft"), AtomixThreads) evalMap { atomix =>
+        println("RESOURCE 4")
+        BackupStore[IO, String, String](atomix, "reconnect", backup4, pool)
+      }
+
+    for {
+      pairs12 <- List(resource1, resource2, resource3) parTraverse (_.allocated)
+      store1 = pairs12(0)._1
+      finish1 = pairs12(0)._2
+      store2 = pairs12(1)._1
+      finish2 = pairs12(1)._2
+      store3 = pairs12(2)._1
+      finish3 = pairs12(2)._2
+      _ <- store1.insert("a", "b")
+      _ <- finish2
+      _ <- IO(println("2 finished"))
+
+      pairs34 <- List(resource4, resource2) parTraverse (_.allocated)
+      _ <- IO(println("34 started"))
+      store4 = pairs34(0)._1
+      finish4 = pairs34(0)._2
+      store2 = pairs12(1)._1
+      finish2 = pairs12(1)._2
+      _ <- store3.insert("b", "c")
+      _ <- IO(println("3 inserted"))
+      as1 <- List(store1, store3, store4) parTraverse (_.lookup("a"))
+      _ <- IO(println("134 a"))
+      bs1 <- List(store1, store3, store4) parTraverse (_.lookup("b"))
+      _ <- IO(println("134 b"))
+      _ <- List(finish1, finish3, finish4, finish2).parSequence
+    } yield {
+      as1 === List(Some("b"), Some("b"), Some("b"))
+      bs1 === List(Some("c"), Some("c"), Some("c"))
+    }
+
+  }
 
 /*
   "restore" >>* {

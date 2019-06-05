@@ -51,7 +51,7 @@ object BackupStore {
       name: String,
       backup: ConcurrentMap[K, V],
       pool: BlockingContext)
-      : F[IndexedStore[F, K, V]] = {
+      : F[BackupStore[F, K, V]] = {
 
     def backupMap(atomix: Atomix): F[BackupAsyncAtomicMap[K, V]] = Sync[F].delay {
       BackupAsyncAtomicMap[F, K, V](atomix.atomicMapBuilder[K, V](name).build().async(), backup, pool)
@@ -72,8 +72,8 @@ object BackupStore {
       _ <- Applicative[F].unlessA(initialized){ for {
         _ <- store.restore
         _ <- cfToAsync(flag.set(true))
-        _ <- cfToAsync(lock.unlock())
       } yield () }
+      _ <- cfToAsync(lock.unlock())
     } yield store
   }
 }

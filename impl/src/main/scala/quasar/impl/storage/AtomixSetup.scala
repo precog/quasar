@@ -48,6 +48,8 @@ import java.nio.channels.AsynchronousChannelGroup
 import java.nio.channels.spi.AsynchronousChannelProvider
 import java.nio.file.Path
 
+import scala.collection.JavaConverters._
+
 object AtomixSetup {
   final case class NodeInfo(memberId: String, host: String, port: Int) extends Product with Serializable
 
@@ -104,20 +106,45 @@ object AtomixSetup {
       res <- d.get
     } yield res
 
+    // Note, that we remove log files before and after atomix run
+    // post-remove isn't really necessary, but we're backed up, so, this shouldn't be a problem
+    // pre-remove is necessary because we can't guarantee that newish cluster has a quorum
+    // in terms of oldish one
+    // e.g. we ran `12345` and then `12`, since logs have all `12345` records
+    // `12` cluster won't be started.
+    // The other things is retrying, retrying is bad, but until this
+    // https://github.com/atomix/atomix/issues/957 is done partition groups (and members for raft)
+    // must be set during initialization.
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def fAtomix: F[Atomix] = for {
       _ <- recursiveDelete(logPath.toFile)
       connected <- fConnected
-      atomix <- mkAtomix(thisNode, (thisNode :: connected), logPath)
+      _ <- Sync[F].delay(println(connected))
+      atomix <- mkAtomix(thisNode, thisNode :: seeds, logPath)
       _ <- cfToAsync(atomix.start)
       postConnected <- fConnected
-      result <- if (connected.length < postConnected.length / 2) for {
+      _ <- Sync[F].delay(println(postConnected))
+      members <- Sync[F].delay(atomix
+        .getPartitionService()
+        .getPartitionGroup(DataGroupName)
+        .getPartitions()
+        .asScala
+        .toList
+        .flatMap(_.members().asScala.toList)
+        .map(_.id())
+        .toSet)
+      _ <- Sync[F].delay(println(members))
+      result <- if (false && members.size < postConnected.length) for {
         _ <- cfToAsync(atomix.stop)
         res <- Sync[F].suspend(fAtomix)
       } yield res
       else Sync[F].delay(atomix)
     } yield result
 
-    Resource.make(fAtomix) { atomix => Sync[F].suspend(cfToAsync(atomix.stop)) as (()) }
+    Resource.make(fAtomix) { atomix => for {
+      _ <- Sync[F].suspend(cfToAsync(atomix.stop))
+      _ <- recursiveDelete(logPath.toFile)
+    } yield () }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
@@ -127,7 +154,6 @@ object AtomixSetup {
     if (file.isDirectory) {
       Option(file.listFiles()) match {
         case None =>
-          println("no files")
           delete
         case Some(xs) =>
           xs.toList.traverse(recursiveDelete(_)) *> delete
@@ -144,12 +170,18 @@ object AtomixSetup {
     val nodeList: List[Node] =
       connectedSeeds map (atomixNode(_))
 
-    val raftPartition = RaftPartitionGroup
+/*
+    val dataPartition = RaftPartitionGroup
       .builder(DataGroupName)
       .withMembers((connectedSeeds map (_.memberId)):_*)
       .withStorageLevel(StorageLevel.DISK)
       .withDataDirectory(path.toFile)
       .withNumPartitions(DataPartitionsNum)
+      .build()
+ */
+    val dataPartition = PrimaryBackupPartitionGroup
+      .builder(DataGroupName)
+      .withNumPartitions(32)
       .build()
 
     Atomix.builder()
@@ -159,7 +191,7 @@ object AtomixSetup {
         .builder(SystemGroupName)
         .withNumPartitions(SystemPartitionsNum)
         .build())
-      .withPartitionGroups(raftPartition)
+      .withPartitionGroups(dataPartition)
       .withMembershipProvider(BootstrapDiscoveryProvider
         .builder()
         .withNodes(nodeList:_*)

@@ -129,7 +129,7 @@ lazy val foundation = project
       "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
-      "com.propensive"             %% "contextual"                % "1.0.1",
+      "com.propensive"             %% "contextual"                % "1.1.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,

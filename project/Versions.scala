@@ -26,4 +26,5 @@ object Versions {
   val atomixVersion       = "3.0.6"
   val mapdbVersion        = "3.0.7"
   val nettyVersion        = "4.1.36.Final"
+  val igniteVersion       = "2.7.5"
 }

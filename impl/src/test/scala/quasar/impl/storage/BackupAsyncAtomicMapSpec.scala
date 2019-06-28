@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+/*
 package quasar.impl.storage
 
 import slamdata.Predef._
@@ -435,3 +436,4 @@ final class BackupAsyncAtomicMapSpec extends IndexedStoreSpec[IO, String, String
   }
  */
 }
+ */

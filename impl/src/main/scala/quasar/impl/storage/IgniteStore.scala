@@ -46,8 +46,6 @@ final class IgniteStore[F[_]: Async: ContextShift, K, V](
 
   def entries: Stream[F, (K, V)] = for {
     iterator <- Stream.eval(evalOnPool(F.delay(cache.iterator.asScala)))
-    _ <- Stream.eval(F.delay(println(iterator)))
-    _ <- Stream.eval(F.delay(println(iterator.next)))
     entry <- evalStreamOnPool(Stream.fromIterator[F, Entry[K, V]](iterator))
   } yield (entry.getKey, entry.getValue)
 
@@ -79,12 +77,12 @@ object IgniteStore {
 
   def igfToF[F[_]: Async: ContextShift, A](igf: IgniteFuture[A]): F[A] = {
     if (igf.isDone) {
-      println(igf.get)
       igf.get.pure[F]
     }
-    else
+    else {
       Async[F].async { (cb: Either[Throwable, A] => Unit) =>
         val _ = igf.listen { (ig: IgniteFuture[A]) => cb(Right(ig.get)) }
       } productL ContextShift[F].shift
+    }
   }
 }

@@ -37,42 +37,45 @@ final class IgniteStoreSpec extends IndexedStoreSpec[IO, Int, String] {
   val blockingPool: BlockingContext = BlockingContext.cached("ignite-indexed-store-spec")
   val freshIndex: IO[Int] = IO(Random.nextInt)
   val ignite: Resource[IO, Ignite] = {
+    def mkCreationListener(d: Deferred[IO, Ignite]): IgnitionListener = new IgnitionListener {
+      def onStateChange(name: String, state: IgniteState): Unit = state match {
+        case IgniteState.STARTED =>
+          d.complete(Ignition.ignite()).unsafeRunSync
+        case y =>
+      }
+    }
+
     val create: IO[Ignite] = for {
       d <- Deferred.tryable[IO, Ignite]
       ignite <- IO(Ignition.start()).start
-      _ <- IO(Ignition.addListener(new IgnitionListener {
-        def onStateChange(name: String, state: IgniteState): Unit = state match {
-          case IgniteState.STARTED =>
-            println("================================================================================")
-            println("STARTED")
-            println("================================================================================")
-            d.complete(Ignition.ignite()).unsafeRunSync
-          case _ => ()
-        }})).start
+      creationListener = mkCreationListener(d)
+      _ <- IO(Ignition.addListener(creationListener))
       i <- d.get
+      _ <- IO(Ignition.removeListener(creationListener))
     } yield i
+
+    def mkStoppingListener(d: Deferred[IO, Unit]): IgnitionListener = new IgnitionListener {
+      def onStateChange(name: String, state: IgniteState): Unit = state match {
+        case IgniteState.STARTED => ()
+        case _ => d.complete(()).unsafeRunSync
+      }
+    }
+
     def stop(i: Ignite): IO[Unit] = for {
-      _ <- IO(println("STOPPED"))
       _ <- IO(Ignition.stop(true)).start
       d <- Deferred.tryable[IO, Unit]
-      _ <- IO(Ignition.addListener(new IgnitionListener {
-        def onStateChange(name: String, state: IgniteState): Unit = state match {
-          case IgniteState.STARTED => ()
-          case _ => d.complete(()).unsafeRunSync
-        }
-      })).start
+      stoppingListener = mkStoppingListener(d)
+      _ <- IO(Ignition.addListener(stoppingListener))
       _ <- d.get
+      _ <- IO(Ignition.removeListener(stoppingListener))
     } yield (())
-    Resource.make(create)(stop)
-  }
-Resource.make(IO(Ignition.start()))(x => IO(Ignition.stop(true)) as (()))
-  val emptyStore: Resource[IO, IndexedStore[IO, Int, String]] = ignite evalMap { (ig: Ignite) =>
-    println(ig)
-    val cache = ig.getOrCreateCache[Int, String]("test")
-    println(cache)
-    IO(IgniteStore[IO, Int, String](cache, blockingPool))
+    Resource.make(IO.suspend(create))(x => IO.suspend(stop(x)))
   }
 
+  val emptyStore: Resource[IO, IndexedStore[IO, Int, String]] = ignite evalMap { (ig: Ignite) =>
+    val cache = ig.getOrCreateCache[Int, String]("test")
+    IO(IgniteStore[IO, Int, String](cache, blockingPool))
+  }
   val valueA = "A"
   val valueB = "B"
 }

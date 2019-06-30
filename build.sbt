@@ -300,6 +300,7 @@ lazy val impl = project
       "io.atomix"      % "atomix-primary-backup"     % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "io.atomix"      % "atomix-raft"     % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.apache.ignite" % "ignite-core"  % igniteVersion,
+      "org.apache.ignite" % "ignite-log4j"  % igniteVersion,
       "io.netty"       % "netty-all"                 % nettyVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working

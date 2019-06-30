@@ -16,7 +16,7 @@
 
 package quasar.impl.storage
 
-import slamdata.Predef.{List, Some}
+import slamdata.Predef._ //{List, Some, println}
 import quasar.EffectfulQSpec
 
 import scala.concurrent.ExecutionContext

@@ -227,3 +227,11 @@ object BackupAsyncAtomicMap {
     new BackupAsyncAtomicMap(async, backup, executor)
   }
 }
+
+class Foo(x: Int) {
+  private final val xx: Int = x
+}
+
+class Bar(x: Int) extends Foo(x) {
+  private final val xx: Int = x + 1
+}

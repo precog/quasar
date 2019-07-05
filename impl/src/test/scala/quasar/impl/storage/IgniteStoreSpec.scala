@@ -37,6 +37,8 @@ import java.nio.file.{Paths, Path => NPath, Files}
 import java.util.concurrent.ConcurrentHashMap
 import org.apache.ignite._
 
+import fs2._
+
 final class IgniteStoreSpec extends IndexedStoreSpec[IO, Int, String] {
   sequential
 

@@ -20,12 +20,16 @@ import slamdata.Predef._
 
 import quasar.concurrent.BlockingContext
 
+import cats.arrow.FunctionK
 import cats.effect._
+import cats.effect.concurrent.Ref
 import cats.syntax.apply._
 import cats.syntax.flatMap._
+import cats.syntax.applicative._
 import cats.syntax.functor._
 
 import fs2.Stream
+import fs2.concurrent.InspectableQueue
 import scalaz.syntax.tag._
 
 import io.atomix.cluster.ClusterMembershipService
@@ -33,61 +37,176 @@ import io.atomix.cluster.messaging.ClusterCommunicationService
 import io.atomix.cluster.{Member, MemberId}
 
 import scala.collection.JavaConverters._
-import java.util.concurrent.{Executors, Executor}
+import java.util.concurrent.{Executors, Executor, ConcurrentMap}
 import scala.concurrent.ExecutionContext
 import java.util.function.Consumer
 import scala.concurrent.duration._
 
-final class AEStore[F[_]: Async: ContextShift, K, V](
+final class AEStore[F[_]: ConcurrentEffect: ContextShift, K, V](
     name: String,
     communication: ClusterCommunicationService,
-    membership: ClusterMembershipService)
+    membership: ClusterMembershipService,
+    sendingRef: Ref[F, AEStore.Pending],
+    underlying: ConcurrentMap[K, V],
+    blockingPool: BlockingContext)(
+    implicit timer: Timer[F])
     extends IndexedStore[F, K, V] {
 
-  def entries: Stream[F, (K, V)] = ???
-  def lookup(k: K): F[Option[V]] = ???
-  def insert(k: K, v: V): F[Unit] = ???
-  def delete(k: K): F[Boolean] = ???
+
+  private def evalOnPool[A](fa: F[A]): F[A] =
+    ContextShift[F].evalOn[A](blockingPool.unwrap)(fa)
+
+  private def evalStreamOnPool[A](s: Stream[F, A]): Stream[F, A] =
+    s.translate(new FunctionK[F, F] {
+      def apply[A](fa: F[A]): F[A] = evalOnPool(fa)
+    })
+
+  def entries: Stream[F, (K, V)] = for {
+    iterator <- Stream.eval(evalOnPool(Sync[F].delay(underlying.entrySet.iterator.asScala)))
+    entry <- evalStreamOnPool(
+      Stream.fromIterator[F, java.util.Map.Entry[K, V]](iterator))
+  } yield (entry.getKey, entry.getValue)
+
+  def lookup(k: K): F[Option[V]] =
+    evalOnPool(Sync[F].delay(Option(underlying.get(k))))
+
+  def insert(k: K, v: V): F[Unit] = evalOnPool(for {
+    _ <- Sync[F].delay(underlying.put(k, v))
+    currentTime <- timer.clock.monotonic(MILLISECONDS)
+    _ <- sendingRef.modify {
+      case AEStore.Pending(lst, time, firstAdded) =>
+        (AEStore.Pending(Array[Byte]() :: lst, time, if (lst.isEmpty) currentTime else firstAdded), ())
+    }
+  } yield ())
+
+  def delete(k: K): F[Boolean] = evalOnPool(for {
+    res <- Sync[F].delay(Option(underlying.remove(k)).nonEmpty)
+    currentTime <- timer.clock.monotonic(MILLISECONDS)
+    _ <- sendingRef.modify {
+      case AEStore.Pending(lst, time, firstAdded) =>
+        (AEStore.Pending(Array[Byte]() :: lst, time, if (lst.isEmpty) currentTime else firstAdded), ())
+    }
+  } yield res)
 
   private def peers: F[Set[Member]] = Sync[F].delay {
     membership.getMembers.asScala.to[Set]
   }
 
+  def advertisement: F[Stream[F, Unit]] = Sync[F].delay {
+    val sendAndWait = Stream.eval(sendAd) *> Stream.sleep(new FiniteDuration(100, MILLISECONDS))
+    Stream.sleep(new FiniteDuration(5000, MILLISECONDS)) *> sendAndWait.repeat
+  }
   private def sendAd: F[Unit] = Sync[F].delay {
     println("SENDING AD")
   }
-  private def purgeTombstones: F[Unit] = Sync[F].delay {
+
+  def purgeTombstones: F[Stream[F, Unit]] =
+    Sync[F].delay((Stream.sleep(new FiniteDuration(100, MILLISECONDS)) *> Stream.eval(purge)).repeat)
+
+  private def purge: F[Unit] = Sync[F].delay {
     println("PURGING TOMBSTONES")
   }
-  private def handleBootstrap(id: MemberId): F[Unit] = Sync[F].delay {
-    println("HANDLING BOOTSTRAP")
+
+  private def run(action: F[Unit]) =
+    ConcurrentEffect[F].runAsync(action)(_ => IO.unit).unsafeRunSync
+
+  private def handler[A](eventName: String, cb: A => Unit): Unit = {
+    val consumer: Consumer[A] = (a) => cb(a)
+    communication.subscribe(
+      eventName,
+      consumer,
+      AEStore.blockingContextExecutor(blockingPool))
+    ()
   }
-  private def init(bs: Array[Byte]): F[Unit] = Sync[F].delay {
-    println("INITIALIZING")
+
+  private def enqueue[A](q: InspectableQueue[F, A], eventName: String, maxItems: Int): Stream[F, Unit] =
+    Stream.eval(Sync[F].delay(handler[A](eventName, { (a: A) => run {
+      q.getSize.flatMap((size: Int) => q.enqueue1(a).whenA(size < maxItems))
+    }})))
+
+  private def unsubscribe(eventName: String): F[Unit] = Sync[F].delay {
+    communication.unsubscribe(eventName)
   }
-  private def requestUpdate(id: MemberId): F[Unit] = Sync[F].delay {
-    println("REQUEST UPDATE")
+
+  val BootstrapMessage: String = s"aestore::bootstrapping::${name}"
+  def bootstrapping: F[Stream[F, Array[Byte]]] =
+    InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
+      enqueue(queue, BootstrapMessage, 256) *> queue.dequeue
+    }
+  def bootstrapHandler(as: Array[Byte]): F[Unit] = Sync[F].delay {
+    println("bootstrap received")
   }
-  private def updateReceived(bs: Array[Byte]): F[Unit] = Sync[F].delay {
-    println("UPDATE RECEIVED")
+
+  val InitMessage: String = s"aestore::initializing::${name}"
+  def initializing: F[Stream[F, Array[Byte]]] =
+    InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
+      enqueue(queue, InitMessage, 32) *> queue.dequeue
+    }
+  def initHandler(as: Array[Byte]): F[Unit] = Sync[F].delay {
+    println("init received")
   }
-  private def antiEntropy(bs: Array[Byte]): F[Unit] = Sync[F].delay {
-    println("HANDLE ANTY ENTROPY")
+
+  val UpdateRequestMessage: String = s"aestore::update-request::${name}"
+  def updateRequesing: F[Stream[F, Array[Byte]]] =
+    InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
+      enqueue(queue, UpdateRequestMessage, 128) *> queue.dequeue
+    }
+  def updateRequestedHandler(as: Array[Byte]): F[Unit] = Sync[F].delay {
+    println("update requested")
   }
-  private def sendUpdate: F[Unit] = Sync[F].delay {
-    println("SENDING UPDATE")
+
+  val UpdateReceivedMessage: String = s"aestore::updated::${name}"
+  def updateReceived: F[Stream[F, Array[Byte]]] =
+    InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
+      enqueue(queue, UpdateReceivedMessage, 128) *> queue.dequeue
+    }
+  def updateReceivedHandler(as: Array[Byte]): F[Unit] = Sync[F].delay {
+    println("update received")
   }
+
+  private def sendToAll: F[Unit] = for {
+    pids <- peers.map(_.map(_.id))
+    currentTime <- timer.clock.monotonic(MILLISECONDS)
+    msg <- sendingRef.modify {
+      case x@AEStore.Pending(lst, currentTime, firstAdded) => (AEStore.Pending(List(), currentTime, 0L), lst)
+    }
+    _ <- Sync[F].delay(communication.multicast(
+      UpdateReceivedMessage,
+      msg,
+      pids.to[scala.collection.mutable.Set].asJava))
+  } yield ()
+
+  def notifyPeersF: F[Unit] = for {
+    currentTime <- timer.clock.monotonic(MILLISECONDS)
+    AEStore.Pending(lst, lastTime, firstAdded) <- sendingRef.get
+    _ <- if (lst.isEmpty) {
+      sendingRef.set(AEStore.Pending(lst, currentTime, firstAdded))
+    } else if (currentTime - firstAdded > 50) {
+      sendToAll *> sendingRef.set(AEStore.Pending(List(), currentTime, 0L))
+    } else if (lst.length > 50) {
+      sendToAll *> sendingRef.set(AEStore.Pending(List(), currentTime, 0L))
+    } else if (currentTime - lastTime > 200) {
+      sendToAll *> sendingRef.set(AEStore.Pending(List(), currentTime, 0L))
+    } else { Sync[F].delay(()) }
+  } yield ()
+
+  def notifyingPeers: Stream[F, Unit] =
+    (Stream.eval(notifyPeersF) *> Stream.sleep(new FiniteDuration(10, MILLISECONDS))).repeat
+
+
 }
 
 object AEStore {
+  final case class Pending(items: List[Array[Byte]], lastSend: Long, firstAdded: Long) extends Product with Serializable
+
   def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {
     def execute(r: java.lang.Runnable) = pool.unwrap.execute(r)
   }
 
   /* OK, so basically we need the following things
-   * 1) event streams which ignores events if there are too much of them, they are handled on blocking pool
-   * 2) timed streams which sends advertisements and purge tombstone commands, they are evaled on blocking pool, preferrable single threaded
-   * 3) batch sender, that is the thing that accumulates events and sends them together to all peers selected by specific function.
+   * x) event streams which ignores events if there are too much of them, they are handled on blocking pool
+   * x) timed streams which sends advertisements and purge tombstone commands, they are evaled on blocking pool, preferrable single threaded
+   * x) batch sender, that is the thing that accumulates events and sends them together to all peers selected by specific function.
    * Note that default peer selection is either one random node or all nodes (it's 6a.m. I'm a bit tired), and this should be somehow
    * adjustable: cluster size?, config?
    * The sender should work on blocking pool too.
@@ -97,12 +216,15 @@ object AEStore {
    * 2) After loading instead of requesting updates with only memberid we can request data with loaded values. We might also bootstrap things
    * using a couple of, this also changes updates communication a bit.
    * 3) `Serializer[A]`, `MapValue` serializer
+   *
+   *  There is no need in any builder or other fancy interfaces, `AtomixCluster` have all services needed here.
    */
 
   def apply[F[_]: ConcurrentEffect: ContextShift, K, V](
       name: String,
       communication: ClusterCommunicationService,
       membership: ClusterMembershipService,
+      underlying: ConcurrentMap[K, V],
       handlePool: BlockingContext,
       sendingPool: ExecutionContext,
       syncContext: ExecutionContext)(
@@ -114,49 +236,8 @@ object AEStore {
     val UpdateRequestMessage: String = s"aestore::update-request::${name}"
     val UpdateReceivedMessage: String = s"aestore::updated::${name}"
     for {
-      store <- Sync[F].delay(new AEStore[F, K, V](name, communication, membership))
-      _ <- Concurrent[F].start {
-        def repeat: F[Unit] =
-          store.sendAd *> timer.sleep(new FiniteDuration(100, MILLISECONDS)) *> ContextShift[F].shift *> repeat
-        ContextShift[F].evalOn(syncContext)(repeat)
-      }
-      _ <- Concurrent[F].start {
-        def repeat: F[Unit] =
-          store.purgeTombstones *> timer.sleep(new FiniteDuration(400, MILLISECONDS)) *> ContextShift[F].shift *> repeat
-        ContextShift[F].evalOn(syncContext)(repeat)
-      }
-      bootstrapConsumer: Consumer[MemberId] = (m: MemberId) =>
-        Effect[F].runAsync(store.handleBootstrap(m))(x => IO.unit).unsafeRunSync
-      _ <- Sync[F].delay(communication.subscribe(
-        BootstrapMessage,
-        bootstrapConsumer,
-        blockingContextExecutor(handlePool)))
-      initConsumer: Consumer[Array[Byte]] = (a: Array[Byte]) =>
-        Effect[F].runAsync(store.init(a))(x => IO.unit).unsafeRunSync
-      _ <- Sync[F].delay(communication.subscribe(
-        InitMessage,
-        initConsumer,
-        blockingContextExecutor(handlePool)))
-      requestConsumer: Consumer[MemberId] = (m: MemberId) =>
-        Effect[F].runAsync(store.requestUpdate(m))(x => IO.unit).unsafeRunSync
-      _ <- Sync[F].delay(communication.subscribe(
-        UpdateRequestMessage,
-        requestConsumer,
-        blockingContextExecutor(handlePool)))
-      updateConsumer: Consumer[Array[Byte]] = (a: Array[Byte]) =>
-        Effect[F].runAsync(store.updateReceived(a))(x => IO.unit).unsafeRunSync
-      _ <- Sync[F].delay(communication.subscribe(
-        UpdateReceivedMessage,
-        updateConsumer,
-        blockingContextExecutor(handlePool)))
-      adConsumer: Consumer[Array[Byte]] = (a: Array[Byte]) =>
-        Effect[F].runAsync(store.updateReceived(a))(x => IO.unit).unsafeRunSync
-      _ <- Sync[F].delay(communication.subscribe(
-        AntiEntropyMessage,
-        adConsumer,
-        blockingContextExecutor(handlePool)))
-      _ <- Concurrent[F].start(ContextShift[F].evalOn(handlePool.unwrap)(store.sendUpdate))
-
+      sendingRef <- Ref.of[F, Pending](Pending(List(), 0L, 0L))
+      store <- Sync[F].delay(new AEStore[F, K, V](name, communication, membership, sendingRef, underlying, handlePool))
     } yield store
   }
 }

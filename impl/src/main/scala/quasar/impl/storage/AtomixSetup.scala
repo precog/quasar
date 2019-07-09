@@ -64,7 +64,7 @@ object AtomixSetup {
 
   def atomixNode(node: NodeInfo): Node =
     Node.builder().withAddress(node.host, node.port).withId(node.memberId).build()
-
+/*
   def apply[F[_]: Concurrent: ContextShift: MonadError[?[_], Throwable]](
       thisNode: NodeInfo,
       seeds: List[NodeInfo],
@@ -161,11 +161,10 @@ object AtomixSetup {
     }
     else delete
   }
-
-  private[this] def mkAtomix[F[_]: Sync](
+ */
+  def mkAtomix[F[_]: Sync](
       thisNode: NodeInfo,
-      connectedSeeds: List[NodeInfo],
-      path: Path)
+      connectedSeeds: List[NodeInfo])
       : F[Atomix] = Sync[F].delay {
     val nodeList: List[Node] =
       connectedSeeds map (atomixNode(_))
@@ -191,7 +190,7 @@ object AtomixSetup {
         .builder(SystemGroupName)
         .withNumPartitions(SystemPartitionsNum)
         .build())
-      .withPartitionGroups(dataPartition)
+//      .withPartitionGroups(dataPartition)
       .withMembershipProvider(BootstrapDiscoveryProvider
         .builder()
         .withNodes(nodeList:_*)

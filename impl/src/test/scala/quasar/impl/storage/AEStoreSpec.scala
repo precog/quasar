@@ -23,6 +23,8 @@ import cats.effect.{IO, Resource, ContextShift, Timer}
 import cats.syntax.functor._
 
 import io.atomix.core._
+import io.atomix.cluster._
+import io.atomix.cluster.{Member, MemberId}
 
 import monocle.Prism
 
@@ -33,8 +35,13 @@ import scala.concurrent.ExecutionContext
 import ExecutionContext.Implicits.global
 import scala.util.Random
 import scalaz.std.string._
-
+import scala.concurrent.duration._
 import shims._
+import AtomixSetup._
+import java.util.function.{Consumer, Function}
+import java.util.concurrent.CompletableFuture
+
+import AEStore._
 
 final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   sequential
@@ -53,14 +60,56 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   val bytesStringP: Prism[Array[Byte], String] =
     Prism((bytes: Array[Byte]) => Some(new String(bytes, StandardCharsets.UTF_8)))(_.getBytes)
 
-  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
-    atomix <- Resource.make(AtomixSetup.mkAtomix[IO](defaultNode, List()))((a: Atomix) =>
-      AtomixSetup.cfToAsync[IO, java.lang.Void](a.stop) as (()))
+  def startAtomix(me: NodeInfo, seeds: List[NodeInfo]): IO[AtomixCluster] = for {
+    atomix <- AtomixSetup.mkAtomix[IO](me, me :: seeds)
+    _ <- cfToAsync[IO, java.lang.Void](atomix.start)
+  } yield atomix
+
+  def stopAtomix(atomix: AtomixCluster): IO[Unit] =
+    IO.suspend(cfToAsync[IO, java.lang.Void](atomix.stop) as (()))
+
+  def mkStore(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, IndexedStore[IO, String, String]] = for {
+    atomix <- Resource.make(startAtomix(me, seeds))(stopAtomix(_))
     underlying <- Resource.pure[IO, ConcurrentHashMap[String, AEStore.Value]](new ConcurrentHashMap[String, AEStore.Value]())
-    store <- AEStore[IO]("default", atomix.getCommunicationService(), atomix.getMembershipService(), underlying, pool)
+    store <- AEStore[IO](s"default", atomix.getCommunicationService(), atomix.getMembershipService(), underlying, pool)
   } yield store
 
+  val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = mkStore(defaultNode, List())
   val valueA = "A"
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)
+
+  "foo" >>* {
+    val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
+    val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
+    val node2: NodeInfo = NodeInfo("2", "localhost", 6002)
+    for {
+      (store0, finish0) <- mkStore(node0, List(node0, node1)).allocated
+      _ <- store0.insert("a", "b")
+      (store1, finish1) <- mkStore(node1, List(node0, node1)).allocated
+      _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
+      a0 <- store0.lookup("a")
+      a1 <- store0.lookup("a")
+      _ <- finish0
+      _ <- finish1
+    } yield {
+      println(s"a0, a1 ::: ${a0}, ${a1}")
+      true
+    }
+  }
+
+  "bar" >>* {
+    val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
+    val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
+    for {
+      atomix0 <- startAtomix(node0, List(node0, node1))
+      atomix1 <- startAtomix(node1, List(node0, node1))
+      _ <- IO(atomix0.getCommunicationService().subscribe[String]("test", (x: String) => println(x), AEStore.blockingContextExecutor(pool)).join)
+      _ <- IO(atomix1.getCommunicationService().unicast("test", "A message", MemberId.from("0")).join)
+      _ <- stopAtomix(atomix0)
+      _ <- stopAtomix(atomix1)
+    } yield {
+      true
+    }
+  }
 }

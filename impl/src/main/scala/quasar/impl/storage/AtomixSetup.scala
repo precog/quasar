@@ -37,6 +37,8 @@ import quasar.concurrent.NamedDaemonThreadFactory
 
 import io.atomix.core._
 import io.atomix.cluster._
+import io.atomix.cluster.ClusterMembershipService
+import io.atomix.cluster.messaging.ClusterCommunicationService
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider
 import io.atomix.protocols.backup.partition.PrimaryBackupPartitionGroup
 import io.atomix.protocols.raft.partition.RaftPartitionGroup
@@ -165,32 +167,13 @@ object AtomixSetup {
   def mkAtomix[F[_]: Sync](
       thisNode: NodeInfo,
       connectedSeeds: List[NodeInfo])
-      : F[Atomix] = Sync[F].delay {
+      : F[AtomixCluster] = Sync[F].delay {
     val nodeList: List[Node] =
       connectedSeeds map (atomixNode(_))
 
-/*
-    val dataPartition = RaftPartitionGroup
-      .builder(DataGroupName)
-      .withMembers((connectedSeeds map (_.memberId)):_*)
-      .withStorageLevel(StorageLevel.DISK)
-      .withDataDirectory(path.toFile)
-      .withNumPartitions(DataPartitionsNum)
-      .build()
- */
-    val dataPartition = PrimaryBackupPartitionGroup
-      .builder(DataGroupName)
-      .withNumPartitions(32)
-      .build()
-
-    Atomix.builder()
+    AtomixCluster.builder()
       .withMemberId(thisNode.memberId)
       .withAddress(thisNode.host, thisNode.port)
-      .withManagementGroup(PrimaryBackupPartitionGroup
-        .builder(SystemGroupName)
-        .withNumPartitions(SystemPartitionsNum)
-        .build())
-//      .withPartitionGroups(dataPartition)
       .withMembershipProvider(BootstrapDiscoveryProvider
         .builder()
         .withNodes(nodeList:_*)
@@ -202,9 +185,10 @@ object AtomixSetup {
     if (cf.isDone)
       cf.get.pure[F]
     else {
-      Async[F].async { (cb: Either[Throwable, A] => Unit)  =>
-        val _ = cf.whenComplete { (res: A, t: Throwable) => cb(Option(t).toLeft(res)) }
-      } productL ContextShift[F].shift
+      Async[F].suspend(Async[F].async { (cb: Either[Throwable, A] => Unit)  =>
+        val _ = cf.whenComplete { (res: A, t: Throwable) =>
+          cb(Option(t).toLeft(res)) }
+      } productL ContextShift[F].shift)
     }
   }
 }

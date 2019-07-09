@@ -46,12 +46,12 @@ import io.atomix.cluster.{Member, MemberId}
 import scala.collection.JavaConverters._
 import java.util.concurrent.{Executors, Executor, ConcurrentMap}
 import scala.concurrent.ExecutionContext
-import java.util.function.Consumer
+import java.util.function.{Consumer, Function}
 import scala.concurrent.duration._
 import java.nio.charset.StandardCharsets
 
 import AEStore._
-
+import AtomixSetup._
 
 final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     name: String,
@@ -120,7 +120,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
   // SENDING ADS
   def sendingAdStream: F[Stream[F, Unit]] = F.delay {
     val sendAndWait = Stream.eval(sendAd) *> Stream.sleep(new FiniteDuration(100, MILLISECONDS))
-    Stream.sleep(new FiniteDuration(5000, MILLISECONDS)) *> sendAndWait.repeat
+    Stream.sleep(new FiniteDuration(100, MILLISECONDS)) *> sendAndWait.repeat
   }
 
   private def sendAd: F[Unit] = for {
@@ -233,12 +233,15 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     }
     fStream.map(decodeStream(decodePendingEvents))
   }
-  def updateHandler(mp: ValueMap): F[Unit] = mp.toList.traverse_ {
-    case (k, newVal) =>
-      val oldVal: Option[Value] = Option(underlying.get(k))//.flatMap(decodeValue(_))
-      F.delay(underlying.put(k, newVal)).whenA {
-        oldVal.map(_.timestamp).getOrElse(0L) < newVal.timestamp
-      }
+  def updateHandler(mp: ValueMap): F[Unit] = {
+    println(s"mp ::: $mp")
+    mp.toList.traverse_ {
+      case (k, newVal) =>
+        val oldVal: Option[Value] = Option(underlying.get(k))//.flatMap(decodeValue(_))
+          F.delay(underlying.put(k, newVal)).whenA {
+            oldVal.map(_.timestamp).getOrElse(0L) < newVal.timestamp
+          }
+    }
   }
 
   def updateHandled: F[Stream[F, Unit]] = for {
@@ -277,7 +280,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     currentTime <- timer.clock.monotonic(MILLISECONDS)
     AEStore.Pending(lst, lastTime, firstAdded) <- sendingRef.get
     shouldUpdate = (currentTime - firstAdded > 50) || (lst.size > 50) || (currentTime - lastTime > 200)
-    _ <- sendingRef.set(Pending(lst, currentTime, firstAdded)).whenA(lst.isEmpty)
+//    _ <- sendingRef.set(Pending(lst, currentTime, firstAdded)).whenA(lst.isEmpty)
     _ <- (sendToAll *> sendingRef.set(Pending(Map(), currentTime, 0L))).whenA(shouldUpdate)
   } yield ()
 
@@ -286,6 +289,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     currentTime <- timer.clock.monotonic(MILLISECONDS)
     msg <- sendingRef.modify {
       case x@Pending(lst, currentTime, firstAdded) =>
+        println(s"lst ::: $lst")
         (AEStore.Pending(Map(), currentTime, 0L), encodePendingEvents(lst))
     }
     _ <- multicast(communication, Update(name), msg, pids)
@@ -299,19 +303,20 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
   private def run(action: F[Unit]) =
     ConcurrentEffect[F].runAsync(action)(_ => IO.unit).unsafeRunSync
 
-  private def handler[A](eventName: String, cb: A => Unit): Unit = {
-    val consumer: Consumer[A] = (a) => cb(a)
-    communication.subscribe(
+  private def handler(eventName: String, cb: Array[Byte] => Unit): F[Unit] = for {
+    _ <- cfToAsync(communication.subscribe[Array[Byte]](
       eventName,
-      consumer,
-      blockingContextExecutor(blockingPool))
-    ()
-  }
+      (x: Array[Byte]) => {
+        cb(x)
+      },
+      blockingContextExecutor(blockingPool)))
+  } yield ()
 
-  private def enqueue[A](q: InspectableQueue[F, A], eventType: Message, maxItems: Int): Stream[F, Unit] =
-    Stream.eval(F.delay(handler[A](printMessage(eventType), { (a: A) => run {
+  private def enqueue(q: InspectableQueue[F, Array[Byte]], eventType: Message, maxItems: Int): Stream[F, Unit] = {
+    Stream.eval(handler(printMessage(eventType), { (a: Array[Byte]) => run {
       q.getSize.flatMap((size: Int) => q.enqueue1(a).whenA(size < maxItems))
-    }})))
+    }}))
+  }
 
   private def unsubscribe(eventName: String): F[Unit] = F.delay {
     communication.unsubscribe(eventName)
@@ -351,18 +356,16 @@ object AEStore {
     case Advertisement(n) => s"aestore::advertisement::${n}"
   }
 
-  def unicast[F[_]: Sync](
+  def unicast[F[_]: Async: ContextShift](
       comm: ClusterCommunicationService,
       message: Message,
       payload: Array[Byte],
       target: MemberId)
-      : F[Unit] = Sync[F].delay {
-    comm.unicast(
+      : F[Unit] =
+    cfToAsync(comm.unicast(
       printMessage(message),
       payload,
-      target);
-    ()
-  }
+      target)) as (())
 
   def multicast[F[_]: Sync](
       comm: ClusterCommunicationService,
@@ -373,8 +376,7 @@ object AEStore {
     comm.multicast(
       printMessage(message),
       payload,
-      targets.to[scala.collection.mutable.Set].asJava);
-    ()
+      targets.to[scala.collection.mutable.Set].asJava)
   }
 
   import java.nio.ByteBuffer
@@ -569,11 +571,10 @@ object AEStore {
       fibs <- List(adReceiver, adSender, purger, bootstrapper, updates, updateRequester, synching).traverse { (s: Stream[F, Unit]) =>
         F.start(ContextShift[F].evalOn(pool.unwrap)(s.compile.drain))
       }
-      _ <- F.start(stopper.get *> fibs.traverse_(_.cancel) *> store.close)
     } yield (store, stopper)
     def finish(pair: (IndexedStore[F, Key, RawValue], Deferred[F, Either[Throwable, Unit]])): F[Unit] =
       pair._2.complete(Right(()))
     Resource.make(init)(finish).map(_._1)
-
   }
+
 }

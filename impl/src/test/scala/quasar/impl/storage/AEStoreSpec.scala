@@ -89,12 +89,20 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
       (store1, finish1) <- mkStore(node1, List(node0, node1)).allocated
       _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
       a0 <- store0.lookup("a")
-      a1 <- store0.lookup("a")
+      a1 <- store1.lookup("a")
+      _ <- store0.insert("b", "c")
+      _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
+      b0 <- store0.lookup("b")
+      b1 <- store1.lookup("b")
       _ <- finish0
       _ <- finish1
     } yield {
-      println(s"a0, a1 ::: ${a0}, ${a1}")
+      println(s"values ::: $a0, $a1, $b0, $b1")
       true
+//      a0 mustEqual Some("b")
+//      a1 mustEqual Some("b")
+//      b0 mustEqual Some("c")
+//      b1 mustEqual Some("c")
     }
   }
 

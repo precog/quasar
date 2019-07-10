@@ -19,7 +19,6 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import quasar.concurrent.BlockingContext
-import quasar.contrib.scalaz.MonadError_
 
 import cats.arrow.FunctionK
 import cats.effect._
@@ -28,8 +27,6 @@ import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.applicative._
 import cats.syntax.functor._
-import cats.syntax.either._
-import cats.instances.either._
 import cats.instances.option._
 import cats.syntax.traverse._
 import cats.syntax.foldable._
@@ -44,11 +41,14 @@ import io.atomix.cluster.messaging.ClusterCommunicationService
 import io.atomix.cluster.{Member, MemberId}
 
 import scala.collection.JavaConverters._
-import java.util.concurrent.{Executors, Executor, ConcurrentMap}
-import scala.concurrent.ExecutionContext
-import java.util.function.{Consumer, Function}
+import java.util.concurrent.{Executor, ConcurrentMap}
 import scala.concurrent.duration._
-import java.nio.charset.StandardCharsets
+
+import scodec._
+import scodec.codecs._
+import scodec.codecs.implicits._
+import scodec.bits.{ByteVector, BitVector}
+
 
 import AEStore._
 import AtomixSetup._
@@ -104,7 +104,6 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
   def insert(k: Key, v: RawValue): F[Unit] = evalOnPool(for {
     currentTime <- timer.clock.monotonic(MILLISECONDS)
     value: Value = Tagged(v, currentTime)
-    valueBytes = encodeValue(value)
     _ <- F.delay(underlying.put(k, value))
     id <- localId
     _ <- sendingRef.modify((x: Pending) => (Pending(x.items.updated(k, value), x.inited, currentTime), ()))
@@ -118,16 +117,14 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
 
 
   // SENDING ADS
-  def sendingAdStream: F[Stream[F, Unit]] = F.delay {
-    (Stream.eval(sendAd) *> Stream.sleep(AdTimeout)).repeat
-  }
+  def sendingAdStream: F[Stream[F, Unit]] =
+    F.delay((Stream.eval(sendAd) *> Stream.sleep(AdTimeout)).repeat)
 
   private def sendAd: F[Unit] = for {
     pids <- peers.map(_.map(_.id))
     ad <- prepareAd
     id <- localId
-    _ <- F.delay(println(s"prepared ::: ${ad}"))
-    _ <- multicast(communication, Advertisement(name), encodeAdvertisement(ad), pids - id).unlessA((pids - id).isEmpty)
+    _ <- multicast(communication, Advertisement(name), ad, pids - id).unlessA((pids - id).isEmpty)
     _ <- ContextShift[F].shift
   } yield ()
 
@@ -140,13 +137,6 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
   }
 
   // RECEIVING ADS
-  def advertisement: F[Stream[F, AdvertisementPayload]] = {
-    val fStream = InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
-      enqueue(queue, Advertisement(name), 256) *> queue.dequeue
-      }
-    fStream.map(decodeStream(decodeAdvertisement))
-  }
-
   def handleAdvertisement(ad: AdvertisementPayload): F[Unit] = {
     val initMap = underlying.entrySet.iterator.asScala.map((e: java.util.Map.Entry[Key, Value]) => (e.getKey, e.getValue)).toMap
     val init: (List[Key], ValueMap) = (List(), initMap)
@@ -165,15 +155,16 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     for {
       (requesting, returning) <- result
       id <- localId
-      _ <- unicast(communication, RequestUpdate(name), encodeUpdateRequest(UpdateRequest(requesting, id)), ad.local)
+      _ <- unicast(communication, RequestUpdate(name), UpdateRequest(requesting, id), ad.local)
       _ <- ContextShift[F].shift
-      _ <- unicast(communication, Update(name), encodeValueMap(returning), ad.local)
+      _ <- unicast(communication, Update(name), returning, ad.local)
       _ <- ContextShift[F].shift
     } yield ()
   }
 
   def advertisementHandled: F[Stream[F, Unit]] =
-    advertisement.map(_.evalMap(handleAdvertisement(_)))
+    subscriptionStream[AdvertisementPayload](Advertisement(name), 256)
+      .map(_.evalMap(handleAdvertisement(_)))
 
   // TOMBSTONES PURGING
   def purgeTombstones: F[Stream[F, Unit]] =
@@ -186,30 +177,18 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
       }}}
 
   // RECEIVING UPDATES (both via initialization and update messages)
-  def updateReceived: F[Stream[F, ValueMap]] = {
-    val fStream = InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
-      enqueue(queue, Update(name), 256) *> queue.dequeue
-    }
-    fStream.map(decodeStream(decodeValueMap))
-  }
 
-  def updateHandler(mp: ValueMap): F[Unit] = mp.toList.traverse_{
+  def updateHandler(mp: ValueMap): F[Unit] = mp.toList.traverse_ {
     case (k, newVal) =>
-      val oldVal: Option[Value] = Option(underlying.get(k))
-      F.delay(underlying.put(k, newVal)).whenA(oldVal.map(timestamp(_)).getOrElse(0L) < timestamp(newVal))
+      val oldTS: Long = Option(underlying.get(k)).map(timestamp(_)).getOrElse(0L)
+      F.delay(underlying.put(k, newVal)).whenA(oldTS < timestamp(newVal))
   }
 
   def updateHandled: F[Stream[F, Unit]] =
-    updateReceived.map(_.evalMap(updateHandler))
+    subscriptionStream[ValueMap](Update(name), 256)
+      .map(_.evalMap(updateHandler(_)))
 
   // REQUESTING FOR UPDATES
-
-  def updateRequesting: F[Stream[F, UpdateRequest]] = {
-    val fStream = InspectableQueue.unbounded[F, Array[Byte]].map { (queue: InspectableQueue[F, Array[Byte]]) =>
-      enqueue(queue, RequestUpdate(name), 128) *> queue.dequeue
-    }
-    fStream.map(decodeStream(decodeUpdateRequest))
-  }
 
   def updateRequestedHandler(req: UpdateRequest): F[Unit] = {
     val payload: ValueMap = req.items.foldLeft(Map[Key, Value]()) { (acc: ValueMap, k: Key) =>
@@ -218,11 +197,12 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
         case Some(toInsert) => acc.updated(k, toInsert)
       }
     }
-    unicast(communication, Update(name), encodeValueMap(payload), req.local) *> ContextShift[F].shift
+    unicast(communication, Update(name), payload, req.local) *> ContextShift[F].shift
   }
 
   def updateRequestHandled: F[Stream[F, Unit]] =
-    updateRequesting.map(_.evalMap(updateRequestedHandler(_)))
+    subscriptionStream[UpdateRequest](RequestUpdate(name), 128)
+      .map(_.evalMap(updateRequestedHandler(_)))
 
   // SYNCHRONIZATION
 
@@ -238,30 +218,39 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     _ <- ContextShift[F].shift
   } yield ()
 
-  private def sendingRefUpdate(now: Long)(inp: Pending): (Pending, Option[Array[Byte]]) = inp match {
+  private def sendingRefUpdate(now: Long)(inp: Pending): (Pending, Option[ValueMap]) = inp match {
     case Pending(lst, _, _) if lst.isEmpty => (inp, None)
     case Pending(_, _, last) if now - last < BatchInterval => (inp, None)
-    case Pending(lst, _, _) if lst.size > MaxEvents => (Pending(Map(), now, now), Some(encodeValueMap(lst)))
+    case Pending(lst, _, _) if lst.size > MaxEvents => (Pending(Map(), now, now), Some(lst))
     case Pending(_, init, _) if now - init < CollectingInterval => (inp, None)
-    case Pending(lst, _, _) => (Pending(Map(), now, now), Some(encodeValueMap(lst)))
+    case Pending(lst, _, _) => (Pending(Map(), now, now), Some(lst))
   }
 
   // PRIVATE
 
+  def subscriptionStream[P: Codec](msg: Message, limit: Int): F[Stream[F, P]] =
+    InspectableQueue.unbounded[F, P].map((queue: InspectableQueue[F, P]) =>
+      enqueue[P](queue, msg, limit) *> queue.dequeue)
+
   private def run(action: F[Unit]) =
     ConcurrentEffect[F].runAsync(action)(_ => IO.unit).unsafeRunSync
 
-  private def handler(eventName: String, cb: Array[Byte] => Unit): F[Unit] =
+  private def handler(eventName: String, cb: BitVector => Unit): F[Unit] =
     cfToAsync(communication.subscribe[Array[Byte]](
       eventName,
-      cb(_),
+      (x: Array[Byte]) => cb(ByteVector(x).bits),
       blockingContextExecutor(blockingPool))) as (())
 
-  private def enqueue(q: InspectableQueue[F, Array[Byte]], eventType: Message, maxItems: Int): Stream[F, Unit] =
-    Stream.eval(handler(printMessage(eventType), { (a: Array[Byte]) => run {
-      q.getSize.flatMap((size: Int) => {
-        q.enqueue1(a).whenA(size < maxItems)
-      })}}))
+  private def enqueue[P: Codec](q: InspectableQueue[F, P], eventType: Message, maxItems: Int): Stream[F, Unit] = {
+    val C = Codec[P]
+    Stream.eval(handler(printMessage(eventType), { (a: BitVector) => C.decode(a) match {
+      case Attempt.Failure(_) => ()
+      case Attempt.Successful(d) => run(for {
+        size <- q.getSize
+        _ <- q.enqueue1(d.value).whenA(size < maxItems)
+      } yield())
+    }}))
+  }
 
   private def unsubscribe(eventName: String): F[Unit] = F.delay {
     communication.unsubscribe(eventName)
@@ -280,12 +269,11 @@ object AEStore {
   type RawValue = String
   type RawMap = Map[Key, RawValue]
 
-  def decodeStream[F[_]: Sync, A, B](decode: A => Option[B])(inp: Stream[F, A]): Stream[F, B] =
-    inp.flatMap { (a: A) => decode(a) match {
-      case None => Stream.empty
-      case Some(b) => Stream.emit(b)
+  def decodeStream[F[_]: Sync, A: Codec](inp: Stream[F, BitVector]): Stream[F, A] =
+    inp.flatMap { (a: BitVector) => Codec[A].decode(a) match {
+      case Attempt.Failure(_) => Stream.empty
+      case Attempt.Successful(d) => Stream.emit(d.value)
     }}
-
   trait Message extends Product with Serializable
   final case class RequestUpdate(name: String) extends Message
   final case class Update(name: String) extends Message
@@ -297,33 +285,35 @@ object AEStore {
     case Advertisement(n) => s"aestore::advertisement::${n}"
   }
 
-  def unicast[F[_]: Async: ContextShift](
+  def unicast[F[_]: Async: ContextShift, P: Codec](
       comm: ClusterCommunicationService,
       message: Message,
-      payload: Array[Byte],
+      payload: P,
       target: MemberId)
-      : F[Unit] = {
-    cfToAsync(comm.unicast(
-      printMessage(message),
-      payload,
-      target)) as (())
-  }
+      : F[Unit] =
+    Codec[P].encode(payload).map((b: BitVector) => {
+      cfToAsync(comm.unicast(
+        printMessage(message),
+        b.toByteArray,
+        target)) as (())
+    }).getOrElse(Sync[F].delay(()))
 
-  def multicast[F[_]: Sync](
+
+  def multicast[F[_]: Sync, P: Codec](
       comm: ClusterCommunicationService,
       message: Message,
-      payload: Array[Byte],
+      payload: P,
       targets: Set[MemberId])
       : F[Unit] = Sync[F].delay {
     if (targets.isEmpty) ()
     else
-      comm.multicast(
-        printMessage(message),
-        payload,
-        targets.to[scala.collection.mutable.Set].asJava)
+      Codec[P].encode(payload).map((b: BitVector) => {
+        comm.multicast(
+          printMessage(message),
+          b.toByteArray,
+          targets.to[scala.collection.mutable.Set].asJava)
+      }).getOrElse(())
   }
-
-  import java.nio.ByteBuffer
 
   final case class Pending(
       items: ValueMap,
@@ -342,142 +332,40 @@ object AEStore {
       local: MemberId)
       extends Product with Serializable
 
-  def encodeUpdateRequest(ur: UpdateRequest): Array[Byte] = {
-    val itemBytes = ur.items.map(_.getBytes)
-    val size = itemBytes.foldLeft(0)((x: Int, a: Array[Byte]) => x + a.length)
-    val buffer = ByteBuffer.allocate(size + itemBytes.length * 4)
-    itemBytes.foreach { (as: Array[Byte]) => buffer.putInt(as.length).put(as) }
-    encodeMemberId(ur.local) ++ buffer.array
+  implicit val memberIdCodec: Codec[MemberId] =
+    utf8_32.xmap(MemberId.from, _.id)
+
+  implicit val valueCodec: Codec[Value] = {
+    either(bool, int64, utf8_32 ~ int64).xmapc({
+      case Left(t) => Tombstone(t)
+      case Right((v, t)) => Tagged(v, t)
+    })({
+      case Tombstone(ts) => Left(ts)
+      case Tagged(v, ts) => Right((v, ts))
+    })
   }
 
-  def decodeUpdateRequest(as: Array[Byte]): Option[UpdateRequest] = {
-    def read(buffer: ByteBuffer): String = {
-      val size = buffer.getInt
-      val res = Array.ofDim[Byte](size)
-      buffer.get(res)
-      new String(res, "UTF-8")
-    }
-    def go(buffer: ByteBuffer, acc: Option[List[String]]): Option[List[String]] = {
-      if (buffer.remaining == 0) acc
-      else {
-        val newAcc: Option[List[String]] = for {
-          lst <- acc
-          k <- scala.Either.catchNonFatal(read(buffer)).toOption
-        } yield k :: lst
-        go(buffer, newAcc)
-      }
-    }
-    val inp = ByteBuffer.wrap(as)
-    for {
-      id <- decodeMemberId(inp)
-      items <- go(inp, Some(List()))
-    } yield UpdateRequest(items, id)
+  implicit val advertisementPayloadCodec: Codec[AdvertisementPayload] = {
+    val tses: Codec[Map[Key, Long]] =
+      listOfN(int32, utf8_32 ~ int64).xmap(_.toMap, _.toList)
+
+    (tses ~ memberIdCodec).xmapc({
+      case (mp, mid) => AdvertisementPayload(mp, mid)
+    })({
+      case AdvertisementPayload(mp, mid) => (mp, mid)
+    })
   }
 
-
-  def encodeAdvertisement(ad: AdvertisementPayload): Array[Byte] = {
-    val res = scala.collection.mutable.ArrayBuffer.empty[Byte]
-    ad.items.foreach {
-      case (k, v) =>
-        val kb = k.getBytes
-        val item = ByteBuffer.allocate(kb.length + 12)
-          .putInt(kb.length)
-          .put(kb)
-          .putLong(v)
-          .array
-        res ++= item
-    }
-    encodeMemberId(ad.local) ++ (res.toArray: Array[Byte])
+  implicit val updateRequestCodec: Codec[UpdateRequest] = {
+    (listOfN(int32, utf8_32) ~ memberIdCodec).xmapc({
+      case (ks, mid) => UpdateRequest(ks, mid)
+    })({
+      case UpdateRequest(ks, mid) => (ks, mid)
+    })
   }
 
-  def decodeAdvertisement(as: Array[Byte]): Option[AdvertisementPayload] = {
-    def read(buffer: ByteBuffer): String = {
-      val size = buffer.getInt
-      val res = Array.ofDim[Byte](size)
-      buffer.get(res)
-      new String(res, StandardCharsets.UTF_8)
-    }
-
-    def go(buffer: ByteBuffer, acc: Option[Map[Key, Long]]): Option[Map[Key, Long]] = {
-      acc match {
-        case None => None
-        case Some(mp) if buffer.remaining == 0 => Some(mp)
-        case Some(mp) =>
-          val newAcc: Option[Map[Key, Long]] = for {
-            mp <- acc
-            k <- scala.Either.catchNonFatal(read(buffer)).toOption
-            v <- scala.Either.catchNonFatal(buffer.getLong()).toOption
-          } yield mp.updated(k, v)
-          go(buffer, newAcc)
-      }
-    }
-    val inp = ByteBuffer.wrap(as)
-    for {
-      mid <- decodeMemberId(inp)
-      items <- go(inp, Some(Map()))
-    } yield AdvertisementPayload(items, mid)
-  }
-
-  def encodeMemberId(mid: MemberId): Array[Byte] = {
-    val a = mid.id.getBytes("utf-8")
-    ByteBuffer.allocate(a.length + 4)
-      .putInt(a.length)
-      .put(a)
-      .array
-  }
-
-  def decodeMemberId(buffer: ByteBuffer): Option[MemberId] = scala.Either.catchNonFatal({
-    val size = buffer.getInt
-    val arr = Array.ofDim[Byte](size)
-    buffer.get(arr)
-    MemberId.from(new String(arr, java.nio.charset.Charset.forName("UTF-8")))
-  }).toOption
-
-  def encodeValueMap(items: ValueMap): Array[Byte] = {
-    val res = scala.collection.mutable.ArrayBuffer.empty[Byte]
-    items.foreach {
-      case (k, v) =>
-        val valueBytes = encodeValue(v)
-        val kb = k.getBytes
-        val item = ByteBuffer.allocate(valueBytes.length + kb.length + 8)
-          .putInt(kb.length)
-          .put(kb)
-          .putInt(valueBytes.length)
-          .put(valueBytes)
-          .array
-        res ++= item
-    }
-    res.toArray
-
-  }
-
-  def decodeValueMap(bytes: Array[Byte]): Option[ValueMap] = {
-    def readKey(buffer: ByteBuffer): String = {
-      val size = buffer.getInt
-      val res = Array.ofDim[Byte](size)
-      buffer.get(res)
-      new String(res, StandardCharsets.UTF_8)
-    }
-    def readValue (buffer: ByteBuffer): Option[Value] = {
-      val size = buffer.getInt
-      val res = Array.ofDim[Byte](size)
-      buffer.get(res)
-      decodeValue(res)
-    }
-    def go(buffer: ByteBuffer, acc: Option[Map[Key, Value]]): Option[Map[Key, Value]] = {
-      acc match {
-        case None => None
-        case Some(mp) if buffer.remaining == 0 => Some(mp)
-        case Some(mp) =>
-          val newAcc = for {
-            k <- scala.Either.catchNonFatal(readKey(buffer)).toOption
-            v <- scala.Either.catchNonFatal(readValue(buffer)).toOption.flatten
-          } yield mp.updated(k, v)
-          go(buffer, newAcc)
-      }
-    }
-    go(ByteBuffer.wrap(bytes), Some(Map()))
-  }
+  implicit val valueMapCodec: Codec[ValueMap] =
+    listOfN(int32, utf8_32 ~ valueCodec).xmap(_.toMap, _.toList)
 
   trait Value extends Product with Serializable
   final case class Tombstone(timestamp: Long) extends Value
@@ -493,36 +381,6 @@ object AEStore {
     case Tagged(_, ts) => ts
   }
 
-  def encodeValue(v: Value): Array[Byte] = v match {
-    case Tagged(v, ts) =>
-      val rawBytes = v.getBytes
-      ByteBuffer
-        .allocate(9)
-        .put(0x0: Byte)
-        .putLong(ts)
-        .array ++ rawBytes
-    case Tombstone(timestamp) =>
-      ByteBuffer
-        .allocate(9)
-        .put(0xf: Byte)
-        .putLong(timestamp)
-        .array
-  }
-
-  def decodeValue(bytes: Array[Byte]): Option[Value] =
-    if (bytes.length < 9) None
-    else {
-      val buffer = ByteBuffer.wrap(bytes)
-      val flag: Byte = buffer.get
-      val ts = buffer.getLong()
-      if (flag == 0x0) {
-        val arr: Array[Byte] = Array.ofDim(bytes.length - 9)
-        buffer.get(arr)
-        Some(Tagged(new String(arr, "UTF-8"), ts))
-      } else {
-        Some(Tombstone(ts))
-      }
-    }
 
   def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {
     def execute(r: java.lang.Runnable) = pool.unwrap.execute(r)

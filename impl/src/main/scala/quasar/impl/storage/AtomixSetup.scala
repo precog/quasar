@@ -40,8 +40,6 @@ import io.atomix.cluster._
 import io.atomix.cluster.ClusterMembershipService
 import io.atomix.cluster.messaging.ClusterCommunicationService
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider
-import io.atomix.protocols.backup.partition.PrimaryBackupPartitionGroup
-import io.atomix.protocols.raft.partition.RaftPartitionGroup
 import io.atomix.storage.StorageLevel
 
 import java.util.concurrent.CompletableFuture

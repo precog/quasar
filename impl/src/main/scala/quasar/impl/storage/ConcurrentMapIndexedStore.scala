@@ -73,4 +73,10 @@ object ConcurrentMapIndexedStore {
     val onDelete: Boolean => F[Unit] = (a: Boolean) => ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit.whenA(a))
     IndexedStore.hooked(pure, onUpdate, onDelete)
   }
+  def unhooked[F[_]: Sync: ContextShift, K, V](
+      mp: ConcurrentMap[K, V],
+      blockingPool: BlockingContext)
+      : IndexedStore[F, K, V] = {
+    new ConcurrentMapIndexedStore(mp, blockingPool)
+  }
 }

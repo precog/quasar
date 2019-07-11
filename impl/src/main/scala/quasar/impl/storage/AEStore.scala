@@ -57,7 +57,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     communication: ClusterCommunicationService,
     membership: ClusterMembershipService,
     sendingRef: Ref[F, Pending[K, V]],
-    underlying: ConcurrentMap[K, MapValue[V]],
+    underlying: IndexedStore[F, K, MapValue[V]],
     blockingPool: BlockingContext)(
     implicit timer: Timer[F])
     extends IndexedStore[F, K, V] {
@@ -87,31 +87,22 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
       def apply[A](fa: F[A]): F[A] = evalOnPool(fa)
     })
 
-  def entries: Stream[F, (K, V)] = for {
-    iterator <- Stream.eval(evalOnPool(F.delay(underlying.entrySet.iterator.asScala)))
-    entry <- evalStreamOnPool(
-      Stream.fromIterator[F, java.util.Map.Entry[K, MapValue[V]]](iterator))
-    key = entry.getKey
-    value <- raw(entry.getValue) match {
-      case None => Stream.empty
-      case Some(a) => Stream.emit(a)
-    }
-  } yield (key, value)
+  def entries: Stream[F, (K, V)] =
+    underlying.entries.map({ case (k, v) => raw(v).map((k, _))}).unNone
 
-  def lookup(k: K): F[Option[V]] = evalOnPool(F.delay{
-    Option(underlying.get(k)).flatMap(raw(_))
-  })
+  def lookup(k: K): F[Option[V]] =
+    underlying.lookup(k).map(_.flatMap(raw(_)))
 
   def insert(k: K, v: V): F[Unit] = evalOnPool(for {
     currentTime <- timer.clock.monotonic(MILLISECONDS)
     value: MapValue[V] = Tagged(v, currentTime)
-    _ <- F.delay(underlying.put(k, value))
+    _ <- underlying.insert(k, value)
     id <- localId
     _ <- sendingRef.modify((x: Pending[K, V]) => (Pending(x.items.updated(k, value), x.inited, currentTime), ()))
   } yield ())
 
   def delete(k: K): F[Boolean] = evalOnPool(for {
-    res <- F.delay(Option(underlying.remove(k)).nonEmpty)
+    res <- underlying.delete(k)
     currentTime <- timer.clock.monotonic(MILLISECONDS)
     _ <- sendingRef.modify((x: Pending[K, V]) => (Pending(x.items.updated(k, Tombstone(currentTime)), x.inited, currentTime), ()))
   } yield res)
@@ -129,32 +120,42 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     _ <- ContextShift[F].shift
   } yield ()
 
-  private def prepareAd: F[AdvertisementPayload[K]] = localId.map { (id: MemberId) =>
-    val mp = scala.collection.mutable.Map[K, Long]()
-    underlying.forEach { (k: K, v: MapValue[V]) =>
-      mp.updated(k, timestamp(v)); ()
-    }
-    AdvertisementPayload(mp.toMap[K, Long], id)
-  }
+  private def prepareAd: F[AdvertisementPayload[K]] = for {
+    lst <- underlying.entries.map({ case (k, v) => (k, timestamp(v))}).compile.toList
+    id <- localId
+  } yield AdvertisementPayload(lst.toMap, id)
+
 
   // RECEIVING ADS
   def handleAdvertisement(ad: AdvertisementPayload[K]): F[Unit] = {
-    val initMap = underlying.entrySet.iterator.asScala.map((e: java.util.Map.Entry[K, MapValue[V]]) => (e.getKey, e.getValue)).toMap
-    val init: (List[K], Map[K, MapValue[V]]) = (List(), initMap)
-    val result = ad.items.toList.foldM[F, (List[K], Map[K, MapValue[V]])](init){ (acc, v) => (acc, v) match {
-      case ((requesting, returning), (k, v)) =>
-        val mbCurrent = Option(underlying.get(k))
-        if (mbCurrent.map(timestamp(_)).getOrElse(0L) < v) {
+    type Accum = (List[K], Map[K, MapValue[V]])
+
+    val fInitMap: F[Map[K, MapValue[V]]] =
+      underlying
+        .entries
+        .map({ case (k, v) => ad.items.get(k) as ((k, v)) })
+        .unNone
+        .compile
+        .toList
+        .map(_.toMap)
+
+    val fInit: F[Accum] = fInitMap.map((List(), _))
+
+    def result(init: Accum)  = ad.items.toList.foldM[F, Accum](init){ (acc, v) => (acc, v) match {
+      case ((requesting, returning), (k, v)) => for {
+        mbCurrent <- underlying.lookup(k)
+        res <- if (mbCurrent.fold(0L)(timestamp(_)) < v) {
           F.delay((k :: requesting, returning))
         } else for {
-          current <- mbCurrent match {
-            case Some(a) => Sync[F].delay(a)
-            case None => timer.clock.monotonic(MILLISECONDS).map(Tombstone(_))
-          }
-        } yield (requesting, returning.updated(k, current))
+          (current: MapValue[V]) <- mbCurrent.fold(
+            timer.clock.monotonic(MILLISECONDS).map((x: Long) => Tombstone(x): MapValue[V]))(
+            F.delay(_))
+          } yield (requesting, returning.updated(k, current))
+        } yield res
     }}
     for {
-      (requesting, returning) <- result
+      init <- fInit
+      (requesting, returning) <- result(init)
       id <- localId
       _ <- unicast(communication, RequestUpdate(name), UpdateRequest(requesting, id), ad.local)
       _ <- ContextShift[F].shift
@@ -171,18 +172,20 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
   def purgeTombstones: F[Stream[F, Unit]] =
     F.delay((Stream.sleep(PurgeTimeout) *> Stream.eval(purge)).repeat)
 
-  private def purge: F[Unit] =
-    F.delay { underlying.synchronized {
-      underlying.forEach { (k: K, v: MapValue[V]) =>
-        if (raw(v).isEmpty) underlying.remove(k); ()
-      }}}
+  private def purge: F[Unit] = underlying.synchronized {
+    underlying.entries.evalMap({ case (k, v) =>
+      underlying.delete(k).whenA(raw(v).isEmpty)
+    }).compile.drain
+  }
 
   // RECEIVING UPDATES (both via initialization and update messages)
 
   def updateHandler(mp: Map[K, MapValue[V]]): F[Unit] = mp.toList.traverse_ {
-    case (k, newVal) =>
-      val oldTS: Long = Option(underlying.get(k)).map(timestamp(_)).getOrElse(0L)
-      F.delay(underlying.put(k, newVal)).whenA(oldTS < timestamp(newVal))
+    case (k, newVal) => for {
+      v <- underlying.lookup(k)
+      ts = v.fold(0L)(timestamp(_))
+      _ <- underlying.insert(k, newVal).whenA(ts < timestamp(newVal))
+    } yield (())
   }
 
   def updateHandled: F[Stream[F, Unit]] =
@@ -191,15 +194,13 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
 
   // REQUESTING FOR UPDATES
 
-  def updateRequestedHandler(req: UpdateRequest[K]): F[Unit] = {
-    val payload: Map[K, MapValue[V]] = req.items.foldLeft(Map[K, MapValue[V]]()) { (acc: Map[K, MapValue[V]], k: K) =>
-      Option(underlying.get(k)) match {
-        case None => acc
-        case Some(toInsert) => acc.updated(k, toInsert)
-      }
+  def updateRequestedHandler(req: UpdateRequest[K]): F[Unit] = for {
+    payload <- req.items.foldM(Map[K, MapValue[V]]()) { (acc: Map[K, MapValue[V]], k: K) =>
+      underlying.lookup(k).map(_.fold(acc)(acc.updated(k, _)))
     }
-    unicast(communication, Update(name), payload, req.local) *> ContextShift[F].shift
-  }
+    _ <- unicast(communication, Update(name), payload, req.local)
+    _ <- ContextShift[F].shift
+  } yield (())
 
   def updateRequestHandled: F[Stream[F, Unit]] =
     subscriptionStream[UpdateRequest[K]](RequestUpdate(name), 128)
@@ -377,7 +378,7 @@ object AEStore {
       name: String,
       communication: ClusterCommunicationService,
       membership: ClusterMembershipService,
-      underlying: ConcurrentMap[K, MapValue[V]],
+      underlying: IndexedStore[F, K, MapValue[V]],
       pool: BlockingContext)(
       implicit timer: Timer[F])
       : Resource[F, IndexedStore[F, K, V]] = {

@@ -71,7 +71,9 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   def mkStore(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, IndexedStore[IO, String, String]] = for {
     atomix <- Resource.make(startAtomix(me, seeds))(stopAtomix(_))
-    underlying <- Resource.pure[IO, ConcurrentHashMap[String, MapValue[String]]](new ConcurrentHashMap[String, MapValue[String]]())
+    storage <- Resource.pure[IO, ConcurrentHashMap[String, MapValue[String]]](new ConcurrentHashMap[String, MapValue[String]]())
+    underlying <- Resource.pure[IO, IndexedStore[IO, String, MapValue[String]]](ConcurrentMapIndexedStore.unhooked[IO, String, MapValue[String]](
+      storage, pool))
     store <- AEStore[IO, String, String](s"default", atomix.getCommunicationService(), atomix.getMembershipService(), underlying, pool)
   } yield store
 

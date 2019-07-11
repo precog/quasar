@@ -63,7 +63,7 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   def startAtomix(me: NodeInfo, seeds: List[NodeInfo]): IO[AtomixCluster] = for {
     atomix <- AtomixSetup.mkAtomix[IO](me, me :: seeds)
-    _ <- cfToAsync[IO, java.lang.Void](atomix.start)
+    _ <- IO.suspend(cfToAsync[IO, java.lang.Void](atomix.start))
   } yield atomix
 
   def stopAtomix(atomix: AtomixCluster): IO[Unit] =
@@ -100,11 +100,28 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
       _ <- finish0
       _ <- finish1
     } yield {
-      println(s"values ::: $a0, $a1, $b0, $b1")
       a0 mustEqual Some("b")
       a1 mustEqual Some("b")
       b0 mustEqual Some("c")
       b1 mustEqual Some("c")
     }
   }
+
+  "bar" >>* {
+    val node0: NodeInfo = NodeInfo("0", "localhost", 6006)
+    val node1: NodeInfo = NodeInfo("1", "localhost", 6008)
+    for {
+      atomix0 <- startAtomix(node0, List(node0, node1))
+      atomix1 <- startAtomix(node1, List(node0, node1))
+//      _ <- IO(atomix0.getCommunicationService().subscribe[String]("test", (x: String) => println(x), AEStore.blockingContextExecutor(pool)).join)
+//      _ <- IO(atomix1.getCommunicationService().unicast("test", "A message", MemberId.from("0")).join)
+      _ <- IO(println(atomix0.getMembershipService.getMembers))
+      _ <- IO(println(atomix1.getMembershipService.getMembers))
+      _ <- stopAtomix(atomix0)
+      _ <- stopAtomix(atomix1)
+    } yield {
+      true
+    }
+  }
+
 }

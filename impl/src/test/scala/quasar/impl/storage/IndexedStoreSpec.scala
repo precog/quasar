@@ -40,7 +40,7 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
   def valueA: V
 
   def valueB: V
-/*
+
   "indexed store" >> {
     "entries" >> {
       "empty when store is empty" >>* {
@@ -148,5 +148,4 @@ abstract class IndexedStoreSpec[F[_]: Effect, I: Equal: Show, V: Equal: Show](
       }
     }
   }
- */
 }

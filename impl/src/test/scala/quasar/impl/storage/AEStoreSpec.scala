@@ -19,33 +19,29 @@ package quasar.impl.storage
 import slamdata.Predef._
 import quasar.concurrent.BlockingContext
 
-import cats.effect.{IO, Resource, ContextShift, Timer}
+import cats.effect.{IO, Resource, Timer}
 import cats.syntax.functor._
 
-import io.atomix.core._
 import io.atomix.cluster._
-import io.atomix.cluster.{Member, MemberId}
 
 import monocle.Prism
+
+import scalaz.std.string._
+
+import scodec._
+import scodec.codecs._
 
 import java.util.concurrent.ConcurrentHashMap
 import java.nio.charset.StandardCharsets
 
 import scala.concurrent.ExecutionContext
-import ExecutionContext.Implicits.global
-import scala.util.Random
-import scalaz.std.string._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.util.Random
+
 import shims._
+
 import AtomixSetup._
-import java.util.function.{Consumer, Function}
-import java.util.concurrent.CompletableFuture
-
-import scodec._
-import scodec.codecs._
-//import scodec.codecs.implicits._
-
-import AEStore._
 
 final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   sequential
@@ -83,6 +79,7 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   val freshIndex = IO(Random.nextInt().toString)
 
   "foo" >>* {
+
     val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
     val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
     val node2: NodeInfo = NodeInfo("2", "localhost", 6002)
@@ -91,12 +88,18 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
       _ <- store0.insert("a", "b")
       (store1, finish1) <- mkStore(node1, List(node0, node1)).allocated
       _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
+      start <- timer.clock.monotonic(MILLISECONDS)
       a0 <- store0.lookup("a")
       a1 <- store1.lookup("a")
       _ <- store0.insert("b", "c")
+      end <- timer.clock.monotonic(MILLISECONDS)
+      _ <- IO(println(s"two lookups and one insert ::: ${end - start}"))
       _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
+      start <- timer.clock.monotonic(MILLISECONDS)
       b0 <- store0.lookup("b")
       b1 <- store1.lookup("b")
+      end <- timer.clock.monotonic(MILLISECONDS)
+      _ <- IO(println(s"two lookups ::: ${end - start}"))
       _ <- finish0
       _ <- finish1
     } yield {
@@ -113,14 +116,13 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
     for {
       atomix0 <- startAtomix(node0, List(node0, node1))
       atomix1 <- startAtomix(node1, List(node0, node1))
-//      _ <- IO(atomix0.getCommunicationService().subscribe[String]("test", (x: String) => println(x), AEStore.blockingContextExecutor(pool)).join)
-//      _ <- IO(atomix1.getCommunicationService().unicast("test", "A message", MemberId.from("0")).join)
-      _ <- IO(println(atomix0.getMembershipService.getMembers))
-      _ <- IO(println(atomix1.getMembershipService.getMembers))
+      a0 <- IO(atomix0.getMembershipService.getMembers)
+      a1 <- IO(atomix1.getMembershipService.getMembers)
       _ <- stopAtomix(atomix0)
       _ <- stopAtomix(atomix1)
     } yield {
-      true
+      a0.size mustEqual 2
+      a1.size mustEqual 2
     }
   }
 

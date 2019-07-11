@@ -38,10 +38,10 @@ import scalaz.syntax.tag._
 
 import io.atomix.cluster.ClusterMembershipService
 import io.atomix.cluster.messaging.ClusterCommunicationService
-import io.atomix.cluster.{Member, MemberId}
+import io.atomix.cluster.MemberId
 
 import scala.collection.JavaConverters._
-import java.util.concurrent.{Executor, ConcurrentMap}
+import java.util.concurrent.Executor
 import scala.concurrent.duration._
 
 import scodec._
@@ -54,8 +54,8 @@ import AtomixSetup._
 
 final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     name: String,
-    communication: ClusterCommunicationService,
-    membership: ClusterMembershipService,
+    communication: Communication[F, MemberId],
+    membership: Membership[F, MemberId],
     sendingRef: Ref[F, Pending[K, V]],
     underlying: IndexedStore[F, K, MapValue[V]],
     blockingPool: BlockingContext)(
@@ -70,14 +70,6 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
   val CollectingInterval: Int = 100
 
   private val F = Sync[F]
-
-  def localId: F[MemberId] = F.delay {
-    membership.getLocalMember.id
-  }
-
-  def peers: F[Set[Member]] = F.delay {
-    membership.getMembers.asScala.to[Set]
-  }
 
   private def evalOnPool[A](fa: F[A]): F[A] =
     ContextShift[F].evalOn[A](blockingPool.unwrap)(fa)
@@ -97,7 +89,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     currentTime <- timer.clock.monotonic(MILLISECONDS)
     value: MapValue[V] = Tagged(v, currentTime)
     _ <- underlying.insert(k, value)
-    id <- localId
+    id <- membership.localId
     _ <- sendingRef.modify((x: Pending[K, V]) => (Pending(x.items.updated(k, value), x.inited, currentTime), ()))
   } yield ())
 
@@ -113,16 +105,16 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     F.delay((Stream.eval(sendAd) *> Stream.sleep(AdTimeout)).repeat)
 
   private def sendAd: F[Unit] = for {
-    pids <- peers.map(_.map(_.id))
+    pids <- membership.random
     ad <- prepareAd
-    id <- localId
-    _ <- multicast(communication, Advertisement(name), ad, pids - id).unlessA((pids - id).isEmpty)
+    id <- membership.localId
+    _ <- communication.multicast(Advertisement(name), ad, pids - id).unlessA((pids - id).isEmpty)
     _ <- ContextShift[F].shift
   } yield ()
 
   private def prepareAd: F[AdvertisementPayload[K]] = for {
     lst <- underlying.entries.map({ case (k, v) => (k, timestamp(v))}).compile.toList
-    id <- localId
+    id <- membership.localId
   } yield AdvertisementPayload(lst.toMap, id)
 
 
@@ -156,16 +148,16 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     for {
       init <- fInit
       (requesting, returning) <- result(init)
-      id <- localId
-      _ <- unicast(communication, RequestUpdate(name), UpdateRequest(requesting, id), ad.local)
+      id <- membership.localId
+      _ <- communication.unicast(RequestUpdate(name), UpdateRequest(requesting, id), ad.local)
       _ <- ContextShift[F].shift
-      _ <- unicast(communication, Update(name), returning, ad.local)
+      _ <- communication.unicast(Update(name), returning, ad.local)
       _ <- ContextShift[F].shift
     } yield ()
   }
 
   def advertisementHandled: F[Stream[F, Unit]] =
-    subscriptionStream[AdvertisementPayload[K]](Advertisement(name), 256)
+    communication.subscribe[AdvertisementPayload[K]](Advertisement(name), 256)
       .map(_.evalMap(handleAdvertisement(_)))
 
   // TOMBSTONES PURGING
@@ -189,7 +181,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
   }
 
   def updateHandled: F[Stream[F, Unit]] =
-    subscriptionStream[Map[K, MapValue[V]]](Update(name), 256)
+    communication.subscribe[Map[K, MapValue[V]]](Update(name), 256)
       .map(_.evalMap(updateHandler(_)))
 
   // REQUESTING FOR UPDATES
@@ -198,12 +190,12 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     payload <- req.items.foldM(Map[K, MapValue[V]]()) { (acc: Map[K, MapValue[V]], k: K) =>
       underlying.lookup(k).map(_.fold(acc)(acc.updated(k, _)))
     }
-    _ <- unicast(communication, Update(name), payload, req.local)
+    _ <- communication.unicast(Update(name), payload, req.local)
     _ <- ContextShift[F].shift
   } yield (())
 
   def updateRequestHandled: F[Stream[F, Unit]] =
-    subscriptionStream[UpdateRequest[K]](RequestUpdate(name), 128)
+    communication.subscribe[UpdateRequest[K]](RequestUpdate(name), 128)
       .map(_.evalMap(updateRequestedHandler(_)))
 
   // SYNCHRONIZATION
@@ -213,10 +205,10 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
 
   def notifyPeersF: F[Unit] = for {
     currentTime <- timer.clock.monotonic(MILLISECONDS)
-    pids <- peers.map(_.map(_.id))
+    pids <- membership.random
     msg <- sendingRef.modify(sendingRefUpdate(currentTime))
-    id <- localId
-    _ <- msg.traverse_(multicast(communication, Update(name), _, pids - id))
+    id <- membership.localId
+    _ <- msg.traverse_(communication.multicast(Update(name), _, pids - id))
     _ <- ContextShift[F].shift
   } yield ()
 
@@ -227,41 +219,83 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     case Pending(_, init, _) if now - init < CollectingInterval => (inp, None)
     case Pending(lst, _, _) => (Pending(Map(), now, now), Some(lst))
   }
+}
 
-  // PRIVATE
+abstract class Membership[F[_], Id] {
+  def localId: F[Id]
+  def peers: F[Set[Id]]
+  def random: F[Set[Id]]
+}
 
-  def subscriptionStream[P: Codec](msg: Message, limit: Int): F[Stream[F, P]] =
-    InspectableQueue.unbounded[F, P].map((queue: InspectableQueue[F, P]) =>
-      enqueue[P](queue, msg, limit) *> queue.dequeue)
+object Membership {
+  def atomix[F[_]: Sync](service: ClusterMembershipService): Membership[F, MemberId] = new Membership[F, MemberId] {
+    val F = Sync[F]
+    def localId: F[MemberId] =
+      F.delay(service.getLocalMember.id)
 
-  private def run(action: F[Unit]) =
-    ConcurrentEffect[F].runAsync(action)(_ => IO.unit).unsafeRunSync
+    def peers: F[Set[MemberId]] =
+      F.delay(service.getMembers.asScala.to[Set].map(_.id))
 
-  private def handler(eventName: String, cb: BitVector => Unit): F[Unit] =
-    cfToAsync(communication.subscribe[Array[Byte]](
-      eventName,
-      (x: Array[Byte]) => cb(ByteVector(x).bits),
-      blockingContextExecutor(blockingPool))) as (())
-
-  private def enqueue[P: Codec](q: InspectableQueue[F, P], eventType: Message, maxItems: Int): Stream[F, Unit] = {
-    val C = Codec[P]
-    Stream.eval(handler(printMessage(eventType), { (a: BitVector) => C.decode(a) match {
-      case Attempt.Failure(_) => ()
-      case Attempt.Successful(d) => run(for {
-        size <- q.getSize
-        _ <- q.enqueue1(d.value).whenA(size < maxItems)
-      } yield())
-    }}))
+    def random: F[Set[MemberId]] =
+      peers
   }
+}
 
-  private def unsubscribe(eventName: String): F[Unit] = F.delay {
-    communication.unsubscribe(eventName)
-  }
+abstract class Communication[F[_], Id] {
+  def unicast[P: Codec](msg: Message, payload: P, target: Id): F[Unit]
+  def multicast[P: Codec](msg: Message, payload: P, targets: Set[Id]): F[Unit]
+  def subscribe[P: Codec](msg: Message, limit: Int): F[Stream[F, P]]
+}
 
-  private def close: F[Unit] =
-    List(RequestUpdate(name), Update(name), Advertisement(name)).traverse_ { (m: Message) =>
-      unsubscribe(printMessage(m))
+object Communication {
+  def atomix[F[_]: ConcurrentEffect: ContextShift](
+      service: ClusterCommunicationService,
+      pool: BlockingContext)
+      : Communication[F, MemberId] = new Communication[F, MemberId] {
+    val F = ConcurrentEffect[F]
+    def unicast[P: Codec](msg: Message, payload: P, target: MemberId): F[Unit] =
+      Codec[P].encode(payload).map((b: BitVector) => {
+        cfToAsync(service.unicast(
+          printMessage(msg),
+          b.toByteArray,
+          target)) as (())
+      }).getOrElse(F.delay(()))
+
+    def multicast[P: Codec](msg: Message, payload: P, targets: Set[MemberId]): F[Unit] = F.delay {
+      if (targets.isEmpty) ()
+      else
+        Codec[P].encode(payload).map((b: BitVector) => {
+          service.multicast(
+            printMessage(msg),
+            b.toByteArray,
+            targets.to[scala.collection.mutable.Set].asJava)
+        }).getOrElse(())
     }
+
+    def subscribe[P: Codec](msg: Message, limit: Int): F[Stream[F, P]] =
+      InspectableQueue.unbounded[F, P]
+        .map((queue: InspectableQueue[F, P]) => enqueue[P](queue, msg, limit) *> queue.dequeue)
+        .map(_.onFinalize(F.delay(service.unsubscribe(printMessage(msg)))))
+
+    private def enqueue[P: Codec](q: InspectableQueue[F, P], eventType: Message, maxItems: Int): Stream[F, Unit] = {
+      val C = Codec[P]
+      Stream.eval(handler(printMessage(eventType), { (a: BitVector) => C.decode(a) match {
+        case Attempt.Failure(_) => ()
+        case Attempt.Successful(d) => run(for {
+          size <- q.getSize
+          _ <- q.enqueue1(d.value).whenA(size < maxItems)
+        } yield())
+      }}))
+    }
+    private def handler(eventName: String, cb: BitVector => Unit): F[Unit] =
+      cfToAsync(service.subscribe[Array[Byte]](
+        eventName,
+        (x: Array[Byte]) => cb(ByteVector(x).bits),
+        blockingContextExecutor(pool))) as (())
+
+    private def run(action: F[Unit]) =
+      F.runAsync(action)(_ => IO.unit).unsafeRunSync
+  }
 }
 
 object AEStore {
@@ -279,36 +313,6 @@ object AEStore {
     case RequestUpdate(n) => s"aestore::requestUpdate::${n}"
     case Update(n) => s"aestore::update::${n}"
     case Advertisement(n) => s"aestore::advertisement::${n}"
-  }
-
-  def unicast[F[_]: Async: ContextShift, P: Codec](
-      comm: ClusterCommunicationService,
-      message: Message,
-      payload: P,
-      target: MemberId)
-      : F[Unit] =
-    Codec[P].encode(payload).map((b: BitVector) => {
-      cfToAsync(comm.unicast(
-        printMessage(message),
-        b.toByteArray,
-        target)) as (())
-    }).getOrElse(Sync[F].delay(()))
-
-
-  def multicast[F[_]: Sync, P: Codec](
-      comm: ClusterCommunicationService,
-      message: Message,
-      payload: P,
-      targets: Set[MemberId])
-      : F[Unit] = Sync[F].delay {
-    if (targets.isEmpty) ()
-    else
-      Codec[P].encode(payload).map((b: BitVector) => {
-        comm.multicast(
-          printMessage(message),
-          b.toByteArray,
-          targets.to[scala.collection.mutable.Set].asJava)
-      }).getOrElse(())
   }
 
   final case class Pending[K, V](
@@ -388,7 +392,13 @@ object AEStore {
     val init: F[(IndexedStore[F, K, V], Deferred[F, Either[Throwable, Unit]])] = for {
       currentTime <- timer.clock.monotonic(MILLISECONDS)
       sendingRef <- Ref.of[F, Pending[K, V]](Pending(Map(), currentTime, currentTime))
-      store <- Sync[F].delay(new AEStore[F, K, V](name, communication, membership, sendingRef, underlying, pool))
+      store <- Sync[F].delay(new AEStore[F, K, V](
+        name,
+        Communication.atomix(communication, pool),
+        Membership.atomix(membership),
+        sendingRef,
+        underlying,
+        pool))
       stopper <- Deferred.tryable[F, Either[Throwable, Unit]]
       // Streams!
       adReceiver <- store.advertisementHandled.map(_.interruptWhen(stopper))
@@ -398,7 +408,14 @@ object AEStore {
       updateRequester <- store.updateRequestHandled.map(_.interruptWhen(stopper))
       synching <- store.synchronization.map(_.interruptWhen(stopper))
       // Run them!
-      fibs <- List(adReceiver, adSender, purger, updates, updateRequester, synching).traverse { (s: Stream[F, Unit]) =>
+      _ <- List(
+        adReceiver,
+        adSender,
+        purger,
+        updates,
+        updateRequester,
+        synching)
+      .traverse { (s: Stream[F, Unit]) =>
         F.start(ContextShift[F].evalOn(pool.unwrap)(s.compile.drain))
       }
     } yield (store, stopper)

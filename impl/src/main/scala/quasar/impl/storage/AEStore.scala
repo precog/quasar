@@ -49,19 +49,18 @@ import scodec.codecs._
 import scodec.codecs.implicits._
 import scodec.bits.{ByteVector, BitVector}
 
-
 import AEStore._
 import AtomixSetup._
 
-final class AEStore[F[_]: ConcurrentEffect: ContextShift](
+final class AEStore[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
     name: String,
     communication: ClusterCommunicationService,
     membership: ClusterMembershipService,
-    sendingRef: Ref[F, Pending],
-    underlying: ConcurrentMap[Key, Value],
+    sendingRef: Ref[F, Pending[K, V]],
+    underlying: ConcurrentMap[K, MapValue[V]],
     blockingPool: BlockingContext)(
     implicit timer: Timer[F])
-    extends IndexedStore[F, Key, RawValue] {
+    extends IndexedStore[F, K, V] {
 
   val MaxEvents: Int = 50
   val AdTimeout: FiniteDuration = new FiniteDuration(500, MILLISECONDS)
@@ -72,7 +71,9 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
 
   private val F = Sync[F]
 
-  def localId: F[MemberId] = F.delay(membership.getLocalMember.id)
+  def localId: F[MemberId] = F.delay {
+    membership.getLocalMember.id
+  }
 
   def peers: F[Set[Member]] = F.delay {
     membership.getMembers.asScala.to[Set]
@@ -86,10 +87,10 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
       def apply[A](fa: F[A]): F[A] = evalOnPool(fa)
     })
 
-  def entries: Stream[F, (Key, RawValue)] = for {
+  def entries: Stream[F, (K, V)] = for {
     iterator <- Stream.eval(evalOnPool(F.delay(underlying.entrySet.iterator.asScala)))
     entry <- evalStreamOnPool(
-      Stream.fromIterator[F, java.util.Map.Entry[Key, Value]](iterator))
+      Stream.fromIterator[F, java.util.Map.Entry[K, MapValue[V]]](iterator))
     key = entry.getKey
     value <- raw(entry.getValue) match {
       case None => Stream.empty
@@ -97,22 +98,22 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     }
   } yield (key, value)
 
-  def lookup(k: Key): F[Option[RawValue]] = evalOnPool(F.delay{
+  def lookup(k: K): F[Option[V]] = evalOnPool(F.delay{
     Option(underlying.get(k)).flatMap(raw(_))
   })
 
-  def insert(k: Key, v: RawValue): F[Unit] = evalOnPool(for {
+  def insert(k: K, v: V): F[Unit] = evalOnPool(for {
     currentTime <- timer.clock.monotonic(MILLISECONDS)
-    value: Value = Tagged(v, currentTime)
+    value: MapValue[V] = Tagged(v, currentTime)
     _ <- F.delay(underlying.put(k, value))
     id <- localId
-    _ <- sendingRef.modify((x: Pending) => (Pending(x.items.updated(k, value), x.inited, currentTime), ()))
+    _ <- sendingRef.modify((x: Pending[K, V]) => (Pending(x.items.updated(k, value), x.inited, currentTime), ()))
   } yield ())
 
-  def delete(k: Key): F[Boolean] = evalOnPool(for {
+  def delete(k: K): F[Boolean] = evalOnPool(for {
     res <- F.delay(Option(underlying.remove(k)).nonEmpty)
     currentTime <- timer.clock.monotonic(MILLISECONDS)
-    _ <- sendingRef.modify((x: Pending) => (Pending(x.items.updated(k, Tombstone(currentTime)), x.inited, currentTime), ()))
+    _ <- sendingRef.modify((x: Pending[K, V]) => (Pending(x.items.updated(k, Tombstone(currentTime)), x.inited, currentTime), ()))
   } yield res)
 
 
@@ -128,19 +129,19 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     _ <- ContextShift[F].shift
   } yield ()
 
-  private def prepareAd: F[AdvertisementPayload] = localId.map { (id: MemberId) =>
-    val mp = scala.collection.mutable.Map[Key, Long]()
-    underlying.forEach { (k: String, v: Value) =>
+  private def prepareAd: F[AdvertisementPayload[K]] = localId.map { (id: MemberId) =>
+    val mp = scala.collection.mutable.Map[K, Long]()
+    underlying.forEach { (k: K, v: MapValue[V]) =>
       mp.updated(k, timestamp(v)); ()
     }
-    AdvertisementPayload(mp.toMap[Key, Long], id)
+    AdvertisementPayload(mp.toMap[K, Long], id)
   }
 
   // RECEIVING ADS
-  def handleAdvertisement(ad: AdvertisementPayload): F[Unit] = {
-    val initMap = underlying.entrySet.iterator.asScala.map((e: java.util.Map.Entry[Key, Value]) => (e.getKey, e.getValue)).toMap
-    val init: (List[Key], ValueMap) = (List(), initMap)
-    val result = ad.items.toList.foldM[F, (List[Key], ValueMap)](init){ (acc, v) => (acc, v) match {
+  def handleAdvertisement(ad: AdvertisementPayload[K]): F[Unit] = {
+    val initMap = underlying.entrySet.iterator.asScala.map((e: java.util.Map.Entry[K, MapValue[V]]) => (e.getKey, e.getValue)).toMap
+    val init: (List[K], Map[K, MapValue[V]]) = (List(), initMap)
+    val result = ad.items.toList.foldM[F, (List[K], Map[K, MapValue[V]])](init){ (acc, v) => (acc, v) match {
       case ((requesting, returning), (k, v)) =>
         val mbCurrent = Option(underlying.get(k))
         if (mbCurrent.map(timestamp(_)).getOrElse(0L) < v) {
@@ -163,7 +164,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
   }
 
   def advertisementHandled: F[Stream[F, Unit]] =
-    subscriptionStream[AdvertisementPayload](Advertisement(name), 256)
+    subscriptionStream[AdvertisementPayload[K]](Advertisement(name), 256)
       .map(_.evalMap(handleAdvertisement(_)))
 
   // TOMBSTONES PURGING
@@ -172,26 +173,26 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
 
   private def purge: F[Unit] =
     F.delay { underlying.synchronized {
-      underlying.forEach { (k: Key, v: Value) =>
+      underlying.forEach { (k: K, v: MapValue[V]) =>
         if (raw(v).isEmpty) underlying.remove(k); ()
       }}}
 
   // RECEIVING UPDATES (both via initialization and update messages)
 
-  def updateHandler(mp: ValueMap): F[Unit] = mp.toList.traverse_ {
+  def updateHandler(mp: Map[K, MapValue[V]]): F[Unit] = mp.toList.traverse_ {
     case (k, newVal) =>
       val oldTS: Long = Option(underlying.get(k)).map(timestamp(_)).getOrElse(0L)
       F.delay(underlying.put(k, newVal)).whenA(oldTS < timestamp(newVal))
   }
 
   def updateHandled: F[Stream[F, Unit]] =
-    subscriptionStream[ValueMap](Update(name), 256)
+    subscriptionStream[Map[K, MapValue[V]]](Update(name), 256)
       .map(_.evalMap(updateHandler(_)))
 
   // REQUESTING FOR UPDATES
 
-  def updateRequestedHandler(req: UpdateRequest): F[Unit] = {
-    val payload: ValueMap = req.items.foldLeft(Map[Key, Value]()) { (acc: ValueMap, k: Key) =>
+  def updateRequestedHandler(req: UpdateRequest[K]): F[Unit] = {
+    val payload: Map[K, MapValue[V]] = req.items.foldLeft(Map[K, MapValue[V]]()) { (acc: Map[K, MapValue[V]], k: K) =>
       Option(underlying.get(k)) match {
         case None => acc
         case Some(toInsert) => acc.updated(k, toInsert)
@@ -201,7 +202,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
   }
 
   def updateRequestHandled: F[Stream[F, Unit]] =
-    subscriptionStream[UpdateRequest](RequestUpdate(name), 128)
+    subscriptionStream[UpdateRequest[K]](RequestUpdate(name), 128)
       .map(_.evalMap(updateRequestedHandler(_)))
 
   // SYNCHRONIZATION
@@ -218,7 +219,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     _ <- ContextShift[F].shift
   } yield ()
 
-  private def sendingRefUpdate(now: Long)(inp: Pending): (Pending, Option[ValueMap]) = inp match {
+  private def sendingRefUpdate(now: Long)(inp: Pending[K, V]): (Pending[K, V], Option[Map[K, MapValue[V]]]) = inp match {
     case Pending(lst, _, _) if lst.isEmpty => (inp, None)
     case Pending(_, _, last) if now - last < BatchInterval => (inp, None)
     case Pending(lst, _, _) if lst.size > MaxEvents => (Pending(Map(), now, now), Some(lst))
@@ -260,15 +261,9 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift](
     List(RequestUpdate(name), Update(name), Advertisement(name)).traverse_ { (m: Message) =>
       unsubscribe(printMessage(m))
     }
-
 }
 
 object AEStore {
-  type Key = String
-  type ValueMap = Map[Key, Value]
-  type RawValue = String
-  type RawMap = Map[Key, RawValue]
-
   def decodeStream[F[_]: Sync, A: Codec](inp: Stream[F, BitVector]): Stream[F, A] =
     inp.flatMap { (a: BitVector) => Codec[A].decode(a) match {
       case Attempt.Failure(_) => Stream.empty
@@ -315,92 +310,84 @@ object AEStore {
       }).getOrElse(())
   }
 
-  final case class Pending(
-      items: ValueMap,
+  final case class Pending[K, V](
+      items: Map[K, MapValue[V]],
       inited: Long,
       lastAdded: Long)
       extends Product with Serializable
 
-
-  final case class AdvertisementPayload(
-      items: Map[Key, Long],
+  final case class AdvertisementPayload[K](
+      items: Map[K, Long],
       local: MemberId)
       extends Product with Serializable
 
-  final case class UpdateRequest(
-      items: List[Key],
-      local: MemberId)
-      extends Product with Serializable
+  trait MapValue[+A] extends Product with Serializable
+  final case class Tombstone(timestamp: Long) extends MapValue[Nothing]
+  final case class Tagged[A](raw: A, timestamp: Long) extends MapValue[A]
 
-  implicit val memberIdCodec: Codec[MemberId] =
-    utf8_32.xmap(MemberId.from, _.id)
-
-  implicit val valueCodec: Codec[Value] = {
-    either(bool, int64, utf8_32 ~ int64).xmapc({
-      case Left(t) => Tombstone(t)
-      case Right((v, t)) => Tagged(v, t)
-    })({
-      case Tombstone(ts) => Left(ts)
-      case Tagged(v, ts) => Right((v, ts))
-    })
-  }
-
-  implicit val advertisementPayloadCodec: Codec[AdvertisementPayload] = {
-    val tses: Codec[Map[Key, Long]] =
-      listOfN(int32, utf8_32 ~ int64).xmap(_.toMap, _.toList)
-
-    (tses ~ memberIdCodec).xmapc({
-      case (mp, mid) => AdvertisementPayload(mp, mid)
-    })({
-      case AdvertisementPayload(mp, mid) => (mp, mid)
-    })
-  }
-
-  implicit val updateRequestCodec: Codec[UpdateRequest] = {
-    (listOfN(int32, utf8_32) ~ memberIdCodec).xmapc({
-      case (ks, mid) => UpdateRequest(ks, mid)
-    })({
-      case UpdateRequest(ks, mid) => (ks, mid)
-    })
-  }
-
-  implicit val valueMapCodec: Codec[ValueMap] =
-    listOfN(int32, utf8_32 ~ valueCodec).xmap(_.toMap, _.toList)
-
-  trait Value extends Product with Serializable
-  final case class Tombstone(timestamp: Long) extends Value
-  final case class Tagged(raw: RawValue, timestamp: Long) extends Value
-
-  def raw(v: Value): Option[RawValue] = v match {
+  def raw[A](v: MapValue[A]): Option[A] = v match {
     case Tombstone(_) => None
     case Tagged(raw, _) => Some(raw)
   }
 
-  def timestamp(v: Value): Long = v match {
+  def timestamp(v: MapValue[_]): Long = v match {
     case Tombstone(ts) => ts
     case Tagged(_, ts) => ts
   }
 
+  implicit val memberIdCodec: Codec[MemberId] =
+    utf8_32.xmap(MemberId.from, _.id)
+
+  implicit def mapCodec[K, V](implicit k: Codec[K], v: Codec[V]): Codec[Map[K, V]] =
+    listOfN(int32, k ~ v).xmap(_.toMap, _.toList)
+
+  implicit def mapValueCodec[A](implicit a: Codec[A]): Codec[MapValue[A]] =
+    either(bool, int64, a ~ int64).xmapc({
+      case Left(t) => Tombstone(t)
+      case Right((v, t)) => Tagged(v, t)
+    })({
+      case Tombstone(t) => Left(t)
+      case Tagged(v, t) => Right((v, t))
+    })
+
+  implicit def advertisementPayloadCodec[K: Codec]: Codec[AdvertisementPayload[K]] =
+    (Codec[Map[K, Long]] ~ memberIdCodec).xmapc({
+      case (mp, mid) => AdvertisementPayload[K](mp, mid)
+    })({
+      case AdvertisementPayload(mp, mid) => (mp, mid)
+    })
+
+  final case class UpdateRequest[K](
+      items: List[K],
+      local: MemberId)
+      extends Product with Serializable
+
+  implicit def updateRequestCodec[K](implicit k: Codec[K]): Codec[UpdateRequest[K]] =
+    (listOfN(int32, k) ~ memberIdCodec).xmapc({
+      case (l, id) => UpdateRequest[K](l, id)
+    })({
+      case UpdateRequest(l, id) => (l, id)
+    })
 
   def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {
     def execute(r: java.lang.Runnable) = pool.unwrap.execute(r)
   }
 
-  def apply[F[_]: ConcurrentEffect: ContextShift](
+  def apply[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
       name: String,
       communication: ClusterCommunicationService,
       membership: ClusterMembershipService,
-      underlying: ConcurrentMap[Key, Value],
+      underlying: ConcurrentMap[K, MapValue[V]],
       pool: BlockingContext)(
       implicit timer: Timer[F])
-      : Resource[F, IndexedStore[F, Key, RawValue]] = {
+      : Resource[F, IndexedStore[F, K, V]] = {
 
     val F = ConcurrentEffect[F]
 
-    val init: F[(IndexedStore[F, Key, RawValue], Deferred[F, Either[Throwable, Unit]])] = for {
+    val init: F[(IndexedStore[F, K, V], Deferred[F, Either[Throwable, Unit]])] = for {
       currentTime <- timer.clock.monotonic(MILLISECONDS)
-      sendingRef <- Ref.of[F, Pending](Pending(Map(), currentTime, currentTime))
-      store <- Sync[F].delay(new AEStore[F](name, communication, membership, sendingRef, underlying, pool))
+      sendingRef <- Ref.of[F, Pending[K, V]](Pending(Map(), currentTime, currentTime))
+      store <- Sync[F].delay(new AEStore[F, K, V](name, communication, membership, sendingRef, underlying, pool))
       stopper <- Deferred.tryable[F, Either[Throwable, Unit]]
       // Streams!
       adReceiver <- store.advertisementHandled.map(_.interruptWhen(stopper))
@@ -414,9 +401,8 @@ object AEStore {
         F.start(ContextShift[F].evalOn(pool.unwrap)(s.compile.drain))
       }
     } yield (store, stopper)
-    def finish(pair: (IndexedStore[F, Key, RawValue], Deferred[F, Either[Throwable, Unit]])): F[Unit] =
+    def finish(pair: (IndexedStore[F, K, V], Deferred[F, Either[Throwable, Unit]])): F[Unit] =
       pair._2.complete(Right(()))
     Resource.make(init)(finish).map(_._1)
   }
-
 }

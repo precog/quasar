@@ -41,17 +41,18 @@ import AtomixSetup._
 import java.util.function.{Consumer, Function}
 import java.util.concurrent.CompletableFuture
 
+import scodec._
+import scodec.codecs._
+//import scodec.codecs.implicits._
+
 import AEStore._
 
 final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   sequential
 
   implicit val ec: ExecutionContext = ExecutionContext.global
-//  implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+  implicit val strCodec: Codec[String] = utf8_32
   implicit val timer: Timer[IO] = IO.timer(ec)
-//  implicit val monadQuasarErr: MonadQuasarErr[F] =
-//MonadError_.facet[F](QuasarError.throwableP)
-
 
   val pool = BlockingContext.cached("aestore-pool")
 
@@ -70,8 +71,8 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   def mkStore(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, IndexedStore[IO, String, String]] = for {
     atomix <- Resource.make(startAtomix(me, seeds))(stopAtomix(_))
-    underlying <- Resource.pure[IO, ConcurrentHashMap[String, AEStore.Value]](new ConcurrentHashMap[String, AEStore.Value]())
-    store <- AEStore[IO](s"default", atomix.getCommunicationService(), atomix.getMembershipService(), underlying, pool)
+    underlying <- Resource.pure[IO, ConcurrentHashMap[String, MapValue[String]]](new ConcurrentHashMap[String, MapValue[String]]())
+    store <- AEStore[IO, String, String](s"default", atomix.getCommunicationService(), atomix.getMembershipService(), underlying, pool)
   } yield store
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = mkStore(defaultNode, List())
@@ -98,26 +99,10 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
       _ <- finish1
     } yield {
       println(s"values ::: $a0, $a1, $b0, $b1")
-      true
-//      a0 mustEqual Some("b")
-//      a1 mustEqual Some("b")
-//      b0 mustEqual Some("c")
-//      b1 mustEqual Some("c")
-    }
-  }
-
-  "bar" >>* {
-    val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
-    val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
-    for {
-      atomix0 <- startAtomix(node0, List(node0, node1))
-      atomix1 <- startAtomix(node1, List(node0, node1))
-      _ <- IO(atomix0.getCommunicationService().subscribe[String]("test", (x: String) => println(x), AEStore.blockingContextExecutor(pool)).join)
-      _ <- IO(atomix1.getCommunicationService().unicast("test", "A message", MemberId.from("0")).join)
-      _ <- stopAtomix(atomix0)
-      _ <- stopAtomix(atomix1)
-    } yield {
-      true
+      a0 mustEqual Some("b")
+      a1 mustEqual Some("b")
+      b0 mustEqual Some("c")
+      b1 mustEqual Some("c")
     }
   }
 }

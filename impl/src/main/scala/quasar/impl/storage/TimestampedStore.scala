@@ -44,5 +44,5 @@ final case class TimestampedStore[F[_]: FlatMap: Timer, K, V](
     was <- underlying.lookup(k)
     tmb <- tombstone[F, V]
     res <- underlying.insert(k, tmb)
-  } yield !was.isEmpty
+  } yield was.flatMap(raw(_)).nonEmpty
 }

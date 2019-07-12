@@ -55,9 +55,6 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   val defaultNode = NodeInfo("default", "localhost", 6000)
 
-  val bytesStringP: Prism[Array[Byte], String] =
-    Prism((bytes: Array[Byte]) => Some(new String(bytes, StandardCharsets.UTF_8)))(_.getBytes)
-
   def startAtomix(me: NodeInfo, seeds: List[NodeInfo]): IO[AtomixCluster] = IO.suspend {
     val a = Atomix.atomix(me, seeds)
     Atomix.start[IO](a) as a

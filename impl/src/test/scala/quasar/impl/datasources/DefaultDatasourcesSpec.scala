@@ -52,7 +52,7 @@ import scalaz.syntax.std.option._
 import shims._
 
 final class DefaultDatasourcesSpec
-    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
+    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, MockSchemaConfig.type] {
 
   type PathType = ResourcePathType
 
@@ -74,12 +74,14 @@ final class DefaultDatasourcesSpec
 
   val schemaConfig = MockSchemaConfig
 
+  val oldSchemaConfig = MockSchemaConfig
+
   def gatherMultiple[A](as: Stream[DefaultM, A]) = as.compile.toList
 
   def mkDatasources(
       errs: IMap[Int, Exception], sanitize: String => String)(
       init: String => Option[InitializationError[String]])
-      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] = {
+      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, MockSchemaConfig.type] = {
 
     val freshId =
       for {
@@ -103,7 +105,7 @@ final class DefaultDatasourcesSpec
           MockSchemaConfig.MockSchema.some.pure[DefaultM]
       }
 
-    DefaultDatasources(freshId, refs, errors, manager, schema)
+    DefaultDatasources(freshId, refs, errors, manager, schema, schema)
   }
 
   "implementation specific" >> {
@@ -260,7 +262,6 @@ final class DefaultDatasourcesSpec
         }).unsafeRunSync()
       }
     }
-
   }
 }
 

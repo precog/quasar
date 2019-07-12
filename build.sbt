@@ -139,7 +139,7 @@ lazy val foundation = project
       "org.specs2"                 %% "specs2-scalacheck"         % specsVersion                         % Test,
       "org.specs2"                 %% "specs2-scalaz"             % specsVersion                         % Test,
       "org.scalaz"                 %% "scalaz-scalacheck-binding" % (scalazVersion + "-scalacheck-1.14") % Test,
-      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.2"                              % Test))
+      "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3"                              % Test))
   .enablePlugins(AutomateHeaderPlugin, BuildInfoPlugin)
 
 /** Types and interfaces describing Quasar's functionality. */
@@ -312,4 +312,8 @@ lazy val runp = (project in file("run"))
     impl,
     qsu)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.mapdb" %  "mapdb"  % mapdbVersion,
+      "eu.timepit" %% "refined-scalacheck" % refinedVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)

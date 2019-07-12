@@ -27,7 +27,7 @@ import quasar.contrib.iota._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 import cats.effect.Sync
 
@@ -45,15 +45,16 @@ import scalaz.syntax.std.option._
 import shims._
 
 final class DefaultDatasources[
-    F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
+    F[_]: Sync, I: Equal, C: Equal, OldS <: SchemaConfig, S <: SchemaConfig,
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     R] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     errors: DatasourceErrors[F, I],
     manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, ResourcePathType],
+    oldSchema: ResourceSchema[F, OldS, (ResourcePath, R)],
     schema: ResourceSchema[F, S, (ResourcePath, R)])
-    extends Datasources[F, Stream[F, ?], I, C, S] {
+    extends Datasources[F, Stream[F, ?], I, C, OldS, S] {
 
   type PathType = ResourcePathType
 
@@ -107,10 +108,10 @@ final class DefaultDatasources[
       case -\/(err) => Condition.abnormal(err).point[F]
     }
 
-  def resourceSchema(
+  def oldResourceSchema(
       datasourceId: I,
       path: ResourcePath,
-      schemaConfig: S,
+      schemaConfig: OldS,
       timeLimit: FiniteDuration)
       : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]] =
     withDatasource[DiscoveryError[I], Option[schemaConfig.Schema]](datasourceId) { mds =>
@@ -122,7 +123,24 @@ final class DefaultDatasources[
           hw.evaluate(dsl.Read(path, IdStatus.ExcludeId))
       }
 
-      fr.flatMap(r => schema(schemaConfig, (path, r), timeLimit))
+      fr.flatMap(r => oldSchema(schemaConfig, (path, r), timeLimit))
+    }
+
+  def resourceSchema(
+      datasourceId: I,
+      path: ResourcePath,
+      schemaConfig: S)
+      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]] =
+    withDatasource[DiscoveryError[I], Option[schemaConfig.Schema]](datasourceId) { mds =>
+      val fr = mds match {
+        case ManagedDatasource.ManagedLightweight(lw) =>
+          lw.evaluate(InterpretedRead(path, ScalarStages.Id))
+
+        case ManagedDatasource.ManagedHeavyweight(hw) =>
+          hw.evaluate(dsl.Read(path, IdStatus.ExcludeId))
+      }
+
+      fr.flatMap(r => schema(schemaConfig, (path, r), 0.seconds))
     }
 
   def supportedDatasourceTypes: F[ISet[DatasourceType]] =
@@ -209,14 +227,15 @@ final class DefaultDatasources[
 
 object DefaultDatasources {
   def apply[
-      F[_]: Sync, I: Equal, C: Equal, S <: SchemaConfig,
+      F[_]: Sync, I: Equal, C: Equal, OldS <: SchemaConfig, S <: SchemaConfig,
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       R](
       freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       errors: DatasourceErrors[F, I],
       manager: DatasourceManager[I, C, T, F, Stream[F, ?], R, ResourcePathType],
+      oldSchema: ResourceSchema[F, OldS, (ResourcePath, R)],
       schema: ResourceSchema[F, S, (ResourcePath, R)])
-      : Datasources[F, Stream[F, ?], I, C, S] =
-    new DefaultDatasources(freshId, refs, errors, manager, schema)
+      : Datasources[F, Stream[F, ?], I, C, OldS, S] =
+    new DefaultDatasources(freshId, refs, errors, manager, oldSchema, schema)
 }

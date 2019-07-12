@@ -18,6 +18,11 @@ package quasar.common.data
 
 import slamdata.Predef._
 
+import cats.instances.string._
+import cats.syntax.eq._
+
+import monocle.Optional
+
 import qdata._
 import qdata.time.{DateTimeInterval, OffsetDate}
 
@@ -37,6 +42,21 @@ import scala.sys.error
 object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
   import QType._
 
+  object MetaKey {
+    val Type = "quasar.rvalue.type"
+    val Size = "quasar.rvalue.size"
+  }
+
+  object MetaType {
+    val Binary = "quasar.rvalue.type.binary"
+  }
+
+  val rMetaType: Optional[RValue, String] =
+    RValue.rField1(MetaKey.Type).composePrism(RValue.rString)
+
+  val rMetaSize: Optional[RValue, Long] =
+    RValue.rField1(MetaKey.Size).composePrism(RValue.rLong)
+
   def tpe(a: RValue): QType = a match {
     case RObject(_) => QObject
     case RArray(_) => QArray
@@ -55,6 +75,7 @@ object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
     case CLocalDate(_) => QLocalDate
     case CLocalTime(_) => QLocalTime
     case CInterval(_) => QInterval
+    case CBinary(_) => QMeta
     case CNull => QNull
     case CUndefined => error("Unable to represent `CUndefined`.")
     case CArray(_, _) => error("Unable to represent `CArray`.")
@@ -173,6 +194,7 @@ object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
 
   def getMetaValue(a: RValue): RValue = a match {
     case RMeta(value, _) => value
+    case CBinary(bytes) => RValue.rString(CBinary.toBase64String(bytes))
     case _ => error(s"Expected `RMeta`. Received $a")
   }
   def getMetaMeta(a: RValue): RValue = a match {
@@ -180,9 +202,21 @@ object QDataRValue extends QDataEncode[RValue] with QDataDecode[RValue] {
       case Some(meta) => meta
       case _ => error(s"Expected `RObject` with $metaKey in meta meta. Received $a")
     }
+    case CBinary(bytes) =>
+      RValue.rObject(Map(
+        MetaKey.Type -> RValue.rString(MetaType.Binary),
+        MetaKey.Size -> RValue.rLong(bytes.length.toLong)))
     case _ => error(s"Expected `RMeta`. Received $a")
   }
   def makeMeta(value: RValue, meta: RValue): RValue = {
-    RMeta(value, RObject(Map(metaKey -> meta)))
+    def attemptBinary: Option[Array[Byte]] =
+      if (rMetaType.exist(_ === MetaType.Binary)(meta))
+        RValue.rString
+          .getOption(value)
+          .flatMap(CBinary.fromBase64String)
+      else
+        None
+
+    attemptBinary.fold(RValue.rMeta(value, RObject(Map(metaKey -> meta))))(RValue.rBinary(_))
   }
 }

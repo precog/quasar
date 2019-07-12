@@ -31,18 +31,6 @@ object TableName {
   implicit val showTableName: Show[TableName] = Show.showFromToString
 }
 
-final case class TableColumn(name: String, tpe: ColumnType.Scalar)
-
-object TableColumn {
-  implicit val equalTableColumn: Equal[TableColumn] =
-    Equal.equalBy(c => (c.name, c.tpe))
-
-  implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.tpe.show ++ Cord(")")
-    }
-}
-
 final case class TableRef[Q](name: TableName, query: Q, columns: List[TableColumn])
 
 object TableRef {

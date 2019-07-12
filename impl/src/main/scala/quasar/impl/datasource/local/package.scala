@@ -21,52 +21,74 @@ import slamdata.Predef._
 import quasar.api.datasource.DatasourceType
 import quasar.api.destination.DestinationType
 import quasar.api.resource.ResourcePath
-import quasar.contrib.scalaz.MonadError_
 import quasar.fp.ski.ι
 
-import java.nio.file.{Paths, Path => JPath}
+import java.nio.file.{InvalidPathException, Paths, Path => JPath}
 
 import argonaut.{DecodeJson, Json}
 
 import cats.data.EitherT
 import cats.effect.Sync
+import cats.instances.option._
 import cats.syntax.applicative._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
+import cats.syntax.traverse._
 
 import eu.timepit.refined.auto._
 
 import pathy.Path
 
-import scalaz.\/
 import scalaz.syntax.foldable._
 
 import shims.monadToScalaz
 
 package object local {
+  // TODO: These should actually be v2 with some indication that v1 is also supported
   val LocalType = DatasourceType("local", 1L)
   val LocalParsedType = DatasourceType("local-parsed", 1L)
 
-  val LocalDestinationType = DestinationType("local", 1L, 1L)
+  val LocalDestinationType = DestinationType("local", 1L)
 
-  def toNio[F[_]: Sync](root: JPath, rp: ResourcePath): F[JPath] =
-    Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(root) { (p, n) =>
-      if (n.isEmpty) p.pure[F]
-      else MonadError_[F, Throwable].unattempt_(\/.fromTryCatchNonFatal(p.resolve(n)))
-    }
+  private val ParentDir = ".."
 
   def attemptConfig[F[_]: Sync, A: DecodeJson, B](
-    config: Json,
-    errorPrefix: String)(onError: (Json, String) => B)
+      config: Json,
+      errorPrefix: String)(
+      onError: (Json, String) => B)
       : EitherT[F, B, A] =
-    EitherT.fromEither(config.as[A].toEither)
-      .leftMap[B] {
-        case (s, _) => onError(config, errorPrefix + s)
-      }
+    EitherT.fromEither[F](config.as[A].toEither) leftMap {
+      case (s, _) => onError(config, errorPrefix + s)
+    }
 
-  def validatePath[F[_]: Sync, B](
-    path: String,
-    config: Json,
-    errorPrefix: String)(onError: (Json, String) => B)
+  def resolvedResourcePath[F[_]](
+      root: JPath,
+      rp: ResourcePath)(
+      implicit F: Sync[F])
+      : F[Option[JPath]] =
+    F.recover {
+      for {
+        cur <- F.delay(Paths.get(""))
+
+        jp <- Path.flatten("", "", "", ι, ι, rp.toPath).foldLeftM(cur) { (p, n) =>
+          if (n.isEmpty) p.pure[F]
+          else F.delay(p.resolve(n))
+        }
+
+        resolved <-
+          Some(jp.normalize)
+            .filterNot(_.startsWith(ParentDir))
+            .traverse(norm => F.delay(root.resolve(norm)))
+      } yield resolved
+    } {
+      case _: InvalidPathException => None
+    }
+
+  def validatedPath[F[_]: Sync, B](
+      path: String,
+      errorPrefix: String)(
+      onError: String => B)
       : EitherT[F, B, JPath] =
     EitherT(Sync[F].attempt(Sync[F].delay(Paths.get(path))))
-      .leftMap[B](t => onError(config, errorPrefix + t.getMessage))
+      .leftMap[B](t => onError(errorPrefix + t.getMessage))
 }

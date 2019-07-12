@@ -21,7 +21,8 @@ import slamdata.Predef._
 import quasar.api.destination.DestinationError.InitializationError
 import quasar.api.destination.DestinationType
 import quasar.api.resource.ResourcePath
-import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink, ResultType, TableColumn}
+import quasar.api.table.TableColumn
+import quasar.connector.{Destination, DestinationModule, MonadResourceErr, ResultSink, ResultType}
 
 import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
@@ -33,7 +34,7 @@ import scalaz.{Applicative, NonEmptyList}
 import shims._
 
 object MockDestinationModule extends DestinationModule {
-  def destinationType = DestinationType("mock", 1L, 1L)
+  def destinationType = DestinationType("mock", 1L)
   def sanitizeDestinationConfig(config: Json) =
     Json.jString("sanitized")
 

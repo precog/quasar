@@ -38,6 +38,8 @@ abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
 
   def nonExistentPath: ResourcePath
 
+  def nonExistentPathWithAsterisk: ResourcePath = nonExistentPath / ResourceName("*")
+
   def gatherMultiple[A](fga: G[A]): F[List[A]]
 
   private val widthLimit = 10
@@ -96,6 +98,12 @@ abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
     "non-existent is not a resource" >>* {
       datasource
         .pathIsResource(nonExistentPath)
+        .map(_ must beFalse)
+    }
+
+    "non-existent * is not a resource" >>* {
+      datasource
+        .pathIsResource(nonExistentPathWithAsterisk)
         .map(_ must beFalse)
     }
   }

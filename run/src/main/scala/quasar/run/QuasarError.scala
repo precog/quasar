@@ -17,10 +17,12 @@
 package quasar.run
 
 import slamdata.Predef.{Exception, Product, Serializable, Throwable}
+
 import quasar.api.datasource.DatasourceError.CreateError
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.qscript.PlannerError
+import quasar.run.store.StoreError
 import quasar.sql.ParsingError
 
 import argonaut.Json
@@ -37,6 +39,7 @@ object QuasarError {
   final case class Evaluating(error: ResourceError) extends QuasarError
   final case class Parsing(error: ParsingError) extends QuasarError
   final case class Planning(error: PlannerError) extends QuasarError
+  final case class Storing(error: StoreError) extends QuasarError
 
   val compiling: Prism[QuasarError, SemanticErrors] =
     Prism.partial[QuasarError, SemanticErrors] {
@@ -63,6 +66,11 @@ object QuasarError {
       case Planning(err) => err
     } (Planning(_))
 
+  val storing: Prism[QuasarError, StoreError] =
+    Prism.partial[QuasarError, StoreError] {
+      case Storing(err) => err
+    } (Storing(_))
+
   val throwableP: Prism[Throwable, QuasarError] =
     Prism.partial[Throwable, QuasarError] {
       case QuasarException(qe) => qe
@@ -75,6 +83,7 @@ object QuasarError {
       case Evaluating(e) => e.show
       case Parsing(e) => e.show
       case Planning(e) => e.show
+      case Storing(e) => e.show
     }
 
   ////

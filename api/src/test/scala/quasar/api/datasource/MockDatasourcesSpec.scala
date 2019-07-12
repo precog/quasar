@@ -36,21 +36,22 @@ import shims._
 import MockDatasourcesSpec._
 
 final class MockDatasourcesSpec
-  extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {
+  extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type, MockSchemaConfig.type] {
 
-
-  val s3: DatasourceType    = DatasourceType("s3", 1L)
+  val s3: DatasourceType = DatasourceType("s3", 1L)
   val azure: DatasourceType = DatasourceType("azure", 1L)
   val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type] =
+  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type, MockSchemaConfig.type] =
     MockDatasources[String, MockM, List](
       acceptedSet, _ => Condition.normal(), SStream.empty)
 
   def supportedType = DatasourceType("s3", 1L)
 
   def validConfigs = ("bucket1", "bucket2")
+
+  val oldSchemaConfig = MockSchemaConfig
 
   val schemaConfig = MockSchemaConfig
 

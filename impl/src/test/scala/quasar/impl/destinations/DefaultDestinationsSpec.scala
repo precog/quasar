@@ -69,7 +69,7 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
       storeRef <- Ref[IO].of(store)
       store = RefIndexedStore[Int, DestinationRef[Json]](storeRef)
       mgr <- manager(running, errors, mockModules)
-    } yield DefaultDestinations[IO, Int, Json](fId, store, mgr)
+    } yield DefaultDestinations[Int, Json, IO](fId, store, mgr)
 
   def emptyDestinations: IO[Destinations[IO, Stream[IO, ?], Int, Json]] =
     mkDestinations(IMap.empty, IMap.empty, IMap.empty)
@@ -78,6 +78,8 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
 
   val testRef =
     DestinationRef(MockDestinationType, DestinationName("foo-mock"), Json.jEmptyString)
+
+  val sanitize = DestinationRef.config.set(Json.jString("sanitized"))
 
   "destinations" >> {
     "add destination" >> {
@@ -109,7 +111,7 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
       }
 
       "rejects unknown destination" >> {
-        val unknownType = DestinationType("unknown", 1L, 1L)
+        val unknownType = DestinationType("unknown", 1L)
         val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
 
         val testRun = for {
@@ -137,11 +139,66 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
 
         val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
 
-        val sanitize = DestinationRef.config.set(Json.jString("sanitized"))
-
         beforeReplace must be_\/-(sanitize(testRef))
         replaceResult must beNormal
         afterReplace must be_\/-(sanitize(newRef))
+      }
+
+      "verifies name uniqueness on replacement" >> {
+        val testRef2 =
+          DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
+        val testRef3 =
+          DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
+
+        val testRun = for {
+          dests <- emptyDestinations
+          addStatus1 <- dests.addDestination(testRef)
+          addStatus2 <- dests.addDestination(testRef2)
+          replaceStatus <- dests.replaceDestination(1, testRef3)
+        } yield (addStatus1, addStatus2, replaceStatus)
+
+        val (addStatus1, addStatus2, replaceStatus) = testRun.unsafeRunSync
+
+        addStatus1 must be_\/-(1)
+        addStatus2 must be_\/-(2)
+
+        replaceStatus must beAbnormal(
+          DestinationError.destinationNameExists[DestinationError[Int, Json]](testRef3.name))
+      }
+
+      "allows replacement with the same name" >> {
+        val testRef2 = DestinationRef.config.set(Json.jString("modified"))(testRef)
+
+        val testRun = for {
+          dests <- emptyDestinations
+          addStatus <- dests.addDestination(testRef)
+          replaceStatus <- dests.replaceDestination(1, testRef2)
+        } yield (addStatus, replaceStatus)
+
+        val (addStatus, replaceStatus) = testRun.unsafeRunSync
+
+        addStatus must be_\/-(1)
+        replaceStatus must beNormal
+      }
+
+      "verifies support before removing the replaced destination" >> {
+        val testRef2 = DestinationRef.kind.set(DestinationType("unknown", 1337L))(testRef)
+
+        val testRun = for {
+          dests <- emptyDestinations
+          addStatus <- dests.addDestination(testRef)
+          refBeforeReplace <- dests.destinationRef(1)
+          replaceStatus <- dests.replaceDestination(1, testRef2)
+          refAfterReplace <- dests.destinationRef(1)
+        } yield (addStatus, refBeforeReplace, replaceStatus, refAfterReplace)
+
+        val (addStatus, refBeforeReplace, replaceStatus, refAfterReplace) = testRun.unsafeRunSync
+
+        addStatus must be_\/-(1)
+        refBeforeReplace must be_\/-(sanitize(testRef))
+        replaceStatus must beAbnormal(
+          DestinationError.destinationUnsupported(testRef2.kind, ISet.singleton(MockDestinationType)))
+        refAfterReplace must be_\/-(sanitize(testRef))
       }
 
       "shuts down replaced destination" >> {

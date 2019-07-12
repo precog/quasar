@@ -31,10 +31,10 @@ import fs2.Stream
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
-import scalaz.{\/, Equal, IMap, ISet, OptionT, Order}
+import scalaz.{\/, Equal, EitherT, IMap, ISet, OptionT, Order}
 import shims._
 
-class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
+class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
     manager: DestinationManager[I, C, F])
@@ -86,11 +86,13 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
 
   def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
     refs.lookup(destinationId) >>= {
-      case Some(_) => for {
-        removeStatus <- removeDestination(destinationId)
-        destStatus <- manager.initDestination(destinationId, ref)
-        _ <- refs.insert(destinationId, ref)
-      } yield destStatus orElse removeStatus
+      case Some(_) =>
+        (for {
+        _ <- uniqueName(destinationId, ref) >> refSupported(ref)
+        _ <- liftC[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
+        _ <- liftC[CreateError[C], DestinationError[I, C]](manager.initDestination(destinationId, ref))
+        _ <- EitherT.rightT(refs.insert(destinationId, ref))
+      } yield ()).run.map(Condition.disjunctionIso.reverseGet(_))
       case None =>
         Condition.abnormal(
           DestinationError.destinationNotFound[I, DestinationError[I, C]](destinationId)).pure[F]
@@ -101,12 +103,27 @@ class DefaultDestinations[F[_]: Sync, I: Equal: Order, C] private (
 
   def errors: F[IMap[I, Exception]] =
     manager.errors
+
+  private def liftC[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
+    EitherT(c.map(Condition.disjunctionIso.get(_)))
+
+  private def refSupported(ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
+    EitherT(supportedDestinationTypes.map(_.member(ref.kind)).ifM(
+      ().right[DestinationError[I, C]].point[F],
+      supportedDestinationTypes.map(
+        DestinationError.destinationUnsupported[DestinationError[I, C]](ref.kind, _).left[Unit])))
+
+  private def uniqueName(replaceId: I, ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
+    EitherT(refs.entries.filter {
+      case (i, r) => r.name === ref.name && i =/= replaceId
+    }.compile.last.map(_.fold(().right[DestinationError[I, C]])(_ =>
+      DestinationError.destinationNameExists[DestinationError[I, C]](ref.name).left[Unit])))
 }
 
 object DefaultDestinations {
-  def apply[F[_]: Sync, I: Equal: Order, C](
+  def apply[I: Equal: Order, C, F[_]: Sync](
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
-    manager: DestinationManager[I, C, F]): DefaultDestinations[F, I, C] =
-    new DefaultDestinations[F, I, C](freshId, refs, manager)
+    manager: DestinationManager[I, C, F]): DefaultDestinations[I, C, F] =
+    new DefaultDestinations[I, C, F](freshId, refs, manager)
 }

@@ -46,7 +46,7 @@ final class MockDatasources[
     supportedTypes: ISet[DatasourceType],
     errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
     structure: SStream[Tree[ResourceName]])
-  extends Datasources[F, G, Int, C, MockSchemaConfig.type] {
+  extends Datasources[F, G, Int, C, MockSchemaConfig.type, MockSchemaConfig.type] {
 
   import DatasourceError._
 
@@ -138,8 +138,7 @@ final class MockDatasources[
   def resourceSchema(
       id: Int,
       path: ResourcePath,
-      cfg: MockSchemaConfig.type,
-      timeLimit: FiniteDuration)
+      cfg: MockSchemaConfig.type)
       : F[DiscoveryError[Int] \/ Option[cfg.Schema]] =
     mockState.gets { s =>
       if (s.dss member id)
@@ -151,6 +150,14 @@ final class MockDatasources[
       else
         datasourceNotFound[Int, ExistentialError[Int]](id).left
     }
+
+  def oldResourceSchema(
+      id: Int,
+      path: ResourcePath,
+      cfg: MockSchemaConfig.type,
+      timeLimit: FiniteDuration)
+      : F[DiscoveryError[Int] \/ Option[cfg.Schema]] =
+    resourceSchema(id, path, cfg)
 
   val supportedDatasourceTypes: F[ISet[DatasourceType]] = supportedTypes.point[F]
 
@@ -223,6 +230,6 @@ object MockDatasources {
       supportedTypes: ISet[DatasourceType],
       errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
       structure: SStream[Tree[ResourceName]])
-      : Datasources[F, G, Int, C, MockSchemaConfig.type] =
+      : Datasources[F, G, Int, C, MockSchemaConfig.type, MockSchemaConfig.type] =
     new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
 }

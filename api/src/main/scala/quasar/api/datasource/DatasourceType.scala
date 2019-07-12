@@ -16,23 +16,34 @@
 
 package quasar.api.datasource
 
+import slamdata.Predef.{None, Some, String}
+
 import quasar.contrib.refined._
 import quasar.fp.numeric.Positive
+import quasar.fp.ski.κ
 
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.refineV
 import eu.timepit.refined.scalaz._
+import eu.timepit.refined.string.MatchesRegex
+import monocle.Prism
 import monocle.macros.Lenses
 import scalaz.{Cord, Order, Show}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.show._
+import shapeless.{Witness => W}
 
 @Lenses
 final case class DatasourceType(name: DatasourceType.Name, version: Positive)
 
 object DatasourceType extends DatasourceTypeInstances {
-  type Name = datasource.Name
-  type NameP = datasource.NameP
+  type NameP = MatchesRegex[W.`"[a-zA-Z0-9-]+"`.T]
+  type Name = String Refined NameP
+
+  def stringName = Prism[String, Name](
+    refineV[NameP](_).fold(κ(None), Some(_)))(_.value)
 }
 
 sealed abstract class DatasourceTypeInstances {

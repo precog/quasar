@@ -38,19 +38,21 @@ import scalaz.syntax.foldable._
 import scalaz.std.list._
 
 abstract class DatasourcesSpec[
-    F[_], G[_], I: Order: Show, C: Equal: Show, S <: SchemaConfig](
+    F[_], G[_], I: Order: Show, C: Equal: Show, OldS <: SchemaConfig, S <: SchemaConfig](
     implicit F: Effect[F], ec: ExecutionContext)
     extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
 
-  def datasources: Datasources[F, G, I, C, S]
+  def datasources: Datasources[F, G, I, C, OldS, S]
 
   def supportedType: DatasourceType
 
   // Must be distinct.
   def validConfigs: (C, C)
+
+  val oldSchemaConfig: OldS
 
   val schemaConfig: S
 
@@ -244,8 +246,12 @@ abstract class DatasourcesSpec[
     }
   }
 
+  "old resource schema" >> {
+    discoveryExamples(datasources.oldResourceSchema(_, _, oldSchemaConfig, 30.seconds))
+  }
+
   "resource schema" >> {
-    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig, 30.seconds))
+    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig))
   }
 
   ////

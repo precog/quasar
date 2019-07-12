@@ -14,22 +14,23 @@
  * limitations under the License.
  */
 
-package quasar.api.datasource
+package quasar.api.table
 
 import slamdata.Predef._
 
-import quasar.fp.ski.κ
+import scalaz.{Cord, Equal, Show}
+import scalaz.std.tuple._
+import scalaz.std.string._
+import scalaz.syntax.show._
 
-import eu.timepit.refined.refineV
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.string.MatchesRegex
-import monocle.Prism
-import shapeless.{Witness => W}
+final case class TableColumn(name: String, tpe: ColumnType.Scalar)
 
-package object datasource {
-  type NameP = MatchesRegex[W.`"[a-zA-Z0-9-]+"`.T]
-  type Name = String Refined NameP
+object TableColumn {
+  implicit val equalTableColumn: Equal[TableColumn] =
+    Equal.equalBy(c => (c.name, c.tpe))
 
-  def stringName = Prism[String, Name](
-    refineV[NameP](_).fold(κ(None), Some(_)))(_.value)
+  implicit val showTableColumn: Show[TableColumn] =
+    Show show { tc =>
+      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.tpe.show ++ Cord(")")
+    }
 }

@@ -15,7 +15,7 @@ bumpInDownstream() { echo $1 > quasar-version; }
 export -f bumpInDownstream
 
 # internal
-for c in slamdata-backend quasar-repl mimir thoth benchmarks; do
+for c in slamdata-backend quasar-repl mimir thoth benchmarks scion; do
   scripts/bumpDependentProject slamdata $c bumpInDownstream
 done
 

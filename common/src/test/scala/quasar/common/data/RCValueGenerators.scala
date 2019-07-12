@@ -27,10 +27,15 @@ import scala.sys
 trait RCValueGenerators {
   def maxArrayDepth = 3
 
+  def genBytes: Gen[Array[Byte]] =
+    arrayOf(genByte)
+
   def genCValueType: Gen[CValueType[_]] =
-    Gen.oneOf[CValueType[_]](CString, CBoolean, CLong, CDouble, CNum,
+    Gen.oneOf[CValueType[_]](
+      CString, CBoolean, CLong, CDouble, CNum,
       COffsetDateTime, COffsetTime, COffsetDate,
-      CLocalDateTime, CLocalTime, CLocalDate, CInterval)
+      CLocalDateTime, CLocalTime, CLocalDate, CInterval,
+      CBinary)
 
   def genCType: Gen[CType] = frequency(7 -> genCValueType, 3 -> Gen.oneOf(CNull, CEmptyObject, CEmptyArray))
 
@@ -47,6 +52,7 @@ trait RCValueGenerators {
     case COffsetTime => genOffsetTime.map(COffsetTime(_))
     case COffsetDate => genOffsetDate.map(COffsetDate(_))
     case CInterval => genInterval.map(CInterval(_))
+    case CBinary => genBytes.map(CBinary(_))
     case CArrayType(_) =>
       scala.sys.error("CArrayType not supported")
   }

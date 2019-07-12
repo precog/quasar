@@ -71,7 +71,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
       }
 
       "rejects a destination of an unknown type" >> {
-        val notKnown = DestinationType("notknown", 1L, 1L)
+        val notKnown = DestinationType("notknown", 1L)
         val ref = DestinationRef(notKnown, DestinationName("notknown"), Json.jEmptyString)
 
         emptyManager.flatMap(_.initDestination(1, ref)).unsafeRunSync must beLike {
@@ -157,7 +157,7 @@ object DefaultDestinationManagerSpec extends quasar.Qspec {
 
     "sanitize refs" >> {
       "returns an empty object when the destination is unknown" >> {
-        val notKnown = DestinationType("notknown", 1L, 1L)
+        val notKnown = DestinationType("notknown", 1L)
         val notKnownRef = DestinationRef(notKnown, DestinationName("notknown"), Json.jString("baz"))
 
         val sanitized = for {

@@ -14,21 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.connector
+package quasar.common
 
-import slamdata.Predef.String
+import slamdata.Predef._
 
-import scalaz.{Order, Show}
-import scalaz.std.string._
+import org.scalacheck.{Arbitrary, Gen}, Arbitrary.arbitrary
 
-final case class TableColumn(value: String)
+trait CPathGenerator {
+  implicit val arbitraryCPathNode: Arbitrary[CPathNode] =
+    Arbitrary(Gen.frequency(
+      20 -> arbitrary[Int].map(CPathIndex(_)),
+      20 -> arbitrary[String].map(CPathField(_)),
+      20 -> arbitrary[String].map(CPathMeta(_)),
+      1 -> Gen.const(CPathArray)))
 
-object TableColumn extends TableColumnInstances
-
-sealed abstract class TableColumnInstances {
-  implicit val show: Show[TableColumn] =
-    Show.shows(_.value)
-
-  implicit val order: Order[TableColumn] =
-    Order.orderBy(_.value)
+  implicit val arbitraryCPath: Arbitrary[CPath] =
+    Arbitrary(Gen.sized { sz =>
+      Gen.listOfN(sz % 10, arbitrary[CPathNode]).map(CPath(_))
+    })
 }
+
+object CPathGenerator extends CPathGenerator

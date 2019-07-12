@@ -18,6 +18,8 @@ package quasar.connector
 
 import slamdata.Predef.{Byte, List}
 
+import quasar.api.table.TableColumn
+
 import fs2.Stream
 
 sealed trait ResultType[F[_]] {

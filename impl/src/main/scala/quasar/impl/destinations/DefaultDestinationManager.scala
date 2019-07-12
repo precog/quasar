@@ -93,4 +93,10 @@ object DefaultDestinationManager {
     running: Ref[F, IMap[I, (Destination[F], F[Unit])]],
     currentErrors: Ref[F, IMap[I, Exception]]): DefaultDestinationManager[I, F] =
     new DefaultDestinationManager[I, F](modules, running, currentErrors)
+
+  def empty[I: Order, F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
+    modules: IMap[DestinationType, DestinationModule])
+      : F[DefaultDestinationManager[I, F]] =
+    (Ref.of[F, IMap[I, (Destination[F], F[Unit])]](IMap.empty) |@| Ref.of[F, IMap[I, Exception]](IMap.empty))(
+      new DefaultDestinationManager[I, F](modules, _, _))
 }

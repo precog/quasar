@@ -17,10 +17,13 @@
 package quasar.impl.storage
 
 import slamdata.Predef._
+
 import quasar.concurrent.BlockingContext
+import quasar.impl.cluster.{Timestamped, Atomix, Message}, Atomix.NodeInfo, Message._
 
 import cats.effect.{IO, Resource, Timer}
 import cats.syntax.functor._
+import cats.syntax.contravariant._
 
 import io.atomix.cluster._
 
@@ -41,8 +44,6 @@ import scala.util.Random
 
 import shims._
 
-import AtomixSetup._
-
 final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   sequential
 
@@ -52,25 +53,29 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   val pool = BlockingContext.cached("aestore-pool")
 
-  val defaultNode = AtomixSetup.NodeInfo("default", "localhost", 6000)
+  val defaultNode = NodeInfo("default", "localhost", 6000)
 
   val bytesStringP: Prism[Array[Byte], String] =
     Prism((bytes: Array[Byte]) => Some(new String(bytes, StandardCharsets.UTF_8)))(_.getBytes)
 
-  def startAtomix(me: NodeInfo, seeds: List[NodeInfo]): IO[AtomixCluster] = for {
-    atomix <- AtomixSetup.mkAtomix[IO](me, me :: seeds)
-    _ <- IO.suspend(cfToAsync[IO, java.lang.Void](atomix.start))
-  } yield atomix
+  def startAtomix(me: NodeInfo, seeds: List[NodeInfo]): IO[AtomixCluster] = IO.suspend {
+    val a = Atomix.atomix(me, seeds)
+    Atomix.start[IO](a) as a
+  }
 
   def stopAtomix(atomix: AtomixCluster): IO[Unit] =
-    IO.suspend(cfToAsync[IO, java.lang.Void](atomix.stop) as (()))
+    IO.suspend(Atomix.stop[IO](atomix))
+
+  def atomixR(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, AtomixCluster] =
+    Resource.make(startAtomix(me, seeds))(stopAtomix(_))
 
   def mkStore(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, IndexedStore[IO, String, String]] = for {
-    atomix <- Resource.make(startAtomix(me, seeds))(stopAtomix(_))
-    storage <- Resource.pure[IO, ConcurrentHashMap[String, MapValue[String]]](new ConcurrentHashMap[String, MapValue[String]]())
-    underlying <- Resource.pure[IO, IndexedStore[IO, String, MapValue[String]]](ConcurrentMapIndexedStore.unhooked[IO, String, MapValue[String]](
-      storage, pool))
-    store <- AEStore[IO, String, String](s"default", atomix.getCommunicationService(), atomix.getMembershipService(), underlying, pool)
+    atomix <- atomixR(me, seeds)
+    storage <- Resource.liftF(IO(new ConcurrentHashMap[String, Timestamped[String]]()))
+    underlying = ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](storage, pool)
+    timestamped = TimestampedStore[IO, String, String](underlying)
+    cluster = Atomix.cluster[IO](atomix, pool).contramap(printMessage(_))
+    store <- AEStore[IO, String, String]("default", cluster, timestamped, pool)
   } yield store
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = mkStore(defaultNode, List())
@@ -78,8 +83,7 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
   val valueB = "B"
   val freshIndex = IO(Random.nextInt().toString)
 
-  "foo" >>* {
-
+  "data propagated" >>* {
     val node0: NodeInfo = NodeInfo("0", "localhost", 6000)
     val node1: NodeInfo = NodeInfo("1", "localhost", 6001)
     val node2: NodeInfo = NodeInfo("2", "localhost", 6002)
@@ -88,18 +92,12 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
       _ <- store0.insert("a", "b")
       (store1, finish1) <- mkStore(node1, List(node0, node1)).allocated
       _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
-      start <- timer.clock.monotonic(MILLISECONDS)
       a0 <- store0.lookup("a")
       a1 <- store1.lookup("a")
       _ <- store0.insert("b", "c")
-      end <- timer.clock.monotonic(MILLISECONDS)
-      _ <- IO(println(s"two lookups and one insert ::: ${end - start}"))
       _ <- timer.sleep(new FiniteDuration(1000, MILLISECONDS))
-      start <- timer.clock.monotonic(MILLISECONDS)
       b0 <- store0.lookup("b")
       b1 <- store1.lookup("b")
-      end <- timer.clock.monotonic(MILLISECONDS)
-      _ <- IO(println(s"two lookups ::: ${end - start}"))
       _ <- finish0
       _ <- finish1
     } yield {
@@ -109,21 +107,4 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
       b1 mustEqual Some("c")
     }
   }
-
-  "bar" >>* {
-    val node0: NodeInfo = NodeInfo("0", "localhost", 6006)
-    val node1: NodeInfo = NodeInfo("1", "localhost", 6008)
-    for {
-      atomix0 <- startAtomix(node0, List(node0, node1))
-      atomix1 <- startAtomix(node1, List(node0, node1))
-      a0 <- IO(atomix0.getMembershipService.getMembers)
-      a1 <- IO(atomix1.getMembershipService.getMembers)
-      _ <- stopAtomix(atomix0)
-      _ <- stopAtomix(atomix1)
-    } yield {
-      a0.size mustEqual 2
-      a1.size mustEqual 2
-    }
-  }
-
 }

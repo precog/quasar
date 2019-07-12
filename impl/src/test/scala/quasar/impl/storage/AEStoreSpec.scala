@@ -25,17 +25,13 @@ import cats.effect.{IO, Resource, Timer}
 import cats.syntax.functor._
 import cats.syntax.contravariant._
 
-import io.atomix.cluster._
-
-import monocle.Prism
-
 import scalaz.std.string._
 
+import io.atomix.cluster._
 import scodec._
 import scodec.codecs._
 
 import java.util.concurrent.ConcurrentHashMap
-import java.nio.charset.StandardCharsets
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global

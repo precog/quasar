@@ -23,7 +23,7 @@ import quasar.impl.cluster.{Timestamped, Cluster, Message}, Timestamped._, Messa
 
 import cats.~>
 import cats.effect._
-import cats.effect.concurrent.MVar
+import cats.effect.concurrent.Semaphore
 import cats.instances.list._
 import cats.instances.option._
 import cats.syntax.applicative._
@@ -168,37 +168,17 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
 }
 
 object AEStore {
-  // have two "locks": one that is blocking everything and the other only critical operation
-  final class Gates[F[_]: Concurrent](strict: MVar[F, Unit], optional: MVar[F, Unit]) {
-    // blocks only critical operation (in our case purging tombstones)
-    def in[A](fa: F[A]): F[A] = for {
-      // block `strict`
-      _ <- optional.tryTake
-      // wait until strict mvar is full and immediately free the lock
-      // this makes `in` impossible to run when `strict` is in progress
-      // but lots of `in`s could be run simultaneously
-      _ <- strict.take
-      _ <- strict.put(())
-      // do stuff
-      a <- fa
-      // unblock `strict`
-      _ <- optional.tryPut(())
-    } yield a
-    // blocks on any operation
-    def strict[A](fa: F[A]): F[A] = for {
-      _ <- strict.take
-      _ <- optional.take
-      a <- fa
-      _ <- optional.put(())
-      _ <- strict.put(())
-    } yield a
+  final class Gates[F[_]: Bracket[?[_], Throwable]](semaphore: Semaphore[F]) {
+    def in[A](fa: F[A]): F[A] =
+      Bracket[F, Throwable].guarantee(semaphore.acquire *> fa)(semaphore.release)
+
+    def strict[A](fa: F[A]): F[A] =
+      Bracket[F, Throwable].guarantee(semaphore.acquireN(Int.MaxValue) *> fa)(semaphore.releaseN(Int.MaxValue))
   }
 
   object Gates {
-    def apply[F[_]: Concurrent]: F[Gates[F]] = for {
-      strict <- MVar.of[F, Unit](())
-      optional <- MVar.of[F, Unit](())
-    } yield new Gates(strict, optional)
+    def apply[F[_]: Concurrent: Bracket[?[_], Throwable]]: F[Gates[F]] =
+      Semaphore[F](Int.MaxValue) map (new Gates(_))
   }
 
   implicit def mapCodec[K, V](implicit k: Codec[K], v: Codec[V]): Codec[Map[K, V]] =

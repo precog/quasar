@@ -22,12 +22,10 @@ import quasar.concurrent.BlockingContext
 import quasar.impl.cluster.{Timestamped, Atomix, Message}, Atomix.NodeInfo, Message._
 
 import cats.effect.{IO, Resource, Timer}
-import cats.syntax.functor._
 import cats.syntax.contravariant._
 
 import scalaz.std.string._
 
-import io.atomix.cluster._
 import scodec._
 import scodec.codecs._
 

@@ -21,8 +21,9 @@ import slamdata.Predef._
 import quasar.concurrent.BlockingContext
 import quasar.impl.cluster.{Timestamped, Cluster, Message}, Timestamped._, Message._
 
+import cats.~>
 import cats.effect._
-import cats.effect.concurrent.Deferred
+import cats.effect.concurrent.MVar
 import cats.instances.list._
 import cats.instances.option._
 import cats.syntax.applicative._
@@ -30,7 +31,6 @@ import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.foldable._
 import cats.syntax.functor._
-import cats.syntax.traverse._
 
 import fs2.Stream
 
@@ -48,6 +48,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
     name: String,
     cluster: Cluster[F, Message],
     store: TimestampedStore[F, K, V],
+    gates: Gates[F],
     config: AEStoreConfig)
     extends IndexedStore[F, K, V] {
 
@@ -63,14 +64,14 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
     store.lookup(k)
 
   def insert(k: K, v: V): F[Unit] =
-    store.insert(k, v)
+    gates.in(store.insert(k, v))
 
   def delete(k: K): F[Boolean] =
-    store.delete(k)
+    gates.in(store.delete(k))
 
   // SENDING ADS
-  def sendingAdStream: F[Stream[F, Unit]] =
-    F.delay((Stream.eval(sendAd) *> Stream.sleep(ms(config.adTimeout))).repeat)
+  def sendingAdStream: Stream[F, Unit] =
+    (Stream.eval(sendAd) *> Stream.sleep(ms(config.adTimeoutMillis))).repeat
 
   private def sendAd: F[Unit] =
     prepareAd.flatMap(cluster.gossip(Advertisement(name), _))
@@ -121,15 +122,15 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
       .map(_.evalMap(Function.tupled(handleAdvertisement(_, _))(_)))
 
   // TOMBSTONES PURGING
-  def purgeTombstones: F[Stream[F, Unit]] =
-    // don't start purging immediately
-    F.delay((Stream.sleep(ms(config.purgeTimeout)) *> Stream.eval(purge)).repeat)
+  def purgeTombstones: Stream[F, Unit] =
+    (Stream.sleep(ms(config.purgeTimeoutMillis)) *> Stream.eval(purge)).repeat
 
-  private def purge: F[Unit] = underlying.synchronized {
-    underlying.entries.evalMap({ case (k, v) => for {
+  private def purge: F[Unit] = {
+    val purgingStream: Stream[F, Unit] = underlying.entries.evalMap { case (k, v) => for {
       now <- Timer[F].clock.realTime(MILLISECONDS)
-      _ <- underlying.delete(k).whenA(raw(v).isEmpty && now - timestamp(v) > config.tombstoneLiveFor)
-    } yield () }).compile.drain
+      _ <- underlying.delete(k).whenA(raw(v).isEmpty && now - timestamp(v) > config.tombstoneLiveForMillis)
+    } yield () }
+    gates.strict(purgingStream.compile.drain)
   }
 
   // RECEIVING UPDATES
@@ -138,7 +139,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
     case (k, newVal) => for {
       v <- underlying.lookup(k)
       ts = v.fold(0L)(timestamp(_))
-      _ <- underlying.insert(k, newVal).whenA(ts < timestamp(newVal))
+      _ <- gates.in(underlying.insert(k, newVal).whenA(ts < timestamp(newVal)))
     } yield (())
   }
 
@@ -167,6 +168,39 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
 }
 
 object AEStore {
+  // have two "locks": one that is blocking everything and the other only critical operation
+  final class Gates[F[_]: Concurrent](strict: MVar[F, Unit], optional: MVar[F, Unit]) {
+    // blocks only critical operation (in our case purging tombstones)
+    def in[A](fa: F[A]): F[A] = for {
+      // block `strict`
+      _ <- optional.tryTake
+      // wait until strict mvar is full and immediately free the lock
+      // this makes `in` impossible to run when `strict` is in progress
+      // but lots of `in`s could be run simultaneously
+      _ <- strict.take
+      _ <- strict.put(())
+      // do stuff
+      a <- fa
+      // unblock `strict`
+      _ <- optional.tryPut(())
+    } yield a
+    // blocks on any operation
+    def strict[A](fa: F[A]): F[A] = for {
+      _ <- strict.take
+      _ <- optional.take
+      a <- fa
+      _ <- optional.put(())
+      _ <- strict.put(())
+    } yield a
+  }
+
+  object Gates {
+    def apply[F[_]: Concurrent]: F[Gates[F]] = for {
+      strict <- MVar.of[F, Unit](())
+      optional <- MVar.of[F, Unit](())
+    } yield new Gates(strict, optional)
+  }
+
   implicit def mapCodec[K, V](implicit k: Codec[K], v: Codec[V]): Codec[Map[K, V]] =
     listOfN(int32, k ~ v).xmap(_.toMap, _.toList)
 
@@ -180,30 +214,37 @@ object AEStore {
 
     val res: F[Resource[F, IndexedStore[F, K, V]]] = for {
       currentTime <- timer.clock.realTime(MILLISECONDS)
+      gates <- Gates[F]
       store <- Sync[F].delay(new AEStore[F, K, V](
         name,
         cluster,
         underlying,
+        gates,
         AEStoreConfig.default))
       adReceiver <- store.advertisementHandled
-      adSender <- store.sendingAdStream
-      purger <- store.purgeTombstones
       updates <- store.updateHandled
       updateRequester <- store.updateRequestHandled
     } yield {
-      val merged = Stream.emits(List(adReceiver, adSender, purger, updates, updateRequester)).parJoinUnbounded
+      val merged = Stream.emits(List(
+        adReceiver,
+        store.sendingAdStream,
+        store.purgeTombstones,
+        updates,
+        updateRequester)).parJoinUnbounded
       val storeStream = Stream.emit[F, IndexedStore[F, K, V]](store)
       storeStream.concurrently(merged).compile.resource.lastOrError
     }
 
-    Resource.liftF(res).flatten
+    Resource.liftF(res).flatten.mapK[F](new ~>[F, F] {
+      def apply[A](fa: F[A]): F[A] = ContextShift[F].evalOn(pool.unwrap)(fa)
+    })
   }
 
   final case class AEStoreConfig(
     maxEvents: Long,
-    adTimeout: Long,
-    purgeTimeout: Long,
-    tombstoneLiveFor: Long,
+    adTimeoutMillis: Long,
+    purgeTimeoutMillis: Long,
+    tombstoneLiveForMillis: Long,
     updateRequestLimit: Int,
     updateLimit: Int,
     adLimit: Int)
@@ -211,9 +252,9 @@ object AEStore {
   object AEStoreConfig {
     val default: AEStoreConfig = AEStoreConfig(
       maxEvents = 50L,
-      adTimeout = 30L,
-      purgeTimeout = 30L,
-      tombstoneLiveFor = 1000L,
+      adTimeoutMillis = 30L,
+      purgeTimeoutMillis = 30L,
+      tombstoneLiveForMillis = 1000L,
       updateRequestLimit = 128,
       updateLimit = 128,
       adLimit = 128)

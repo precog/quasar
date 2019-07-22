@@ -34,10 +34,10 @@ object Timestamped {
   final case class Tagged[A](raw: A, timestamp: Long) extends Timestamped[A]
 
   def tombstone[F[_]: Functor: Timer, A]: F[Timestamped[A]] =
-    Timer[F].clock.monotonic(MILLISECONDS).map(Tombstone(_))
+    Timer[F].clock.realTime(MILLISECONDS).map(Tombstone(_))
 
   def tagged[F[_]: Functor: Timer, A](raw: A): F[Timestamped[A]] =
-    Timer[F].clock.monotonic(MILLISECONDS).map(Tagged(raw, _))
+    Timer[F].clock.realTime(MILLISECONDS).map(Tagged(raw, _))
 
   def raw[A](v: Timestamped[A]): Option[A] = v match {
     case Tombstone(_) => None

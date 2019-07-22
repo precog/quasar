@@ -127,7 +127,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
 
   private def purge: F[Unit] = underlying.synchronized {
     underlying.entries.evalMap({ case (k, v) => for {
-      now <- Timer[F].clock.monotonic(MILLISECONDS)
+      now <- Timer[F].clock.realTime(MILLISECONDS)
       _ <- underlying.delete(k).whenA(raw(v).isEmpty && now - timestamp(v) > config.tombstoneLiveFor)
     } yield () }).compile.drain
   }
@@ -178,35 +178,25 @@ object AEStore {
       implicit timer: Timer[F])
       : Resource[F, IndexedStore[F, K, V]] = {
 
-    val init: F[(IndexedStore[F, K, V], Deferred[F, Either[Throwable, Unit]])] = for {
-      currentTime <- timer.clock.monotonic(MILLISECONDS)
+    val res: F[Resource[F, IndexedStore[F, K, V]]] = for {
+      currentTime <- timer.clock.realTime(MILLISECONDS)
       store <- Sync[F].delay(new AEStore[F, K, V](
         name,
         cluster,
         underlying,
         AEStoreConfig.default))
+      adReceiver <- store.advertisementHandled
+      adSender <- store.sendingAdStream
+      purger <- store.purgeTombstones
+      updates <- store.updateHandled
+      updateRequester <- store.updateRequestHandled
+    } yield {
+      val merged = Stream.emits(List(adReceiver, adSender, purger, updates, updateRequester)).parJoinUnbounded
+      val storeStream = Stream.emit[F, IndexedStore[F, K, V]](store)
+      storeStream.concurrently(merged).compile.resource.lastOrError
+    }
 
-      stopper <- Deferred.tryable[F, Either[Throwable, Unit]]
-      // Streams!
-      adReceiver <- store.advertisementHandled.map(_.interruptWhen(stopper))
-      adSender <- store.sendingAdStream.map(_.interruptWhen(stopper))
-      purger <- store.purgeTombstones.map(_.interruptWhen(stopper))
-      updates <- store.updateHandled.map(_.interruptWhen(stopper))
-      updateRequester <- store.updateRequestHandled.map(_.interruptWhen(stopper))
-      // Run them! (parJoin doesn't work for some reason)
-      _ <- List(
-        adReceiver,
-        adSender,
-        purger,
-        updates,
-        updateRequester)
-      .traverse { (s: Stream[F, Unit]) =>
-        ConcurrentEffect[F].start(ContextShift[F].evalOn(pool.unwrap)(s.compile.drain))
-      }
-    } yield (store, stopper)
-    def finish(pair: (IndexedStore[F, K, V], Deferred[F, Either[Throwable, Unit]])): F[Unit] =
-      pair._2.complete(Right(()))
-    Resource.make(init)(finish).map(_._1)
+    Resource.liftF(res).flatten
   }
 
   final case class AEStoreConfig(

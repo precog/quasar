@@ -51,19 +51,8 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
 
   val defaultNode = NodeInfo("default", "localhost", 6000)
 
-  def startAtomix(me: NodeInfo, seeds: List[NodeInfo]): IO[AtomixCluster] = IO.suspend {
-    val a = Atomix.atomix(me, seeds)
-    Atomix.start[IO](a) as a
-  }
-
-  def stopAtomix(atomix: AtomixCluster): IO[Unit] =
-    IO.suspend(Atomix.stop[IO](atomix))
-
-  def atomixR(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, AtomixCluster] =
-    Resource.make(startAtomix(me, seeds))(stopAtomix(_))
-
   def mkStore(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, IndexedStore[IO, String, String]] = for {
-    atomix <- atomixR(me, seeds)
+    atomix <- Atomix.resource[IO](me, seeds)
     storage <- Resource.liftF(IO(new ConcurrentHashMap[String, Timestamped[String]]()))
     underlying = ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](storage, pool)
     timestamped = TimestampedStore[IO, String, String](underlying)

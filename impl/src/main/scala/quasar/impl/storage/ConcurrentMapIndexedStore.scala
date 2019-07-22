@@ -56,7 +56,7 @@ final class ConcurrentMapIndexedStore[F[_]: Sync: ContextShift, K, V](
     evalOnPool(F.delay(Option( mp get k )))
 
   def insert(k: K, v: V): F[Unit] =
-    evalOnPool(F.delay(mp.put(k, v))) as (())
+    evalOnPool(F.delay(mp.put(k, v))).void
 
   def delete(k: K): F[Boolean] =
     evalOnPool(F.delay(Option(mp.remove(k)).nonEmpty))
@@ -69,8 +69,8 @@ object ConcurrentMapIndexedStore {
       blockingPool: BlockingContext)
       : IndexedStore[F, K, V] = {
     val pure = new ConcurrentMapIndexedStore(mp, blockingPool)
-    val onUpdate: F[Unit] = ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit)
-    val onDelete: Boolean => F[Unit] = (a: Boolean) => ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit.whenA(a))
+    def onUpdate(k: K, v: V): F[Unit] = ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit)
+    def onDelete(k: K, a: Boolean): F[Unit] = ContextShift[F].evalOn[Unit](blockingPool.unwrap)(commit.whenA(a))
     IndexedStore.hooked(pure, onUpdate, onDelete)
   }
   def unhooked[F[_]: Sync: ContextShift, K, V](

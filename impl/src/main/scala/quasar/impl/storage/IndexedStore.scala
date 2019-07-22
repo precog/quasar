@@ -143,13 +143,13 @@ object IndexedStore extends IndexedStoreInstances {
 
   def hooked[F[_]: Monad, I, V](
       store: IndexedStore[F, I, V],
-      updateHook: F[Unit],
-      deleteHook: Boolean => F[Unit])
+      updateHook: (I, V) => F[Unit],
+      deleteHook: (I, Boolean) => F[Unit])
       : IndexedStore[F, I, V] = new IndexedStore[F, I, V] {
     def entries = store.entries
     def lookup(k: I): F[Option[V]] = store.lookup(k)
-    def insert(k: I, v: V): F[Unit] = store.insert(k, v) *> updateHook
-    def delete(k: I): F[Boolean] = store.delete(k) flatMap { x => deleteHook(x) as x }
+    def insert(k: I, v: V): F[Unit] = store.insert(k, v) *> updateHook(k, v)
+    def delete(k: I): F[Boolean] = store.delete(k) flatMap { x => deleteHook(k, x) as x }
   }
 }
 

@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.concurrent.BlockingContext
 
-import cats.effect.{Sync, Async, ConcurrentEffect, ContextShift, IO}
+import cats.effect.{Sync, Async, ConcurrentEffect, ContextShift, IO, Resource}
 import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.eq._
@@ -29,7 +29,6 @@ import cats.syntax.foldable._
 import cats.syntax.functor._
 import cats.instances.int._
 import cats.instances.list._
-import cats.instances.option._
 
 import fs2.Stream
 import fs2.concurrent.InspectableQueue
@@ -41,6 +40,8 @@ import io.atomix.cluster.discovery.BootstrapDiscoveryProvider
 import io.atomix.cluster.messaging.ClusterCommunicationService
 import io.atomix.utils.net.Address
 
+import org.slf4s.Logging
+
 import scodec.{Codec, Attempt}
 import scodec.bits.{ByteVector, BitVector}
 
@@ -50,13 +51,16 @@ import java.util.function.BiConsumer
 
 import scala.collection.JavaConverters._
 
-object Atomix {
-  final case class NodeInfo(id: String, host: String, port: Int) extends Product with Serializable
+object Atomix extends Logging {
+  final case class NodeInfo(id: String, host: String, port: Int)
 
   private def atomixNode(node: NodeInfo): Node =
     Node.builder.withAddress(node.host, node.port).withId(node.id).build()
 
-  def atomix(me: NodeInfo, seeds: List[NodeInfo]): AtomixCluster =
+  def resource[F[_]: Async: ContextShift](me: NodeInfo, seeds: List[NodeInfo]): Resource[F, AtomixCluster] =
+    Resource.make(atomix[F](me, seeds).flatMap((ax: AtomixCluster) => start(ax) as ax))(stop(_))
+
+  def atomix[F[_]: Sync](me: NodeInfo, seeds: List[NodeInfo]): F[AtomixCluster] = Sync[F].delay {
     AtomixCluster.builder
       .withMemberId(me.id)
       .withAddress(me.host, me.port)
@@ -65,12 +69,13 @@ object Atomix {
         .withNodes(seeds.map(atomixNode(_)):_*)
         .build())
       .build()
+  }
 
   def start[F[_]: Async: ContextShift](cluster: AtomixCluster): F[Unit] =
-    cfToAsync(cluster.start) as (())
+    Sync[F].suspend(cfToAsync(cluster.start).void)
 
   def stop[F[_]: Async: ContextShift](cluster: AtomixCluster): F[Unit] =
-    cfToAsync(cluster.stop) as (())
+    Sync[F].suspend(cfToAsync(cluster.stop).void)
 
   def cfToAsync[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] =
     if (cf.isDone) cf.get.pure[F]
@@ -112,19 +117,22 @@ object Atomix {
         cfToAsync(service.unicast(
           tag,
           b.toByteArray,
-          target)) as (())
-      }).getOrElse(F.delay(()))
+          target)).void
+      }).getOrElse(F.delay {
+        log.warn(s"incorrect message was sent by unicast ::: ${payload}, to ::: ${target}")
+      })
 
-    def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] = F.delay {
-      if (targets.isEmpty) ()
+    def multicast[P: Codec](tag: String, payload: P, targets: Set[MemberId]): F[Unit] =
+      if (targets.isEmpty) F.delay(())
       else
         Codec[P].encode(payload).map((b: BitVector) => {
-          service.multicast(
+          F.delay(service.multicast(
             tag,
             b.toByteArray,
-            targets.asJava)
-        }).getOrElse(())
-    }
+            targets.asJava))
+        }).getOrElse(F.delay {
+          log.warn(s"incorrect message sent by multicast ::: ${payload}, to ::: ${targets}")
+        })
 
     def subscribe[P: Codec](tag: String, limit: Int): F[Stream[F, (MemberId, P)]] =
       InspectableQueue.unbounded[F, (MemberId, P)]
@@ -139,7 +147,12 @@ object Atomix {
           port <- F.delay(addr.port)
           mid <- membership.byAddress(netAddr, port)
           size <- q.getSize
-          _ <- mid.traverse_((id: MemberId) => q.enqueue1((id, d.value)).whenA(size < maxItems))
+          _ <- mid match {
+            case None => F.delay {
+              log.warn(s"incorrect message received\neventType ::: ${eventType}\nsource ::: ${addr}\nbits ::: ${a.toHex}")
+            }
+            case Some(id) => q.enqueue1((id, d.value)).whenA(size < maxItems)
+          }
         } yield())
       }}))
     }
@@ -150,7 +163,7 @@ object Atomix {
       cfToAsync(service.subscribe[Array[Byte]](
         eventName,
         biconsumer,
-        blockingContextExecutor(pool))) as (())
+        blockingContextExecutor(pool))).void
     }
 
     private def run(action: F[Unit]) =

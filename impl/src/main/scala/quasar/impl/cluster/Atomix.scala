@@ -60,7 +60,7 @@ object Atomix extends Logging {
   def resource[F[_]: Async: ContextShift](me: NodeInfo, seeds: List[NodeInfo]): Resource[F, AtomixCluster] =
     Resource.make(atomix[F](me, seeds).flatMap((ax: AtomixCluster) => start(ax) as ax))(stop(_))
 
-  def atomix[F[_]: Sync](me: NodeInfo, seeds: List[NodeInfo]): F[AtomixCluster] = Sync[F].delay {
+  private def atomix[F[_]: Sync](me: NodeInfo, seeds: List[NodeInfo]): F[AtomixCluster] = Sync[F].delay {
     AtomixCluster.builder
       .withMemberId(me.id)
       .withAddress(me.host, me.port)
@@ -71,20 +71,20 @@ object Atomix extends Logging {
       .build()
   }
 
-  def start[F[_]: Async: ContextShift](cluster: AtomixCluster): F[Unit] =
+  private def start[F[_]: Async: ContextShift](cluster: AtomixCluster): F[Unit] =
     Sync[F].suspend(cfToAsync(cluster.start).void)
 
-  def stop[F[_]: Async: ContextShift](cluster: AtomixCluster): F[Unit] =
+  private def stop[F[_]: Async: ContextShift](cluster: AtomixCluster): F[Unit] =
     Sync[F].suspend(cfToAsync(cluster.stop).void)
 
-  def cfToAsync[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] =
+  private def cfToAsync[F[_]: Async: ContextShift, A](cf: CompletableFuture[A]): F[A] =
     if (cf.isDone) cf.get.pure[F]
     else Async[F].async { (cb: Either[Throwable, A] => Unit) =>
       val _ = cf.whenComplete((res: A, t: Throwable) => cb(Option(t).toLeft(res)))
     } productL ContextShift[F].shift
 
 
-  def membership[F[_]: Sync](service: ClusterMembershipService): Membership[F, MemberId] = new Membership[F, MemberId] {
+  private def membership[F[_]: Sync](service: ClusterMembershipService): Membership[F, MemberId] = new Membership[F, MemberId] {
     val F = Sync[F]
     def localId: F[MemberId] =
       F.delay(service.getLocalMember.id)
@@ -105,7 +105,7 @@ object Atomix extends Logging {
     }
   }
 
-  def communication[F[_]: ConcurrentEffect: ContextShift](
+  private def communication[F[_]: ConcurrentEffect: ContextShift](
       service: ClusterCommunicationService,
       membership: Membership[F, MemberId],
       pool: BlockingContext)

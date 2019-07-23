@@ -42,14 +42,14 @@ import scodec.codecs.implicits._
 
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
-import AEStore._
+import AntiEntropyStore._
 
-final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Codec](
+final class AntiEntropyStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Codec](
     name: String,
     cluster: Cluster[F, Message],
     store: TimestampedStore[F, K, V],
     gates: Gates[F],
-    config: AEStoreConfig)
+    config: AntiEntropyStoreConfig)
     extends IndexedStore[F, K, V] {
 
   private val F = Sync[F]
@@ -167,7 +167,7 @@ final class AEStore[F[_]: ConcurrentEffect: ContextShift: Timer, K: Codec, V: Co
 
 }
 
-object AEStore {
+object AntiEntropyStore {
   final class Gates[F[_]: Bracket[?[_], Throwable]](semaphore: Semaphore[F]) {
     def in[A](fa: F[A]): F[A] =
       Bracket[F, Throwable].guarantee(semaphore.acquire *> fa)(semaphore.release)
@@ -195,12 +195,12 @@ object AEStore {
     val res: F[Resource[F, IndexedStore[F, K, V]]] = for {
       currentTime <- timer.clock.realTime(MILLISECONDS)
       gates <- Gates[F]
-      store <- Sync[F].delay(new AEStore[F, K, V](
+      store <- Sync[F].delay(new AntiEntropyStore[F, K, V](
         name,
         cluster,
         underlying,
         gates,
-        AEStoreConfig.default))
+        AntiEntropyStoreConfig.default))
       adReceiver <- store.advertisementHandled
       updates <- store.updateHandled
       updateRequester <- store.updateRequestHandled
@@ -220,7 +220,7 @@ object AEStore {
     })
   }
 
-  final case class AEStoreConfig(
+  final case class AntiEntropyStoreConfig(
     maxEvents: Long,
     adTimeoutMillis: Long,
     purgeTimeoutMillis: Long,
@@ -229,8 +229,8 @@ object AEStore {
     updateLimit: Int,
     adLimit: Int)
 
-  object AEStoreConfig {
-    val default: AEStoreConfig = AEStoreConfig(
+  object AntiEntropyStoreConfig {
+    val default: AntiEntropyStoreConfig = AntiEntropyStoreConfig(
       maxEvents = 50L,
       adTimeoutMillis = 30L,
       purgeTimeoutMillis = 30L,

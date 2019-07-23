@@ -38,7 +38,7 @@ import scala.util.Random
 
 import shims._
 
-final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
+final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
   sequential
 
   implicit val ec: ExecutionContext = ExecutionContext.global
@@ -55,7 +55,7 @@ final class AEStoreSpec extends IndexedStoreSpec[IO, String, String] {
     underlying = ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](storage, pool)
     timestamped = TimestampedStore[IO, String, String](underlying)
     cluster = Atomix.cluster[IO](atomix, pool).contramap(printMessage(_))
-    store <- AEStore[IO, String, String]("default", cluster, timestamped, pool)
+    store <- AntiEntropyStore[IO, String, String]("default", cluster, timestamped, pool)
   } yield store
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = mkStore(defaultNode, List())

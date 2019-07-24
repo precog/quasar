@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,10 @@ import contextual._
 import scalaz._
 
 trait StaticInterpolator[A] extends Interpolator {
+
+  type Input = String
+  type Output = A
+
   def parse(s: String): String \/ A
 
   def contextualize(interpolation: StaticInterpolation) = {

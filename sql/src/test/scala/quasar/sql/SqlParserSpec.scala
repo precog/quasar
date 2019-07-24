@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -491,7 +491,7 @@ class SQLParserSpec extends quasar.Qspec {
     "should refuse a semicolon not at the end" in {
       val q = "select foo from (select 5 as foo;) where foo = 7"
       parse(q) must be_-\/(
-        GenericParsingError("operator ')' expected; but found `;'")
+        GenericParsingError("end of input expected; but found `from'")
       )
     }
 
@@ -516,13 +516,13 @@ class SQLParserSpec extends quasar.Qspec {
     "not parse basic let with digit as the identifier" in {
       parse("""8 := 5; 8""") must
         be_-\/(
-          GenericParsingError("keyword 'except' expected; but found `:='"))
+          GenericParsingError("end of input expected; but found `:='"))
     }
 
     "not parse basic let with digit at the start of the identifier" in {
       parse("""8_ := 5; 8_""") must
         be_-\/(
-          GenericParsingError("keyword 'except' expected; but found `*** error: '!' expected but _ found'"))
+          GenericParsingError("end of input expected; but found `*** error: '!' expected but _ found'"))
     }
 
     "not parse basic let with '_' at the start of the identifier" in {

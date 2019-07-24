@@ -55,7 +55,7 @@ lazy val buildSettings = Seq(
    * Slice#allFromRValues to not free memory, so it's not just a convenience or
    * an optimization.
    */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0"))
+  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"))
 
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
@@ -129,7 +129,7 @@ lazy val foundation = project
       "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
-      "com.propensive"             %% "contextual"                % "1.0.1",
+      "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
       "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
@@ -228,7 +228,7 @@ lazy val sql = project
   .settings(
     libraryDependencies ++= Seq(
       "com.github.julien-truffaut" %% "monocle-macro" % monocleVersion,
-      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.0.7"))
+      "org.scala-lang.modules"     %% "scala-parser-combinators" % "1.1.2"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val qscript = project
@@ -302,7 +302,7 @@ lazy val impl = project
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "5.2.1"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "5.3.0"))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

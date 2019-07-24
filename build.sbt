@@ -297,7 +297,7 @@ lazy val impl = project
       "org.typelevel"  %% "jawn-argonaut"            % jawnVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
-      "org.scodec"     %% "scodec-bits"              % "1.1.6",
+      "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
       "io.netty"       % "netty-all"                 % nettyVersion,
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working

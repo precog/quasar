@@ -8,7 +8,7 @@ object Versions {
   val disciplineVersion   = "0.11.1"
   val jawnVersion         = "0.14.2"
   val jawnfs2Version      = "0.14.2"
-  val matryoshkaVersion   = "0.18.3"
+  val matryoshkaVersion   = "0.21.3"
   val monocleVersion      = "1.6.0"
   val pathyVersion        = "0.2.13"
   val refinedVersion      = "0.9.8"

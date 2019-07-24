@@ -35,7 +35,7 @@ import fs2.concurrent.InspectableQueue
 
 import scalaz.syntax.tag._
 
-import io.atomix.cluster.{AtomixCluster, MemberId, Member, ClusterMembershipService, Node}
+import io.atomix.cluster.{AtomixCluster, MemberId, Member, ClusterMembershipService, Node, ClusterConfig}
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider
 import io.atomix.cluster.messaging.ClusterCommunicationService
 import io.atomix.utils.net.Address
@@ -61,7 +61,7 @@ object Atomix extends Logging {
     Resource.make(atomix[F](me, seeds).flatMap((ax: AtomixCluster) => start(ax) as ax))(stop(_))
 
   private def atomix[F[_]: Sync](me: NodeInfo, seeds: List[NodeInfo]): F[AtomixCluster] = Sync[F].delay {
-    AtomixCluster.builder
+    AtomixCluster.builder(new ClusterConfig())
       .withMemberId(me.id)
       .withAddress(me.host, me.port)
       .withMembershipProvider(BootstrapDiscoveryProvider

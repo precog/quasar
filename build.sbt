@@ -280,6 +280,7 @@ lazy val core = project
 /** Implementations of the Quasar API. */
 lazy val impl = project
   .settings(name := "quasar-impl")
+  .settings(parallelExecution in Test := false)
   .dependsOn(
     api % BothScopes,
     common % "test->test",
@@ -288,6 +289,7 @@ lazy val impl = project
     sst)
   .settings(commonSettings)
   .settings(
+
     libraryDependencies ++= Seq(
       "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,

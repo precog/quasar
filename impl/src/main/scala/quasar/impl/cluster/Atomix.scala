@@ -151,7 +151,10 @@ object Atomix extends Logging {
             case None => F.delay {
               log.warn(s"incorrect message received\neventType ::: ${eventType}\nsource ::: ${addr}\nbits ::: ${a.toHex}")
             }
-            case Some(id) => q.enqueue1((id, d.value)).whenA(size < maxItems)
+            case Some(_) if size >= maxItems => F.delay {
+              log.warn(s"there are too much events in subscription queue\neventType ::: ${eventType}\nsize ::: ${size}")
+            }
+            case Some(id) => q.enqueue1((id, d.value))
           }
         } yield())
       }}))
@@ -189,6 +192,12 @@ object Atomix extends Logging {
     def unicast[P: Codec](msg: String, p: P, id: Id): F[Unit] =
       communication.unicast(msg, p, id) *> ContextShift[F].shift
 
+    def broadcast[P: Codec](msg: String, p: P): F[Unit] = for {
+      targets <- membership.peers
+      _ <- communication.multicast(msg, p, targets)
+      _ <- ContextShift[F].shift
+    } yield ()
+
     def subscribe[P: Codec](msg: String, limit: Int): F[Stream[F, (Id, P)]] =
       communication.subscribe(msg, limit)
   }
@@ -196,5 +205,4 @@ object Atomix extends Logging {
   private def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {
     def execute(r: java.lang.Runnable) = pool.unwrap.execute(r)
   }
-
 }

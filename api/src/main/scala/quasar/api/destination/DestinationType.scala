@@ -16,7 +16,7 @@
 
 package quasar.api.destination
 
-import slamdata.Predef.{None, Some, String}
+import slamdata.Predef._
 
 import quasar.contrib.refined._
 import quasar.fp.numeric.Positive
@@ -56,6 +56,6 @@ sealed abstract class DestinationTypeInstances {
   implicit val show: Show[DestinationType] =
     Show.shows {
       case DestinationType(n, v) =>
-        "DestinationType(" + n.shows + ", " + v.shows + ")"
+        "DestinationType(" ++ n.shows + ", " ++ v.shows ++ ")"
     }
 }

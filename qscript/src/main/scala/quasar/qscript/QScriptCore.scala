@@ -201,9 +201,9 @@ object QScriptCore {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
         Show.shows {
-          case Map(src, mf) => "Map(" +
-            s.shows(src) + ", " ++
-            mf.shows     + ")"
+          case Map(src, mf) => "Map(" ++
+            s.shows(src) ++ ", " ++
+            mf.shows ++ ")"
           case LeftShift(src, struct, id, stpe, undef, repair) => "LeftShift(" ++
             s.shows(src) ++ ", " ++
             struct.shows ++ ", " ++
@@ -225,12 +225,12 @@ object QScriptCore {
             l.shows ++ ", " ++
             r.shows ++ ")"
           case Filter(a, func) => "Filter(" ++
-            s.shows(a) + ", " +
-            func.shows + ")"
+            s.shows(a) ++ ", " ++
+            func.shows ++ ")"
           case Subset(a, f, sel, c) => "Subset(" ++
-            s.shows(a) ++ ", " +
-            f.shows ++ ", " +
-            sel.shows ++ ", " +
+            s.shows(a) ++ ", " ++
+            f.shows ++ ", " ++
+            sel.shows ++ ", " ++
             c.shows ++ ")"
           case Unreferenced() => "Unreferenced"
         }

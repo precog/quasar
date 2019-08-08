@@ -56,6 +56,6 @@ sealed abstract class DestinationTypeInstances {
   implicit val show: Show[DestinationType] =
     Show.shows {
       case DestinationType(n, v) =>
-        "DestinationType(" ++ n.shows + ", " ++ v.shows ++ ")"
+        "DestinationType(" ++ n.shows ++ ", " ++ v.shows ++ ")"
     }
 }

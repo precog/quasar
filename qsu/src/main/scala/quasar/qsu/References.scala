@@ -16,7 +16,7 @@
 
 package quasar.qsu
 
-import slamdata.Predef.Symbol
+import slamdata.Predef._
 import quasar.ejson.implicits._
 import quasar.fp._
 import quasar.contrib.iota._
@@ -108,11 +108,11 @@ object References {
   implicit def show[T[_[_]]: ShowT]: Show[References[T]] =
     Show.shows {
       case References(accessing, accessed) =>
-        "References {\n\n" +
-        "Accessing[\n" +
-        printMultiline(accessing.toList) +
-        "]\n\nAccessed[\n" +
-        printMultiline(accessed.toList) +
+        "References {\n\n" ++
+        "Accessing[\n" ++
+        printMultiline(accessing.toList) ++
+        "]\n\nAccessed[\n" ++
+        printMultiline(accessed.toList) ++
         "]\n}"
     }
 }

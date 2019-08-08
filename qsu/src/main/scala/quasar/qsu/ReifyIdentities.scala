@@ -622,10 +622,10 @@ object ReifyIdentities {
   object ResearchedQSU {
     implicit def show[T[_[_]]: ShowT]: Show[ResearchedQSU[T]] =
       Show.shows { rqsu =>
-        "ResearchedQSU\n======\n" +
-        rqsu.graph.shows +
-        "\n\n" +
-        rqsu.refs.shows +
+        "ResearchedQSU\n======\n" ++
+        rqsu.graph.shows ++
+        "\n\n" ++
+        rqsu.refs.shows ++
         "\n======"
       }
   }

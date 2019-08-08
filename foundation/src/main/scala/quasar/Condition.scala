@@ -16,7 +16,7 @@
 
 package quasar
 
-import slamdata.Predef.{None, Option, Product, Serializable, Some, Unit}
+import slamdata.Predef._
 import quasar.fp.ski.κ
 
 import scala.util.{Either, Left, Right}
@@ -148,7 +148,7 @@ sealed abstract class ConditionInstances extends ConditionInstances0 {
 
   implicit def show[E: Show]: Show[Condition[E]] =
     Show.shows {
-      case Condition.Abnormal(e) => "Abnormal(" + e.shows + ")"
+      case Condition.Abnormal(e) => "Abnormal(" ++ e.shows ++ ")"
       case Condition.Normal()    => "Normal"
     }
 }

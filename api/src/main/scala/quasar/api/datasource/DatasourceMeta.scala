@@ -16,7 +16,7 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Exception, Option}
+import slamdata.Predef._
 import quasar.Condition
 
 import monocle.macros.Lenses
@@ -45,7 +45,7 @@ sealed abstract class DatasourceMetaInstances {
 
     Show.shows {
       case DatasourceMeta(n, k, s) =>
-        "DatasourceMeta(" + k.shows + ", " + n.shows + ", " + s.shows + ")"
+        "DatasourceMeta(" ++ k.shows ++ ", " ++ n.shows ++ ", " ++ s.shows ++ ")"
     }
   }
 }

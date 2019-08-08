@@ -16,6 +16,8 @@
 
 package quasar.api.destination
 
+import slamdata.Predef._
+
 import monocle.macros.Lenses
 import monocle.PLens
 import scalaz.std.tuple._
@@ -39,7 +41,7 @@ sealed abstract class DestinationRefInstances extends DestinationRefInstances0 {
   implicit def show[C: Show]: Show[DestinationRef[C]] =
     Show.shows {
       case DestinationRef(t, n, c) =>
-        "DestinationRef(" + t.shows + ", " + n.shows + ", " + c.shows + ")"
+        "DestinationRef(" ++ t.shows ++ ", " ++ n.shows ++ ", " ++ c.shows ++ ")"
     }
 
   implicit val traverse1: Traverse1[DestinationRef] =

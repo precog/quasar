@@ -91,7 +91,7 @@ object MapFuncDerived {
     new Delay[Show, MapFuncDerived[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFuncDerived[T, A]] = {
         def shz(label: String, a: A*) =
-          label + "(" + a.map(sh.shows).toList.intercalate(", ") + ")"
+          label ++ "(" ++ a.map(sh.shows).toList.intercalate(", ") ++ ")"
 
         Show.shows {
           // unary
@@ -100,7 +100,7 @@ object MapFuncDerived {
           case Floor(a1) => shz("Floor", a1)
           case Trunc(a1) => shz("Trunc", a1)
           case Round(a1) => shz("Round", a1)
-          case Typecheck(a1, typ) => "TypeCheck" + "(" + sh.shows(a1) + ":" + typ.shows + ")"
+          case Typecheck(a1, typ) => "TypeCheck" ++ "(" ++ sh.shows(a1) ++ ":" ++ typ.shows ++ ")"
 
           // binary
           case FloorScale(a1, a2) => shz("FloorScale", a1, a2)

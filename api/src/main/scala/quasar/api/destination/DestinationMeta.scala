@@ -16,6 +16,8 @@
 
 package quasar.api.destination
 
+import slamdata.Predef._
+
 import quasar.Condition
 import slamdata.Predef.{Exception, Option}
 
@@ -45,7 +47,7 @@ sealed abstract class DestinationMetaInstances {
 
     Show.shows {
       case DestinationMeta(n, k, s) =>
-        "DestinationMeta(" + k.shows + ", " + n.shows + ", " + s.shows + ")"
+        "DestinationMeta(" ++ k.shows ++ ", " ++ n.shows ++ ", " ++ s.shows ++ ")"
     }
   }
 }

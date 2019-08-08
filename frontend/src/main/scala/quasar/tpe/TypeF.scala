@@ -473,10 +473,11 @@ private[quasar] sealed abstract class TypeFInstances {
         def showJ(j: J): String =
           "`" ++ j.shows ++ "`"
 
-        def showKnown(kn: IMap[J, A]): String =
+        def showKnown(kn: IMap[J, A]): String = {
           kn.toList map {
-            case (j, a) => showJ(j) + " : " + a.shows
+            case (j, a) => (showJ(j) ++ " : " ++ a.shows).self
           } intercalate ", "
+        }
 
         Show.shows {
           case Bottom() => "⊥"
@@ -484,17 +485,17 @@ private[quasar] sealed abstract class TypeFInstances {
           case Const(j) => showJ(j)
 
           case Arr(k, None) => k.shows
-          case Arr(INil(), Some(u)) => u.shows + "[]"
+          case Arr(INil(), Some(u)) => u.shows ++ "[]"
           case Arr(k, Some(u)) =>
-            "[" + k.map(_.shows).intercalate(", ") + " ? " + u.shows + "]"
+            "[" ++ k.map(_.shows).intercalate(", ") ++ " ? " ++ u.shows ++ "]"
 
           case Map(kn, Some((k, v))) =>
-            "{" + showKnown(kn) + " ? " + k.shows + " : " + v.shows + "}"
+            "{" ++ showKnown(kn) ++ " ? " ++ k.shows ++ " : " ++ v.shows ++ "}"
 
-          case Map(kn, None) => "{" + showKnown(kn) + "}"
+          case Map(kn, None) => "{" ++ showKnown(kn) ++ "}"
 
           case Unioned(xs) =>
-            "(" + (xs map (_.shows) intercalate " | ") + ")"
+            "(" ++ (xs map (_.shows) intercalate " | ") ++ ")"
 
           case Top() => "⊤"
         }

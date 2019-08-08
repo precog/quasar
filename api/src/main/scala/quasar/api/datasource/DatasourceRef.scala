@@ -16,6 +16,8 @@
 
 package quasar.api.datasource
 
+import slamdata.Predef._
+
 import monocle.PLens
 import monocle.macros.Lenses
 import scalaz.{Apply, Equal, Order, Show, Traverse1}
@@ -39,7 +41,7 @@ sealed abstract class DatasourceRefInstances extends DatasourceRefInstances0 {
   implicit def show[C: Show]: Show[DatasourceRef[C]] =
     Show.shows {
       case DatasourceRef(t, n, c) =>
-        "DatasourceRef(" + t.shows + ", " + n.shows + ", " + c.shows + ")"
+        "DatasourceRef(" ++ t.shows ++ ", " ++ n.shows ++ ", " ++ c.shows ++ ")"
     }
 
   implicit val traverse1: Traverse1[DatasourceRef] =

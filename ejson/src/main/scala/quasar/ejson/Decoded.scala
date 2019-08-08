@@ -16,7 +16,7 @@
 
 package quasar.ejson
 
-import slamdata.Predef.{Option, String}
+import slamdata.Predef._
 import quasar.{RenderTree, RenderedTree}
 import quasar.fp.ski.κ
 import quasar.contrib.iota.copkTraverse
@@ -97,7 +97,7 @@ sealed abstract class DecodedInstances {
     }
 
   implicit def show[A: Show]: Show[Decoded[A]] =
-    Show.show(d => "Decoded" + d.fold(
+    Show.shows(d => "Decoded" ++ d.fold[String](
       (t, m) => (t, m).shows,
-      a => "(" + a.shows + ")"))
+      a => "(" ++ a.shows ++ ")"))
 }

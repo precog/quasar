@@ -461,11 +461,11 @@ object ApplyProvenance {
 
   object AuthenticatedQSU {
     implicit def show[T[_[_]]: ShowT, P: Show]: Show[AuthenticatedQSU[T, P]] =
-      Show.show { case AuthenticatedQSU(g, d) =>
+      Show.shows { case AuthenticatedQSU(g, d) =>
         "AuthenticatedQSU {\n" +
-        g.shows +
-        "\n\n" +
-        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).shows +
+        g.shows ++
+        "\n\n" ++
+        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).shows ++
         "\n}"
       }
   }

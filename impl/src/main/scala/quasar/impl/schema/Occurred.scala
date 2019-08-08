@@ -53,7 +53,7 @@ object Occurred {
   implicit def show[N: Show, A: Show]: Show[Occurred[N, A]] =
     Show.shows {
       case Occurred(n, a) =>
-        "Occurred(" + n.shows + ", " ++ a.shows + ")"
+        "Occurred(" ++ n.shows ++ ", " ++ a.shows ++ ")"
     }
 
   ////

@@ -16,6 +16,8 @@
 
 package quasar.impl.evaluate
 
+import slamdata.Predef._
+
 import quasar.api.resource.ResourcePath
 
 import monocle.macros.Lenses
@@ -41,7 +43,7 @@ sealed abstract class SourceInstances extends SourceInstances0 {
   implicit def show[A: Show]: Show[Source[A]] =
     Show.shows {
       case Source(p, a) =>
-        "Source(" + p.shows + ", " + a.shows + ")"
+        "Source(" ++ p.shows ++ ", " ++ a.shows ++ ")"
     }
 
   implicit val traverse: Traverse[Source] =

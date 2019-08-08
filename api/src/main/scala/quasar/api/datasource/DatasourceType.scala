@@ -16,7 +16,7 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{None, Some, String}
+import slamdata.Predef._
 
 import quasar.contrib.refined._
 import quasar.fp.numeric.Positive
@@ -53,6 +53,6 @@ sealed abstract class DatasourceTypeInstances {
   implicit val show: Show[DatasourceType] =
     Show.shows {
       case DatasourceType(n, v) =>
-        "DatasourceType(" + n.shows + ", " + v.shows + ")"
+        "DatasourceType(" ++ n.shows ++ ", " ++ v.shows ++ ")"
     }
 }

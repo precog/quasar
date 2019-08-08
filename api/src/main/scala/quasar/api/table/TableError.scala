@@ -16,7 +16,7 @@
 
 package quasar.api.table
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef._
 
 import scalaz.Show
 import scalaz.syntax.show._
@@ -41,13 +41,13 @@ object TableError {
   implicit def showPreparationNotInProgress[I: Show]: Show[PreparationNotInProgress[I]] =
     Show.shows {
       case PreparationNotInProgress(id) =>
-        "PreparationNotInProgress(" + id.shows + ")"
+        "PreparationNotInProgress(" ++ id.shows ++ ")"
     }
 
   implicit def showModificationError[I: Show]: Show[ModificationError[I]] =
     Show.shows {
       case PreparationExists(id) =>
-        "PreparationExists(" + id.shows + ")"
+        "PreparationExists(" ++ id.shows ++ ")"
       case e:CreateError[I] => e.shows
       case e:PrePreparationError[I] => e.shows
     }
@@ -55,19 +55,19 @@ object TableError {
   implicit def showCreateError[I]: Show[CreateError[I]] =
     Show.shows {
       case NameConflict(n) =>
-        "NameConflict(" + n.shows + ")"
+        "NameConflict(" ++ n.shows ++ ")"
     }
 
   implicit def showPrePreparationError[I: Show]: Show[PrePreparationError[I]] =
     Show.shows {
       case PreparationInProgress(id) =>
-        "PreparationInProgress(" + id.shows + ")"
+        "PreparationInProgress(" ++ id.shows ++ ")"
       case e:ExistenceError[I] => e.shows
     }
 
   implicit def showExistenceError[I: Show]: Show[ExistenceError[I]] =
     Show.shows {
       case TableNotFound(id) =>
-        "TableNotFound(" + id.shows + ")"
+        "TableNotFound(" ++ id.shows ++ ")"
     }
 }

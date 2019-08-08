@@ -143,32 +143,32 @@ object LogicalPlan {
         implicit val showA: Show[A] = sa
         Show.shows {
           case Read(v) =>
-            "Read(" + v.shows + ")"
+            "Read(" ++ v.shows ++ ")"
           case Constant(v) =>
-            "Constant(" + v.shows + ")"
+            "Constant(" ++ v.shows ++ ")"
           case Invoke(func, values) =>
             // TODO remove trailing comma
-            func.shows + "(" +
-            values.foldLeft("") { case (acc, v) => acc + sa.shows(v) + ", " } + ")"
+            func.shows ++ "(" ++
+            values.foldLeft("") { case (acc, v) => acc ++ sa.shows(v) ++ ", " } ++ ")"
           case JoinSideName(n) =>
-            "JoinSideName(" + n.toString ++ ")"
+            "JoinSideName(" ++ n.toString ++ ")"
           case Join(l, r, tpe, JoinCondition(lName, rName, v)) =>
-            "Join(" +
-            l.shows + ", " +
-            r.shows + ", " +
-            tpe.shows + ", " +
-            lName.toString + ", " +
-            rName.toString + ", " +
-            v.shows + ")"
+            "Join(" ++
+            l.shows ++ ", " ++
+            r.shows ++ ", " ++
+            tpe.shows ++ ", " ++
+            lName.toString ++ ", " ++
+            rName.toString ++ ", " ++
+            v.shows ++ ")"
           case Free(n) =>
-            "Free(" + n.toString + ")"
+            "Free(" ++ n.toString ++ ")"
           case Let(n, f, b) =>
-            "Let(" + n.toString + "," +
-            sa.shows(f) + "," + sa.shows(b) + ")"
+            "Let(" ++ n.toString ++ "," ++
+            sa.shows(f) ++ "," ++ sa.shows(b) ++ ")"
           case Sort(src, ords) =>
-            "Sort(" + sa.shows(src) + ", " + ords.shows + ")"
+            "Sort(" ++ sa.shows(src) ++ ", " ++ ords.shows ++ ")"
           case TemporalTrunc(part, src) =>
-            "TemporalTrunc(" + part.shows + "," + sa.shows(src) + ")"
+            "TemporalTrunc(" ++ part.shows ++ "," ++ sa.shows(src) ++ ")"
         }
       }
     }

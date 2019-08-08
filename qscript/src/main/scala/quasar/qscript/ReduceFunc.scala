@@ -48,16 +48,16 @@ object ReduceFunc {
   implicit val show: Delay[Show, ReduceFunc] =
     new Delay[Show, ReduceFunc] {
       def apply[A](show: Show[A]) = Show.shows {
-        case Count(a)        => "Count(" + show.shows(a) + ")"
-        case Sum(a)          => "Sum(" + show.shows(a) + ")"
-        case Min(a)          => "Min(" + show.shows(a) + ")"
-        case Max(a)          => "Max(" + show.shows(a) + ")"
-        case Avg(a)          => "Avg(" + show.shows(a) + ")"
-        case Arbitrary(a)    => "Arbitrary(" + show.shows(a) + ")"
-        case First(a)        => "First(" + show.shows(a) + ")"
-        case Last(a)         => "Last(" + show.shows(a) + ")"
-        case UnshiftArray(a) => "UnshiftArray(" + show.shows(a) + ")"
-        case UnshiftMap(a1, a2) => "UnshiftMap(" + show.shows(a1) + ", " + show.shows(a2) + ")"
+        case Count(a)        => "Count(" ++ show.shows(a) ++ ")"
+        case Sum(a)          => "Sum(" ++ show.shows(a) ++ ")"
+        case Min(a)          => "Min(" ++ show.shows(a) ++ ")"
+        case Max(a)          => "Max(" ++ show.shows(a) ++ ")"
+        case Avg(a)          => "Avg(" ++ show.shows(a) ++ ")"
+        case Arbitrary(a)    => "Arbitrary(" ++ show.shows(a) ++ ")"
+        case First(a)        => "First(" ++ show.shows(a) ++ ")"
+        case Last(a)         => "Last(" ++ show.shows(a) ++ ")"
+        case UnshiftArray(a) => "UnshiftArray(" ++ show.shows(a) ++ ")"
+        case UnshiftMap(a1, a2) => "UnshiftMap(" ++ show.shows(a1) ++ ", " ++ show.shows(a2) ++ ")"
       }
     }
 

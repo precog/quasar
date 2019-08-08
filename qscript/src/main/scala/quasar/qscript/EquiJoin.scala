@@ -66,13 +66,13 @@ object EquiJoin {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.shows {
         case EquiJoin(src, lBr, rBr, key, f, combine) =>
-          "EquiJoin(" +
-          showA.shows(src) + "," +
-          lBr.shows + "," +
-          rBr.shows + "," +
-          key.shows + "," +
-          f.shows + "," +
-          combine.shows + ")"
+          "EquiJoin(" ++
+          showA.shows(src) ++ "," ++
+          lBr.shows ++ "," ++
+          rBr.shows ++ "," ++
+          key.shows ++ "," ++
+          f.shows ++ "," ++
+          combine.shows ++ ")"
       }
     }
 

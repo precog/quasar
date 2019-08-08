@@ -16,7 +16,7 @@
 
 package quasar.impl.schema
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef._
 import quasar.contrib.iota._
 import quasar.sst._
 
@@ -108,10 +108,10 @@ sealed abstract class SstSchemaInstances {
 
     Show.shows {
       case PopulationSchema(s) =>
-        "Population(" + Population.unsubst[T, TypeStat[A]](s).shows + ")"
+        "Population(" ++ Population.unsubst[T, TypeStat[A]](s).shows ++ ")"
 
       case SampleSchema(x) =>
-        "Sample(" + x.shows + ")"
+        "Sample(" ++ x.shows ++ ")"
     }
   }
 }

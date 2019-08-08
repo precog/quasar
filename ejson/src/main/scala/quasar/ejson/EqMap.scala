@@ -70,5 +70,5 @@ sealed abstract class EqMapInstances {
     }
 
   implicit def show[A: Show, B: Show]: Show[EqMap[A, B]] =
-    Show.shows(m => "EqMap" + m.toList.shows)
+    Show.shows(m => "EqMap" ++ m.toList.shows)
 }

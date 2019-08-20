@@ -114,7 +114,7 @@ lazy val foundation = project
     buildInfoPackage := "quasar.build",
 
     libraryDependencies ++= Seq(
-      "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
+      "com.slamdata"               %% "slamdata-predef"           % "0.0.8",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "1.7.0",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,

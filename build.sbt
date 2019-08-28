@@ -52,14 +52,6 @@ lazy val buildSettings = Seq(
 
   console := { (console in Test).value }, // console alias test:console
 
-  /*
-   * This plugin fixes a number of problematic cases in the for-comprehension
-   * desugaring. Notably, it eliminates a non-tail-recursive case which causes
-   * Slice#allFromRValues to not free memory, so it's not just a convenience or
-   * an optimization.
-   */
-  addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"))
-
 // In Travis, the processor count is reported as 32, but only ~2 cores are
 // actually available to run.
 concurrentRestrictions in Global := {

@@ -25,6 +25,7 @@ import quasar.api.destination.ResultType
 import quasar.api.push.{ResultPush, ResultPushError, ResultRender, Status}
 import quasar.api.resource.ResourcePath
 import quasar.api.table.TableRef
+import quasar.contrib.fs2.pipe.streamLimiter
 
 import java.time.Instant
 import java.util.Map
@@ -79,11 +80,15 @@ class DefaultResultPush[
       columns = tableRef.columns
 
       evaluated <- EitherT.rightT(format match {
-        case ResultType.Csv =>
-          evaluator.evaluate(query).map(_.flatMap(render.renderCsv(_, columns)))
+        case ResultType.Csv => {
+          evaluator.evaluate(query)
+            .map(_.flatMap(render.renderCsv(_, columns)))
+        }
       })
 
-      sinked = Stream.eval(sink.run(path, columns, evaluated)).map(Right(_))
+      limited = limit.fold(evaluated)(limit => evaluated.through(streamLimiter(limit)))
+
+      sinked = Stream.eval(sink.run(path, columns, limited)).map(Right(_))
 
       now <- EitherT.rightT(instantNow)
       submitted <- EitherT.rightT(jobManager.submit(Job(tableId, sinked)))

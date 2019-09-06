@@ -48,4 +48,16 @@ object pipe {
       str.flatMap(cb => Stream.chunk(Chunk.ByteBuffer(encoder.encode(cb))))
     }
   }
+
+  def streamLimiter[F[_]](limit: Long): Pipe[F, Byte, Byte] = { in =>
+    in.scanChunksOpt(0L) { count =>
+      if (count >= limit) {
+        None
+      } else {
+        Some { bytes =>
+          (count + bytes.size, bytes)
+        }
+      }
+    }
+  }
 }

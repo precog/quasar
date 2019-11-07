@@ -26,14 +26,12 @@ import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Datasource, DestinationModule, QueryResult}
 import quasar.contrib.std.uuid._
-import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
 import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations}
-import quasar.impl.schema.{SstConfig, SstEvalConfig}
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.DefaultTables
 import quasar.qscript.{QScriptEducated, construction, Map => QSMap}
@@ -53,10 +51,9 @@ import org.slf4s.Logging
 import scalaz.{IMap, Show, ~>}
 import scalaz.syntax.show._
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz}
-import spire.std.double._
 
 final class Quasar[F[_], R, C <: SchemaConfig](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], C],
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json, C],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery],
     val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
@@ -76,8 +73,7 @@ object Quasar extends Logging {
       qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], R])(
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
-      resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
-      sstEvalConfig: SstEvalConfig)(
+      resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
@@ -108,10 +104,8 @@ object Quasar extends Logging {
       destManager <- Resource.liftF(DefaultDestinationManager.empty[UUID, F](destModules))
       destinations = DefaultDestinations[UUID, Json, F](freshUUID, destinationRefs, destManager)
 
-      oldResourceSchema = SimpleCompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
-
       datasources =
-        DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, oldResourceSchema, resourceSchema)
+        DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
 
       lookupRunning =
         (id: UUID) => dsManager.managedDatasource(id).map(_.map(_.modify(reifiedAggregateDs)))

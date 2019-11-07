@@ -34,7 +34,6 @@ import DefaultDatasourcesSpec._
 
 import java.io.IOException
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.FiniteDuration
 
 import cats.data.{StateT, WriterT}
 import cats.effect.IO
@@ -48,12 +47,11 @@ import monocle.macros.Lenses
 import scalaz.{-\/, IMap, ISet, Monoid, \/-}
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import scalaz.syntax.std.option._
 
 import shims.{eqToScalaz, equalToCats, monoidToCats, monoidToScalaz, monadToScalaz, showToCats, showToScalaz}
 
 final class DefaultDatasourcesSpec
-    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, MockSchemaConfig.type] {
+    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
 
   type PathType = ResourcePathType
 
@@ -75,14 +73,12 @@ final class DefaultDatasourcesSpec
 
   val schemaConfig = MockSchemaConfig
 
-  val oldSchemaConfig = MockSchemaConfig
-
   def gatherMultiple[A](as: Stream[DefaultM, A]) = as.compile.toList
 
   def mkDatasources(
       errs: IMap[Int, Exception], sanitize: String => String)(
       init: String => Option[InitializationError[String]])
-      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type, MockSchemaConfig.type] = {
+      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] = {
 
     val freshId =
       for {
@@ -102,11 +98,11 @@ final class DefaultDatasourcesSpec
 
     val schema =
       new ResourceSchema[DefaultM, MockSchemaConfig.type, (ResourcePath, Unit)] {
-        def apply(c: MockSchemaConfig.type, r: (ResourcePath, Unit), d: FiniteDuration) =
-          MockSchemaConfig.MockSchema.some.pure[DefaultM]
+        def apply(c: MockSchemaConfig.type, r: (ResourcePath, Unit)) =
+          MockSchemaConfig.MockSchema.pure[DefaultM]
       }
 
-    DefaultDatasources(freshId, refs, errors, manager, schema, schema)
+    DefaultDatasources(freshId, refs, errors, manager, schema)
   }
 
   "implementation specific" >> {

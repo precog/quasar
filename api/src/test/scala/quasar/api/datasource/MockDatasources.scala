@@ -23,8 +23,6 @@ import quasar.api.datasource.DatasourceError.InitializationError
 import quasar.api.resource._
 import quasar.contrib.scalaz.MonadState_
 
-import scala.concurrent.duration.FiniteDuration
-
 import scalaz.{\/, ApplicativePlus, IMap, ISet, Monad, Monoid, Tags, Tree}
 import scalaz.std.anyVal._
 import scalaz.std.stream._
@@ -46,7 +44,7 @@ final class MockDatasources[
     supportedTypes: ISet[DatasourceType],
     errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
     structure: SStream[Tree[ResourceName]])
-  extends Datasources[F, G, Int, C, MockSchemaConfig.type, MockSchemaConfig.type] {
+  extends Datasources[F, G, Int, C, MockSchemaConfig.type] {
 
   import DatasourceError._
 
@@ -139,25 +137,17 @@ final class MockDatasources[
       id: Int,
       path: ResourcePath,
       cfg: MockSchemaConfig.type)
-      : F[DiscoveryError[Int] \/ Option[cfg.Schema]] =
+      : F[DiscoveryError[Int] \/ cfg.Schema] =
     mockState.gets { s =>
       if (s.dss member id)
         forestAt(path) match {
-          case Some(forest) if forest.isEmpty => MockSchemaConfig.MockSchema.some.right
+          case Some(forest) if forest.isEmpty => MockSchemaConfig.MockSchema.right
           case Some(_) => pathNotAResource[DiscoveryError[Int]](path).left
           case None => pathNotFound[DiscoveryError[Int]](path).left
         }
       else
         datasourceNotFound[Int, ExistentialError[Int]](id).left
     }
-
-  def oldResourceSchema(
-      id: Int,
-      path: ResourcePath,
-      cfg: MockSchemaConfig.type,
-      timeLimit: FiniteDuration)
-      : F[DiscoveryError[Int] \/ Option[cfg.Schema]] =
-    resourceSchema(id, path, cfg)
 
   val supportedDatasourceTypes: F[ISet[DatasourceType]] = supportedTypes.point[F]
 
@@ -230,6 +220,6 @@ object MockDatasources {
       supportedTypes: ISet[DatasourceType],
       errorCondition: DatasourceRef[C] => Condition[InitializationError[C]],
       structure: SStream[Tree[ResourceName]])
-      : Datasources[F, G, Int, C, MockSchemaConfig.type, MockSchemaConfig.type] =
+      : Datasources[F, G, Int, C, MockSchemaConfig.type] =
     new MockDatasources[C, F, G](supportedTypes, errorCondition, structure)
 }

@@ -34,17 +34,12 @@ import cats.implicits._
 
 import skolems._
 
-final class RateLimiter[F[_]: Sync: Timer] private (caution: Double) {
-  // TODO make these things clustering-aware
-  private val configs: TrieMap[Exists[Key], Config] =
-    new TrieMap[Exists[Key], Config](
-      toHashing[Exists[Key]],
-      toEquiv[Exists[Key]])
+import RateLimiter.{Config, Key, State}
 
-  private val states: TrieMap[Exists[Key], Ref[F, State]] =
-    new TrieMap[Exists[Key], Ref[F, State]](
-      toHashing[Exists[Key]],
-      toEquiv[Exists[Key]])
+final class RateLimiter[F[_]: Sync: Timer] private (
+    configs: TrieMap[Exists[Key], Config],
+    states: TrieMap[Exists[Key], Ref[F, State]])(
+    caution: Double) {
 
   def apply[A: Hash: ClassTag](key: A, max: Int, window: FiniteDuration)
       : F[F[Unit]] =
@@ -88,13 +83,16 @@ final class RateLimiter[F[_]: Sync: Timer] private (caution: Double) {
 
   private val nowF: F[FiniteDuration] =
     Timer[F].clock.realTime(TimeUnit.MILLISECONDS).map(_.millis)
+}
 
-  private case class Config(max: Int, window: FiniteDuration)
-  private case class State(count: Int, start: FiniteDuration)
+object RateLimiter {
 
-  private case class Key[A](value: A, hash: Hash[A], tag: ClassTag[A])
+  final case class Config(max: Int, window: FiniteDuration)
+  final case class State(count: Int, start: FiniteDuration)
 
-  private object Key {
+  final case class Key[A](value: A, hash: Hash[A], tag: ClassTag[A])
+
+  object Key {
     implicit def hash: Hash[Exists[Key]] =
       new Hash[Exists[Key]] {
 
@@ -109,9 +107,27 @@ final class RateLimiter[F[_]: Sync: Timer] private (caution: Double) {
         }
       }
   }
-}
 
-object RateLimiter {
-  def apply[F[_]: Sync: Timer](caution: Double): F[RateLimiter[F]] =
-    Sync[F].delay(new RateLimiter[F](caution))
+  def apply[F[_]: Sync: Timer](caution: Double)
+      : F[RateLimiter[F]] = {
+
+    val configs: TrieMap[Exists[Key], Config] =
+      new TrieMap[Exists[Key], Config](
+        toHashing[Exists[Key]],
+        toEquiv[Exists[Key]])
+
+    val states: TrieMap[Exists[Key], Ref[F, State]] =
+      new TrieMap[Exists[Key], Ref[F, State]](
+        toHashing[Exists[Key]],
+        toEquiv[Exists[Key]])
+
+    Sync[F].delay(new RateLimiter[F](configs, states)(caution))
+  }
+
+  def applyAll[F[_]: Sync: Timer](
+      configs: TrieMap[Exists[Key], Config],
+      states: TrieMap[Exists[Key], Ref[F, State]])(
+      caution: Double)
+      : F[RateLimiter[F]] =
+    Sync[F].delay(new RateLimiter[F](configs, states)(caution))
 }

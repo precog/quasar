@@ -16,6 +16,7 @@
 
 package quasar.impl.datasource.local
 
+import quasar.RateLimiter
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
@@ -40,7 +41,8 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
   def sanitizeConfig(config: Json): Json = config
 
   def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)(
+      config: Json,
+      rateLimiter: RateLimiter[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {

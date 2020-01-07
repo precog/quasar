@@ -26,7 +26,7 @@ import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 import pathy.Path._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.{ Divide => _, _}, Scalaz._
+import scalaz.{Divide => _, Select => _, _}, Scalaz._
 
 class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We

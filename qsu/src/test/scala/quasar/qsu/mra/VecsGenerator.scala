@@ -14,23 +14,24 @@
  * limitations under the License.
  */
 
-package quasar.sst
+package quasar.qsu.mra
 
-import quasar.ejson.{EJsonArbitrary, TypeTag}
 import quasar.pkg.tests._
 
-import matryoshka.Delay
-import scalaz._, Scalaz._
-import scalaz.scalacheck.ScalaCheckBinding._
+import cats.Order
 
-trait TaggedArbitrary {
-  import EJsonArbitrary._
+import org.scalacheck.Cogen
 
-  implicit val arbitraryTagged: Delay[Arbitrary, Tagged] =
-    new Delay[Arbitrary, Tagged] {
-      def apply[A](arb: Arbitrary[A]) =
-        Arbitrary((arbitrary[TypeTag] ⊛ arb.gen)(Tagged(_, _)))
-    }
+import ProvImpl.Vecs
+
+trait VecsGenerator {
+  import IdentitiesGenerator._
+
+  implicit def arbitraryVecs[A: Arbitrary: Order]: Arbitrary[Vecs[A]] =
+    Arbitrary(arbitrary[Identities[A]].map(Vecs.active(_)))
+
+  implicit def cogenVecs[A: Order: Cogen]: Cogen[Vecs[A]] =
+    Cogen[Identities[A]].contramap(_.united)
 }
 
-object TaggedArbitrary extends TaggedArbitrary
+object VecsGenerator extends VecsGenerator

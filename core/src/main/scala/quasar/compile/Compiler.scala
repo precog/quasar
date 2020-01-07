@@ -44,7 +44,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import pathy.Path._
-import scalaz.{Plus => _, Tree => _, Free => ZFree, _}, Scalaz._
+import scalaz.{Plus => _, Tree => _, Free => ZFree, Select => _, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 final case class TableContext[T]

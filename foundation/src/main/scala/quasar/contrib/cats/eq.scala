@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-package quasar
+package quasar.contrib.cats
 
-import slamdata.Predef.{RuntimeException, String}
+import scala.math.Equiv
 
-import fs2.{RaiseThrowable, Stream}
+import cats.kernel.Eq
 
-package object datagen {
-  /** A stream that is failed with the given reason. */
-  def failedStream[F[_]: RaiseThrowable, A](reason: String): Stream[F, A] = {
-    Stream.raiseError[F](new RuntimeException(reason)).covaryOutput[A]
-  }
+object eqv {
+  def toEquiv[A: Eq]: Equiv[A] =
+    Equiv.fromFunction(Eq[A].eqv(_, _))
 }

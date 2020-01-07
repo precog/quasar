@@ -16,12 +16,10 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Boolean, Exception, Option}
+import slamdata.Predef.{Boolean, Exception}
 import quasar.Condition
 import quasar.api.SchemaConfig
 import quasar.api.resource._
-
-import scala.concurrent.duration.FiniteDuration
 
 import scalaz.{\/, ISet}
 
@@ -32,7 +30,7 @@ import scalaz.{\/, ISet}
   * @tparam OldS old schema configuration
   * @tparam S schema configuration
   */
-trait Datasources[F[_], G[_], I, C, OldS <: SchemaConfig, S <: SchemaConfig] {
+trait Datasources[F[_], G[_], I, C, S <: SchemaConfig] {
   import DatasourceError._
 
   type PathType <: ResourcePathType
@@ -75,28 +73,13 @@ trait Datasources[F[_], G[_], I, C, OldS <: SchemaConfig, S <: SchemaConfig] {
   def replaceDatasource(datasourceId: I, ref: DatasourceRef[C])
       : F[Condition[DatasourceError[I, C]]]
 
-  /** Retrieves the schema of the resource at the given `path` with the
-    * specified datasource according to the provided `schemaConfig`.
-    *
-    * Execution time is limited to `timeLimit` and any available value will
-    * be returned upon expiration. If a "complete" schema, as defined by the
-    * specified config, is computed before the time limit, it will be returned
-    * immediately.
-    *
-    * Returns `None` if the resource exists but a schema is not available.
+  /** Retrieves the schema of the resource at the given `path`.
     */
-  def oldResourceSchema(
-      datasourceId: I,
-      path: ResourcePath,
-      schemaConfig: OldS,
-      timeLimit: FiniteDuration)
-      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
-
   def resourceSchema(
       datasourceId: I,
       path: ResourcePath,
       schemaConfig: S)
-      : F[DiscoveryError[I] \/ Option[schemaConfig.Schema]]
+      : F[DiscoveryError[I] \/ schemaConfig.Schema]
 
   /** The set of supported datasource types. */
   def supportedDatasourceTypes: F[ISet[DatasourceType]]

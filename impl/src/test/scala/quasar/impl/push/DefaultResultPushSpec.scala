@@ -18,15 +18,16 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
+import cats.data.{NonEmptyMap, NonEmptySet}
 import cats.effect.IO
+import cats.effect.concurrent.Deferred
+import cats.implicits._
 
 import eu.timepit.refined.auto._
 
-import fs2.concurrent.SignallingRef
-import fs2.job.JobManager
 import fs2.{Stream, text}
-
-import org.specs2.matcher.MatchResult
+import fs2.concurrent.{Enqueue, Queue}
+import fs2.job.JobManager
 
 import quasar.api.QueryEvaluator
 import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType}
@@ -36,12 +37,9 @@ import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
 import quasar.{ConditionMatchers, EffectfulQSpec}
 
-import scalaz.std.set._
-import scalaz.std.string._
-import scalaz.syntax.bind._
-import scalaz.{Equal, NonEmptyList, \/-}
+import scalaz.NonEmptyList
 
-import shims.monadToScalaz
+import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -49,34 +47,41 @@ import scala.concurrent.duration._
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   implicit val tmr = IO.timer(global)
 
-  val TableId = 42
-  val DestinationId = 42
-  val RefDestinationType = DestinationType("ref", 1L)
+  val Timeout = 10.seconds
 
-  // convert a bytestream into stream of space separeted words
-  def bytesToString(s: Stream[IO, Byte]): Stream[IO, String] =
-    s.split(_ == 0x20).flatMap(Stream.chunk).through(text.utf8Decode)
+  val TableId = 42
+  val DestinationId = 43
+  val QDestinationType = DestinationType("ref", 1L)
 
   type Filesystem = Map[ResourcePath, String]
 
-  final class RefDestination(ref: SignallingRef[IO, Filesystem]) extends Destination[IO] {
-    def destinationType: DestinationType = RefDestinationType
+  // NB: These must be at least 3 bytes each to ensure they're
+  //     emitted from utf8Decode without additional input.
+  val W1 = "lorum"
+  val W2 = "ipsum"
+  val W3 = "dolor"
+
+  // The string formed by concatentating Ws
+  val dataString = W1 + W2 + W3
+
+  final class QDestination(q: Enqueue[IO, Option[Filesystem]]) extends Destination[IO] {
+    def destinationType: DestinationType = QDestinationType
+
     def sinks = NonEmptyList(csvSink)
 
     val csvSink: ResultSink[IO] = ResultSink.csv[IO](RenderConfig.Csv()) {
       case (dst, columns, bytes) =>
-        bytesToString(bytes).evalMap(str =>
-          ref.update(currentFs =>
-            currentFs + (dst -> currentFs.get(dst).fold(str)(_ ++ str))))
+        bytes.through(text.utf8Decode)
+          .evalMap(s => q.enqueue1(Some(Map(dst -> s))))
+          .onFinalize(q.enqueue1(None))
     }
   }
 
-  object RefDestination {
-    def apply(): IO[(Destination[IO], SignallingRef[IO, Filesystem])] =
-      for {
-        fs <- SignallingRef[IO, Filesystem](Map.empty)
-        destination = new RefDestination(fs)
-      } yield (destination, fs)
+  object QDestination {
+    def apply(): IO[(QDestination, Stream[IO, Filesystem])] =
+      Queue.noneTerminated[IO, Filesystem] map { q =>
+        (new QDestination(q), q.dequeue.scanMonoid)
+      }
   }
 
   final class MockResultRender extends ResultRender[IO, String] {
@@ -103,11 +108,48 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         fn(query)
     }
 
+  trait StreamControl[F[_]] {
+    // Cause the stream to emit a value
+    def emit(s: String): F[Unit]
+
+    // Forcibly halts the stream
+    def halt: F[Unit]
+
+    // Completes when the stream has halted for any reason
+    def halted: F[Unit]
+  }
+
+  val controlledStream: IO[(StreamControl[IO], Stream[IO, String])] =
+    Queue.noneTerminated[IO, String] flatMap { q =>
+      Deferred[IO, Unit] map { d =>
+        val toutErr = new RuntimeException(s"Expected data stream to terminate within ${Timeout} millis.")
+
+        val s = q.dequeue.onFinalize(d.complete(()))
+
+        val ctl = new StreamControl[IO] {
+          def emit(v: String) = q.enqueue1(Some(v))
+          val halt = q.enqueue1(None)
+          val halted = d.get.timeoutTo(Timeout, IO.raiseError(toutErr))
+        }
+
+        (ctl, s)
+      }
+    }
+
+  val dataStream: IO[(IO[Unit], Stream[IO, String])] =
+    Deferred[IO, Unit] map { d =>
+      val s =
+        Stream.fixedDelay[IO](100.millis)
+          .zipRight(Stream(W1, W2, W3))
+
+      (d.get, s.onFinalize(d.complete(())))
+    }
+
   def mkResultPush(
-    tables: Map[Int, TableRef[String]],
-    destinations: Map[Int, Destination[IO]],
-    manager: JobManager[IO, Int, Nothing],
-    evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
+      tables: Map[Int, TableRef[String]],
+      destinations: Map[Int, Destination[IO]],
+      manager: JobManager[IO, (Int, Int), Nothing],
+      evaluator: QueryEvaluator[IO, String, Stream[IO, String]])
       : IO[ResultPush[IO, Int, Int]] = {
 
     val lookupTable: Int => IO[Option[TableRef[String]]] =
@@ -126,297 +168,694 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       render)
   }
 
-  def mockEvaluate(q: String): String =
-    s"evaluated($q)"
+  val jobManager =
+    JobManager[IO, (Int, Int), Nothing]()
+      .compile
+      .resource
+      .lastOrError
 
-  val WorkTime = Duration(400, MILLISECONDS)
-  val Timeout = 5 * WorkTime
+  def awaitFs(fss: Stream[IO, Filesystem], count: Long = -1): IO[Filesystem] = {
+    val (s, msg) =
+      if (count <= 0)
+        (fss, "final filesystem")
+      else
+        (fss.take(count + 1), s"${count} filesystem updates")
 
-  val await = IO.sleep(WorkTime * 2)
-  val awaitS = Stream.sleep_(WorkTime)
+    s.compile.lastOrError.timeoutTo(
+      Timeout,
+      IO.raiseError(new RuntimeException(s"Expected $msg within ${Timeout}.")))
+  }
 
-  def latchGet(s: SignallingRef[IO, String], expected: String): IO[Unit] =
-    s.discrete.filter(Equal[String].equal(_, expected)).take(1).compile.drain
-      .timeoutTo(Timeout * 2, IO.raiseError(new Exception("latchGet timed out")))
+  def await(io: IO[_]): IO[Unit] =
+    io.timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected completion within ${Timeout}."))).void
 
-  def waitForUpdate[K, V](s: SignallingRef[IO, Map[K, V]]): IO[Unit] =
-    s.discrete.filter(_.nonEmpty).take(1).compile.drain
-      .timeoutTo(Timeout, IO.raiseError(new Exception("waitForUpdate timed out")))
+  def awaitStatusLike(
+      p: ResultPush[IO, Int, Int],
+      tableId: Int,
+      destinationId: Int)(
+      f: PartialFunction[PushMeta, Boolean])
+      : IO[PushMeta] = {
 
-  /* Runs `io` with a timeout, producing a failing expectation if `io`
-     completes before the timeout. errMsg is included with the failing expectation. */
-  def verifyTimeout[A](io: IO[A], errMsg: String): IO[MatchResult[Any]] =
-    (io >> IO(ko(errMsg))).timeoutTo(Timeout, IO(ok))
+    val metas =
+      Stream.eval(p.destinationStatus(destinationId))
+        .map(_.toOption.flatMap(_.get(tableId)))
+        .unNone
 
-  "result push" >> {
-    "push a table to a destination" >>* {
+    Stream.fixedDelay[IO](100.millis)
+      .zipRight(metas)
+      .filter(f.applyOrElse(_, (_: PushMeta) => false))
+      .take(1)
+      .compile.lastOrError
+      .timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected a matching `PushMeta` $Timeout.")))
+  }
+
+  "start" >> {
+    "asynchronously pushes a table to a destination" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
       val query = "query"
       val testTable = TableRef(TableName("foo"), query, List())
 
-      for {
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        (destination, filesystem) <- RefDestination()
-        ref <- SignallingRef[IO, String]("Not started")
-        evaluator = mkEvaluator(q => IO(Stream.emit(mockEvaluate(q)) ++ Stream.eval_(ref.set("Finished"))))
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
 
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
-        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
-        _ <- latchGet(ref, "Finished")
-        filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
-        _ <- cleanup
-      } yield {
-        filesystemAfterPush.keySet must equal(Set(pushPath))
-        filesystemAfterPush(pushPath) must equal(mockEvaluate(query))
-        startRes must beNormal
-      }
-    }
+          (halted, data) <- dataStream
 
-    "cancel a table push" >>* {
-      val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
-      val query = "query"
-      val testTable = TableRef(TableName("foo"), query, List())
+          evaluator = mkEvaluator(_ => IO(data))
 
-      def testStream(ref: SignallingRef[IO, String]): Stream[IO, String] =
-        Stream("foo") ++
-          Stream(" ") ++ // chunk delimiter
-          Stream.eval_(ref.set("Working")) ++
-          Stream.sleep_(WorkTime) ++
-          Stream("bar") ++
-          Stream.eval_(ref.set("Finished"))
+          push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
 
-      for {
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        (destination, filesystem) <- RefDestination()
-        ref <- SignallingRef[IO, String]("Not started")
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ => IO(testStream(ref))))
-        startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
-        _ <- latchGet(ref, "Working")
-        cancelRes <- push.cancel(TableId)
+          startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
 
-        filesystemAfterPush <- waitForUpdate(filesystem) >> filesystem.get
-        // fail the test if push evaluation was not cancelled
-        evaluationFinished <- verifyTimeout(latchGet(ref, "Finished"), "Push not cancelled")
-        _ <- cleanup
-      } yield {
-        filesystemAfterPush.keySet must equal(Set(pushPath))
-        // check if a *partial* result was pushed
-        filesystemAfterPush(pushPath) must equal("foo")
-        startRes must beNormal
-        cancelRes must beNormal
-        evaluationFinished
-      }
-    }
+          _ <- await(halted)
 
-    "retrieves the status of a running push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-
-      for {
-        (destination, filesystem) <- RefDestination()
-        sync <- SignallingRef[IO, String]("Not started")
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-          IO(Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2"))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- latchGet(sync, "Started")
-        pushStatus <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        pushStatus must beLike {
-          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Running(_), None))) => ok
+          filesystemAfterPush <- awaitFs(filesystem)
+        } yield {
+          filesystemAfterPush.keySet must equal(Set(pushPath))
+          filesystemAfterPush(pushPath) must equal(dataString)
+          startRes must beNormal
         }
       }
     }
 
-    "retrieves the status of a canceled push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-
-      for {
-        (destination, filesystem) <- RefDestination()
-        sync <- SignallingRef[IO, String]("Not started")
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-          IO(Stream.eval(sync.set("Started")).as("1") ++ awaitS ++ Stream.eval(sync.set("Finished")).as("2"))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- latchGet(sync, "Started")
-        _ <- push.cancel(TableId)
-        _ <- await
-        pushStatus <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        pushStatus must beLike {
-          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Canceled(_, _), None))) => ok
-        }
-      }
-    }
-
-    "retrieves the status of a completed push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-
-      for {
-        (destination, filesystem) <- RefDestination()
-        sync <- SignallingRef[IO, String]("Not started")
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-          IO(Stream.eval_(sync.set("Started")) ++ awaitS ++ Stream.eval_(sync.set("Finished")))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- latchGet(sync, "Finished")
-        _ <- await // wait for concurrent update of push status
-        pushStatus <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        pushStatus must beLike {
-          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Finished(_, _), None))) => ok
-        }
-      }
-    }
-
-    "handles errors produced while computing the stream" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
-
-      for {
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        (destination, filesystem) <- RefDestination()
-        push <- mkResultPush(
-          Map(TableId -> testTable),
-          Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-            IO.raiseError[Stream[IO, String]](new Exception("boom"))))
-        pushStatus <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- await // wait for error handling
-        status <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        status must beLike {
-          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Failed(ex, _, _), None))) =>
-            ex.getMessage must equal("boom")
-        }
-      }
-    }
-
-    "retrieves the status of an errored push" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-      val ex = new Exception("boom")
-
-      for {
-        (destination, filesystem) <- RefDestination()
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        sync <- SignallingRef[IO, String]("Not started")
-        push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, mkEvaluator(_ =>
-          IO(Stream.eval_(sync.set("Started")) ++ Stream.raiseError[IO](ex))))
-        _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- latchGet(sync, "Started")
-        _ <- await // wait for error handling
-        pushStatus <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        pushStatus must beLike {
-          case \/-(Some(PushMeta(DestinationId, _, ResultType.Csv, Status.Failed(ex, _, _), None))) =>
-            ex.getMessage must equal("boom")
-        }
-      }
-    }
-
-    "fails with ResultPushError.TableNotFound for unknown tables" >>* {
-      for {
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(), Map(), jm, mkEvaluator(_ => IO(Stream.empty)))
-        pushStatus <- push.status(99)
-        _ <- cleanup
-      } yield {
-        pushStatus must be_-\/(ResultPushError.TableNotFound(99))
-      }
-    }
-
-    "returns None for a table that has not been pushed" >>* {
-      val testTable = TableRef(TableName("baz"), "query", List())
-
-      for {
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => IO(Stream.empty)))
-        pushStatus <- push.status(TableId)
-        _ <- cleanup
-      } yield {
-        pushStatus must be_\/-(None)
-      }
-    }
-
-    "rejects an already running push" >>* {
+    "rejects an already running push of a table to the same destination" >>* {
       val path = ResourcePath.root()
       val testTable = TableRef(TableName("baz"), "query", List())
 
-      for {
-        (destination, filesystem) <- RefDestination()
-        sync <- SignallingRef[IO, String]("Not started")
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(
-          Map(TableId -> testTable),
-          Map(DestinationId -> destination),
-          jm,
-          mkEvaluator(_ => IO(Stream.eval(sync.set("Started")).as("1") ++ awaitS.as("2") ++ Stream.eval(sync.set("Finished")).as("3"))))
-        firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
-        secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
-        _ <- cleanup
-      } yield {
-        firstStartStatus must beNormal
-        secondStartStatus must beAbnormal(ResultPushError.PushAlreadyRunning(TableId))
+      jobManager use { jm =>
+        for {
+          (destination, _) <- QDestination()
+          (_, data) <- controlledStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data)))
+
+          firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+          secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          firstStartStatus must beNormal
+          secondStartStatus must beAbnormal(ResultPushError.PushAlreadyRunning(TableId, DestinationId))
+        }
       }
     }
 
-    "cancel all pushes" >>* {
+    "allows concurrent push of a table to multiple destinations" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+      val dest2 = DestinationId + 1
+
+      jobManager use { jm =>
+        for {
+          (destination, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination, dest2 -> destination),
+            jm,
+            mkEvaluator(_ => controlledStream.map(_._2)))
+
+          firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+          secondStartStatus <- push.start(TableId, dest2, path, ResultType.Csv, None)
+        } yield {
+          firstStartStatus must beNormal
+          secondStartStatus must beNormal
+        }
+      }
+    }
+
+    "fails with 'destination not found' when destination doesn't exist" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+          startStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beAbnormal(ResultPushError.DestinationNotFound(DestinationId))
+        }
+      }
+    }
+
+    "fails with 'table not found' when table doesn't exist" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+          push <- mkResultPush(
+            Map(),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+          startStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beAbnormal(ResultPushError.TableNotFound(TableId))
+        }
+      }
+    }
+
+    "fails when destination doesn't support requested format" >> todo
+  }
+
+  "start these" >> {
+    val path1 = ResourcePath.root() / ResourceName("foo")
+    val testTable1 = TableRef(TableName("foo"), "queryFoo", List())
+
+    val path2 = ResourcePath.root() / ResourceName("bar")
+    val testTable2 = TableRef(TableName("bar"), "queryBar", List())
+
+    "starts a push for each table to the destination" >>* {
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (fooHalted, dataFoo) <- dataStream
+          (barHalted, dataBar) <- dataStream
+
+          push <- mkResultPush(
+            Map(1 -> testTable1, 2 -> testTable2),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case "queryFoo" => IO(dataFoo)
+              case "queryBar" => IO(dataBar)
+            })
+
+          errors <- push.startThese(DestinationId, NonEmptyMap.of(
+            1 -> ((path1, ResultType.Csv, None)),
+            2 -> ((path2, ResultType.Csv, None))))
+
+          _ <- await(fooHalted)
+          _ <- await(barHalted)
+
+        } yield {
+          errors.isEmpty must beTrue
+        }
+      }
+    }
+
+    "returns the cause of any pushes that failed to start" >>* {
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (barHalted, barData) <- dataStream
+
+          push <- mkResultPush(
+            Map(2 -> testTable2),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case "queryBar" => IO(barData)
+            })
+
+          errors <- push.startThese(DestinationId, NonEmptyMap.of(
+            1 -> ((path1, ResultType.Csv, None)),
+            2 -> ((path2, ResultType.Csv, None))))
+
+          _ <- await(barHalted)
+        } yield {
+          errors must_=== Map(1 -> ResultPushError.TableNotFound(1))
+        }
+      }
+    }
+  }
+
+  "cancel" >> {
+    "aborts a running push" >>* {
+      val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
+      val query = "query"
+      val testTable = TableRef(TableName("foo"), query, List())
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (ctl, data) <- controlledStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data)))
+
+          startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
+
+          _ <- ctl.emit(W1)
+
+          filesystemAfterPush <- awaitFs(filesystem, 1)
+
+          cancelRes <- push.cancel(TableId, DestinationId)
+
+          _ <- await(ctl.halted)
+        } yield {
+          filesystemAfterPush.keySet must equal(Set(pushPath))
+          // check if a *partial* result was pushed
+          filesystemAfterPush(pushPath) must equal(W1)
+          startRes must beNormal
+          cancelRes must beNormal
+        }
+      }
+    }
+
+    "no-op when push already completed" >>* {
+      val testTable = TableRef(TableName("foo"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (halted, data) <- dataStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data)))
+
+          startRes <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+
+          _ <- awaitFs(filesystem)
+          _ <- await(halted)
+
+          cancelRes <- push.cancel(TableId, DestinationId)
+        } yield {
+          startRes must beNormal
+          cancelRes must beNormal
+        }
+      }
+    }
+
+    "no-op when no push for extant table" >>* {
+      val testTable = TableRef(TableName("foo"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          cancelRes <- push.cancel(TableId, DestinationId)
+        } yield {
+          cancelRes must beNormal
+        }
+      }
+    }
+
+    "returns 'destination not found' when destination doesn't exist" >>* {
+      val testTable = TableRef(TableName("foo"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          cancelRes <- push.cancel(TableId, DestinationId)
+        } yield {
+          cancelRes must beAbnormal(ResultPushError.DestinationNotFound(DestinationId))
+        }
+      }
+    }
+
+    "returns 'table not found' when table doesn't exist" >>* {
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          cancelRes <- push.cancel(TableId, DestinationId)
+        } yield {
+          cancelRes must beAbnormal(ResultPushError.TableNotFound(TableId))
+        }
+      }
+    }
+  }
+
+  "cancel these" >> {
+    "cancels running pushes" >>* {
+      val queryA = "queryA"
+      val queryB = "queryB"
+      val queryC = "queryC"
+
+      val testTableA = TableRef(TableName("A"), queryA, List())
+      val testTableB = TableRef(TableName("B"), queryB, List())
+      val testTableC = TableRef(TableName("C"), queryC, List())
+
+      val pushPathA = ResourcePath.root() / ResourceName("foo") / ResourceName("A")
+      val pushPathB = ResourcePath.root() / ResourceName("foo") / ResourceName("B")
+
+      val idA = TableId
+      val idB = idA + 1
+      val idC = idB + 1
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (ctlA, dataA) <- controlledStream
+          (ctlB, dataB) <- controlledStream
+
+          push <- mkResultPush(
+            Map(
+              idA -> testTableA,
+              idB -> testTableB,
+              idC -> testTableC),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case `queryA` => IO(dataA)
+              case `queryB` => IO(dataB)
+            })
+
+          startRes <- push.startThese(
+            DestinationId,
+            NonEmptyMap.of(
+              idA -> ((pushPathA, ResultType.Csv, None)),
+              idB -> ((pushPathB, ResultType.Csv, None))))
+
+          _ <- ctlA.emit(W1)
+          _ <- ctlB.emit(W2)
+
+          filesystemAfterPush <- awaitFs(filesystem, 2)
+
+          cancelRes <- push.cancelThese(
+            DestinationId,
+            NonEmptySet.of(idA, idB, idC))
+
+          // fail the test if push evaluation was not cancelled
+          _ <- await(ctlA.halted)
+          _ <- await(ctlB.halted)
+        } yield {
+          filesystemAfterPush.keySet must equal(Set(pushPathA, pushPathB))
+          // check if a *partial* result was pushed
+          filesystemAfterPush(pushPathA) must equal(W1)
+          filesystemAfterPush(pushPathB) must equal(W2)
+          startRes.isEmpty must beTrue
+          cancelRes.isEmpty must beTrue
+        }
+      }
+    }
+
+    "returns the cause of any push that failed to cancel" >>* {
+      val queryA = "queryA"
+      val testTableA = TableRef(TableName("A"), queryA, List())
+      val pushPathA = ResourcePath.root() / ResourceName("foo") / ResourceName("A")
+
+      val idA = TableId
+      val idB = idA + 1
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (ctlA, dataA) <- controlledStream
+
+          push <- mkResultPush(
+            Map(idA -> testTableA),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case `queryA` => IO(dataA)
+            })
+
+          startRes <- push.start(
+            idA,
+            DestinationId,
+            pushPathA,
+            ResultType.Csv,
+            None)
+
+          _ <- ctlA.emit(W1)
+
+          filesystemAfterPush <- awaitFs(filesystem, 1)
+
+          cancelRes <- push.cancelThese(DestinationId, NonEmptySet.of(idA, idB))
+
+          _ <- await(ctlA.halted)
+        } yield {
+          filesystemAfterPush.keySet must equal(Set(pushPathA))
+          // check if a *partial* result was pushed
+          filesystemAfterPush(pushPathA) must equal(W1)
+          startRes must beNormal
+          cancelRes must_=== Map(idB -> ResultPushError.TableNotFound(idB))
+        }
+      }
+    }
+  }
+
+  "destination status" >> {
+    "empty when nothing has been pushed" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          pushStatus <- push.destinationStatus(DestinationId)
+        } yield {
+          pushStatus must beLike {
+            case Right(m) => m.isEmpty must beTrue
+          }
+        }
+      }
+    }
+
+    "includes running push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (ctl, data) <- controlledStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data)))
+
+          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+
+          _ <- ctl.emit(W1)
+          _ <- awaitFs(filesystem, 1)
+
+          _ <- awaitStatusLike(push, TableId, DestinationId) {
+            case PushMeta(_, ResultType.Csv, None, Status.Running(_)) => true
+          }
+        } yield ok
+      }
+    }
+
+    "includes canceled push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (ctl, data) <- controlledStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data)))
+
+          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+
+          _ <- ctl.emit(W1)
+          _ <- awaitFs(filesystem, 1)
+
+          _ <- push.cancel(TableId, DestinationId)
+
+          _ <- await(ctl.halted)
+
+          _ <- awaitStatusLike(push, TableId, DestinationId) {
+            case PushMeta(_, ResultType.Csv, None, Status.Canceled(_, _)) => true
+          }
+        } yield ok
+      }
+    }
+
+    "includes completed push" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (halted, data) <- dataStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data)))
+
+          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- await(halted)
+
+          _ <- awaitStatusLike(push, TableId, DestinationId) {
+            case PushMeta(_, ResultType.Csv, None, Status.Finished(_, _)) => true
+          }
+        } yield ok
+      }
+    }
+
+    "includes pushes that failed to initialize along with error that led to failure" >>* {
+      val testTable = TableRef(TableName("foo"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO.raiseError[Stream[IO, String]](new Exception("boom"))))
+
+          pushStatus <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+
+          status <- awaitStatusLike(push, TableId, DestinationId) {
+            case PushMeta(_, _, _, Status.Failed(_, _, _)) => true
+          }
+        } yield {
+          status must beLike {
+            case PushMeta(_, ResultType.Csv, None, Status.Failed(ex, _, _)) =>
+              ex.getMessage must equal("boom")
+          }
+        }
+      }
+    }
+
+    "includes pushes that failed during streaming along with the error that led to falure" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+      val ex = new Exception("boom")
+
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
+
+          (halted, data) <- dataStream
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator(_ => IO(data ++ Stream.raiseError[IO](ex))))
+
+          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- await(halted)
+
+          status <- awaitStatusLike(push, TableId, DestinationId) {
+            case PushMeta(_, _, _, Status.Failed(_, _, _)) => true
+          }
+        } yield {
+          status must beLike {
+            case PushMeta(_, ResultType.Csv, None, Status.Failed(ex, _, _)) =>
+              ex.getMessage must equal("boom")
+          }
+        }
+      }
+    }
+
+    "returns 'destination not found' when destination doesn't exist" >>* {
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+          pushStatus <- push.destinationStatus(DestinationId)
+        } yield {
+          pushStatus must beLeft(ResultPushError.DestinationNotFound(DestinationId))
+        }
+      }
+    }
+  }
+
+  "cancel all" >> {
+    "aborts all running pushes" >>* {
       val path1 = ResourcePath.root() / ResourceName("foo")
       val testTable1 = TableRef(TableName("foo"), "queryFoo", List())
 
       val path2 = ResourcePath.root() / ResourceName("bar")
       val testTable2 = TableRef(TableName("bar"), "queryBar", List())
 
-      for {
-        (destination, filesystem) <- RefDestination()
-        refFoo <- SignallingRef[IO, String]("Not started")
-        refBar <- SignallingRef[IO, String]("Not started")
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(1 -> testTable1, 2 -> testTable2), Map(DestinationId -> destination), jm, mkEvaluator {
-          case "queryFoo" =>
-            IO(Stream.eval_(refFoo.set("Started")) ++ awaitS ++ Stream.eval_(refFoo.set("Finished")))
-          case "queryBar" =>
-            IO(Stream.eval_(refBar.set("Started")) ++ awaitS ++ Stream.eval_(refBar.set("Finished")))
-        })
-        _ <- push.start(1, DestinationId, path1, ResultType.Csv, None)
-        _ <- push.start(2, DestinationId, path2, ResultType.Csv, None)
-        _ <- latchGet(refFoo, "Started") >> latchGet(refBar, "Started")
-        _ <- push.cancelAll
-        fooCanceled <- verifyTimeout(latchGet(refFoo, "Finished"), "queryFoo not cancelled")
-        barCanceled <- verifyTimeout(latchGet(refBar, "Finished"), "queryBar not cancelled")
-        _ <- cleanup
-      } yield ok
-    }
+      jobManager use { jm =>
+        for {
+          (destination, filesystem) <- QDestination()
 
-    "fails with ResultPush.DestinationNotFound with an unknown destination id" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
-      val UnknownDestinationId = 99
+          (ctlA, dataA) <- controlledStream
+          (ctlB, dataB) <- controlledStream
 
-      for {
-        (destination, filesystem) <- RefDestination()
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(TableId -> testTable), Map(), jm, mkEvaluator(_ => IO(Stream.empty)))
-        pushRes <- push.start(TableId, UnknownDestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- cleanup
-      } yield {
-        pushRes must beAbnormal(ResultPushError.DestinationNotFound(UnknownDestinationId))
+          push <- mkResultPush(
+            Map(1 -> testTable1, 2 -> testTable2),
+            Map(DestinationId -> destination),
+            jm,
+            mkEvaluator {
+              case "queryFoo" => IO(dataA)
+              case "queryBar" => IO(dataB)
+            })
+
+          _ <- push.start(1, DestinationId, path1, ResultType.Csv, None)
+          _ <- push.start(2, DestinationId, path2, ResultType.Csv, None)
+
+          _ <- ctlA.emit(W1)
+          _ <- ctlB.emit(W2)
+
+          _ <- awaitFs(filesystem, 2)
+
+          _ <- push.cancelAll
+
+          _ <- await(ctlA.halted)
+          _ <- await(ctlB.halted)
+        } yield ok
       }
     }
 
-    "fails with ResultPush.TableNotFound with an unknown table id" >>* {
-      val testTable = TableRef(TableName("foo"), "query", List())
-      val UnknownTableId = 99
-
-      for {
-        (destination, filesystem) <- RefDestination()
-        (jm, cleanup) <- JobManager[IO, Int, Nothing]().compile.resource.lastOrError.allocated
-        push <- mkResultPush(Map(), Map(DestinationId -> destination), jm, mkEvaluator(_ => IO(Stream.empty)))
-        pushRes <- push.start(UnknownTableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
-        _ <- cleanup
-      } yield {
-        pushRes must beAbnormal(ResultPushError.TableNotFound(UnknownTableId))
+    "no-op when no running pushes" >>* {
+      jobManager use { jm =>
+        for {
+          push <- mkResultPush(
+            Map(),
+            Map(),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+          _ <- push.cancelAll
+        } yield ok
       }
     }
   }

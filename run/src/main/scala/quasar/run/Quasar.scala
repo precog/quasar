@@ -18,22 +18,23 @@ package quasar.run
 
 import slamdata.Predef._
 
+import quasar.RateLimiter
 import quasar.api.{QueryEvaluator, SchemaConfig}
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
+import quasar.api.push.{ResultPush, ResultRender}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.table.{TableRef, Tables}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Datasource, DestinationModule, QueryResult}
 import quasar.contrib.std.uuid._
-import quasar.ejson.EJson
 import quasar.ejson.implicits._
 import quasar.impl.DatasourceModule
 import quasar.impl.datasource.{AggregateResult, CompositeResult}
 import quasar.impl.datasources._
 import quasar.impl.datasources.middleware._
 import quasar.impl.destinations.{DefaultDestinationManager, DefaultDestinations}
-import quasar.impl.schema.{SstConfig, SstEvalConfig}
+import quasar.impl.push.DefaultResultPush
 import quasar.impl.storage.IndexedStore
 import quasar.impl.table.DefaultTables
 import quasar.qscript.{QScriptEducated, construction, Map => QSMap}
@@ -48,18 +49,20 @@ import cats.Functor
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.syntax.functor._
 import fs2.Stream
+import fs2.job.JobManager
 import matryoshka.data.Fix
 import org.slf4s.Logging
 import scalaz.{IMap, Show, ~>}
 import scalaz.syntax.show._
 import shims.{monadToScalaz, functorToCats, functorToScalaz, orderToScalaz}
-import spire.std.double._
 
 final class Quasar[F[_], R, C <: SchemaConfig](
-    val datasources: Datasources[F, Stream[F, ?], UUID, Json, SstConfig[Fix[EJson], Double], C],
+    val datasources: Datasources[F, Stream[F, ?], UUID, Json, C],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val tables: Tables[F, UUID, SqlQuery],
-    val queryEvaluator: QueryEvaluator[F, SqlQuery, R])
+    val queryEvaluator: QueryEvaluator[F, SqlQuery, Stream[F, R]],
+    val resultPush: ResultPush[F, UUID, UUID],
+    val resultRender: ResultRender[F, R])
 
 @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
 object Quasar extends Logging {
@@ -73,11 +76,12 @@ object Quasar extends Logging {
       datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
       destinationRefs: IndexedStore[F, UUID, DestinationRef[Json]],
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
-      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], R])(
-      datasourceModules: List[DatasourceModule],
-      destinationModules: List[DestinationModule],
+      qscriptEvaluator: LookupRunning[F] => QueryEvaluator[F, Fix[QScriptEducated[Fix, ?]], Stream[F, R]],
+      resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
-      sstEvalConfig: SstEvalConfig)(
+      rateLimiter: RateLimiter[F])(
+      datasourceModules: List[DatasourceModule],
+      destinationModules: List[DestinationModule])(
       implicit
       ec: ExecutionContext)
       : Resource[F, Quasar[F, R, C]] = {
@@ -99,7 +103,7 @@ object Quasar extends Logging {
         DefaultDatasourceManager.Builder[UUID, Fix, F]
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(onCondition)(_, _))
-          .build(moduleMap, configured)
+          .build(moduleMap, configured, rateLimiter)
 
       destModules = IMap.fromList(destinationModules.map(dest => dest.destinationType -> dest))
 
@@ -108,10 +112,8 @@ object Quasar extends Logging {
       destManager <- Resource.liftF(DefaultDestinationManager.empty[UUID, F](destModules))
       destinations = DefaultDestinations[UUID, Json, F](freshUUID, destinationRefs, destManager)
 
-      oldResourceSchema = SimpleCompositeResourceSchema[F, Fix[EJson], Double](sstEvalConfig)
-
       datasources =
-        DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, oldResourceSchema, resourceSchema)
+        DefaultDatasources(freshUUID, datasourceRefs, dsErrors, dsManager, resourceSchema)
 
       lookupRunning =
         (id: UUID) => dsManager.managedDatasource(id).map(_.map(_.modify(reifiedAggregateDs)))
@@ -120,7 +122,16 @@ object Quasar extends Logging {
 
       tables = DefaultTables(freshUUID, tableRefs)
 
-    } yield new Quasar(datasources, destinations, tables, sqlEvaluator)
+      jobManager <- JobManager[F, (UUID, UUID), Nothing]().compile.resource.lastOrError
+
+      push <- Resource.liftF(DefaultResultPush[F, UUID, UUID, SqlQuery, R](
+        tableRefs.lookup,
+        sqlEvaluator,
+        destinations.destinationOf(_).map(_.toOption),
+        jobManager,
+        resultRender))
+
+    } yield new Quasar(datasources, destinations, tables, sqlEvaluator, push, resultRender)
   }
 
   ////

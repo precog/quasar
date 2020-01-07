@@ -21,9 +21,8 @@ import slamdata.Predef._
 import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
 
-final case class PushMeta[D](
-  destinationId: D,
-  path: ResourcePath,
-  resultType: ResultType,
-  status: Status,
-  limit: Option[Long])
+final case class PushMeta(
+    path: ResourcePath,
+    resultType: ResultType,
+    limit: Option[Long],
+    status: Status)

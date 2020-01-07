@@ -16,13 +16,17 @@
 
 package quasar.api.push
 
-import slamdata.Predef.{Option, Long, Unit}
+import slamdata.Predef._
 
 import quasar.Condition
 import quasar.api.destination.ResultType
 import quasar.api.resource.ResourcePath
 
-import scalaz.\/
+import scala.collection.immutable.SortedMap
+
+import cats.Applicative
+import cats.data.{NonEmptyMap, NonEmptySet}
+import cats.implicits._
 
 /** @tparam F effects
   * @tparam T Table Id
@@ -31,14 +35,67 @@ import scalaz.\/
 trait ResultPush[F[_], TableId, DestinationId] {
   import ResultPushError._
 
-  def start(tableId: TableId, destinationId: DestinationId, path: ResourcePath, format: ResultType, limit: Option[Long])
-      : F[Condition[ResultPushError[TableId, DestinationId]]]
-
-  def cancel(tableId: TableId)
+  def cancel(tableId: TableId, destinationId: DestinationId)
       : F[Condition[ExistentialError[TableId, DestinationId]]]
 
-  def status(tableId: TableId)
-      : F[TableNotFound[TableId] \/ Option[PushMeta[DestinationId]]]
-
   def cancelAll: F[Unit]
+
+  def destinationStatus(destinationId: DestinationId)
+      : F[Either[DestinationNotFound[DestinationId], Map[TableId, PushMeta]]]
+
+  def start(
+      tableId: TableId,
+      destinationId: DestinationId,
+      path: ResourcePath,
+      format: ResultType,
+      limit: Option[Long])
+      : F[Condition[ResultPushError[TableId, DestinationId]]]
+
+  /** Attempts to cancel the push to `destinationId` for each entry `tables`.
+    *
+    * The resulting `Map` will contain an entry for any push that failed to
+    * cancel. An empty `Map` indicates no errors were encountered.
+    */
+  def cancelThese(
+      destinationId: DestinationId,
+      tables: NonEmptySet[TableId])(
+      implicit F: Applicative[F])
+      : F[Map[TableId, ExistentialError[TableId, DestinationId]]] = {
+
+    val failed: Map[TableId, ExistentialError[TableId, DestinationId]] =
+      SortedMap.empty(tables.toSortedSet.ordering)
+
+    tables.foldLeft(failed.pure[F]) {
+      case (f, tid) =>
+        (f, cancel(tid, destinationId)) mapN {
+          case (m, Condition.Abnormal(err)) => m.updated(tid, err)
+          case (m, Condition.Normal()) => m
+        }
+    }
+  }
+
+  /** Attempts to start a push to `destinationId` for each entry `tables`.
+    *
+    * The resulting `Map` will contain an entry for any push that failed to
+    * start. An empty `Map` indicates all pushes were started successfully.
+    */
+  def startThese(
+      destinationId: DestinationId,
+      tables: NonEmptyMap[TableId, (ResourcePath, ResultType, Option[Long])])(
+      implicit F: Applicative[F])
+      : F[Map[TableId, ResultPushError[TableId, DestinationId]]] = {
+
+    val tablesM = tables.toSortedMap
+
+    val failed: Map[TableId, ResultPushError[TableId, DestinationId]] =
+      SortedMap.empty(tablesM.ordering)
+
+    tablesM.foldLeft(failed.pure[F]) {
+      case (f, (tid, (path, tpe, limit))) =>
+        (f, start(tid, destinationId, path, tpe, limit)) mapN {
+          case (m, Condition.Abnormal(err)) => m.updated(tid, err)
+          case (m, Condition.Normal()) => m
+        }
+    }
+  }
 }

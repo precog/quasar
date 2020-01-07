@@ -24,9 +24,10 @@ object ResultPushError {
   sealed trait ExistentialError[+T, +D] extends ResultPushError[T, D]
 
   final case class DestinationNotFound[D](destinationId: D) extends ExistentialError[Nothing, D]
+
   final case class TableNotFound[T](tableId: T) extends ExistentialError[T, Nothing]
 
   final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
 
-  final case class PushAlreadyRunning[T](tableId: T) extends ResultPushError[T, Nothing]
+  final case class PushAlreadyRunning[T, D](tableId: T, destinationId: D) extends ResultPushError[T, D]
 }

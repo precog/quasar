@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package quasar.sst
+package quasar.contrib.cats
 
-import slamdata.Predef._
-import quasar.contrib.matryoshka.arbitrary._
-import quasar.contrib.specs2.Spec
-import quasar.fp._
+import scala.util.hashing.Hashing
 
-import matryoshka._
-import scalaz._, Scalaz._
-import scalaz.scalacheck.{ScalazProperties => propz}
+import cats.kernel.Hash
 
-final class TaggedSpec extends Spec with TaggedArbitrary {
-  checkAll(propz.equal.laws[Tagged[Int]])
-  checkAll(propz.traverse1.laws[Tagged])
+object hash {
+  def toHashing[A: Hash]: Hashing[A] =
+    Hashing.fromFunction(Hash[A].hash(_))
 }

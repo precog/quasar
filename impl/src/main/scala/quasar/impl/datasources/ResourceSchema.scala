@@ -16,18 +16,13 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.Option
-
 import quasar.api.SchemaConfig
-
-import scala.concurrent.duration.FiniteDuration
 
 import cats.Contravariant
 
 /** Attempt to discover the schema of a resource. */
 trait ResourceSchema[F[_], S <: SchemaConfig, R] {
-  def apply(schemaConfig: S, resource: R, timeLimit: FiniteDuration)
-      : F[Option[schemaConfig.Schema]]
+  def apply(schemaConfig: S, resource: R): F[schemaConfig.Schema]
 }
 
 object ResourceSchema {
@@ -35,9 +30,8 @@ object ResourceSchema {
     new Contravariant[ResourceSchema[F, S, ?]] {
       def contramap[A, B](rs: ResourceSchema[F, S, A])(f: B => A): ResourceSchema[F, S, B] =
         new ResourceSchema[F, S, B] {
-          def apply(schemaConfig: S, resource: B, timeLimit: FiniteDuration)
-              : F[Option[schemaConfig.Schema]] =
-            rs(schemaConfig, f(resource), timeLimit)
+          def apply(schemaConfig: S, resource: B): F[schemaConfig.Schema] =
+            rs(schemaConfig, f(resource))
         }
     }
 }

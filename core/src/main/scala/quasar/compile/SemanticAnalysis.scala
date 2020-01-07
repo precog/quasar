@@ -28,7 +28,7 @@ import scala.AnyRef
 import matryoshka._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz._, Scalaz._, Validation.{success, failure, failureNel}
+import scalaz.{Select => _,_}, Scalaz._, Validation.{success, failure, failureNel}
 
 object SemanticAnalysis {
   sealed abstract class Synthetic

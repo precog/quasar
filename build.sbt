@@ -15,9 +15,6 @@ def readVersion(path: File): String =
 lazy val fs2GzipVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
 
-lazy val fs2JobVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "fs2-job-version"))
-
 lazy val qdataVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "qdata-version"))
 
@@ -82,13 +79,12 @@ lazy val root = project.in(file("."))
   .aggregate(
     api,
     common, connector, core,
-    datagen,
     ejson,
     foundation, frontend,
     impl,
     qscript, qsu,
     runp,
-    sql, sst,
+    sql
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
@@ -106,7 +102,9 @@ lazy val foundation = project
       "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "2.1.0",
+      "com.codecommit"             %% "skolems"                   % "0.1.2",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
+      "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
       "co.fs2"                     %% "fs2-io"                    % fs2Version,
       "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
@@ -194,24 +192,6 @@ lazy val frontend = project
       "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val sst = project
-  .settings(name := "quasar-sst")
-  .dependsOn(frontend % BothScopes)
-  .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val datagen = project
-  .settings(name := "quasar-datagen")
-  .dependsOn(sst % BothScopes)
-  .settings(commonSettings)
-  .settings(
-    mainClass in Compile := Some("quasar.datagen.Main"),
-
-    libraryDependencies ++= Seq(
-      "com.github.scopt" %% "scopt"          % scoptVersion,
-      "eu.timepit"       %% "refined-scalaz" % refinedVersion))
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Implementation of the SQL² query language.
   */
 lazy val sql = project
@@ -280,14 +260,13 @@ lazy val impl = project
     api % BothScopes,
     common % "test->test",
     connector % BothScopes,
-    frontend % "test->test",
-    sst)
+    frontend % "test->test")
   .settings(commonSettings)
   .settings(
 
     libraryDependencies ++= Seq(
       "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
-      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion.value,
+      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,

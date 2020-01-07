@@ -18,7 +18,7 @@ package quasar.impl.datasources
 
 import slamdata.Predef._
 
-import quasar.{ConditionMatchers, RenderTreeT, ScalarStages}
+import quasar.{ConditionMatchers, RateLimiter, RenderTreeT, ScalarStages}
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -118,7 +118,8 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
     def sanitizeConfig(config: Json): Json = jString("sanitized")
 
     def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-        config: Json)(
+        config: Json,
+        rateLimiter: RateLimiter[F])(
         implicit ec: ExecutionContext)
         : Resource[F, R[F, InterpretedRead[ResourcePath]]] =
       Resource((
@@ -152,11 +153,12 @@ object DefaultDatasourceManagerSpec extends quasar.Qspec with ConditionMatchers 
   }
 
   def withInitialMgr[A](configured: IMap[Int, DatasourceRef[Json]])(f: (Mgr, Disposes) => IO[A]): A =
-    Ref[IO].of(List.empty[DatasourceType])
-      .flatMap(disps =>
-        DefaultDatasourceManager.Builder[Int, Fix, IO]
-          .build(modules(disps), configured)
-          .use(f(_, disps)))
+    RateLimiter[IO](1.0).flatMap(limiter =>
+      Ref[IO].of(List.empty[DatasourceType])
+        .flatMap(disps =>
+          DefaultDatasourceManager.Builder[Int, Fix, IO]
+            .build(modules(disps), configured, limiter)
+            .use(f(_, disps))))
       .unsafeRunSync()
 
   def withMgr[A](f: (Mgr, Disposes) => IO[A]): A =

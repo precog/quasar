@@ -23,7 +23,6 @@ import quasar.api.resource.ResourcePath
 
 import scala.Predef.assert
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 import java.util.UUID
 
 import cats.effect.Effect
@@ -40,21 +39,19 @@ import scalaz.std.list._
 import shims.{eqToScalaz, equalToCats, showToCats, showToScalaz}
 
 abstract class DatasourcesSpec[
-    F[_], G[_], I: Order: Show, C: Equal: Show, OldS <: SchemaConfig, S <: SchemaConfig](
+    F[_], G[_], I: Order: Show, C: Equal: Show, S <: SchemaConfig](
     implicit F: Effect[F], ec: ExecutionContext)
     extends EffectfulQSpec[F]
     with ConditionMatchers {
 
   import DatasourceError._
 
-  def datasources: Datasources[F, G, I, C, OldS, S]
+  def datasources: Datasources[F, G, I, C, S]
 
   def supportedType: DatasourceType
 
   // Must be distinct.
   def validConfigs: (C, C)
-
-  val oldSchemaConfig: OldS
 
   val schemaConfig: S
 
@@ -246,10 +243,6 @@ abstract class DatasourcesSpec[
         metaAfter.any(_._1 ≟ i) must beFalse
       }
     }
-  }
-
-  "old resource schema" >> {
-    discoveryExamples(datasources.oldResourceSchema(_, _, oldSchemaConfig, 30.seconds))
   }
 
   "resource schema" >> {

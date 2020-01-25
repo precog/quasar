@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2401,7 +2401,6 @@ object ScalarStageSpec {
       }
   }
 
-  // TODO cartesian tests with undefined values on both sides
   trait CartesianSpec extends JsonSpec {
     protected final type Cartesian = ScalarStage.Cartesian
     protected final val Cartesian = ScalarStage.Cartesian
@@ -3329,6 +3328,36 @@ object ScalarStageSpec {
             input must cartesianInto(targets)(expected)
           }
         }
+      }
+
+      // a0[_] as a, b0[_] as b
+      "cart-44 cross with undefined values on both sides" >> {
+        import ScalarStage.Pivot
+
+        val input = ldjson("""
+            { "a0": [1] }
+            { "a0": [2], "b0": ["z"] }
+            { "b0": ["y"] }
+            { "a0": [3], "b0": "x" }
+            { "a0": 4, "b0": ["w"] }
+            { "a0": 5, "b0": "v" }
+            """)
+
+        val expected = ldjson("""
+            { "a": 1 }
+            { "a": 2, "b": "z" }
+            { "b": "y" }
+            { "a": 3 }
+            { "b": "w" }
+            """)
+
+          val targets = Map(
+            (CPathField("a"), (CPathField("a0"), List(
+              Pivot(IdStatus.ExcludeId, ColumnType.Array)))),
+            (CPathField("b"), (CPathField("b0"), List(
+              Pivot(IdStatus.ExcludeId, ColumnType.Array)))))
+
+        input must cartesianInto(targets)(expected)
       }
     }
 

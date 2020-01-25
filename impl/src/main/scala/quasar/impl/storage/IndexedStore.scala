@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,31 +19,20 @@ package quasar.impl.storage
 import slamdata.Predef._
 
 import cats.arrow.FunctionK
+import cats.syntax.apply._
 
 import monocle.Prism
 
+import quasar.Store
 import quasar.contrib.scalaz.MonadError_
 import quasar.higher.HFunctor
 
 import fs2.Stream
 import scalaz.{~>, Bind, Functor, InvariantFunctor, Monad, Scalaz, Applicative}, Scalaz._
 
-trait IndexedStore[F[_], I, V] {
+trait IndexedStore[F[_], I, V] extends Store[F, I, V] {
   /** All values in the store paired with their index. */
   def entries: Stream[F, (I, V)]
-
-  /** Retrieve the value at the specified index. */
-  def lookup(i: I): F[Option[V]]
-
-  /** Associate the given value with the specified index, replaces any
-    * existing association.
-    */
-  def insert(i: I, v: V): F[Unit]
-
-  /** Remove any value associated with the specified index, returning whether
-    * it existed.
-    */
-  def delete(i: I): F[Boolean]
 }
 
 object IndexedStore extends IndexedStoreInstances {
@@ -139,6 +128,17 @@ object IndexedStore extends IndexedStoreInstances {
     xmapValueF(s)(
       decodeP[F, V, VV, E](mkError)(prism))(
       v => prism(v).point[F])
+
+  def hooked[F[_]: Monad, I, V](
+      store: IndexedStore[F, I, V],
+      updateHook: (I, V) => F[Unit],
+      deleteHook: (I, Boolean) => F[Unit])
+      : IndexedStore[F, I, V] = new IndexedStore[F, I, V] {
+    def entries = store.entries
+    def lookup(k: I): F[Option[V]] = store.lookup(k)
+    def insert(k: I, v: V): F[Unit] = store.insert(k, v) *> updateHook(k, v)
+    def delete(k: I): F[Boolean] = store.delete(k) flatMap { x => deleteHook(k, x) as x }
+  }
 }
 
 sealed abstract class IndexedStoreInstances {

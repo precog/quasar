@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,19 +24,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 import cats.data.StateT
-import cats.effect.IO
+import cats.effect.{Resource, IO}
 import cats.syntax.applicative._
 import scalaz.IMap
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import shims._
+
+import shims.{monadToScalaz, monoidToCats}
 
 final class PureIndexedStoreSpec extends
     IndexedStoreSpec[StateT[IO, IMap[Int, String], ?], Int, String] {
 
   val emptyStore =
     PureIndexedStore[StateT[IO, IMap[Int, String], ?], Int, String]
-      .pure[StateT[IO, IMap[Int, String], ?]]
+      .pure[Resource[StateT[IO, IMap[Int, String], ?], ?]]
 
   val freshIndex = StateT.liftF(IO(Random.nextInt()))
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package quasar.api.table
 
-import slamdata.Predef.Unit
-
 import quasar.Condition
 
 import fs2.Stream
@@ -25,37 +23,15 @@ import scalaz.\/
 
 /** @tparam I identity
   * @tparam Q query type
-  * @tparam D materialized table data
-  * @tparam S table schema
   */
-trait Tables[F[_], I, Q, D, S] {
-  import TableError.{
-    CreateError,
-    ExistenceError,
-    ModificationError,
-    PreparationNotInProgress,
-    PrePreparationError
-  }
+trait Tables[F[_], I, Q] {
+  import TableError.{CreateError, ExistenceError, ModificationError}
 
-  def allTables: Stream[F, (I, TableRef[Q], PreparationStatus)]
+  def allTables: Stream[F, (I, TableRef[Q])]
 
   def table(tableId: I): F[ExistenceError[I] \/ TableRef[Q]]
 
   def createTable(table: TableRef[Q]): F[CreateError[I] \/ I]
 
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]]
-
-  def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]]
-
-  def preparationEvents: Stream[F, PreparationEvent[I]]
-
-  def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus]
-
-  def cancelPreparation(tableId: I): F[Condition[PreparationNotInProgress[I]]]
-
-  def cancelAllPreparations: F[Unit]
-
-  def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]]
-
-  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]]
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import quasar.Condition
 import slamdata.Predef.{Exception, Option}
 
 import monocle.macros.Lenses
-import scalaz.{Cord, Show}
+import scalaz.Show
 import scalaz.syntax.show._
 
 @Lenses
@@ -43,9 +43,9 @@ sealed abstract class DestinationMetaInstances {
     implicit val exShow: Show[Exception] =
       Show.shows(_.getMessage)
 
-    Show.show {
+    Show.shows {
       case DestinationMeta(n, k, s) =>
-        Cord("DestinationMeta(") ++ k.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ s.show ++ Cord(")")
+        "DestinationMeta(" + k.shows + ", " + n.shows + ", " + s.shows + ")"
     }
   }
 }

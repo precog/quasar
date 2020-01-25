@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ import scalaz.syntax.equal._
 import scalaz.syntax.traverse._
 import scalaz.syntax.std.option._
 
-import shims._
+import shims.monadToScalaz
 
 object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], ResourcePathType] {
 

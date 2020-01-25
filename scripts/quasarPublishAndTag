@@ -20,6 +20,11 @@ for c in slamdata-backend quasar-repl mimir thoth benchmarks scion; do
 done
 
 # datasources
-for c in s3 azure url mongo; do
+for c in s3 azure url mongo postgres; do
   scripts/bumpDependentProject slamdata "quasar-datasource-$c" bumpInDownstream
+done
+
+# destinations
+for c in thoughtspot postgres s3 azure snowflake avalanche; do
+  scripts/bumpDependentProject slamdata "quasar-destination-$c" bumpInDownstream
 done

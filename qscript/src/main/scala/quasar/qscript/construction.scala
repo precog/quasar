@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,8 +61,11 @@ object construction {
     def CurrentTimeZone[A]: RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.CurrentTimeZone())
 
-    def ToLocal[A](a: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
-      rollCore(MapFuncsCore.ToLocal(a))
+    def ToLocal[A](a1: RecFreeMapA[T, A], a2: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToLocal(a1, a2))
+
+    def ToOffset[A](a1: RecFreeMapA[T, A], a2: RecFreeMapA[T, A]): RecFreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToOffset(a1, a2))
 
     def JoinSideName[A](sym: Symbol): RecFreeMapA[T, A] =
       rollCore(MapFuncsCore.JoinSideName(sym))
@@ -392,8 +395,11 @@ object construction {
     def CurrentTimeZone[A]: FreeMapA[T, A] =
       rollCore(MapFuncsCore.CurrentTimeZone())
 
-    def ToLocal[A](a: FreeMapA[T, A]): FreeMapA[T, A] =
-      rollCore(MapFuncsCore.ToLocal(a))
+    def ToLocal[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToLocal(a1, a2))
+
+    def ToOffset[A](a1: FreeMapA[T, A], a2: FreeMapA[T, A]): FreeMapA[T, A] =
+      rollCore(MapFuncsCore.ToOffset(a1, a2))
 
     def JoinSideName[A](sym: Symbol): FreeMapA[T, A] =
       rollCore(MapFuncsCore.JoinSideName(sym))

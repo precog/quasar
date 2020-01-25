@@ -27,6 +27,7 @@ docker/Dockerfiles/Hadoop/hadoop*.tar.gz
 /scripts/discordTravisPost
 /scripts/isRevision
 /scripts/listLabels
+/scripts/closePR
 /pgppassphrase.sbt.enc
 /scripts/publishAndTag
 /pubring.pgp.enc

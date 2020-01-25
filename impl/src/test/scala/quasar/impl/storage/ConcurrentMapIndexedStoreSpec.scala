@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,18 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 import quasar.contrib.cats.effect.stateT.catsStateTEffect
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
 import cats.data.StateT
-import cats.effect.{Sync, IO}
+import cats.effect.{Blocker, IO, Resource, Sync}
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import shims._
+
+import shims.monoidToCats
+
 import java.util.concurrent.ConcurrentHashMap
 
 final class ConcurrentMapIndexedStoreSpec extends
@@ -35,14 +37,14 @@ final class ConcurrentMapIndexedStoreSpec extends
 
   type M[A] = StateT[IO, Int, A]
 
-  val blockingPool: BlockingContext = BlockingContext.cached("concurrent-map-indexed-store-spec")
+  val blocker: Blocker = qc.Blocker.cached("concurrent-map-indexed-store-spec")
 
   val freshIndex: M[Int] = StateT.liftF(IO(Random.nextInt))
 
   val commit: M[Unit] = StateT.modify { (x: Int) => x + 1 }
 
-  val emptyStore: M[IndexedStore[M, Int, String]] =
-    Sync[M].delay { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit, blockingPool) }
+  val emptyStore: Resource[M, IndexedStore[M, Int, String]] =
+    Resource.liftF(Sync[M].delay { new ConcurrentHashMap[Int, String]() } map { ConcurrentMapIndexedStore(_, commit, blocker) })
 
   val valueA = "A"
   val valueB = "B"
@@ -50,8 +52,7 @@ final class ConcurrentMapIndexedStoreSpec extends
   "check commits works" >> {
     val expected = List(0, 1, 2, 3, 4, 4)
 
-    val stateT = for {
-      store <- emptyStore
+    val stateT = emptyStore use { store => for {
       initial <- StateT.get[IO, Int]
 
       i1 <- freshIndex
@@ -74,7 +75,7 @@ final class ConcurrentMapIndexedStoreSpec extends
       deleted2 <- StateT.get[IO, Int]
 
       actual = List(initial, inserted1, inserted2, inserted3, deleted1, deleted2)
-    } yield actual === expected
+    } yield actual === expected }
 
     stateT.runA(0).unsafeRunSync
   }

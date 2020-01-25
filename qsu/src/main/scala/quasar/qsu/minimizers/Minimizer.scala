@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,18 +30,27 @@ trait Minimizer[T[_[_]]] extends QSUTTypes[T] {
 
   def couldApplyTo(candidates: List[QSUGraph]): Boolean
 
+  /** Returns what is essentially a lens focused on the first ancestor of `qgraph`
+    * _not_ applicable to this `Minimizer`. The function component describes how
+    * to rebuild the semantic equivalent of `qgraph` given a (possibly) new ancestor
+    * and `FreeMap` to apply to its output.
+    */
   def extract[
       G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
-      qgraph: QSUGraph): Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])]
+      qgraph: QSUGraph)
+      : Option[(QSUGraph, (QSUGraph, FreeMap) => G[QSUGraph])]
 
-  // the first component of the tuple is the rewrite target on any provenance association
-  // the second component is the root of the resulting graph
+  /** The first component of the tuple is the rewrite target on any provenance
+    * association, i.e. the semantic equivalent of the input. The second component
+    * is the root of the resulting graph.
+    */
   def apply[
       G[_]: Monad: NameGenerator: MonadPlannerErr: RevIdxM: MinStateM[T, P, ?[_]]](
       qgraph: QSUGraph,
       singleSource: QSUGraph,
       candidates: List[QSUGraph],
-      fm: FreeMapA[Int]): G[Option[(QSUGraph, QSUGraph)]]
+      fm: FreeMapA[Int])
+      : G[Option[(QSUGraph, QSUGraph)]]
 }
 
 object Minimizer {

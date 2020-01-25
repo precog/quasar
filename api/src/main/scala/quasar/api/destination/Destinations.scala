@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,9 @@ trait Destinations[F[_], G[_], I, C] {
     * it doesn't exist.
     */
   def destinationRef(destinationId: I): F[ExistentialError[I] \/ DestinationRef[C]]
+
+  /** Returns the specified destination. Initializes it if necessary */
+  def destinationOf(destinationId: I): F[DestinationError[I, C] \/ Destination[F]]
 
   /** Returns the status of the specified destination or an error if it doesn't
     * exist.

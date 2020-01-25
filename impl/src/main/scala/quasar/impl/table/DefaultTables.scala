@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,65 +19,36 @@ package quasar.impl.table
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.QueryEvaluator
-import quasar.api.table.{
-  OngoingStatus,
-  PreparationEvent,
-  PreparationResult,
-  PreparationStatus,
-  PreparedStatus,
-  TableError,
-  TableRef,
-  Tables
-}
+import quasar.api.table.{TableError, TableRef, Tables}
 import quasar.impl.storage.IndexedStore
 
 import cats.effect.Effect
 
 import fs2.Stream
 
-import scalaz.{\/, -\/, \/-, Equal}
+import scalaz.{\/, Equal}
 import scalaz.std.option
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 
-import shims._
+import shims.monadToScalaz
 
-final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
+final class DefaultTables[F[_]: Effect, I: Equal, Q](
     freshId: F[I],
-    tableStore: IndexedStore[F, I, TableRef[Q]],
-    evaluator: QueryEvaluator[F, Q, D],
-    manager: PreparationsManager[F, I, Q, D],
-    lookupTableData: I => F[Option[D]],
-    lookupTableSchema: I => F[Option[S]])
-    extends Tables[F, I, Q, D, S] {
+    tableStore: IndexedStore[F, I, TableRef[Q]])
+    extends Tables[F, I, Q] {
 
   import TableError.{
     CreateError,
     ExistenceError,
     ModificationError,
     NameConflict,
-    PreparationInProgress,
-    PreparationNotInProgress,
-    PrePreparationError,
     TableNotFound
   }
 
-  def allTables: Stream[F, (I, TableRef[Q], PreparationStatus)] =
-    tableStore.entries.evalMap {
-      case (id, table) =>
-        liveStatus(id).map((id, table, _))
-    }
-
-  def cancelAllPreparations: F[Unit] =
-    manager.cancelAll
-
-  def cancelPreparation(tableId: I): F[Condition[PreparationNotInProgress[I]]] =
-    manager.cancelPreparation(tableId).map(_ map {
-      case PreparationsManager.NotInProgressError(i) =>
-        PreparationNotInProgress(i)
-    })
+  val allTables: Stream[F, (I, TableRef[Q])] =
+    tableStore.entries
 
   def createTable(table: TableRef[Q]): F[CreateError[I] \/ I] =
     tableStore.entries
@@ -92,45 +63,6 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
           _ <- tableStore.insert(tableId, table)
         } yield tableId.right
       }
-
-  def preparationStatus(tableId: I): F[ExistenceError[I] \/ PreparationStatus] =
-    for {
-      exists <- table(tableId)
-      status <- liveStatus(tableId)
-    } yield exists.map(_ => status)
-
-  def prepareTable(tableId: I): F[Condition[PrePreparationError[I]]] = {
-    val queryF: F[PrePreparationError[I] \/ Q] =
-      table(tableId).map(_.map(_.query))
-
-    queryF.flatMap {
-      case -\/(err) =>
-        Condition.abnormal(err).point[F]
-      case \/-(query) =>
-        manager.prepareTable(tableId, query) map {
-          _.map {
-            case PreparationsManager.InProgressError(id) =>
-              PreparationInProgress(id)
-          }
-        }
-    }
-  }
-
-  def preparationEvents: Stream[F, PreparationEvent[I]] =
-    manager.notifications
-
-  def preparedData(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, D]] =
-    tableStore.lookup(tableId) flatMap {
-      case Some(_) =>
-        lookupTableData(tableId) map {
-          case Some(dataset) =>
-            PreparationResult.Available[I, D](tableId, dataset).right
-          case None =>
-            PreparationResult.Unavailable[I, D](tableId).right
-        }
-      case None =>
-        (TableNotFound(tableId): ExistenceError[I]).left.pure[F]
-    }
 
   def replaceTable(tableId: I, table: TableRef[Q]): F[Condition[ModificationError[I]]] =
     tableStore.lookup(tableId) flatMap {
@@ -150,55 +82,12 @@ final class DefaultTables[F[_]: Effect, I: Equal, Q, D, S](
 
   def table(tableId: I): F[ExistenceError[I] \/ TableRef[Q]] =
     tableStore.lookup(tableId).map(option.toRight(_)(TableNotFound(tableId)))
-
-  def preparedSchema(tableId: I): F[ExistenceError[I] \/ PreparationResult[I, S]] =
-    tableStore.lookup(tableId) flatMap {
-      case Some(_) =>
-        lookupTableSchema(tableId) map {
-          case Some(s) =>
-            PreparationResult.Available[I, S](tableId, s).right
-          case None =>
-            PreparationResult.Unavailable[I, S](tableId).right
-        }
-      case None =>
-        (TableNotFound(tableId): ExistenceError[I]).left.pure[F]
-    }
-
-  ////
-
-  private def liveStatus(tableId: I): F[PreparationStatus] = {
-    import PreparationsManager.Status
-
-    val prepared: F[PreparedStatus] =
-      lookupTableData(tableId) map { t =>
-        if (t.isDefined) PreparedStatus.Prepared
-        else PreparedStatus.Unprepared
-      }
-
-    val ongoing: F[OngoingStatus] =
-      manager.preparationStatus(tableId) map {
-        case Status.Started(_) | Status.Pending => OngoingStatus.Preparing
-        case Status.Unknown => OngoingStatus.NotPreparing
-      }
-
-    (prepared |@| ongoing)(PreparationStatus(_, _))
-  }
 }
 
 object DefaultTables {
-  def apply[F[_]: Effect, I: Equal, Q, D, S](
+  def apply[F[_]: Effect, I: Equal, Q](
       freshId: F[I],
-      tableStore: IndexedStore[F, I, TableRef[Q]],
-      evaluator: QueryEvaluator[F, Q, D],
-      manager: PreparationsManager[F, I, Q, D],
-      lookupTableData: I => F[Option[D]],
-      lookupTableSchema: I => F[Option[S]])
-      : Tables[F, I, Q, D, S] =
-      new DefaultTables[F, I, Q, D, S](
-        freshId,
-        tableStore,
-        evaluator,
-        manager,
-        lookupTableData,
-        lookupTableSchema)
+      tableStore: IndexedStore[F, I, TableRef[Q]])
+      : Tables[F, I, Q] =
+    new DefaultTables[F, I, Q](freshId, tableStore)
 }

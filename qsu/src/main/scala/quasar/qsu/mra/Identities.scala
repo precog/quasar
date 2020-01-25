@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -459,7 +459,7 @@ object Identities extends IdentitiesInstances {
   /** NB: Linear in the size of the fully expanded representation. */
   def values[A, B: Order]: PTraversal[Identities[A], Identities[B], A, B] =
     new PTraversal[Identities[A], Identities[B], A, B] {
-      import shims._
+      import shims.applicativeToCats
 
       val T = Traverse[NonEmptyList].compose[NonEmptyList].compose[NonEmptyList]
 

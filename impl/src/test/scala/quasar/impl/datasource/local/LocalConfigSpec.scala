@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef._
 
-import quasar.connector._, ParsableType.JsonVariant
+import quasar.connector._
 
 import argonaut.Parse
 
@@ -26,11 +26,12 @@ import cats.instances.either._
 import cats.instances.string._
 import cats.syntax.either._
 
-import shims._
+import shims.{eqToScalaz, showToScalaz}
 
 object LocalConfigSpec extends quasar.Qspec {
   "json decoding" >> {
-    "v2 options" >> {
+
+    "v2 options (backwards)" >> {
       val js = """
         {
           "rootDir": "/data",
@@ -44,8 +45,7 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           2048,
-          ParsableType.json(JsonVariant.ArrayWrapped, false),
-          Some(CompressionScheme.Gzip))
+          DataFormat.gzipped(DataFormat.json))
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }
@@ -62,8 +62,7 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           2048,
-          ParsableType.json(JsonVariant.LineDelimited, true),
-          None)
+          DataFormat.precise(DataFormat.ldjson))
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }
@@ -73,8 +72,7 @@ object LocalConfigSpec extends quasar.Qspec {
         {
           "rootDir": "/data",
           "readChunkSizeBytes": 2048,
-          "format": { "type": "json", "variant": "array-wrapped" },
-          "compressionScheme": "gzip"
+          "format": { "type": "json", "variant": "array-wrapped" }
         }
       """.stripMargin
 
@@ -82,8 +80,7 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           2048,
-          ParsableType.json(JsonVariant.ArrayWrapped, false),
-          Some(CompressionScheme.Gzip))
+          DataFormat.json)
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }
@@ -101,8 +98,7 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           LocalConfig.DefaultReadChunkSizeBytes,
-          ParsableType.json(JsonVariant.ArrayWrapped, false),
-          None)
+          DataFormat.json)
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }
@@ -120,8 +116,45 @@ object LocalConfigSpec extends quasar.Qspec {
         LocalConfig(
           "/data",
           2048,
-          ParsableType.json(JsonVariant.ArrayWrapped, false),
-          None)
+          DataFormat.json)
+
+      Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
+    }
+
+    "can handle csv format" >> {
+      val js = """
+        {
+          "rootDir": "/data",
+          "format": { "type": "separated-values", "header": true, "row1": "\r", "row2": "\n", "record": ",", "openQuote": "\"", "closeQuote": "\"", "escape": "\"" }
+        }
+      """.stripMargin
+      val exp =
+        LocalConfig(
+          "/data",
+          LocalConfig.DefaultReadChunkSizeBytes,
+          DataFormat.SeparatedValues.Default)
+
+      Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
+    }
+    "can handle compressed" >> {
+      val js = """
+        {
+          "rootDir": "/data",
+          "format": { "type": "json", "variant": "array-wrapped", "precise": false },
+          "compressionScheme": "gzip"
+        }
+      """.stripMargin
+      val exp =
+        LocalConfig(
+          "/data",
+          LocalConfig.DefaultReadChunkSizeBytes,
+          DataFormat.gzipped(DataFormat.json))
+
+      val exp1 =
+        LocalConfig(
+          "/data",
+          LocalConfig.DefaultReadChunkSizeBytes,
+          DataFormat.gzipped(DataFormat.json))
 
       Parse.decodeEither[LocalConfig](js) must equal(exp.asRight[String])
     }

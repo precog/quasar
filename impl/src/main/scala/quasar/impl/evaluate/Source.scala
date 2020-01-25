@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package quasar.impl.evaluate
 import quasar.api.resource.ResourcePath
 
 import monocle.macros.Lenses
-import scalaz.{Applicative, Cord, Equal, Order, Show, Traverse}
+import scalaz.{Applicative, Equal, Order, Show, Traverse}
 import scalaz.std.tuple._
 import scalaz.syntax.functor._
 import scalaz.syntax.show._
@@ -39,9 +39,9 @@ sealed abstract class SourceInstances extends SourceInstances0 {
     }
 
   implicit def show[A: Show]: Show[Source[A]] =
-    Show.show {
+    Show.shows {
       case Source(p, a) =>
-        Cord("Source(") ++ p.show ++ Cord(", ") ++ a.show ++ Cord(")")
+        "Source(" + p.shows + ", " + a.shows + ")"
     }
 
   implicit val traverse: Traverse[Source] =

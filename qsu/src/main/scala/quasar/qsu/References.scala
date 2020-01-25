@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import quasar.qscript.{FreeMap, FreeMapA}
 
 import matryoshka.{delayShow, delayEqual, BirecursiveT, ShowT, EqualT}
 import matryoshka.data._
-import scalaz.{\/, Cord, Equal, IMap, ISet, Monoid, Show}
+import scalaz.{\/, Equal, IMap, ISet, Monoid, Show}
 import scalaz.std.list._
 import scalaz.std.option._
 import scalaz.std.tuple._
@@ -106,13 +106,13 @@ object References {
   }
 
   implicit def show[T[_[_]]: ShowT]: Show[References[T]] =
-    Show.show {
+    Show.shows {
       case References(accessing, accessed) =>
-        Cord("References {\n\n") ++
-        Cord("Accessing[\n") ++
-        Cord(printMultiline(accessing.toList)) ++
-        Cord("]\n\nAccessed[\n") ++
-        Cord(printMultiline(accessed.toList)) ++
-        Cord("]\n}")
+        "References {\n\n" +
+        "Accessing[\n" +
+        printMultiline(accessing.toList) +
+        "]\n\nAccessed[\n" +
+        printMultiline(accessed.toList) +
+        "]\n}"
     }
 }

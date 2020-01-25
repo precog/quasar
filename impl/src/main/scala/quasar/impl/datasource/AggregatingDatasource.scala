@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import fs2.{Pull, Stream}
 
 import monocle.Lens
 
-import shims._
+import shims.{equalToCats, monadToScalaz}
 
 /** A datasource transformer that augments underlying datasources by adding an aggregate resource
   * `p / **` for every prefix `p`. An aggregate resource `p / **` will aggregate

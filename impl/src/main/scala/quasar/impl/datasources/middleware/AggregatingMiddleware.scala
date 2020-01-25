@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import cats.Monad
 import cats.effect.Sync
 import cats.syntax.functor._
 import fs2.Stream
-import shims._
+import shims.{functorToCats, functorToScalaz}
 
 object AggregatingMiddleware {
   def apply[T[_[_]], F[_]: MonadResourceErr: MonadCreateErr: Sync, I, R](

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,16 @@ import monocle.macros.Lenses
 import monocle.PLens
 import scalaz.std.tuple._
 import scalaz.syntax.show._
-import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
+import scalaz.{Apply, Equal, Order, Show, Traverse1}
+import scalaz.syntax.equal._
 
 @Lenses
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
 
 object DestinationRef extends DestinationRefInstances {
+  def atMostRenamed[C: Equal](a: DestinationRef[C], b: DestinationRef[C]) =
+    a.kind === b.kind && a.config === b.config
+
   def pConfig[C, D]: PLens[DestinationRef[C], DestinationRef[D], C, D] =
     PLens[DestinationRef[C], DestinationRef[D], C, D](
       _.config)(
@@ -37,9 +41,9 @@ sealed abstract class DestinationRefInstances extends DestinationRefInstances0 {
     Order.orderBy(c => (c.kind, c.name, c.config))
 
   implicit def show[C: Show]: Show[DestinationRef[C]] =
-    Show.show {
+    Show.shows {
       case DestinationRef(t, n, c) =>
-        Cord("DestinationRef(") ++ t.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ c.show ++ Cord(")")
+        "DestinationRef(" + t.shows + ", " + n.shows + ", " + c.shows + ")"
     }
 
   implicit val traverse1: Traverse1[DestinationRef] =

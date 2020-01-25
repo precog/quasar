@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -237,9 +237,14 @@ trait DateLib extends Library with Serializable {
     "Converts an integer epoch time value (i.e. milliseconds since 1 Jan. 1970, UTC) to a timestamp constant.",
     noSimplification)
 
-  val ToLocal = UnaryFunc(
+  val ToLocal = BinaryFunc(
     Mapping,
-    "Removes the time zone offset from a date, time, or datetime value.",
+    "Converts an offset date, time, or datetime and offset string to a local date, time, or datetime.",
+    noSimplification)
+
+  val ToOffset = BinaryFunc(
+    Mapping,
+    "Converts a local date, time, or datetime and offset string to an offset date, time, or datetime.",
     noSimplification)
 }
 

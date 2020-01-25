@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,15 +64,15 @@ object EquiJoin {
   implicit def show[T[_[_]]: ShowT]: Delay[Show, EquiJoin[T, ?]] =
     new Delay[Show, EquiJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.show {
+      def apply[A](showA: Show[A]): Show[EquiJoin[T, A]] = Show.shows {
         case EquiJoin(src, lBr, rBr, key, f, combine) =>
-          Cord("EquiJoin(") ++
-          showA.show(src) ++ Cord(",") ++
-          lBr.show ++ Cord(",") ++
-          rBr.show ++ Cord(",") ++
-          key.show ++ Cord(",") ++
-          f.show ++ Cord(",") ++
-          combine.show ++ Cord(")")
+          "EquiJoin(" +
+          showA.shows(src) + "," +
+          lBr.shows + "," +
+          rBr.shows + "," +
+          key.shows + "," +
+          f.shows + "," +
+          combine.shows + ")"
       }
     }
 

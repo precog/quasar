@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
 import pathy.Path._
-import scalaz.{Plus => _, Tree => _, Free => ZFree, _}, Scalaz._
+import scalaz.{Plus => _, Tree => _, Free => ZFree, Select => _, _}, Scalaz._
 import shapeless.{Annotations => _, Data => _, :: => _, _}
 
 final case class TableContext[T]
@@ -234,6 +234,7 @@ final class Compiler[M[_], T: Equal]
       CIName("time_of_day")               -> date.TimeOfDay,
       CIName("to_timestamp")              -> date.ToTimestamp,
       CIName("to_local")                  -> date.ToLocal,
+      CIName("to_offset")                 -> date.ToOffset,
       CIName("squash")                    -> identity.Squash,
       CIName("type_of")                   -> identity.TypeOf,
       CIName("abs")                       -> math.Abs,

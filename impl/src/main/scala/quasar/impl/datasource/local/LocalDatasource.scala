@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +17,13 @@
 package quasar.impl.datasource.local
 
 import slamdata.Predef._
-import quasar.concurrent.BlockingContext
 import quasar.connector.LightweightDatasourceModule.DS
 import quasar.connector._
 
 import java.nio.file.{Path => JPath}
 
-import cats.effect.{ContextShift, Effect, Timer}
+import cats.effect.{Blocker, ContextShift, Effect, Timer}
 import fs2.io
-import scalaz.syntax.tag._
 
 object LocalDatasource {
 
@@ -34,19 +32,15 @@ object LocalDatasource {
   def apply[F[_]: ContextShift: Effect: MonadResourceErr: Timer](
       root: JPath,
       readChunkSizeBytes: Int,
-      format: ParsableType,
-      compressionScheme: Option[CompressionScheme],
-      blockingPool: BlockingContext)
-      : DS[F] = {
+      format: DataFormat,
+      blocker: Blocker)
+      : DS[F] = { 
 
     EvaluableLocalDatasource[F](LocalType, root) { iRead =>
       val content =
-        io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
+        io.file.readAll[F](iRead.path, blocker, readChunkSizeBytes)
 
-      val typedResult =
-        QueryResult.typed(format, content, iRead.stages)
-
-      compressionScheme.fold(typedResult)(QueryResult.compressed(_, typedResult))
+      QueryResult.typed(format, content, iRead.stages)
     }
   }
 }

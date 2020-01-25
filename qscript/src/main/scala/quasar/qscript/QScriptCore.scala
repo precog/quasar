@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -200,39 +200,39 @@ object QScriptCore {
     new Delay[Show, QScriptCore[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
       def apply[A](s: Show[A]): Show[QScriptCore[T, A]] =
-        Show.show {
-          case Map(src, mf) => Cord("Map(") ++
-            s.show(src) ++ Cord(", ") ++
-            mf.show ++ Cord(")")
-          case LeftShift(src, struct, id, stpe, undef, repair) => Cord("LeftShift(") ++
-            s.show(src) ++ Cord(", ") ++
-            struct.show ++ Cord(", ") ++
-            id.show ++ Cord(", ") ++
-            stpe.show ++ Cord(", ") ++
-            undef.show ++ Cord(", ") ++
-            repair.show ++ Cord(")")
-          case Reduce(a, b, red, rep) => Cord("Reduce(") ++
-            s.show(a) ++ Cord(", ") ++
-            b.show ++ Cord(", ") ++
-            red.show ++ Cord(", ") ++
-            rep.show ++ Cord(")")
-          case Sort(a, b, o) => Cord("Sort(") ++
-            s.show(a) ++ Cord(", ") ++
-            b.show ++ Cord(", ") ++
-            o.show ++ Cord(")")
-          case Union(src, l, r) => Cord("Union(") ++
-            s.show(src) ++ Cord(", ") ++
-            l.show ++ Cord(", ") ++
-            r.show ++ Cord(")")
-          case Filter(a, func) => Cord("Filter(") ++
-            s.show(a) ++ Cord(", ") ++
-            func.show ++ Cord(")")
-          case Subset(a, f, sel, c) => Cord("Subset(") ++
-            s.show(a) ++ Cord(", ") ++
-            f.show ++ Cord(", ") ++
-            sel.show ++ Cord(", ") ++
-            c.show ++ Cord(")")
-          case Unreferenced() => Cord("Unreferenced")
+        Show.shows {
+          case Map(src, mf) => "Map(" +
+            s.shows(src) + ", " +
+            mf.shows     + ")"
+          case LeftShift(src, struct, id, stpe, undef, repair) => "LeftShift(" +
+            s.shows(src) + ", " +
+            struct.shows + ", " +
+            id.shows + ", " +
+            stpe.shows + ", " +
+            undef.shows + ", " +
+            repair.shows + ")"
+          case Reduce(a, b, red, rep) => "Reduce(" +
+            s.shows(a) + ", " +
+            b.shows + ", " +
+            red.shows + ", " +
+            rep.shows + ")"
+          case Sort(a, b, o) => "Sort(" +
+            s.shows(a) + ", " +
+            b.shows + ", " +
+            o.shows + ")"
+          case Union(src, l, r) => "Union(" +
+            s.shows(src) + ", " +
+            l.shows + ", " +
+            r.shows + ")"
+          case Filter(a, func) => "Filter(" +
+            s.shows(a) + ", " +
+            func.shows + ")"
+          case Subset(a, f, sel, c) => "Subset(" +
+            s.shows(a) + ", " +
+            f.shows + ", " +
+            sel.shows + ", " +
+            c.shows + ")"
+          case Unreferenced() => "Unreferenced"
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,17 +47,17 @@ object ReduceFunc {
 
   implicit val show: Delay[Show, ReduceFunc] =
     new Delay[Show, ReduceFunc] {
-      def apply[A](show: Show[A]) = Show.show {
-        case Count(a)        => Cord("Count(") ++ show.show(a) ++ Cord(")")
-        case Sum(a)          => Cord("Sum(") ++ show.show(a) ++ Cord(")")
-        case Min(a)          => Cord("Min(") ++ show.show(a) ++ Cord(")")
-        case Max(a)          => Cord("Max(") ++ show.show(a) ++ Cord(")")
-        case Avg(a)          => Cord("Avg(") ++ show.show(a) ++ Cord(")")
-        case Arbitrary(a)    => Cord("Arbitrary(") ++ show.show(a) ++ Cord(")")
-        case First(a)        => Cord("First(") ++ show.show(a) ++ Cord(")")
-        case Last(a)         => Cord("Last(") ++ show.show(a) ++ Cord(")")
-        case UnshiftArray(a) => Cord("UnshiftArray(") ++ show.show(a) ++ Cord(")")
-        case UnshiftMap(a1, a2) => Cord("UnshiftMap(") ++ show.show(a1) ++ Cord(", ") ++ show.show(a2) ++ Cord(")")
+      def apply[A](show: Show[A]) = Show.shows {
+        case Count(a)        => "Count(" + show.shows(a) + ")"
+        case Sum(a)          => "Sum(" + show.shows(a) + ")"
+        case Min(a)          => "Min(" + show.shows(a) + ")"
+        case Max(a)          => "Max(" + show.shows(a) + ")"
+        case Avg(a)          => "Avg(" + show.shows(a) + ")"
+        case Arbitrary(a)    => "Arbitrary(" + show.shows(a) + ")"
+        case First(a)        => "First(" + show.shows(a) + ")"
+        case Last(a)         => "Last(" + show.shows(a) + ")"
+        case UnshiftArray(a) => "UnshiftArray(" + show.shows(a) + ")"
+        case UnshiftMap(a1, a2) => "UnshiftMap(" + show.shows(a1) + ", " + show.shows(a2) + ")"
       }
     }
 

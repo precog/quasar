@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,18 +20,17 @@ import slamdata.Predef.{Int, String}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.effect.concurrent.Ref
 import scalaz.IMap
 import scalaz.std.anyVal._
 import scalaz.std.string._
-import shims._
 
 object RefIndexedStoreSpec extends RefSpec(Ref.unsafe[IO, Int](0))
 
 abstract class RefSpec(idxRef: Ref[IO, Int]) extends IndexedStoreSpec[IO, Int, String] {
   val emptyStore =
-    Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_))
+    Resource.liftF(Ref.of[IO, IMap[Int, String]](IMap.empty).map(RefIndexedStore(_)))
 
   val freshIndex = idxRef.modify(i => (i + 1, i + 1))
 

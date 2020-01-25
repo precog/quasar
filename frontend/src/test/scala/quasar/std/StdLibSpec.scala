@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1607,25 +1607,142 @@ abstract class StdLibSpec extends Qspec {
       }
 
       "ToLocal" >> {
-        "OffsetDateTime" >> {
-          unary(
-            ToLocal(_).embed,
-            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T23:31:30.011+12:15:18")),
-            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T23:31:30.011")))
+        "OffsetDateTime invalid offset: ZoneRulesException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011+10:00")),
+            Data.Str("foo"),
+            Data.NA)
         }
 
-        "OffsetDate" >> {
-          unary(
-            ToLocal(_).embed,
-            Data.OffsetDate(QOffsetDate.parse("2009-02-13+12:15:18")),
+        "OffsetDateTime invalid offset: DateTimeException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011+10:00")),
+            Data.Str("+"),
+            Data.NA)
+        }
+
+        "OffsetDateTime earlier offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011+10:00")),
+            Data.Str("+01:00"),
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")))
+        }
+
+        "OffsetDateTime later offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T21:31:30.011-10:00")),
+            Data.Str("+01:00"),
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-14T08:31:30.011")))
+        }
+
+        "OffsetDate invalid offset: DateTimeException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+10:00")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
+        "OffsetDate earlier offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+10:00")),
+            Data.Str("+01:00"),
             Data.LocalDate(JLocalDate.parse("2009-02-13")))
         }
 
-        "OffsetTime" >> {
-          unary(
-            ToLocal(_).embed,
-            Data.OffsetTime(JOffsetTime.parse("23:31:30.011+12:15:18")),
-            Data.LocalTime(JLocalTime.parse("23:31:30.011")))
+        "OffsetDate later offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13-10:00")),
+            Data.Str("+01:00"),
+            Data.LocalDate(JLocalDate.parse("2009-02-13")))
+        }
+
+        "OffsetTime invalid offset: DateTimeException" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetTime(JOffsetTime.parse("21:31:30.011+10:00")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
+        "OffsetTime earlier offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetTime(JOffsetTime.parse("21:31:30.011+10:00")),
+            Data.Str("+01:00"),
+            Data.LocalTime(JLocalTime.parse("12:31:30.011")))
+        }
+
+        "OffsetTime later offset" >> {
+          binary(
+            ToLocal(_, _).embed,
+            Data.OffsetTime(JOffsetTime.parse("21:31:30.011-10:00")),
+            Data.Str("+01:00"),
+            Data.LocalTime(JLocalTime.parse("08:31:30.011")))
+        }
+      }
+
+      "ToOffset" >> {
+        "LocalDateTime" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")),
+            Data.Str("+01:00"),
+            Data.OffsetDateTime(JOffsetDateTime.parse("2009-02-13T12:31:30.011+01:00")))
+        }
+
+        "LocalDateTime invalid offset: ZoneRuleException" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
+        "LocalDateTime invalid offset: DateTimeException" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDateTime(JLocalDateTime.parse("2009-02-13T12:31:30.011")),
+            Data.Str("+"),
+            Data.NA)
+        }
+
+        "LocalDate" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDate(JLocalDate.parse("2009-02-13")),
+            Data.Str("+01:00"),
+            Data.OffsetDate(QOffsetDate.parse("2009-02-13+01:00")))
+        }
+
+        "LocalDate invalid offset" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalDate(JLocalDate.parse("2009-02-13")),
+            Data.Str("foo"),
+            Data.NA)
+        }
+
+        "LocalTime" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalTime(JLocalTime.parse("08:31:30.011")),
+            Data.Str("+01:00"),
+            Data.OffsetTime(JOffsetTime.parse("08:31:30.011+01:00")))
+        }
+
+        "LocalTime invalid offset: DateTimeException" >> {
+          binary(
+            ToOffset(_, _).embed,
+            Data.LocalTime(JLocalTime.parse("08:31:30.011")),
+            Data.Str("foo"),
+            Data.NA)
         }
       }
 

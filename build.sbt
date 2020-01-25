@@ -12,9 +12,6 @@ import Versions._
 def readVersion(path: File): String =
   IO.read(path).trim
 
-lazy val fs2GzipVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
-
 lazy val qdataVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "qdata-version"))
 
@@ -31,17 +28,6 @@ lazy val buildSettings = Seq(
 
   // NB: -Xlint triggers issues that need to be fixed
   scalacOptions --= Seq("-Xlint"),
-
-  // NB: Some warts are disabled in specific projects. Here’s why:
-  //   • AsInstanceOf   – wartremover/wartremover#266
-  //   • others         – simply need to be reviewed & fixed
-  wartremoverWarnings in (Compile, compile) --= Seq(
-    Wart.Any,                   // - see wartremover/wartremover#263
-    Wart.PublicInference,       // - creates many compile errors when enabled - needs to be enabled incrementally
-    Wart.ImplicitParameter,     // - creates many compile errors when enabled - needs to be enabled incrementally
-    Wart.ImplicitConversion,    // - see mpilquist/simulacrum#35
-    Wart.Nothing,               // - see wartremover/wartremover#263
-    Wart.NonUnitStatements),    // better-monadic-for causes some spurious warnings from this
 
   testOptions in Test := Seq(Tests.Argument(Specs2, "exclude", "exclusive", "showtimes")),
 
@@ -90,13 +76,12 @@ lazy val root = project.in(file("."))
   .aggregate(
     api,
     common, connector, core,
-    datagen,
     ejson,
     foundation, frontend,
     impl,
     qscript, qsu,
     runp,
-    sql, sst,
+    sql
   ).enablePlugins(AutomateHeaderPlugin)
 
 /** Very general utilities, ostensibly not Quasar-specific, but they just aren’t
@@ -113,8 +98,10 @@ lazy val foundation = project
     libraryDependencies ++= Seq(
       "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
-      "com.codecommit"             %% "shims"                     % "1.7.0",
+      "com.codecommit"             %% "shims"                     % "2.1.0",
+      "com.codecommit"             %% "skolems"                   % "0.1.2",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
+      "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
       "co.fs2"                     %% "fs2-core"                  % fs2Version,
       "co.fs2"                     %% "fs2-io"                    % fs2Version,
       "com.github.julien-truffaut" %% "monocle-core"              % monocleVersion,
@@ -131,6 +118,7 @@ lazy val foundation = project
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
       "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
+      "com.github.markusbernhardt"  % "proxy-vole"                % "1.0.5",
       "com.github.mpilquist"       %% "simulacrum"                % simulacrumVersion                    % Test,
       "org.typelevel"              %% "algebra-laws"              % algebraVersion                       % Test,
       "org.typelevel"              %% "discipline"                % disciplineVersion                    % Test,
@@ -201,24 +189,6 @@ lazy val frontend = project
       "org.typelevel"              %% "algebra-laws"  % algebraVersion % Test))
   .enablePlugins(AutomateHeaderPlugin)
 
-lazy val sst = project
-  .settings(name := "quasar-sst")
-  .dependsOn(frontend % BothScopes)
-  .settings(commonSettings)
-  .enablePlugins(AutomateHeaderPlugin)
-
-lazy val datagen = project
-  .settings(name := "quasar-datagen")
-  .dependsOn(sst % BothScopes)
-  .settings(commonSettings)
-  .settings(
-    mainClass in Compile := Some("quasar.datagen.Main"),
-
-    libraryDependencies ++= Seq(
-      "com.github.scopt" %% "scopt"          % scoptVersion,
-      "eu.timepit"       %% "refined-scalaz" % refinedVersion))
-  .enablePlugins(AutomateHeaderPlugin)
-
 /** Implementation of the SQL² query language.
   */
 lazy val sql = project
@@ -263,6 +233,9 @@ lazy val connector = project
     foundation % "test->test",
     qscript)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.slamdata" %% "tectonic" % tectonicVersion.value))
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val core = project
@@ -284,22 +257,26 @@ lazy val impl = project
     api % BothScopes,
     common % "test->test",
     connector % BothScopes,
-    frontend % "test->test",
-    sst)
+    frontend % "test->test")
   .settings(commonSettings)
   .settings(
+
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-gzip"       % fs2GzipVersion.value,
-      "com.slamdata"   %% "qdata-tectonic" % qdataVersion.value,
-      "com.slamdata"   %% "tectonic-fs2"   % tectonicVersion.value,
-      "org.http4s"     %% "jawn-fs2"       % jawnfs2Version,
-      "org.slf4s"      %% "slf4s-api"      % slf4sVersion,
-      "org.typelevel"  %% "jawn-argonaut"  % jawnVersion,
-      "org.typelevel"  %% "jawn-util"      % jawnVersion,
-      "io.atomix"       % "atomix"         % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
+      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion,
+      "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
+      "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
+      "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
+      "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
+      "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
+      "org.typelevel"  %% "jawn-util"                % jawnVersion,
+      "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
+      "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
+      "io.netty"       % "netty-all"                 % nettyVersion,
+      "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "5.3.0"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+  .evictToLocal("FS2_JOB_PATH", "core") 
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

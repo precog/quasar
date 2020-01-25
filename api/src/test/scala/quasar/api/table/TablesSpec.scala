@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,21 +28,16 @@ import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
 import scalaz.std.list._
 import scalaz.syntax.monad._
 
-abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: Equal: Show, S]
+abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show]
     extends Qspec
     with ConditionMatchers
     with BeforeEach {
 
-  import TableRef._
-
-  def tables: Tables[F, I, Q, D, S]
+  def tables: Tables[F, I, Q]
 
   // `table1` and `table2` must have distinct names
   val table1: TableRef[Q]
   val table2: TableRef[Q]
-
-  val preparation1: D  // preparation for table1
-  val preparation2: D  // preparation for table2
 
   val uniqueId: I  // generate a unique value of type `I`
 
@@ -102,75 +97,6 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: 
       }
     }
 
-    "error when preparing a nonexistent table" >>* {
-      for {
-        id <- uniqueId.point[F]
-        result <- tables.prepareTable(id)
-      } yield {
-        result must beAbnormal {
-          TableError.TableNotFound(id)
-        }
-      }
-    }
-
-    "error when requesting preparation status for a nonexistent table" >>* {
-      for {
-        id <- uniqueId.point[F]
-        result <- tables.preparationStatus(id)
-      } yield {
-        result must beLike {
-          case -\/(TableError.TableNotFound(i)) => i must_= id
-        }
-      }
-    }
-
-    "error when requesting prepared data for a nonexistent table" >>* {
-      for {
-        id <- uniqueId.point[F]
-        result <- tables.preparedData(id)
-      } yield {
-        result must beLike {
-          case -\/(TableError.TableNotFound(i)) => i must_= id
-        }
-      }
-    }
-
-    "error when requesting prepared data for an unprepared table" >>* {
-      for {
-        errorOrId <- tables.createTable(table1)
-        id <- isSuccess(errorOrId)
-        result <- tables.preparedData(id)
-      } yield {
-        result must beLike {
-          case \/-(PreparationResult.Unavailable(i)) => i must_= id
-        }
-      }
-    }
-
-    "error when requesting schema of nonexistent talbe" >>* {
-      for {
-        id <- uniqueId.point[F]
-        result <- tables.preparedSchema(id)
-      } yield {
-        result must beLike {
-          case -\/(TableError.TableNotFound(i)) => i must_= id
-        }
-      }
-    }
-
-    "error when requesting schema for unprepared table" >>* {
-      for {
-        errorOrId <- tables.createTable(table1)
-        id <- isSuccess(errorOrId)
-        result <- tables.preparedSchema(id)
-      } yield {
-        result must beLike {
-          case \/-(PreparationResult.Unavailable(i)) =>
-            i must_= id
-        }
-      }
-    }
-
     "succesfully access a created table" >>* {
       for {
         errorOrId <- tables.createTable(table1)
@@ -226,44 +152,6 @@ abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show, D: 
         }
         replacedResult must beLike {
           case \/-(t) => t must_= newTable
-        }
-      }
-    }
-
-    "successfully prepare a table" >>* {
-      for {
-        errorOrId <- tables.createTable(table1)
-        id <- isSuccess(errorOrId)
-        tableResult <- tables.table(id)
-        prepareResult <- tables.prepareTable(id)
-      } yield {
-        tableResult must beLike {
-          case \/-(t) => t must_= table1
-        }
-
-        prepareResult must beNormal
-      }
-    }
-
-    "successfully replace a prepared table" >>* {
-      for {
-        errorOrId <- tables.createTable(table1)
-        id <- isSuccess(errorOrId)
-
-        originalResult <- tables.table(id)
-        prepareResult <- tables.prepareTable(id)
-
-        _ <- tables.replaceTable(id, table2)
-        replacedResult <- tables.table(id)
-      } yield {
-        originalResult must beLike {
-          case \/-(t) => t must_= table1
-        }
-
-        prepareResult must beNormal
-
-        replacedResult must beLike {
-          case \/-(t) => t must_= table2
         }
       }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package quasar.impl.external
 
 import slamdata.Predef._
-import quasar.concurrent.BlockingContext
 import quasar.connector.{HeavyweightDatasourceModule, LightweightDatasourceModule}
 import quasar.fp.ski.κ
 import quasar.impl.DatasourceModule
@@ -33,7 +32,7 @@ import java.lang.{
   NullPointerException
 }
 
-import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
@@ -43,11 +42,11 @@ import org.slf4s.Logging
 object ExternalDatasources extends Logging {
   def apply[F[_]: ContextShift: Timer](
       config: ExternalConfig,
-      blockingPool: BlockingContext)(
+      blocker: Blocker)(
       implicit F: ConcurrentEffect[F])
       : F[List[DatasourceModule]] = {
     val datasourceModuleStream: Stream[F, DatasourceModule] =
-      ExternalModules(config, blockingPool)
+      ExternalModules(config, blocker)
         .filter {
           case (_, _, PluginType.Datasource) => true
           case _ => false

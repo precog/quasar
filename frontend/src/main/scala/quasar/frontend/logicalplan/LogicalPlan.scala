@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -141,34 +141,34 @@ object LogicalPlan {
     new Delay[Show, LogicalPlan] {
       def apply[A](sa: Show[A]): Show[LogicalPlan[A]] = {
         implicit val showA: Show[A] = sa
-        Show.show {
+        Show.shows {
           case Read(v) =>
-            Cord("Read(") ++ v.show ++ Cord(")")
+            "Read(" + v.shows + ")"
           case Constant(v) =>
-            Cord("Constant(") ++ v.show ++ Cord(")")
+            "Constant(" + v.shows + ")"
           case Invoke(func, values) =>
             // TODO remove trailing comma
-            func.show ++ Cord("(") ++
-            values.foldLeft(Cord("")){ case (acc, v) => acc ++ sa.show(v) ++ Cord(", ") } ++ Cord(")")
+            func.shows + "(" +
+            values.foldLeft("") { case (acc, v) => acc + sa.shows(v) + ", " } + ")"
           case JoinSideName(n) =>
-            Cord("JoinSideName(") ++ Cord(n.toString) ++ Cord(")")
+            "JoinSideName(" + n.toString + ")"
           case Join(l, r, tpe, JoinCondition(lName, rName, v)) =>
-            Cord("Join(") ++
-            l.show ++ Cord(", ") ++
-            r.show ++ Cord(", ") ++
-            tpe.show ++ Cord(", ") ++
-            Cord(lName.toString) ++ Cord(", ") ++
-            Cord(rName.toString) ++ Cord(", ") ++
-            v.show ++ Cord(")")
+            "Join(" +
+            l.shows + ", " +
+            r.shows + ", " +
+            tpe.shows + ", " +
+            lName.toString + ", " +
+            rName.toString + ", " +
+            v.shows + ")"
           case Free(n) =>
-            Cord("Free(") ++ Cord(n.toString) ++ Cord(")")
+            "Free(" + n.toString + ")"
           case Let(n, f, b) =>
-            Cord("Let(") ++ Cord(n.toString) ++ Cord(",") ++
-            sa.show(f) ++ Cord(",") ++ sa.show(b) ++ Cord(")")
+            "Let(" + n.toString + "," +
+            sa.shows(f) + "," + sa.shows(b) + ")"
           case Sort(src, ords) =>
-            Cord("Sort(") ++ sa.show(src) ++ Cord(", ") ++ ords.show ++ Cord(")")
+            "Sort(" + sa.shows(src) + ", " + ords.shows + ")"
           case TemporalTrunc(part, src) =>
-            Cord("TemporalTrunc(") ++ part.show ++ Cord(",") ++ sa.show(src) ++ Cord(")")
+            "TemporalTrunc(" + part.shows + "," + sa.shows(src) + ")"
         }
       }
     }

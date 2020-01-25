@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package quasar.impl.destinations
 import slamdata.Predef._
 
 import quasar.Condition
-import quasar.api.destination.{DestinationMeta, DestinationRef, DestinationType, Destinations}
+import quasar.api.destination.{Destination, DestinationMeta, DestinationRef, DestinationType, Destinations}
 import quasar.api.destination.DestinationError
 import quasar.api.destination.DestinationError.{CreateError, ExistentialError}
 import quasar.contrib.scalaz.MonadState_
@@ -66,6 +66,10 @@ final class MockDestinations[I: Order, C, F[_]: Monad](freshId: F[I], supported:
   def destinationRef(id: I): F[ExistentialError[I] \/ DestinationRef[C]] =
     R.gets(_.lookup(id))
       .map(_.toRight(DestinationError.destinationNotFound(id)).disjunction)
+
+  def destinationOf(id: I): F[DestinationError[I, C] \/ Destination[F]] =
+    DestinationError.destinationNotFound[I, DestinationError[I, C]](id)
+      .left[Destination[F]].point[F]
 
   def destinationStatus(id: I): F[ExistentialError[I] \/ Condition[Exception]] =
     (R.get |@| E.get) {

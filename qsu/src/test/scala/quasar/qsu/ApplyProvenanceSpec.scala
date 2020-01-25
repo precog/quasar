@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -199,7 +199,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
-          RightTarget[Fix],
+          func.RightSide,
           Rotation.FlattenArray))
 
       tree must haveDimensions(SMap(
@@ -215,7 +215,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
-          RightTarget[Fix],
+          func.RightSide,
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
@@ -231,7 +231,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.Hole,
           IncludeId,
           OnUndefined.Omit,
-          RightTarget[Fix],
+          func.RightSide,
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
@@ -249,7 +249,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.ProjectKeyS(recFunc.Hole, "k"),
           ExcludeId,
           OnUndefined.Omit,
-          RightTarget[Fix],
+          func.RightSide,
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
@@ -265,7 +265,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
-          func.ProjectKeyS(RightTarget[Fix], "k"),
+          func.ProjectKeyS(func.RightSide, "k"),
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
@@ -281,7 +281,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.Hole,
           ExcludeId,
           OnUndefined.Omit,
-          func.Add(RightTarget[Fix], func.Constant(J.int(42))),
+          func.Add(func.RightSide, func.Constant(J.int(42))),
           Rotation.ShiftArray))
 
       tree must haveDimensions(SMap(
@@ -375,7 +375,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.ProjectKeyS(recFunc.Hole, "x"),
           ExcludeId,
           OnUndefined.Omit,
-          RightTarget[Fix],
+          func.RightSide,
           Rotation.ShiftArray))
 
       val shiftY =
@@ -384,7 +384,7 @@ object ApplyProvenanceSpec extends Qspec with QSUTTypes[Fix] {
           recFunc.ProjectKeyS(recFunc.Hole, "y"),
           ExcludeId,
           OnUndefined.Omit,
-          RightTarget[Fix],
+          func.RightSide,
           Rotation.ShiftMap))
 
       val fm: RecFreeMap =

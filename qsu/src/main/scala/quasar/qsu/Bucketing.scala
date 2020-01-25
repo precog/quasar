@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import scalaz.std.option._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.option._
 
-import shims._
+import shims.{applicativeToCats, equalToCats, monoidToCats}
 
 final class Bucketing[T[_[_]]: BirecursiveT: EqualT, P] private (
     qprov: QProvAux[T, P])
@@ -66,17 +66,19 @@ final class Bucketing[T[_[_]]: BirecursiveT: EqualT, P] private (
   def modifyIdentities(p: P)(f: IdAccess => IdAccess): P =
     qprov.traverseVectorIds[Id.Id]((i, t) => (f(i), t))(p)
 
+  /** Returns new provenance where all symbols have been modified by `f`. */
+  def modifySymbols(p: P)(f: Symbol => Symbol): P =
+    modifyIdentities(p)(IdAccess.symbols.modify(f))
+
   /** The index of the next group key for `of`. */
   def nextGroupKeyIndex(of: Symbol, p: P): SInt =
     maxGroupKeyIndex(of, p).fold(0)(_ + 1)
 
   /** Renames `from` to `to` in the given dimensions. */
-  def rename(from: Symbol, to: Symbol, p: P): P = {
-    def rename0(sym: Symbol): Symbol =
+  def rename(from: Symbol, to: Symbol, p: P): P =
+    modifySymbols(p) { sym =>
       if (sym === from) to else sym
-
-    modifyIdentities(p)(IdAccess.symbols.modify(rename0))
-  }
+    }
 
   ////
 

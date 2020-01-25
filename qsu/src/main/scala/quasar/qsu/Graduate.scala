@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,6 @@ import quasar.qscript.{
   Filter,
   Hole,
   HoleF,
-  LeftSide,
-  RightSide,
   LeftShift,
   JoinSide,
   Map,
@@ -211,24 +209,15 @@ final class Graduate[T[_[_]]: BirecursiveT: ShowT] private () extends QSUTTypes[
           }
 
         case QSU.LeftShift(source, struct, idStatus, onUndefined, repair, rot) =>
-          for {
-            // Access.value is already resolved, from ReifyIdentities.
-            // this would be nicer with a tri-state Access type.
-            resolvedRepair <-
-              resolveAccess(repair) {
-                case QSU.ShiftTarget.AccessLeftTarget(access) => access.map[JoinSide](_ => LeftSide).left
-                case QSU.ShiftTarget.LeftTarget => (LeftSide: JoinSide).right
-                case QSU.ShiftTarget.RightTarget => (RightSide: JoinSide).right
-              }(κ(source.root))
+          val shiftType = rot match {
+            case QSU.Rotation.FlattenArray | QSU.Rotation.ShiftArray =>
+              ShiftType.Array
 
-            shiftType = rot match {
-              case QSU.Rotation.FlattenArray | QSU.Rotation.ShiftArray =>
-                ShiftType.Array
+            case QSU.Rotation.FlattenMap | QSU.Rotation.ShiftMap =>
+              ShiftType.Map
+          }
 
-              case QSU.Rotation.FlattenMap | QSU.Rotation.ShiftMap =>
-                ShiftType.Map
-            }
-          } yield QCE(LeftShift[T, QSUGraph](source, struct, idStatus, shiftType, onUndefined, resolvedRepair))
+          QCE(LeftShift[T, QSUGraph](source, struct, idStatus, shiftType, onUndefined, repair)).point[F]
 
         case QSU.QSSort(source, buckets, order) =>
           buckets traverse (resolveAccess(_)(_.left)(holeAs(source.root))) map { bs =>

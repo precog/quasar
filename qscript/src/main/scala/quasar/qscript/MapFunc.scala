@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,6 @@ object MapFunc {
     case date.StartOfDay => a => MFC(C.StartOfDay(a))
     case date.TimeOfDay => a => MFC(C.TimeOfDay(a))
     case date.ToTimestamp => a => MFC(C.ToTimestamp(a))
-    case date.ToLocal => a => MFC(C.ToLocal(a))
     case identity.TypeOf => a => MFC(C.TypeOf(a))
     case math.Abs => a => MFD(D.Abs(a))
     case math.Ceil => a => MFD(D.Ceil(a))
@@ -96,6 +95,8 @@ object MapFunc {
   def translateBinaryMapping[T[_[_]], MF[a] <: ACopK[a], A]
       (implicit MFC: MapFuncCore[T, ?] :<<: MF, MFD: MapFuncDerived[T, ?] :<<: MF)
       : scala.PartialFunction[BinaryFunc, (A, A) => MF[A]] = {
+    case date.ToLocal => (a1, a2) => MFC(C.ToLocal(a1, a2))
+    case date.ToOffset => (a1, a2) => MFC(C.ToOffset(a1, a2))
     case date.SetTimeZone => (a1, a2) => MFC(C.SetTimeZone(a1, a2))
     case date.SetTimeZoneHour => (a1, a2) => MFC(C.SetTimeZoneHour(a1, a2))
     case date.SetTimeZoneMinute => (a1, a2) => MFC(C.SetTimeZoneMinute(a1, a2))

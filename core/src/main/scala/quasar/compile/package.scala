@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import quasar.std.SetLib.{Drop, Take}
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path.posixCodec
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Select => _, _}, Scalaz._
 
 package object compile {
   type SemanticErrors = NonEmptyList[SemanticError]

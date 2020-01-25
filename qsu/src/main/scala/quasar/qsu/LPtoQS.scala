@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import matryoshka._
 
 import org.slf4s.Logging
 
-import scalaz.{Cord, Functor, Kleisli => K, Monad, Show}
+import scalaz.{Functor, Kleisli => K, Monad, Show}
 import scalaz.syntax.functor._
 import scalaz.syntax.show._
 
@@ -66,6 +66,8 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       debug("InlineNullary")                 >-
       CoalesceUnaryMappable[T]               >==>
       debug("CoalesceUnaryMappable")         >-
+      CoalesceSquashedMappable[T]            >==>
+      debug("CoalesceSquashedMappable")      >-
       RecognizeDistinct[T]                   >==>
       debug("RecognizeDistinct")             >==>
       ExtractFreeMap[T, F]                   >==>
@@ -77,13 +79,11 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
       ReifyBuckets[T, F](qprov)              >==>
       debug("ReifyBuckets")                  >==>
       MinimizeAutoJoins[T, F](qprov)         >==>
-      debug("MinimizeAutoJoins")             >==>
+      debug("MinimizeAutoJoins")             >-
+      CatchTranspose[T, qprov.P]             >==>
+      debug("CatchTranspose")                >==>
       ReifyAutoJoins[T, F](qprov)            >==>
       debug("ReifyAutoJoins")                >==>
-      ExpandShifts[T, F](qprov)              >==>
-      debug("ExpandShifts")                  >-
-      agraph.modify(ResolveOwnIdentities[T]) >==>
-      debug("ResolveOwnIdentities")          >==>
       ReifyIdentities[T, F]                  >==>
       debug("ReifyIdentities")               >==>
       Graduate[T, F]
@@ -94,7 +94,7 @@ final class LPtoQS[T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT]
   }
 
   private def debug[F[_]: Functor: PhaseResultTell, A: Show](name: String): A => F[A] = { a =>
-    log.debug((Cord(name + "\n") ++ a.show).shows)
+    log.debug(name + "\n" + a.shows)
     PhaseResultTell[F].tell(Vector(Eval.later(PhaseResult.detail(s"QSU ($name)", a.shows)))).as(a)
   }
 }

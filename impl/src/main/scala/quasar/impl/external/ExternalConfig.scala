@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import java.nio.file.{Files, Path}
 import cats.effect.Sync
 import scalaz.std.list._
 import scalaz.syntax.traverse._
-import shims._
+
+import shims.applicativeToScalaz
 
 sealed trait ExternalConfig extends Product with Serializable
 

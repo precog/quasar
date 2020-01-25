@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.qsu
 
 import slamdata.Predef._
 
-import quasar.IdStatus, IdStatus.{ExcludeId, IdOnly, IncludeId}
+import quasar.IdStatus, IdStatus.IncludeId
 import quasar.contrib.matryoshka.ginterpret
 import quasar.contrib.scalaz.MonadState_
 import quasar.ejson
@@ -38,7 +38,6 @@ import quasar.qscript.{
   MapFuncsCore,
   MFC,
   MonadPlannerErr,
-  OnUndefined,
   PlannerError,
   RightSide,
   RightSide3
@@ -54,7 +53,7 @@ import monocle.macros.Lenses
 
 import pathy.Path
 
-import scalaz.{-\/, \/-, Applicative, Cord, Equal, Free, Functor, IList, Monad, Show, StateT, ValidationNel}
+import scalaz.{Applicative, Equal, Free, Functor, IList, Monad, Show, StateT, ValidationNel}
 import scalaz.Scalaz._
 
 import shims.{eqToScalaz, equalToCats}
@@ -86,13 +85,8 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
 
     val authGraph = graph.rewriteM[X] {
       case g @ Extractors.DimEdit(src, _) =>
-        for {
-          _ <- computeDims[X](g)
-        } yield g.overwriteAtRoot(src.unfold map (_.root))
-
-      case g @ Extractors.Transpose(src, retain, rot) =>
-        computeDims[X](g) as g.overwriteAtRoot {
-          LeftShift(src.root, recFunc.Hole, retain.fold[IdStatus](IdOnly, ExcludeId), OnUndefined.Omit, RightTarget[T], rot)
+        computeDims[X](g) as {
+          g.overwriteAtRoot(src.unfold map (_.root))
         }
 
       case other =>
@@ -177,55 +171,12 @@ sealed abstract class ApplyProvenance[T[_[_]]: BirecursiveT: EqualT: ShowT] exte
             shiftedDims
           else
             applyFuncProvenanceN(repair flatMap {
-              case ShiftTarget.LeftTarget =>
+              case LeftSide =>
                 Free.pure(0)
 
-              case ShiftTarget.AccessLeftTarget(Access.Value(_)) =>
-                Free.pure(0)
-
-              case ShiftTarget.RightTarget =>
+              case RightSide =>
                 Free.pure(1)
-
-              case _ =>
-                func.Undefined
             })(sdims, applyIdStatus(idStatus, shiftedDims))
-        }
-
-      // FIXME: This is incorrect, we need an indexed inflate identity to
-      //        properly compute this.
-      case MultiLeftShift(src, shifts, _, repair) =>
-        val tid = IdAccess.identity(g.root)
-
-        compute1[F](g, src) { sdims =>
-          val shiftsDims = shifts map {
-            case (struct, idStatus, rot) =>
-              val structDims =
-                if (struct.empty)
-                  sdims
-                else
-                  applyFuncProvenance(struct, sdims)
-
-              rot match {
-                case Rotation.ShiftMap | Rotation.ShiftArray =>
-                  structDims.inflateExtend(tid, IdType.fromRotation(rot))
-
-                case Rotation.FlattenMap | Rotation.FlattenArray =>
-                  structDims.inflateConjoin(tid, IdType.fromRotation(rot))
-              }
-          }
-
-          val shiftIdDims = shiftsDims.zipWithIndex map {
-            case (d, i) => applyIdStatus(shifts(i)._2, d)
-          }
-
-          if (repair.empty)
-            shiftsDims.foldLeft(qprov.empty)(_ ∧ _)
-          else
-            applyFuncProvenanceN(repair flatMap {
-              case -\/(Access.Value(_)) => Free.pure(0)
-              case \/-(i) => Free.pure(i + 1)
-              case -\/(_) => func.Undefined
-            })(sdims, shiftIdDims: _*)
         }
 
       case LPFilter(_, _) => unexpectedError
@@ -462,11 +413,11 @@ object ApplyProvenance {
   object AuthenticatedQSU {
     implicit def show[T[_[_]]: ShowT, P: Show]: Show[AuthenticatedQSU[T, P]] =
       Show.show { case AuthenticatedQSU(g, d) =>
-        Cord("AuthenticatedQSU {\n") ++
-        g.show ++
-        Cord("\n\n") ++
-        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).show ++
-        Cord("\n}")
+        "AuthenticatedQSU {\n" +
+        g.shows +
+        "\n\n" +
+        d.filterVertices(g.foldMapDown(sg => Set(sg.root))).shows +
+        "\n}"
       }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 package quasar
 
+import slamdata.Predef.{Product, Serializable}
 import scalaz.{Equal, Semigroup, Show}
 import scalaz.syntax.std.boolean._
 import scalaz.syntax.equal._
 
-sealed abstract class IdStatus
+sealed abstract class IdStatus extends Product with Serializable
 
 object IdStatus {
   case object IdOnly extends IdStatus

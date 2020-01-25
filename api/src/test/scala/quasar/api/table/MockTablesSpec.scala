@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,15 +23,15 @@ import quasar.contrib.std.uuid._
 import java.util.UUID
 
 import cats.data.StateT
-import cats.effect.{IO, Sync}
-import scalaz.{~>, Id, IMap, \/-}, Id.Id
+import cats.effect.IO
+import scalaz.{~>, Id, IMap}, Id.Id
 import scalaz.std.string._
-import shims._
+import shims.monadToScalaz
 import MockTablesSpec.MockM
 
-final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, String] {
+final class MockTablesSpec extends TablesSpec[MockM, UUID, String] {
 
-  val tables: Tables[MockM, UUID, String, String, String] =
+  val tables: Tables[MockM, UUID, String] =
     MockTables[MockM]
 
   val columns1: List[TableColumn] =
@@ -58,117 +58,16 @@ final class MockTablesSpec extends TablesSpec[MockM, UUID, String, String, Strin
   val table1: TableRef[String] = TableRef(TableName("table1"), "select * from table1", columns1)
   val table2: TableRef[String] = TableRef(TableName("table2"), "select * from table2", columns2)
 
-  val preparation1: String = table1.query
-  val preparation2: String = table2.query
-
   val uniqueId: UUID = UUID.randomUUID
 
   def run: MockM ~> Id.Id =
-    λ[MockM ~> Id](
-      _.runA(IMap.empty).unsafeRunSync)
-
-  def init(table: MockTables.MockTable): MockM[UUID] =
-    for {
-      tableId <- Sync[MockM].delay(UUID.randomUUID)
-      _ <- MockM.modify(_.insert(tableId, table))
-    } yield tableId
+    λ[MockM ~> Id](_.runA(IMap.empty).unsafeRunSync)
 
   def before: Unit = ()
-
-  "preparations" >> {
-    "error on request to prepare an already preparing table" >>* {
-      for {
-        id <- init(MockTables.MockTable(
-          TableRef(TableName("foo"), "bar", columns1),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
-        result <- tables.prepareTable(id)
-      } yield {
-        result must beAbnormal(TableError.PreparationInProgress(id))
-      }
-    }
-
-    "cancel an ongoing preparation" >>* {
-      for {
-        id1 <- init(MockTables.MockTable(
-          TableRef(TableName("foo1"), "bar1", columns1),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
-
-        id2 <- init(MockTables.MockTable(
-          TableRef(TableName("foo2"), "bar2", columns2),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
-
-        cancel1 <- tables.cancelPreparation(id1)
-
-        res1 <- tables.preparationStatus(id1)
-        res2 <- tables.preparationStatus(id2)
-      } yield {
-        cancel1 must beNormal
-
-        res1 must be_\/-(
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
-
-        res2 must be_\/-(
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing))
-      }
-    }
-
-    "error a request to cancel a not ongoing preparation" >>* {
-      for {
-        id1 <- init(MockTables.MockTable(
-          TableRef(TableName("foo1"), "bar1", columns1),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing)))
-
-        cancel <- tables.cancelPreparation(id1)
-        status <- tables.preparationStatus(id1)
-      } yield {
-        cancel must beAbnormal(TableError.PreparationNotInProgress(id1))
-        status must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
-      }
-    }
-
-    "cancel all ongoing preparations" >>* {
-      for {
-        id1 <- init(MockTables.MockTable(
-          TableRef(TableName("foo1"), "bar1", columns1),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing)))
-
-        id2 <- init(MockTables.MockTable(
-          TableRef(TableName("foo2"), "bar2", columns2),
-          PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.Preparing)))
-
-        id3 <- init(MockTables.MockTable(
-          TableRef(TableName("foo3"), "bar3", columns3),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
-
-        _ <- tables.cancelAllPreparations
-
-        status1 <- tables.preparationStatus(id1)
-        status2 <- tables.preparationStatus(id2)
-        status3 <- tables.preparationStatus(id3)
-      } yield {
-        status1 must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
-        status2 must be_\/-(PreparationStatus(PreparedStatus.Unprepared, OngoingStatus.NotPreparing))
-        status3 must be_\/-(PreparationStatus(PreparedStatus.Prepared, OngoingStatus.NotPreparing))
-      }
-    }
-  }
-
-  "schema" >> {
-    "successfully request schema for prepared table" >>* {
-      for {
-        id <- init(MockTables.MockTable(
-          TableRef(TableName("foo"), "bar", columns1),
-          PreparationStatus(PreparedStatus.Prepared, OngoingStatus.Preparing)))
-        result <- tables.preparedSchema(id)
-      } yield {
-        result must_== \/-(PreparationResult.Available(id, id.toString))
-      }
-    }
-  }
 }
 
 object MockTablesSpec {
-  type Store = IMap[UUID, MockTables.MockTable]
+  type Store = IMap[UUID, TableRef[String]]
 
   type MockM[A] = StateT[IO, Store, A]
   val MockM = MonadState_[MockM, Store]

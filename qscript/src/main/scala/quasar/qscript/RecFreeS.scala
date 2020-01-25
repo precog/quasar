@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,13 +122,13 @@ object RecFreeS {
         case Leaf(a) => sh.show(a)
         case Suspend(fa) => S.apply(sh).show(fa)
         case Fix(form, body) => {
-          def mkLet(f: Cord, b: Cord): Cord =
-            Cord("Let(") ++ f ++ Cord(" = ") ++ b ++ Cord(")")
+          def mkLet(f: String, b: String): String =
+            "Let(" + f + " = " + b + ")"
 
-          val alg: Algebra[CoEnv[Hole, RecFreeS[F, ?], ?], Cord] =
-            interpret[RecFreeS[F, ?], Hole, Cord](_.show, RecFreeS.recInterpret(_.show, frm => (Cord("SrcHole"), c => mkLet(frm, c))))
+          val alg: Algebra[CoEnv[Hole, RecFreeS[F, ?], ?], String] =
+            interpret[RecFreeS[F, ?], Hole, String](_.shows, RecFreeS.recInterpret(_.shows, frm => ("SrcHole", c => mkLet(frm, c))))
 
-          mkLet(RecFreeS.show[F].apply(sh).show(form), body.cata(alg))
+          mkLet(RecFreeS.show[F].apply(sh).shows(form), body.cata(alg))
         }
       }))
 

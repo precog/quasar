@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,26 @@
 
 package quasar.connector
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef._
 
-import scalaz.{Equal, Show}
+import cats.{Show, Eq}
+import argonaut.{Argonaut, CodecJson, DecodeResult}, Argonaut._
 
 sealed trait CompressionScheme extends Product with Serializable
 
 object CompressionScheme {
   case object Gzip extends CompressionScheme
 
-  implicit val equal: Equal[CompressionScheme] =
-    Equal.equalA
+  implicit val equal: Eq[CompressionScheme] =
+    Eq.fromUniversalEquals
 
   implicit val show: Show[CompressionScheme] =
-    Show.showFromToString
+    Show.fromToString
+
+  implicit val codecCompressionScheme: CodecJson[CompressionScheme] = CodecJson({
+    case Gzip => "gzip".asJson
+  }, (c => c.as[String].flatMap {
+    case "gzip" => DecodeResult.ok(Gzip)
+    case other => DecodeResult.fail(s"Unrecognized compression scheme: $other", c.history)
+  }))
 }

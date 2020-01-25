@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 package quasar.impl.datasource.local
 
+import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
   malformedConfiguration
 }
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
@@ -30,18 +31,21 @@ import scala.util.Either
 
 import argonaut.Json
 import cats.effect._
+import cats.kernel.Hash
 
 object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  override lazy val blockingPool: BlockingContext =
-    BlockingContext.cached("local-datasource")
+  override lazy val blocker: Blocker =
+    qc.Blocker.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
 
   def sanitizeConfig(config: Json): Json = config
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)(
+  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+      config: Json,
+      rateLimiting: RateLimiting[F, A],
+      stateStore: ByteStore[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {
@@ -58,8 +62,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
         root,
         lc.readChunkSizeBytes,
         lc.format,
-        lc.compressionScheme,
-        blockingPool)
+        blocker)
     }
 
     Resource.liftF(ds.value)

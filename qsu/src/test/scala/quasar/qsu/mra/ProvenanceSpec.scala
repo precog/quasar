@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package quasar.qsu.mra
 
-import slamdata.Predef.List
+import slamdata.Predef._
 
 import quasar.Qspec
 import quasar.qscript.OnUndefined
@@ -330,12 +330,24 @@ abstract class ProvenanceSpec[
       p.injectStatic(s, t1).projectStatic(s, t1) eqv p
     }
 
-    "does not extend when any injects exist" >> prop { (p: P, s: S, v: V, t: T) =>
+    "extends uninjected vectors when injected exist" >> prop { (p: P, s: S, v: V, t: T) =>
       val q = empty.projectStatic(s1, t)
       val x = p.inflateExtend(v, t)
       val y = q.injectStatic(s, t)
 
-      (x ∧ y).projectStatic(s, t) eqv (x ∧ q)
+      val px = x.projectStatic(s, t)
+
+      (x ∧ y).projectStatic(s, t) eqv (px ∧ q)
+    }
+
+    "terminates vectors with non-matching inject" >> prop { (p: P, s: S, v: V, t: T) =>
+      val q = empty.projectStatic(s1, t)
+      val x = p.inflateExtend(v, t)
+      val y = q.injectStatic(s2, t)
+
+      val px = x.projectStatic(s, t).inflateExtend(v, t)
+
+      (x ∧ y).projectStatic(s, t).inflateExtend(v, t) eqv (px ∧ q)
     }
 
     "affects unions independently" >> prop { (v: V, x: S, y: S, t: T) =>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,14 +24,14 @@ import quasar.contrib.scalaz._
 import quasar.contrib.scalaz.MonadState_
 import quasar.fp._
 import quasar.fp.ski.κ
-import quasar.qscript.{FreeMapA, OnUndefined, RecFreeMap}
+import quasar.qscript.{JoinFunc, OnUndefined, RecFreeMap}
 
 import monocle.macros.Lenses
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns.EnvT
-import scalaz.{\/-, -\/, \/, Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
+import scalaz.{\/-, -\/, Cofree, DList, Id, Monad, Monoid, MonadState, Scalaz, Show, State, StateT}, Scalaz._
 
 @Lenses
 final case class QSUGraph[T[_[_]]](
@@ -394,7 +394,6 @@ object QSUGraph extends QSUGraphInstances {
   object Extractors {
     import quasar.common.data.Data
     import quasar.qscript.{
-      FreeMap,
       Hole,
       JoinSide,
       JoinSide3,
@@ -484,15 +483,8 @@ object QSUGraph extends QSUGraphInstances {
     }
 
     object LeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, FreeMapA[T, QSU.ShiftTarget], QSU.Rotation)] = g.unfold match {
+      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], RecFreeMap[T], IdStatus, OnUndefined, JoinFunc[T], QSU.Rotation)] = g.unfold match {
         case g: QSU.LeftShift[T, QSUGraph[T]] => QSU.LeftShift.unapply(g)
-        case _ => None
-      }
-    }
-
-    object MultiLeftShift {
-      def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], List[(FreeMap[T], IdStatus, QSU.Rotation)], OnUndefined, FreeMapA[T, Access[Hole] \/ Int])] = g.unfold match {
-        case g: QSU.MultiLeftShift[T, QSUGraph[T]] => QSU.MultiLeftShift.unapply(g)
         case _ => None
       }
     }

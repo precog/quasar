@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,8 +101,13 @@ object MappableRegion {
   object MaximalUnary {
     import QSUGraph.Extractors._
 
-    def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] = {
-      val fm = maximal[T](g)
+    def unapply[T[_[_]]](g: QSUGraph[T]): Option[(QSUGraph[T], FreeMap[T])] =
+      extractUnary(g)(κ(false))
+
+    def extractUnary[T[_[_]]](g: QSUGraph[T])(halt: Symbol => Boolean)
+        : Option[(QSUGraph[T], FreeMap[T])] = {
+
+      val fm = apply[T](halt, g)
 
       val roots = Foldable[FreeMapA[T, ?]].foldMap(fm) {
         case Unreferenced() => Set.empty[Symbol]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,12 @@ package quasar.impl.parsing
 import slamdata.Predef.{Option, Some, String, Throwable}
 
 import quasar.api.resource.ResourcePath
-import quasar.connector.{ParsableType, ResourceError}
-import quasar.connector.ParsableType.JsonVariant
+import quasar.connector.{DataFormat, ResourceError, CompressionScheme}, DataFormat.JsonVariant
 
 import tectonic.{IncompleteParseException, ParseException}
 
 object TectonicResourceError {
-  def apply(path: ResourcePath, tpe: ParsableType, cause: Throwable): Option[ResourceError] =
+  def apply(path: ResourcePath, tpe: DataFormat, cause: Throwable): Option[ResourceError] =
     Some(cause) collect {
       case ParseException(msg, _, _, _) =>
         ResourceError.malformedResource(path, typeSummary(tpe), Some(msg), Some(cause))
@@ -34,8 +33,17 @@ object TectonicResourceError {
         ResourceError.malformedResource(path, typeSummary(tpe), Some(msg), Some(cause))
     }
 
-  val typeSummary: ParsableType => String = {
-    case ParsableType.Json(vnt, isPrecise) =>
-      JsonVariant.stringP(vnt) + (if (isPrecise) " (precise)" else "")
+  val typeSummary: DataFormat => String = {
+    case DataFormat.Compressed(CompressionScheme.Gzip, pt) =>
+      "gzipped " + typeSummary(pt: DataFormat)
+    case v: DataFormat.SeparatedValues =>
+      "separated values"
+    case DataFormat.Json(vnt, isPrecise) =>
+      variantString(vnt) + (if (isPrecise) " (precise)" else "")
+  }
+
+  private val variantString: DataFormat.JsonVariant => String = {
+    case JsonVariant.ArrayWrapped => "json"
+    case JsonVariant.LineDelimited => "ldjson"
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import quasar.std._, StdLib._, agg._, array._, date._, identity._, math._
 import pathy.Path._
 import matryoshka.data.Fix
 import matryoshka.implicits._
-import scalaz.{ Divide => _, _}, Scalaz._
+import scalaz.{Divide => _, Select => _, _}, Scalaz._
 
 class CompilerSpec extends quasar.Qspec with CompilerHelpers {
   // NB: imports are here to shadow duplicated names in [[quasar.sql]]. We

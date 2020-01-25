@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import scalaz.{Cord, Equal, Show}
+import scalaz.{Equal, Show}
 import scalaz.std.tuple._
 import scalaz.std.string._
 import scalaz.syntax.show._
@@ -30,7 +30,7 @@ object TableColumn {
     Equal.equalBy(c => (c.name, c.tpe))
 
   implicit val showTableColumn: Show[TableColumn] =
-    Show show { tc =>
-      Cord("TableColumn(") ++ tc.name ++ Cord(", ") ++ tc.tpe.show ++ Cord(")")
+    Show shows { tc =>
+      "TableColumn(" + tc.name + ", " + tc.tpe.shows + ")"
     }
 }

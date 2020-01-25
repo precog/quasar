@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,16 +91,16 @@ object MapFuncDerived {
     new Delay[Show, MapFuncDerived[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFuncDerived[T, A]] = {
         def shz(label: String, a: A*) =
-          Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
+          label + "(" + a.map(sh.shows).toList.intercalate(", ") + ")"
 
-        Show.show {
+        Show.shows {
           // unary
           case Abs(a1)   => shz("Abs", a1)
           case Ceil(a1)  => shz("Ceil", a1)
           case Floor(a1) => shz("Floor", a1)
           case Trunc(a1) => shz("Trunc", a1)
           case Round(a1) => shz("Round", a1)
-          case Typecheck(a1, typ) => Cord("TypeCheck") ++ Cord("(") ++ sh.show(a1) ++ Cord(":") ++ typ.show ++ Cord(")")
+          case Typecheck(a1, typ) => "TypeCheck" + "(" + sh.shows(a1) + ":" + typ.shows + ")"
 
           // binary
           case FloorScale(a1, a2) => shz("FloorScale", a1, a2)

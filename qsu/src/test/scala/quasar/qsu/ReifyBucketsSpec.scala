@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,15 +23,14 @@ import quasar.IdStatus.ExcludeId
 import quasar.contrib.iota.{copkEqual, copkTraverse}
 import quasar.ejson.{EJson, Fixed}
 import quasar.ejson.implicits._
-import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs, SrcHole}
+import quasar.qscript.{construction, Hole, MapFuncsCore, PlannerError, ReduceFuncs}
 import quasar.qsu.mra.ProvImpl
 
-import matryoshka.{delayEqual, Embed}
+import matryoshka.delayEqual
 import matryoshka.data.Fix
-import matryoshka.data.{freeEqual, freeRecursive}
-import matryoshka.patterns.CoEnv
+import matryoshka.data.freeEqual
 
-import scalaz.{\/, -\/, \/-, EitherT, State}
+import scalaz.{\/, \/-, EitherT, State}
 
 import shims.{eqToScalaz, orderToCats, orderToScalaz}
 
@@ -197,15 +196,12 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               QSReduce(
                 AutoJoin2(
                   Read(_, ExcludeId),
-                  LeftShift(
+                  Transpose(
                     AutoJoin2(
                       Read(_, ExcludeId),
                       loc,
                       _),
-                    Embed(CoEnv(-\/(SrcHole))),
-                    ExcludeId,
-                    tgt,
-                    _,
+                    Retain.Values,
                     Rotation.FlattenArray),
                   _),
                 List(sumBucket),
@@ -283,15 +279,12 @@ object ReifyBucketsSpec extends Qspec with QSUTTypes[Fix] with TreeMatchers {
               QSReduce(
                 AutoJoin2(
                   Read(_, ExcludeId),
-                  LeftShift(
+                  Transpose(
                     AutoJoin2(
                       Read(_, ExcludeId),
                       loc,
                       _),
-                    Embed(CoEnv(-\/(SrcHole))),
-                    ExcludeId,
-                    tgt,
-                    _,
+                    Retain.Values,
                     Rotation.FlattenArray),
                   _),
                 List(sumBucket),

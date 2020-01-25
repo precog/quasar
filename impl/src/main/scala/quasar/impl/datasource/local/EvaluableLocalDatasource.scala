@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ import java.nio.file.attribute.BasicFileAttributes
 import cats.effect.{ContextShift, Effect, Timer}
 import fs2.Stream
 import scalaz.{OptionT, Scalaz}, Scalaz._
-import shims._
+
+import shims.monadToScalaz
 
 /** A Datasource backed by the underlying filesystem local to Quasar.
   *

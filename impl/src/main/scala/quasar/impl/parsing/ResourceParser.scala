@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package quasar.impl.parsing
 
 import quasar.api.resource.ResourcePath
-import quasar.connector.{MonadResourceErr, ParsableType, QueryResult}
+import quasar.connector.{MonadResourceErr, DataFormat, QueryResult}
 
 import slamdata.Predef._
 
@@ -38,7 +38,7 @@ object ResourceParser {
         .fold(Stream.raiseError(t))(re => Stream.eval(MonadResourceErr[F].raiseError(re)))
     }
 
-  private def expectedTypeOf[F[_]](qr: QueryResult[F]): Option[ParsableType] =
+  private def expectedTypeOf[F[_]](qr: QueryResult[F]): Option[DataFormat] =
     Some(qr) collect {
       case QueryResult.Typed(t, _, _) => t
     }

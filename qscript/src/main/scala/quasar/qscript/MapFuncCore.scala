@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -410,7 +410,6 @@ object MapFuncCore {
         case TemporalTrunc(a1, a2) => f(a2) ∘ (TemporalTrunc(a1, _))
         case TimeOfDay(a1) => f(a1) ∘ (TimeOfDay(_))
         case ToTimestamp(a1) => f(a1) ∘ (ToTimestamp(_))
-        case ToLocal(a1) => f(a1) ∘ (ToLocal(_))
         case TypeOf(a1) => f(a1) ∘ (TypeOf(_))
         case Negate(a1) => f(a1) ∘ (Negate(_))
         case Not(a1) => f(a1) ∘ (Not(_))
@@ -428,6 +427,8 @@ object MapFuncCore {
         case Meta(a1) => f(a1) ∘ (Meta(_))
 
         // binary
+        case ToLocal(a1, a2) => (f(a1) ⊛ f(a2))(ToLocal(_, _))
+        case ToOffset(a1, a2) => (f(a1) ⊛ f(a2))(ToOffset(_, _))
         case SetTimeZone(a1, a2) => (f(a1) ⊛ f(a2))(SetTimeZone(_, _))
         case SetTimeZoneHour(a1, a2) => (f(a1) ⊛ f(a2))(SetTimeZoneHour(_, _))
         case SetTimeZoneMinute(a1, a2) => (f(a1) ⊛ f(a2))(SetTimeZoneMinute(_, _))
@@ -514,7 +515,6 @@ object MapFuncCore {
         case (TemporalTrunc(a1, a2), TemporalTrunc(b1, b2)) => a1 ≟ b1 && in.equal(a2, b2)
         case (TimeOfDay(a1), TimeOfDay(b1)) => in.equal(a1, b1)
         case (ToTimestamp(a1), ToTimestamp(b1)) => in.equal(a1, b1)
-        case (ToLocal(a1), ToLocal(b1)) => in.equal(a1, b1)
         case (TypeOf(a1), TypeOf(b1)) => in.equal(a1, b1)
         case (Negate(a1), Negate(b1)) => in.equal(a1, b1)
         case (Not(a1), Not(b1)) => in.equal(a1, b1)
@@ -532,6 +532,8 @@ object MapFuncCore {
         case (Meta(a1), Meta(b1)) => in.equal(a1, b1)
 
         //  binary
+        case (ToLocal(a1, a2), ToLocal(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
+        case (ToOffset(a1, a2), ToOffset(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (SetTimeZone(a1, a2), SetTimeZone(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (SetTimeZoneHour(a1, a2), SetTimeZoneHour(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
         case (SetTimeZoneMinute(a1, a2), SetTimeZoneMinute(b1, b2)) => in.equal(a1, b1) && in.equal(a2, b2)
@@ -577,17 +579,17 @@ object MapFuncCore {
     new Delay[Show, MapFuncCore[T, ?]] {
       def apply[A](sh: Show[A]): Show[MapFuncCore[T, A]] = {
         def shz(label: String, a: A*) =
-          Cord(label) ++ Cord("(") ++ a.map(sh.show).toList.intercalate(Cord(", ")) ++ Cord(")")
+          label + "(" + a.map(sh.shows).toList.intercalate(", ") + ")"
 
-        Show.show {
+        Show.shows {
           // nullary
-          case Constant(v) => Cord("Constant(") ++ v.show ++ Cord(")")
-          case Undefined() => Cord("Undefined()")
-          case JoinSideName(n) => Cord("JoinSideName(") ++ n.show ++ Cord(")")
-          case Now() => Cord("Now()")
-          case NowTime() => Cord("NowTime()")
-          case NowDate() => Cord("NowDate()")
-          case CurrentTimeZone() => Cord("CurrentTimeZone()")
+          case Constant(v) => "Constant(" + v.shows + ")"
+          case Undefined() => "Undefined()"
+          case JoinSideName(n) => "JoinSideName(" + n.shows + ")"
+          case Now() => "Now()"
+          case NowTime() => "NowTime()"
+          case NowDate() => "NowDate()"
+          case CurrentTimeZone() => "CurrentTimeZone()"
 
           // unary
           case ExtractCentury(a1) => shz("ExtractCentury", a1)
@@ -619,10 +621,9 @@ object MapFuncCore {
           case LocalDate(a1) => shz("LocalDate", a1)
           case Interval(a1) => shz("Interval", a1)
           case StartOfDay(a1) => shz("StartOfDay", a1)
-          case TemporalTrunc(a1, a2) => Cord("TemporalTrunc(", a1.show, ", ", sh.show(a2), ")")
+          case TemporalTrunc(a1, a2) => "TemporalTrunc(" + a1.shows + ", " + sh.shows(a2) + ")"
           case TimeOfDay(a1) => shz("TimeOfDay", a1)
           case ToTimestamp(a1) => shz("ToTimestamp", a1)
-          case ToLocal(a1) => shz("ToLocal", a1)
           case TypeOf(a1) => shz("TypeOf", a1)
           case Negate(a1) => shz("Negate", a1)
           case Not(a1) => shz("Not", a1)
@@ -640,6 +641,8 @@ object MapFuncCore {
           case Meta(a1) => shz("Meta", a1)
 
           // binary
+          case ToLocal(a1, a2) => shz("ToLocal", a1, a2)
+          case ToOffset(a1, a2) => shz("ToOffset", a1, a2)
           case Add(a1, a2) => shz("Add", a1, a2)
           case Multiply(a1, a2) => shz("Multiply", a1, a2)
           case Subtract(a1, a2) => shz("Subtract", a1, a2)
@@ -676,11 +679,11 @@ object MapFuncCore {
           case Like(a1, a2, a3) => shz("Like", a1, a2, a3)
           case Substring(a1, a2, a3) => shz("Substring", a1, a2, a3)
           case Guard(a1, tpe, a2, a3) =>
-            Cord("Guard(") ++
-              sh.show(a1) ++ Cord(", ") ++
-              tpe.show ++ Cord(", ") ++
-              sh.show(a2) ++ Cord(", ") ++
-              sh.show(a3) ++ Cord(")")
+            "Guard(" +
+              sh.shows(a1) + ", " +
+              tpe.shows + ", " +
+              sh.shows(a2) + ", " +
+              sh.shows(a3) + ")"
         }
       }
     }
@@ -739,7 +742,6 @@ object MapFuncCore {
           case TemporalTrunc(a1, a2) => NonTerminal("TemporalTrunc" :: nt, a1.shows.some, List(r.render(a2)))
           case TimeOfDay(a1) => nAry("TimeOfDay", a1)
           case ToTimestamp(a1) => nAry("ToTimestamp", a1)
-          case ToLocal(a1) => nAry("ToLocal", a1)
           case TypeOf(a1) => nAry("TypeOf", a1)
           case Negate(a1) => nAry("Negate", a1)
           case Not(a1) => nAry("Not", a1)
@@ -757,6 +759,8 @@ object MapFuncCore {
           case Meta(a1) => nAry("Meta", a1)
 
           // binary
+          case ToLocal(a1, a2) => nAry("ToLocal", a1, a2)
+          case ToOffset(a1, a2) => nAry("ToOffset", a1, a2)
           case Add(a1, a2) => nAry("Add", a1, a2)
           case Multiply(a1, a2) => nAry("Multiply", a1, a2)
           case Subtract(a1, a2) => nAry("Subtract", a1, a2)
@@ -861,7 +865,8 @@ object MapFuncsCore {
   @Lenses final case class TemporalTrunc[T[_[_]], A](part: TemporalPart, a1: A) extends Unary[T, A]
   @Lenses final case class TimeOfDay[T[_[_]], A](a1: A) extends Unary[T, A]
   @Lenses final case class ToTimestamp[T[_[_]], A](a1: A) extends Unary[T, A]
-  @Lenses final case class ToLocal[T[_[_]], A](a1: A) extends Unary[T, A]
+  @Lenses final case class ToLocal[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
+  @Lenses final case class ToOffset[T[_[_]], A](a1: A, a2: A) extends Binary[T, A]
   /** Fetches the [[quasar.Type.OffsetDateTime]] for the current instant in time, in UTC. */
   @Lenses final case class Now[T[_[_]], A]() extends Nullary[T, A]
   /** Fetches the [[quasar.Type.OffsetTime]] for the current instant in time, in UTC. */

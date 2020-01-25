@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import quasar.contrib.scalaz.MonadState_
 import quasar.ejson.EJson
 import quasar.fp._
 import quasar.qscript._, PlannerError.InternalError
-import quasar.qsu.QScriptUniform.ShiftTarget
 import quasar.qsu.mra.Provenance
 
 import matryoshka.{Hole => _}
@@ -42,15 +41,6 @@ package object qsu {
 
   def AccessHole[T[_[_]]]: FreeMapA[T, Access[Hole]] =
     Free.pure(Access.value(SrcHole))
-
-  def LeftTarget[T[_[_]]]: FreeMapA[T, ShiftTarget] =
-    Free.pure(ShiftTarget.LeftTarget)
-
-  def RightTarget[T[_[_]]]: FreeMapA[T, ShiftTarget] =
-    Free.pure(ShiftTarget.RightTarget)
-
-  def AccessLeftTarget[T[_[_]]](f: Hole => Access[Hole]): FreeMapA[T, ShiftTarget] =
-    Free.pure(ShiftTarget.AccessLeftTarget(f(SrcHole)))
 
   def AccessValueF[T[_[_]], A](a: A): FreeAccess[T, A] =
     Free.pure[MapFunc[T, ?], Access[A]](Access.Value(a))

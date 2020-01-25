@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import org.specs2.matcher.MatchResult
 
 import scalaz.Scalaz._
 
-import shims._
+import shims.monadToScalaz
 
 abstract class DatasourceSpec[F[_]: Effect, G[_], P <: ResourcePathType]
     extends EffectfulQSpec[F] {

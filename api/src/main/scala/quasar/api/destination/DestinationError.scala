@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import monocle.Prism
 import scalaz.std.string._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
-import scalaz.{Cord, Equal, ISet, NonEmptyList, Show}
+import scalaz.{Equal, ISet, NonEmptyList, Show}
 
 sealed trait DestinationError[+I, +C] extends Product with Serializable
 
@@ -138,49 +138,49 @@ object DestinationError {
     }
 
   implicit def showCreateError[C: Show]: Show[CreateError[C]] =
-    Show.show {
+    Show.shows {
       case e: InitializationError[C] =>
-        Show[InitializationError[C]].show(e)
+        Show[InitializationError[C]].shows(e)
 
       case DestinationUnsupported(kind, supported) =>
-        Cord("DestinationUnsupported(") ++ kind.show ++ Cord(", ") ++ supported.show ++ Cord(")")
+        "DestinationUnsupported(" + kind.shows + ", " + supported.shows + ")"
 
       case DestinationNameExists(name) =>
-        Cord("DestinationNameExists(") ++ name.show ++ Cord(")")
+        "DestinationNameExists(" + name.shows + ")"
     }
 
   implicit def showInitializationError[C: Show]: Show[InitializationError[C]] =
-    Show.show {
+    Show.shows {
       case MalformedConfiguration(kind, config, reason) =>
-        Cord("MalformedConfiguration(") ++ kind.show ++ Cord(", ") ++ config.show ++ Cord(", ") ++ Cord(reason) ++ Cord(")")
+        "MalformedConfiguration(" + kind.shows + ", " + config.shows + ", " + reason + ")"
 
       case InvalidConfiguration(kind, config, reasons) =>
-        Cord("InvalidConfiguration(") ++ kind.show ++ Cord(", ") ++ config.show ++ Cord(", ") ++ reasons.show ++ Cord(")")
+        "InvalidConfiguration(" + kind.shows + ", " + config.shows + ", " + reasons.shows + ")"
 
       case ConnectionFailed(kind, config, ex) =>
-        Cord("ConnectionFailed(") ++ kind.show ++ Cord(", ") ++ config.show ++ Cord(s")\n$ex")
+        "ConnectionFailed(" + kind.shows + ", " + config.shows + s")\n$ex"
 
       case AccessDenied(kind, config, reason) =>
-        Cord("AccessDenied(") ++ kind.show ++ Cord(", ") ++ config.show ++ Cord(", ") ++ reason.show ++ Cord(")")
+        "AccessDenied(" + kind.shows + ", " + config.shows + ", " + reason.shows + ")"
     }
 
   implicit def showExistentialError[I: Show]: Show[ExistentialError[I]] =
-    Show.show {
+    Show.shows {
       case DestinationNotFound(id) =>
-        Cord("DestinationNotFound(") ++ id.show ++ Cord(")")
+        "DestinationNotFound(" + id.shows + ")"
     }
 
   implicit def show[I: Show, C: Show]: Show[DestinationError[I, C]] =
-    Show.show {
+    Show.shows {
       case e: CreateError[C] => e match {
         case e: InitializationError[C] =>
-          Show[InitializationError[C]].show(e)
+          Show[InitializationError[C]].shows(e)
         case e =>
-          Show[CreateError[C]].show(e)
+          Show[CreateError[C]].shows(e)
       }
       case e: ExistentialError[I] => e match {
         case DestinationNotFound(id) =>
-          Cord("DestinationNotFound(") ++ id.show ++ Cord(")")
+          "DestinationNotFound(" + id.shows + ")"
       }
     }
 }

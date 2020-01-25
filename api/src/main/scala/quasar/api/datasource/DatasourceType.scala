@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import eu.timepit.refined.scalaz._
 import eu.timepit.refined.string.MatchesRegex
 import monocle.Prism
 import monocle.macros.Lenses
-import scalaz.{Cord, Order, Show}
+import scalaz.{Order, Show}
 import scalaz.std.anyVal._
 import scalaz.std.string._
 import scalaz.std.tuple._
@@ -51,8 +51,8 @@ sealed abstract class DatasourceTypeInstances {
     Order.orderBy(t => (t.name, t.version))
 
   implicit val show: Show[DatasourceType] =
-    Show.show {
+    Show.shows {
       case DatasourceType(n, v) =>
-        Cord("DatasourceType(") ++ n.show ++ Cord(", ") ++ v.show ++ Cord(")")
+        "DatasourceType(" + n.shows + ", " + v.shows + ")"
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,15 +69,15 @@ object ThetaJoin {
   implicit def show[T[_[_]]: ShowT]: Delay[Show, ThetaJoin[T, ?]] =
     new Delay[Show, ThetaJoin[T, ?]] {
       @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
-      def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.show {
+      def apply[A](showA: Show[A]): Show[ThetaJoin[T, A]] = Show.shows {
         case ThetaJoin(src, lBr, rBr, on, f, combine) =>
-          Cord("ThetaJoin(") ++
-          showA.show(src) ++ Cord(",") ++
-          lBr.show ++ Cord(",") ++
-          rBr.show ++ Cord(",") ++
-          on.show ++ Cord(",") ++
-          f.show ++ Cord(",") ++
-          combine.show ++ Cord(")")
+          "ThetaJoin(" +
+          showA.shows(src) + "," +
+          lBr.shows + "," +
+          rBr.shows + "," +
+          on.shows + "," +
+          f.shows + "," +
+          combine.shows + ")"
       }
     }
 

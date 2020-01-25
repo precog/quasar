@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,58 +16,37 @@
 
 package quasar.api.table
 
-import slamdata.Predef.{Product, Serializable}
+import slamdata.Predef._
 
-import scalaz.{Cord, Show}
+import scalaz.Show
 import scalaz.syntax.show._
 
-sealed trait TableError extends Product with Serializable
+sealed trait TableError[+I] extends Product with Serializable
 
 object TableError {
-  final case class PreparationNotInProgress[I](tableId: I) extends TableError
+  sealed trait ModificationError[+I] extends TableError[I]
 
-  sealed trait ModificationError[I] extends TableError
-  final case class PreparationExists[I](tableId: I) extends ModificationError[I]
+  sealed trait CreateError[+I] extends ModificationError[I]
+  final case class NameConflict(name: TableName) extends CreateError[Nothing]
 
-  sealed trait CreateError[I] extends ModificationError[I]
-  final case class NameConflict[I](name: TableName) extends CreateError[I]
-
-  sealed trait PrePreparationError[I] extends ModificationError[I]
-  final case class PreparationInProgress[I](tableId: I) extends PrePreparationError[I]
-
-  sealed trait ExistenceError[I] extends ModificationError[I] with PrePreparationError[I]
+  sealed trait ExistenceError[+I] extends ModificationError[I]
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
 
-  implicit def showPreparationNotInProgress[I: Show]: Show[PreparationNotInProgress[I]] =
-    Show.show {
-      case PreparationNotInProgress(id) =>
-        Cord("PreparationNotInProgress(") ++ id.show ++ Cord(")")
-    }
-
-  implicit def showModificationError[I: Show]: Show[ModificationError[I]] =
-    Show.show {
-      case PreparationExists(id) =>
-        Cord("PreparationExists(") ++ id.show ++ Cord(")")
-      case e:CreateError[I] => e.show
-      case e:PrePreparationError[I] => e.show
-    }
-
   implicit def showCreateError[I]: Show[CreateError[I]] =
-    Show.show {
+    Show.shows {
       case NameConflict(n) =>
-        Cord("NameConflict(") ++ n.show ++ Cord(")")
-    }
-
-  implicit def showPrePreparationError[I: Show]: Show[PrePreparationError[I]] =
-    Show.show {
-      case PreparationInProgress(id) =>
-        Cord("PreparationInProgress(") ++ id.show ++ Cord(")")
-      case e:ExistenceError[I] => e.show
+        "NameConflict(" + n.shows + ")"
     }
 
   implicit def showExistenceError[I: Show]: Show[ExistenceError[I]] =
-    Show.show {
+    Show.shows {
       case TableNotFound(id) =>
-        Cord("TableNotFound(") ++ id.show ++ Cord(")")
+        "TableNotFound(" + id.shows + ")"
+    }
+
+  implicit def showModificationError[I: Show]: Show[ModificationError[I]] =
+    Show.shows {
+      case c: CreateError[I] => c.shows
+      case e: ExistenceError[I] => e.shows
     }
 }

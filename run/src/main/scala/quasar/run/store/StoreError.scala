@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package quasar.run.store
 import slamdata.Predef._
 
 import monocle.Prism
-import scalaz.{Cord, Show}
+import scalaz.Show
 
 sealed abstract trait StoreError extends Product with Serializable {
   def detail: String
@@ -38,8 +38,8 @@ object StoreError {
       case StoreErrorException(re) => re
     } (StoreErrorException(_))
 
-  implicit val show: Show[StoreError] = Show.show {
-    case Corrupt(detail) => Cord("StoreError.Corrupt(") ++ Cord(detail) ++ Cord(")")
+  implicit val show: Show[StoreError] = Show.shows {
+    case Corrupt(detail) => "StoreError.Corrupt(" + detail + ")"
   }
 
   ////

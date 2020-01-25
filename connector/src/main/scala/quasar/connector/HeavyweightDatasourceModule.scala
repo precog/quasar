@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,8 @@ trait HeavyweightDatasourceModule {
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
-      config: Json)(
+      config: Json,
+      byteStore: ByteStore[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
 }

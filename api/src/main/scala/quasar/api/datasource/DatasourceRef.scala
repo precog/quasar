@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,18 @@ package quasar.api.datasource
 
 import monocle.PLens
 import monocle.macros.Lenses
-import scalaz.{Apply, Cord, Equal, Order, Show, Traverse1}
+import scalaz.{Apply, Equal, Order, Show, Traverse1}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
+import scalaz.syntax.equal._
 
 @Lenses
 final case class DatasourceRef[C](kind: DatasourceType, name: DatasourceName, config: C)
 
 object DatasourceRef extends DatasourceRefInstances {
+  def atMostRenamed[C: Equal](a: DatasourceRef[C], b: DatasourceRef[C]) =
+    a.kind === b.kind && a.config === b.config
+
   def pConfig[C, D]: PLens[DatasourceRef[C], DatasourceRef[D], C, D] =
     PLens[DatasourceRef[C], DatasourceRef[D], C, D](
       _.config)(
@@ -37,9 +41,9 @@ sealed abstract class DatasourceRefInstances extends DatasourceRefInstances0 {
     Order.orderBy(c => (c.kind, c.name, c.config))
 
   implicit def show[C: Show]: Show[DatasourceRef[C]] =
-    Show.show {
+    Show.shows {
       case DatasourceRef(t, n, c) =>
-        Cord("DatasourceRef(") ++ t.show ++ Cord(", ") ++ n.show ++ Cord(", ") ++ c.show ++ Cord(")")
+        "DatasourceRef(" + t.shows + ", " + n.shows + ", " + c.shows + ")"
     }
 
   implicit val traverse1: Traverse1[DatasourceRef] =

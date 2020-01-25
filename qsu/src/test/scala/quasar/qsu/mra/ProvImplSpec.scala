@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2018 SlamData Inc.
+ * Copyright 2014–2019 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,19 +29,20 @@ import org.scalacheck.Arbitrary
 
 import org.specs2.scalacheck.Parameters
 
-object ProvImplSpec extends {
+import ProvImpl.Vecs
 
-  val prov: Provenance.Aux[Char, Int, Boolean, Uop[Identities[Dim[Char, Int, Boolean]]]] =
+object ProvImplSpec extends {
+  val prov: Provenance.Aux[Char, Int, Boolean, Uop[Vecs[Dim[Char, Int, Boolean]]]] =
     ProvImpl[Char, Int, Boolean]
 
   val params = Parameters(maxSize = 8, workers = 2)
 
 }   with ProvenanceSpec[Char, Int, Boolean]
     with UopGenerator
-    with IdentitiesGenerator
+    with VecsGenerator
     with DimGenerator {
 
-  type Dims = Uop[Identities[Dim[Char, Int, Boolean]]]
+  type Dims = Uop[Vecs[Dim[Char, Int, Boolean]]]
 
   def ts = (true, false)
   def ss = ('a', 'b', 'c')

@@ -18,7 +18,7 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.impl.cluster.Timestamped
 
 import cats.effect.{IO, Resource, Timer}
@@ -40,11 +40,11 @@ final class TimestampedStoreSpec extends IndexedStoreSpec[IO, String, String] {
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
   type UnderlyingStore = IndexedStore[IO, String, Timestamped[String]]
 
-  val pool = BlockingContext.cached("timestamped-spec-pool")
+  val blocker = qc.Blocker.cached("timestamped-spec-pool")
 
   val underlying: Resource[IO, IndexedStore[IO, String, Timestamped[String]]] =
     Resource.liftF[IO, Persistence](IO(new ConcurrentHashMap[String, Timestamped[String]]()))
-      .map(ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](_, pool))
+      .map(ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](_, blocker))
 
   val emptyStore: Resource[IO, IndexedStore[IO, String, String]] = for {
     u <- underlying

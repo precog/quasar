@@ -17,7 +17,6 @@
 package quasar.impl.external
 
 import slamdata.Predef._
-import quasar.concurrent.BlockingContext
 import quasar.connector.DestinationModule
 
 import java.lang.{
@@ -31,7 +30,7 @@ import java.lang.{
   NullPointerException
 }
 
-import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Sync, Timer}
 import cats.syntax.applicativeError._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
@@ -41,11 +40,11 @@ import org.slf4s.Logging
 object ExternalDestinations extends Logging {
   def apply[F[_]: ContextShift: Timer](
       config: ExternalConfig,
-      blockingPool: BlockingContext)(
+      blocker: Blocker)(
       implicit F: ConcurrentEffect[F])
       : F[List[DestinationModule]] = {
     val destinationModuleStream: Stream[F, DestinationModule] =
-      ExternalModules(config, blockingPool)
+      ExternalModules(config, blocker)
         .filter {
           case (_, _, PluginType.Destination) => true
           case _ => false

@@ -19,16 +19,17 @@ package quasar.api.datasource
 import slamdata.Predef._
 import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.SchemaConfig
-import quasar.api.resource.ResourcePath
+import quasar.api.resource.{ResourcePath, ResourceName, ResourcePathType}
 
 import scala.Predef.assert
 import scala.concurrent.ExecutionContext
 import java.util.UUID
 
-import cats.effect.Effect
+import cats.effect.{Resource, Effect}
 import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import cats.instances.tuple._
 import eu.timepit.refined.auto._
 import org.specs2.matcher.Matcher
 import scalaz.{Equal, IMap, Order, Show, \/}
@@ -46,7 +47,7 @@ abstract class DatasourcesSpec[
 
   import DatasourceError._
 
-  def datasources: Datasources[F, G, I, C, S]
+  def datasources: Resource[F, Datasources[F, G, I, C, S]]
 
   def supportedType: DatasourceType
 
@@ -59,117 +60,107 @@ abstract class DatasourcesSpec[
 
   assert(validConfigs._1 =/= validConfigs._2, "validConfigs must be distinct!")
 
-  def mutationExamples(f: DatasourceRef[C] => F[Err \/ I]) = {
-    "lookup on success" >>* {
-      for {
-        a <- refA
+  def mutationExamples(f: (Datasources[F, G, I, C, S], DatasourceRef[C]) => F[Err \/ I]) = {
+    "lookup on success" >>* datasources.use { dses => for {
+      a <- refA
 
-        fr <- f(a)
+      fr <- f(dses, a)
 
-        i <- expectSuccess(fr)
+      i <- expectSuccess(fr)
 
-        r <- datasources.datasourceRef(i)
-      } yield {
-        r must beRef(a)
-      }
-    }
+      r <- dses.datasourceRef(i)
+    } yield {
+      r must beRef(a)
+    }}
 
-    "normal status on success" >>* {
-      for {
-        a <- refA
+    "normal status on success" >>* datasources.use { dses => for {
+      a <- refA
 
-        fr <- f(a)
+      fr <- f(dses, a)
 
-        i <- expectSuccess(fr)
+      i <- expectSuccess(fr)
 
-        r <- datasources.datasourceStatus(i)
-      } yield {
-        r must be_\/-(beNormal[Exception])
-      }
-    }
+      r <- dses.datasourceStatus(i)
+    } yield {
+      r must be_\/-(beNormal[Exception])
+    }}
 
-    "error when name exists" >>* {
-      for {
-        n <- randomName
+    "error when name exists" >>* datasources.use { dses => for {
+      n <- randomName
 
-        x = DatasourceRef(supportedType, n, validConfigs._1)
-        y = DatasourceRef(supportedType, n, validConfigs._2)
+      x = DatasourceRef(supportedType, n, validConfigs._1)
+      y = DatasourceRef(supportedType, n, validConfigs._2)
 
-        r <- f(x) *> f(y)
-      } yield {
-        r must be_-\/(equal[Err](DatasourceNameExists(n)))
-      }
-    }
+      r <- f(dses, x) *> f(dses, y)
+    } yield {
+      r must be_-\/(equal[Err](DatasourceNameExists(n)))
+    }}
 
     "error when type not supported" >>* {
       val unsup = DatasourceType("--unsupported--", 17L)
 
-      for {
+      datasources.use { dses => for {
         n <- randomName
 
         uref = DatasourceRef(unsup, n, validConfigs._1)
 
-        u <- datasources.addDatasource(uref)
+        u <- dses.addDatasource(uref)
 
-        types <- datasources.supportedDatasourceTypes
+        types <- dses.supportedDatasourceTypes
       } yield {
         u must be_-\/(equal[Err](DatasourceUnsupported(unsup, types)))
-      }
+      }}
     }
   }
 
-  def resultsInNotFound[E >: ExistentialError[I] <: Err, A](f: I => F[E \/ A]) =
-    for {
-      i <- refA >>= createRef
+  def resultsInNotFound[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C, S], I) => F[E \/ A]) =
+    datasources.use { dses => for {
+      i <- refA >>= createRef(dses)
 
-      c <- datasources.removeDatasource(i)
+      c <- dses.removeDatasource(i)
 
-      fr <- f(i)
+      fr <- f(dses, i)
     } yield {
       c must beNormal
       fr must beNotFound[E](i)
-    }
+    }}
 
-  def discoveryExamples[E >: ExistentialError[I] <: Err, A](f: (I, ResourcePath) => F[E \/ A]) = {
-
+  def discoveryExamples[E >: ExistentialError[I] <: Err, A](f: (Datasources[F, G, I, C, S], I, ResourcePath) => F[E \/ A]) = {
     "error when datasource not found" >>* {
-      resultsInNotFound(f(_, ResourcePath.root()))
+      resultsInNotFound((dses, i) => f(dses, i, ResourcePath.root()))
     }
 
-    "respond when datasource exists" >>* {
-      for {
-        i <- refA >>= createRef
+    "respond when datasource exists" >>* datasources.use { dses => for {
+      i <- refA >>= createRef(dses)
 
-        fr <- f(i, ResourcePath.root())
-      } yield {
-        fr must not(beNotFound[E](i))
-      }
-    }
+      fr <- f(dses, i, ResourcePath.root())
+    } yield {
+      fr must not(beNotFound[E](i))
+    }}
   }
 
-  "add datasource" >> mutationExamples { ref =>
-    datasources
-      .addDatasource(ref)
-      .map(_.leftMap[DatasourceError[I, C]](e => e))
+  "add datasource" >> mutationExamples { (dses, ref) =>
+    dses.addDatasource(ref).map(_.leftMap[DatasourceError[I, C]](e => e))
   }
+
 
   "replace datasource" >> {
-    mutationExamples(ref => for {
+    mutationExamples((dses, ref) => for {
       b <- refB
 
-      i <- createRef(b)
+      i <- createRef(dses)(b)
 
-      c <- datasources.replaceDatasource(i, ref)
+      c <- dses.replaceDatasource(i, ref)
     } yield {
       Condition.disjunctionIso
         .get(c.map[DatasourceError[I, C]](e => e))
         .map(_ => i)
     })
 
-    "fails when datasource not found" >>* resultsInNotFound { i =>
+    "fails when datasource not found" >>* resultsInNotFound { (dses, i) =>
       for {
         b <- refB
-        c <- datasources.replaceDatasource(i, b)
+        c <- dses.replaceDatasource(i, b)
       } yield {
         Condition.disjunctionIso
           .get(c.map[DatasourceError[I, C]](e => e))
@@ -178,75 +169,81 @@ abstract class DatasourcesSpec[
   }
 
   "all metadata" >> {
-    "returns metadata for all datasources" >>* {
-      for {
-        a <- refA
-        ia <- createRef(a)
+    "returns metadata for all datasources" >>* datasources.use { dses => for {
+      a <- refA
+      ia <- createRef(dses)(a)
 
-        b <- refB
-        ib <- createRef(b)
+      b <- refB
+      ib <- createRef(dses)(b)
 
-        g <- datasources.allDatasourceMetadata
-        ts <- gatherMultiple(g)
+      g <- dses.allDatasourceMetadata
 
-        m = IMap.fromFoldable(ts)
-      } yield {
-        m.lookup(ia).exists(v => v.kind ≟ a.kind && v.name ≟ a.name) must beTrue
-        m.lookup(ib).exists(v => v.kind ≟ b.kind && v.name ≟ b.name) must beTrue
-      }
-    }
+      ts <- gatherMultiple(g)
+
+      m = IMap.fromFoldable(ts)
+    } yield {
+      m.lookup(ia).exists(v => v.kind ≟ a.kind && v.name ≟ a.name) must beTrue
+      m.lookup(ib).exists(v => v.kind ≟ b.kind && v.name ≟ b.name) must beTrue
+    }}
   }
 
   "lookup ref" >> {
     "error when not found" >>* {
-      resultsInNotFound(datasources.datasourceRef)
+      resultsInNotFound((dses, i) => dses.datasourceRef(i))
     }
   }
 
   "lookup status" >> {
     "error when not found" >>* {
-      resultsInNotFound(datasources.datasourceStatus)
+      resultsInNotFound((dses, i) => dses.datasourceStatus(i))
     }
   }
 
   "path is resource" >> {
-    discoveryExamples(datasources.pathIsResource)
+    discoveryExamples((ds, i, pr) => ds.pathIsResource(i, pr))
   }
 
   "prefixed child paths" >> {
-    discoveryExamples(datasources.prefixedChildPaths)
+    // OMG!!!
+    discoveryExamples { (ds, i, pr) =>
+      val raw: F[DiscoveryError[I] \/ G[(ResourceName, ds.PathType)]] = ds.prefixedChildPaths(i, pr)
+      raw map { (ei: DiscoveryError[I] \/ G[(ResourceName, ds.PathType)]) =>
+        ei map { (g: G[(ResourceName, ds.PathType)]) =>
+          gatherMultiple(g) map { (lst: List[(ResourceName, ds.PathType)]) =>
+            lst.map(_.map(x => x: ResourcePathType))
+          }
+        }
+      }
+    }
   }
 
   "remove datasource" >> {
     "error when not found" >>* {
-      resultsInNotFound { id =>
-        datasources.removeDatasource(id)
+      resultsInNotFound { (dses, id) =>
+        dses.removeDatasource(id)
           .map(Condition.disjunctionIso.get(_))
       }
     }
 
-    "not in metadata on success" >>* {
-      for {
-        a <- refA
+    "not in metadata on success" >>* datasources.use { dses => for {
+      a <- refA
+      i <- createRef(dses)(a)
 
-        i <- createRef(a)
+      gBefore <- dses.allDatasourceMetadata
+      metaBefore <- gatherMultiple(gBefore)
 
-        gBefore <- datasources.allDatasourceMetadata
-        metaBefore <- gatherMultiple(gBefore)
+      _ <- dses.removeDatasource(i)
 
-        _ <- datasources.removeDatasource(i)
-
-        gAfter <- datasources.allDatasourceMetadata
-        metaAfter <- gatherMultiple(gAfter)
-      } yield {
-        metaBefore.any(_._1 ≟ i) must beTrue
-        metaAfter.any(_._1 ≟ i) must beFalse
-      }
-    }
+      gAfter <- dses.allDatasourceMetadata
+      metaAfter <- gatherMultiple(gAfter)
+    } yield {
+      metaBefore.any(_._1 ≟ i) must beTrue
+      metaAfter.any(_._1 ≟ i) must beFalse
+    }}
   }
 
   "resource schema" >> {
-    discoveryExamples(datasources.resourceSchema(_, _, schemaConfig))
+    discoveryExamples((dses, a, b) => dses.resourceSchema(a, b, schemaConfig))
   }
 
   ////
@@ -266,8 +263,8 @@ abstract class DatasourcesSpec[
   def sanitizedRefB: F[DatasourceRef[C]] =
     randomName map (DatasourceRef(supportedType, _, validConfigs._2))
 
-  def createRef(r: DatasourceRef[C]): F[I] =
-    datasources.addDatasource(r) >>= expectSuccess
+  def createRef(dses: Datasources[F, G, I, C, S]): DatasourceRef[C] => F[I] = r =>
+    dses.addDatasource(r) >>= expectSuccess
 
   def expectSuccess[E <: Err, A](r: E \/ A): F[A] =
     r.fold(

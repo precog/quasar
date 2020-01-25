@@ -16,9 +16,14 @@
 
 package quasar
 
+import scala.{Array, Byte}
+
 import quasar.contrib.scalaz.MonadError_
 
+import java.lang.String
+
 package object connector {
+  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
 
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 

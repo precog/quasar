@@ -20,19 +20,15 @@ import slamdata.Predef.String
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
-import scalaz.{@@, Tag}
+import cats.{effect => ce}
 
 package object concurrent {
-  sealed trait Blocking
-  val Blocking = Tag.of[Blocking]
 
-  type BlockingContext = ExecutionContext @@ Blocking
+  object Blocker {
+    def apply(ec: ExecutionContext): ce.Blocker =
+      ce.Blocker.liftExecutionContext(ec)
 
-  object BlockingContext {
-    def apply(ec: ExecutionContext): BlockingContext =
-      Blocking(ec)
-
-    def cached(name: String): BlockingContext =
+    def cached(name: String): ce.Blocker =
       apply(ExecutionContext.fromExecutor(Executors.newCachedThreadPool(NamedDaemonThreadFactory(name))))
   }
 }

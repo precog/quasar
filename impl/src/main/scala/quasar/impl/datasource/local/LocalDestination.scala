@@ -18,18 +18,16 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef.{Stream => _, _}
 
-import cats.effect.{ContextShift, Effect}
+import cats.effect.{Blocker, ContextShift, Effect}
 
 import fs2.{io, Stream}
 
 import quasar.api.destination.{Destination, ResultSink}
 import quasar.api.push.RenderConfig
-import quasar.concurrent.BlockingContext
 import quasar.connector.{MonadResourceErr, ResourceError}
 
 import scalaz.NonEmptyList
 import scalaz.syntax.monad._
-import scalaz.syntax.tag._
 
 import shims.monadToScalaz
 
@@ -37,18 +35,18 @@ import java.nio.file.{Path => JPath}
 
 final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] private (
     root: JPath,
-    blockingContext: BlockingContext) extends Destination[F] {
+    blocker: Blocker) extends Destination[F] {
 
   val destinationType = LocalDestinationType
 
   def sinks: NonEmptyList[ResultSink[F]] =
-    NonEmptyList(csvSink(root, blockingContext))
+    NonEmptyList(csvSink(root, blocker))
 
-  private def csvSink(root: JPath, blockingContext: BlockingContext): ResultSink[F] =
+  private def csvSink(root: JPath, blocker: Blocker): ResultSink[F] =
     ResultSink.csv(RenderConfig.Csv())((dst, columns, bytes) =>
         Stream.eval(resolvedResourcePath[F](root, dst)) >>= {
           case Some(writePath) =>
-            val fileSink = io.file.writeAll[F](writePath, blockingContext.unwrap)
+            val fileSink = io.file.writeAll[F](writePath, blocker)
 
             bytes.through(fileSink)
 
@@ -61,7 +59,7 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
 object LocalDestination {
   def apply[F[_]: Effect: ContextShift: MonadResourceErr](
       root: JPath,
-      blockingContext: BlockingContext)
+      blocker: Blocker)
       : LocalDestination[F] =
-    new LocalDestination[F](root, blockingContext)
+    new LocalDestination[F](root, blocker)
 }

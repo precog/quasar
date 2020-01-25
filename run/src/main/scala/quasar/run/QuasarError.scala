@@ -19,6 +19,7 @@ package quasar.run
 import slamdata.Predef.{Exception, Product, Serializable, Throwable}
 
 import quasar.api.datasource.DatasourceError.CreateError
+import quasar.api.destination.DestinationError.{CreateError => DestCreateError}
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.qscript.PlannerError
@@ -36,12 +37,18 @@ import shims.{showToCats, showToScalaz}
 sealed abstract trait QuasarError extends Product with Serializable
 
 object QuasarError {
+  final case class Pushing(error: DestCreateError[Json]) extends QuasarError
   final case class Compiling(errors: SemanticErrors) extends QuasarError
   final case class Connecting(error: CreateError[Json]) extends QuasarError
   final case class Evaluating(error: ResourceError) extends QuasarError
   final case class Parsing(error: ParsingError) extends QuasarError
   final case class Planning(error: PlannerError) extends QuasarError
   final case class Storing(error: StoreError) extends QuasarError
+
+  val pushing: Prism[QuasarError, DestCreateError[Json]] =
+    Prism.partial[QuasarError, DestCreateError[Json]] {
+      case Pushing(err) => err
+    } (Pushing(_))
 
   val compiling: Prism[QuasarError, SemanticErrors] =
     Prism.partial[QuasarError, SemanticErrors] {
@@ -86,6 +93,7 @@ object QuasarError {
       case Parsing(e) => e.show
       case Planning(e) => e.show
       case Storing(e) => e.show
+      case Pushing(e) => e.show
     }
 
   ////

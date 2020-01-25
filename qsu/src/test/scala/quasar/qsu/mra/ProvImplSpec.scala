@@ -29,19 +29,20 @@ import org.scalacheck.Arbitrary
 
 import org.specs2.scalacheck.Parameters
 
-object ProvImplSpec extends {
+import ProvImpl.Vecs
 
-  val prov: Provenance.Aux[Char, Int, Boolean, Uop[Identities[Dim[Char, Int, Boolean]]]] =
+object ProvImplSpec extends {
+  val prov: Provenance.Aux[Char, Int, Boolean, Uop[Vecs[Dim[Char, Int, Boolean]]]] =
     ProvImpl[Char, Int, Boolean]
 
   val params = Parameters(maxSize = 8, workers = 2)
 
 }   with ProvenanceSpec[Char, Int, Boolean]
     with UopGenerator
-    with IdentitiesGenerator
+    with VecsGenerator
     with DimGenerator {
 
-  type Dims = Uop[Identities[Dim[Char, Int, Boolean]]]
+  type Dims = Uop[Vecs[Dim[Char, Int, Boolean]]]
 
   def ts = (true, false)
   def ss = ('a', 'b', 'c')

@@ -21,11 +21,15 @@ import monocle.PLens
 import scalaz.std.tuple._
 import scalaz.syntax.show._
 import scalaz.{Apply, Equal, Order, Show, Traverse1}
+import scalaz.syntax.equal._
 
 @Lenses
 final case class DestinationRef[C](kind: DestinationType, name: DestinationName, config: C)
 
 object DestinationRef extends DestinationRefInstances {
+  def atMostRenamed[C: Equal](a: DestinationRef[C], b: DestinationRef[C]) =
+    a.kind === b.kind && a.config === b.config
+
   def pConfig[C, D]: PLens[DestinationRef[C], DestinationRef[D], C, D] =
     PLens[DestinationRef[C], DestinationRef[D], C, D](
       _.config)(

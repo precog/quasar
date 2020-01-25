@@ -17,6 +17,7 @@
 package quasar.run
 
 import quasar.api.datasource.DatasourceError.CreateError
+import quasar.api.destination.DestinationError.{CreateError => DestCreateError}
 import quasar.compile.SemanticErrors
 import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
@@ -40,4 +41,7 @@ object implicits {
 
   implicit def storingMonadError[F[_]: MonadQuasarErr]: MonadError_[F, StoreError] =
     MonadError_.facet[F](QuasarError.storing)
+
+  implicit def pushingMonadError[F[_]: MonadQuasarErr]: MonadError_[F, DestCreateError[Json]] =
+    MonadError_.facet[F](QuasarError.pushing)
 }

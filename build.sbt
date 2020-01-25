@@ -12,12 +12,6 @@ import Versions._
 def readVersion(path: File): String =
   IO.read(path).trim
 
-lazy val fs2GzipVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "fs2-gzip-version"))
-
-lazy val fs2JobVersion = Def.setting[String](
-  readVersion(baseDirectory.value / ".." / "fs2-job-version"))
-
 lazy val qdataVersion = Def.setting[String](
   readVersion(baseDirectory.value / ".." / "qdata-version"))
 
@@ -268,13 +262,12 @@ lazy val impl = project
   .settings(
 
     libraryDependencies ++= Seq(
-      "com.slamdata"   %% "fs2-gzip"                 % fs2GzipVersion.value,
-      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion.value,
+      "com.slamdata"   %% "fs2-job"                  % fs2JobVersion,
       "com.slamdata"   %% "qdata-tectonic"           % qdataVersion.value,
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
-      "org.typelevel"  %% "jawn-argonaut"            % jawnVersion,
+      "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,
@@ -282,7 +275,8 @@ lazy val impl = project
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.3"))
+      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+  .evictToLocal("FS2_JOB_PATH", "core") 
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

@@ -32,7 +32,7 @@ import quasar.std.SetLib.{Drop, Take}
 import matryoshka._
 import matryoshka.implicits._
 import pathy.Path.posixCodec
-import scalaz.{Failure => _, _}, Scalaz._
+import scalaz.{Failure => _, Select => _, _}, Scalaz._
 
 package object compile {
   type SemanticErrors = NonEmptyList[SemanticError]

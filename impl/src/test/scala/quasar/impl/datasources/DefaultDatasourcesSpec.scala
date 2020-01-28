@@ -16,271 +16,368 @@
 
 package quasar.impl.datasources
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
-import quasar.Condition
+import quasar.{RateLimiter, RateLimiting, ScalarStages, ConditionMatchers, Condition, NoopRateLimitUpdater}
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
-import quasar.api.resource.{ResourcePath, ResourcePathType}
-import quasar.contrib.cats.stateT._
-import quasar.contrib.cats.writerT._
-import quasar.contrib.cats.effect.stateT.catsStateTEffect
-import quasar.contrib.fs2.stream._
-import quasar.contrib.scalaz.MonadState_
-import quasar.impl.storage.PureIndexedStore
+import quasar.api.resource._
+import quasar.{concurrent => qc}
+import quasar.connector._
+import quasar.connector.DataFormat
+import quasar.contrib.scalaz._
+import quasar.impl.{DatasourceModule, ResourceManager}
+import quasar.impl.datasource.EmptyDatasource
+import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
+import quasar.qscript.{PlannerError, InterpretedRead}
 
-import DefaultDatasourcesSpec._
+import argonaut.Json
+import argonaut.JsonScalaz._
+import argonaut.Argonaut.jString
 
-import java.io.IOException
+import cats.Show
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource, Timer}
+import cats.effect.concurrent.Ref
+import cats.instances.string._
+import cats.instances.option._
+import cats.kernel.Hash
+import cats.kernel.instances.uuid._
+import cats.syntax.applicative._
+import cats.syntax.applicativeError._
+import cats.syntax.functor._
+import cats.syntax.traverse._
+
+import eu.timepit.refined.auto._
+
+import fs2.Stream
+
+import matryoshka.data.Fix
+
+import scalaz.{IMap, \/-}
+
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.data.{StateT, WriterT}
-import cats.effect.IO
-import cats.instances.list._
-import cats.syntax.applicative._
-import cats.syntax.flatMap._
-import eu.timepit.refined.auto._
-import fs2.Stream
-import matryoshka.data.Fix
-import monocle.macros.Lenses
-import scalaz.{-\/, IMap, ISet, Monoid, \/-}
-import scalaz.std.anyVal._
-import scalaz.std.string._
+import shims.{orderToScalaz, showToScalaz, applicativeToScalaz, monoidKToScalaz, showToCats, monadToScalaz}
 
-import shims.{eqToScalaz, equalToCats, monoidToCats, monoidToScalaz, monadToScalaz, showToCats, showToScalaz}
+object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type] with ConditionMatchers {
 
-final class DefaultDatasourcesSpec
-    extends DatasourcesSpec[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] {
+  sequential
+
+  implicit val tmr = IO.timer(global)
 
   type PathType = ResourcePathType
+  type Self = Datasources[IO, Stream[IO, ?], String, Json, MockSchemaConfig.type]
+  type R[F[_], A] = Either[InitializationError[Json], Datasource[F, Stream[F, ?], A, QueryResult[F], ResourcePathType.Physical]]
+  type MDS = ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]
 
-  val monadIdx: MonadState_[DefaultM, Int] =
-    MonadState_.zoom[DefaultM](DefaultState.idx)
+  implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
+    MonadError_.facet[IO](ResourceError.throwableP)
 
-  implicit val monadInitd: MonadState_[DefaultM, ISet[Int]] =
-    MonadState_.zoom[DefaultM](DefaultState.initd)
+  final case class CreateErrorException(ce: CreateError[Json])
+      extends Exception(Show[DatasourceError[String, Json]].show(ce))
 
-  implicit val monadRefs: MonadState_[DefaultM, Refs] =
-    MonadState_.zoom[DefaultM](DefaultState.refs)
+  implicit val ioCreateErrorME: MonadError_[IO, CreateError[Json]] =
+    new MonadError_[IO, CreateError[Json]] {
+      def raiseError[A](e: CreateError[Json]): IO[A] =
+        IO.raiseError(new CreateErrorException(e))
 
-  def datasources = mkDatasources(IMap.empty, c => c)(_ => None)
-  def sanitizedDatasources = mkDatasources(IMap.empty, _ => "sanitized")(_ => None)
+      def handleError[A](fa: IO[A])(f: CreateError[Json] => IO[A]): IO[A] =
+        fa.recoverWith {
+          case CreateErrorException(e) => f(e)
+        }
+    }
 
-  def supportedType = DatasourceType("test-type", 3L)
+  final case class PlannerErrorException(pe: PlannerError)
+      extends Exception(pe.message)
 
-  def validConfigs = ("one", "two")
+  implicit val ioPlannerErrorME: MonadError_[IO, PlannerError] =
+    new MonadError_[IO, PlannerError] {
+      def raiseError[A](e: PlannerError): IO[A] =
+        IO.raiseError(new PlannerErrorException(e))
 
-  val schemaConfig = MockSchemaConfig
+      def handleError[A](fa: IO[A])(f: PlannerError => IO[A]): IO[A] =
+        fa.recoverWith {
+          case PlannerErrorException(pe) => f(pe)
+        }
+    }
 
-  def gatherMultiple[A](as: Stream[DefaultM, A]) = as.compile.toList
+  def lightMod(
+      mp: Map[Json, InitializationError[Json]],
+      sanitize: Option[Json => Json] = None)
+      : DatasourceModule = DatasourceModule.Lightweight {
+    new LightweightDatasourceModule {
+      val kind = supportedType
 
-  def mkDatasources(
-      errs: IMap[Int, Exception], sanitize: String => String)(
-      init: String => Option[InitializationError[String]])
-      : Datasources[DefaultM, Stream[DefaultM, ?], Int, String, MockSchemaConfig.type] = {
-
-    val freshId =
-      for {
-        i <- monadIdx.get
-        _ <- monadIdx.put(i + 1)
-      } yield i
-
-    val refs =
-      PureIndexedStore[DefaultM, Int, DatasourceRef[String]]
-
-    val errors =
-      DatasourceErrors.fromMap(errs.pure[DefaultM])
-
-    val manager =
-      MockDatasourceManager[Int, String, Fix, DefaultM, Stream[DefaultM, ?], Unit](
-        ISet.singleton(supportedType), init, sanitize, ())
-
-    val schema =
-      new ResourceSchema[DefaultM, MockSchemaConfig.type, (ResourcePath, Unit)] {
-        def apply(c: MockSchemaConfig.type, r: (ResourcePath, Unit)) =
-          MockSchemaConfig.MockSchema.pure[DefaultM]
+      def sanitizeConfig(config: Json): Json = sanitize match {
+        case None => config
+        case Some(f) => f(config)
       }
 
-    DefaultDatasources(freshId, refs, errors, manager, schema)
+      def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+          config: Json,
+          rateLimiting: RateLimiting[F, A],
+          byteStore: ByteStore[F])(
+          implicit ec: ExecutionContext)
+          : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
+        lazy val ds: R[F, InterpretedRead[ResourcePath]] =
+          Right {
+            EmptyDatasource[F, Stream[F, ?], InterpretedRead[ResourcePath], QueryResult[F], ResourcePathType.Physical](
+              supportedType,
+              QueryResult.typed(
+                DataFormat.ldjson,
+                Stream.empty,
+                ScalarStages.Id))
+          }
+        val result = mp.get(config) match {
+          case None => ds
+          case Some(e) => Left(e): R[F, InterpretedRead[ResourcePath]]
+        }
+        Resource.make(result.pure[F])(x => ().pure[F])
+      }
+    }
   }
+
+  val blocker: Blocker = qc.Blocker.cached("rdatasources-spec")
+
+  def datasources: Resource[IO, Self] = prepare(Map()).map(_._1)
+
+  def prepare(
+      mp: Map[Json, InitializationError[Json]],
+      errorMap: Option[Ref[IO, IMap[String, Exception]]] = None,
+      sanitize: Option[Json => Json] = None) = {
+
+    val freshId = IO(java.util.UUID.randomUUID.toString())
+
+    val fRefs: IO[IndexedStore[IO, String, DatasourceRef[Json]]] =
+      IO(new ConcurrentHashMap[String, DatasourceRef[Json]]()).map { (mp: ConcurrentHashMap[String, DatasourceRef[Json]]) =>
+        ConcurrentMapIndexedStore.unhooked[IO, String, DatasourceRef[Json]](mp, blocker)
+      }
+
+    val rCache = ResourceManager[IO, String, ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]]
+
+    val schema =
+      new ResourceSchema[IO, MockSchemaConfig.type, (ResourcePath, QueryResult[IO])] {
+        def apply(c: MockSchemaConfig.type, r: (ResourcePath, QueryResult[IO])) =
+          MockSchemaConfig.MockSchema.pure[IO]
+      }
+
+    val errors = DatasourceErrors fromMap {
+      errorMap match {
+        case None => IMap.empty[String, Exception].pure[IO]
+        case Some(e) => e.get
+      }
+    }
+
+    for {
+      rateLimiting <- Resource.liftF(RateLimiter[IO, UUID](1.0, IO.delay(UUID.randomUUID()), NoopRateLimitUpdater[IO, UUID]))
+      starts <- Resource.liftF(Ref.of[IO, List[String]](List()))
+      shuts <- Resource.liftF(Ref.of[IO, List[String]](List()))
+
+      byteStores = ByteStores.void[IO, String]
+
+      modules = {
+        DatasourceModules[Fix, IO, String, UUID](List(lightMod(mp, sanitize)), rateLimiting, byteStores)
+          .widenPathType[PathType]
+          .withMiddleware((i: String, mds: MDS) => starts.update(i :: _) as mds)
+          .withFinalizer((i: String, mds: MDS) => shuts.update(i :: _))
+      }
+      refs <- Resource.liftF(fRefs)
+      cache <- rCache
+      result <- Resource.liftF {
+        DefaultDatasources[Fix, IO, String, Json, MockSchemaConfig.type, QueryResult[IO]](freshId, refs, modules, cache, errors, schema, byteStores)
+      }
+    } yield (result, refs, starts, shuts)
+  }
+
+  def supportedType = DatasourceType("test-type", 3L)
+  def validConfigs = (jString("one"), jString("two"))
+  val schemaConfig = MockSchemaConfig
+  def gatherMultiple[A](as: Stream[IO, A]) = as.compile.toList
 
   "implementation specific" >> {
     "add datasource" >> {
-      "initializes datasource" >> {
-        val addB =
-          refB >>= datasources.addDatasource
-
-        addB.runEmpty.value.map(_ must beLike {
-          case (s, \/-(i)) => s.initd.member(i) must beTrue
-        }).unsafeRunSync()
-      }
-
-      "doesn't store config when initialization fails" >> {
-        val err3 =
-          MalformedConfiguration(supportedType, "three", "3 isn't a config!")
-
-        val ds = mkDatasources(IMap.empty, _ => "") {
-          case "three" => Some(err3)
-          case _ => None
+      "initializes datasource" >>* {
+        for {
+          ((dses, _, starts, _), finalize) <- prepare(Map()).allocated
+          b <- refB
+          i0 <- dses.addDatasource(b)
+          _ <- finalize
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          i0 must beLike {
+            case \/-(i) => List(i) === started
+          }
         }
-
-        val add =
-          refA
-            .map(DatasourceRef.config.set("three"))
-            .flatMap(ds.addDatasource)
-
-        add.runEmpty.value.map(_ must beLike {
-          case (s, -\/(e)) =>
-            s.refs.isEmpty must beTrue
-            s.initd.isEmpty must beTrue
-            (e: DatasourceError[Int, String]) must_= err3
-        }).unsafeRunSync()
       }
-    }
-
-    "lookup status" >> {
-      "includes errors" >> {
-        val errs =
-          IMap[Int, Exception](1 -> new IOException())
-
-        val ds = mkDatasources(errs, _ => "")(_ => None)
-
-        val lbar = for {
+      "doesn't store config when initialization fails" >>* {
+        val err3: InitializationError[Json] =
+          MalformedConfiguration(supportedType, jString("three"), "3 isn't a config!")
+        for {
+          ((dses, refs, _, _), finalize) <- prepare(Map(jString("three") -> err3)).allocated
           a <- refA
-          _ <- ds.addDatasource(a)
-
-          b <- refB
-          _ <- ds.addDatasource(b)
-
-          r <- ds.datasourceStatus(1)
-        } yield r
-
-        lbar.runEmptyA.value.map(_ must beLike {
-          case \/-(Condition.Abnormal(ex)) => ex must beAnInstanceOf[IOException]
-        }).unsafeRunSync()
+          _ <- dses.addDatasource(DatasourceRef.config.set(jString("three"))(a)).attempt
+          _ <- finalize
+          entries <- refs.entries.compile.toList
+        } yield {
+          entries === List()
+        }
       }
     }
-
-    "all metadata" >> {
-      "includes errors" >> {
-        val errs =
-          IMap[Int, Exception](0 -> new IOException())
-
-        val ds = mkDatasources(errs, _ => "")(_ => None)
-
-        val lbar = for {
-          a <- refA
-          _ <- ds.addDatasource(a)
-
-          b <- refB
-          _ <- ds.addDatasource(b)
-
-          g <- ds.allDatasourceMetadata
-          l <- gatherMultiple(g)
-          m = IMap.fromList(l)
-        } yield m
-
-        lbar.runEmptyA.value.map(_.lookup(0) must beLike {
-          case Some(DatasourceMeta(t, _, Condition.Abnormal(ex))) =>
-            (t must_= supportedType) and (ex must beAnInstanceOf[IOException])
-        }).unsafeRunSync()
-      }
-    }
-
     "remove datasource" >> {
-      "shutdown existing" >> {
-        val sdown = for {
+      "shutdown existing" >>* {
+        for {
+          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
           a <- refA
-          _ <- datasources.addDatasource(a)
-          cond <- datasources.removeDatasource(0)
-        } yield cond
-
-        sdown.runEmpty.run.map(_ must beLike {
-          case (sdowns, (s, Condition.Normal())) =>
-            s.initd must_= ISet.empty
-            sdowns must_= List(0)
-        }).unsafeRunSync()
+          added <- dses.addDatasource(a)
+          mbi = added.toOption
+          cond <- mbi.traverse(dses.removeDatasource(_))
+          started <- starts.get
+          ended <- shuts.get
+          _ <- finalize
+        } yield {
+          cond must beLike {
+            case Some(c) =>
+              c must beNormal
+          }
+          mbi must beLike {
+            case Some(x) =>
+              started === List(x)
+              ended === List(x)
+          }
+        }
       }
     }
-
     "replace datasource" >> {
-      "updates manager" >> {
-        val replaced = for {
+      "updates manager" >>* {
+        for {
           a <- refA
           b <- refB
-
-          r <- datasources.addDatasource(a)
+          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          r <- dses.addDatasource(a)
           i = r.toOption.get
-
-          c <- datasources.replaceDatasource(i, b)
-        } yield c
-
-        replaced.runEmpty.run.map(_ must beLike {
-          case (sdowns, (s, Condition.Normal())) =>
-            s.initd must_= ISet.singleton(0)
-            sdowns must_= List(0)
-        }).unsafeRunSync()
+          c <- dses.replaceDatasource(i, b)
+          started <- starts.get
+          ended <- shuts.get
+          _ <- finalize
+        } yield {
+          started === List(i, i)
+          ended === List(i)
+          c must beNormal
+        }
       }
-
-      "doesn't update manager when only name changed" >> {
-        val renamed = for {
+      "doesn't update manager when only name changed" >>* {
+        for {
           a <- refA
           n <- randomName
-
           b = DatasourceRef.name.set(n)(a)
-
-          r <- datasources.addDatasource(a)
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          r <- dses.addDatasource(a)
           i = r.toOption.get
-
-          c <- datasources.replaceDatasource(i, b)
-        } yield c
-
-        renamed.runEmpty.run.map(_ must beLike {
-          case (sdowns, (s, Condition.Normal())) =>
-            s.initd must_= ISet.singleton(0)
-            sdowns must_= Nil
-        }).unsafeRunSync()
+          c <- dses.replaceDatasource(i, b)
+          started <- starts.get
+          ended <- shuts.get
+          mbB <- refs.lookup(i)
+          _ <- finalize
+        } yield {
+          started === List(i)
+          ended === List()
+          c must beNormal
+          mbB must beSome(b)
+        }
       }
     }
-
     "sanitize config" >> {
-      "ref is sanitized" >> {
-        val ds = for {
+      "ref is sanitized" >>* {
+        val sanitize: Json => Json = x => jString("sanitized")
+        for {
           a <- refA
-          _ <- sanitizedDatasources.addDatasource(a)
-          l <- sanitizedDatasources.datasourceRef(0)
-        } yield l
-
-        ds.runEmpty.run.map(x => x must beLike {
-          case (_, (_, \/-(ref))) => {
-            ref.config must_= "sanitized"
-          }
-        }).unsafeRunSync()
+          ((dses, _, _, _), finalize) <- prepare(Map(), None, Some(sanitize)).allocated
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          l <- dses.datasourceRef(i)
+          _ <- finalize
+        } yield {
+          l must be_\/-(a.copy(config = sanitize(a.config)))
+        }
       }
     }
-  }
-}
+    "lookup status" >> {
+      "include errors" >>* {
+        for {
+          ref <- Ref.of[IO, IMap[String, Exception]](IMap.empty)
+          ((dses, _, _, _), finalize) <- prepare(Map(), Some(ref), None).allocated
+          a <- refA
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          _ <- ref.update(_.insert(i, new IOException()))
+          r <- dses.datasourceStatus(i)
+          _ <- finalize
+        } yield {
+          r must beLike {
+            case \/-(Condition.Abnormal(ex)) => ex must beAnInstanceOf[IOException]
+          }
+        }
 
-object DefaultDatasourcesSpec {
-  import MockDatasourceManager.{Initialized, Shutdowns}
-
-  type Refs = IMap[Int, DatasourceRef[String]]
-  type DefaultM[A] = StateT[WriterT[IO, Shutdowns[Int], ?], DefaultState, A]
-
-  @Lenses
-  final case class DefaultState(idx: Int, initd: Initialized[Int], refs: Refs)
-
-  object DefaultState {
-    implicit val monoid: Monoid[DefaultState] =
-      new Monoid[DefaultState] {
-        val zero = DefaultState(0, ISet.empty, IMap.empty)
-
-        def append(x: DefaultState, y: => DefaultState) =
-          DefaultState(
-            x.idx + y.idx,
-            x.initd union y.initd,
-            x.refs union y.refs)
       }
+    }
+    "clustering" >> {
+      "new ref appeared" >>* {
+        for {
+          ((dses, refs, starts, _), finalize) <- prepare(Map()).allocated
+          a <- refA
+          _ <- refs.insert("foo", a)
+          res <- dses.pathIsResource("foo", ResourcePath.root())
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          res.toOption must beSome(false)
+          started === List("foo")
+        }
+      }
+      "ref disappered" >>* {
+        for {
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          a <- refA
+          r <- dses.addDatasource(a)
+          i = r.toOption.get
+          res0 <- dses.pathIsResource(i, ResourcePath.root())
+          _ <- refs.delete(i)
+          res1 <- dses.pathIsResource(i, ResourcePath.root())
+          ended <- shuts.get
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          // Note, that we count resource init and finalize by datasource modules, I couldn't come up
+          // with any way of unifying inner `F[_]` in lightweightdatasource :(
+          res1 must be_-\/
+          started === List(i, i)
+          ended === List(i, i)
+        }
+      }
+      "ref updated" >>* {
+        for {
+          ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
+          a <- refA
+          _ <- refs.insert("foo", a)
+          res0 <- dses.pathIsResource("foo", ResourcePath.root())
+          b <- refB
+          _ <- refs.insert("foo", b)
+          res1 <- dses.pathIsResource("foo", ResourcePath.root())
+          ended <- shuts.get
+          started <- starts.get
+          _ <- finalize
+        } yield {
+          res0.toOption must beSome(false)
+          res1.toOption must beSome(false)
+          started === List("foo", "foo")
+          ended === List("foo")
+        }
+      }
+    }
   }
 }

@@ -25,6 +25,6 @@ for c in s3 azure url mongo postgres; do
 done
 
 # destinations
-for c in thoughtspot postgres s3 azure snowflake; do
+for c in thoughtspot postgres s3 azure snowflake avalanche; do
   scripts/bumpDependentProject slamdata "quasar-destination-$c" bumpInDownstream
 done

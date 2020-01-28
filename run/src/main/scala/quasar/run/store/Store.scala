@@ -19,11 +19,10 @@ package quasar.run.store
 import slamdata.Predef._
 
 import cats.Show
-import cats.effect.{ContextShift, Resource, Sync}
+import cats.effect.{Blocker, ContextShift, Resource, Sync}
 import cats.syntax.show._
 import cats.instances.string._
 
-import quasar.concurrent.BlockingContext
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}, IndexedStore._
 
@@ -42,7 +41,7 @@ object Store {
   def codecStore[A: Show, F[_]: Sync: ContextShift: MonadError_[?[_], StoreError]](
     path: Path,
     codec: CodecJson[A],
-    pool: BlockingContext)
+    blocker: Blocker)
     : Resource[F, IndexedStore[F, UUID, A]] =
     for {
       db <- mapDB[F](path)
@@ -54,7 +53,7 @@ object Store {
           codec.Encoder.encode(_).nospaces)
 
       transformValue(errorFromShow[String]("CodecJson"))(
-        ConcurrentMapIndexedStore(table, Sync[F].delay { db.commit() }, pool), prismaticCodec)
+        ConcurrentMapIndexedStore(table, Sync[F].delay { db.commit() }, blocker), prismaticCodec)
     }
 
   def errorFromShow[A: Show](desc: String)(a: A): StoreError =

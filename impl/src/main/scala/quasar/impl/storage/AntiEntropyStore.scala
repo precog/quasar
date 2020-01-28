@@ -18,7 +18,6 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import quasar.concurrent.BlockingContext
 import quasar.impl.cluster.{Timestamped, Cluster, Message}, Timestamped._, Message._
 
 import cats.~>
@@ -32,8 +31,6 @@ import cats.syntax.foldable._
 import cats.syntax.functor._
 
 import fs2.Stream
-
-import scalaz.syntax.tag._
 
 import scodec.Codec
 import scodec.codecs.{listOfN, int32}
@@ -212,7 +209,7 @@ object AntiEntropyStore {
       name: String,
       cluster: Cluster[F, Message],
       underlying: TimestampedStore[F, K, V],
-      pool: BlockingContext)(
+      blocker: Blocker)(
       implicit timer: Timer[F])
       : Resource[F, IndexedStore[F, K, V]] = {
     val res: F[Resource[F, IndexedStore[F, K, V]]] = for {
@@ -249,14 +246,14 @@ object AntiEntropyStore {
         _ <- Resource.liftF(stopper.get)
       } yield resource
     }
-    Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].evalOn(pool.unwrap)(_)))
+    Resource.suspend(res).mapK[F](λ[F ~> F](ContextShift[F].blockOn(blocker)(_)))
   }
   def default[F[_]: ConcurrentEffect: ContextShift, K: Codec, V: Codec](
       name: String,
       cluster: Cluster[F, Message],
       underlying: TimestampedStore[F, K, V],
-      pool: BlockingContext)(
+      blocker: Blocker)(
       implicit timer: Timer[F])
       : Resource[F, IndexedStore[F, K, V]] =
-    apply[F, K, V](AntiEntropyStoreConfig.default, name, cluster, underlying, pool)
+    apply[F, K, V](AntiEntropyStoreConfig.default, name, cluster, underlying, blocker)
 }

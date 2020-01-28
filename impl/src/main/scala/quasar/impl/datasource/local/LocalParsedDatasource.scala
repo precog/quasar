@@ -18,16 +18,14 @@ package quasar.impl.datasource.local
 
 import slamdata.Predef._
 
-import quasar.concurrent.BlockingContext
 import quasar.connector._, LightweightDatasourceModule.DS
 import quasar.impl.parsing.ResultParser
 
 import java.nio.file.{Path => JPath}
 
-import cats.effect.{ContextShift, Effect, Timer}
+import cats.effect.{Blocker, ContextShift, Effect, Timer}
 import fs2.io
 import qdata.{QDataDecode, QDataEncode}
-import scalaz.syntax.tag._
 
 object LocalParsedDatasource {
 
@@ -39,12 +37,12 @@ object LocalParsedDatasource {
       root: JPath,
       readChunkSizeBytes: Int,
       format: DataFormat,
-      blockingPool: BlockingContext)
+      blocker: Blocker)
       : DS[F] = {
 
     EvaluableLocalDatasource[F](LocalParsedType, root) { iRead =>
       val rawBytes =
-        io.file.readAll[F](iRead.path, blockingPool.unwrap, readChunkSizeBytes)
+        io.file.readAll[F](iRead.path, blocker, readChunkSizeBytes)
       val parsedValues = rawBytes.through(ResultParser.typed(format))
 
       QueryResult.parsed[F, A](QDataDecode[A], parsedValues, iRead.stages)

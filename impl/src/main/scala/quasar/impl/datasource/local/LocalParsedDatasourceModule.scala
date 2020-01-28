@@ -16,13 +16,14 @@
 
 package quasar.impl.datasource.local
 
+import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   InitializationError,
   malformedConfiguration
 }
 import quasar.common.data.RValue
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
@@ -30,18 +31,21 @@ import scala.util.Either
 
 import argonaut.Json
 import cats.effect._
+import cats.kernel.Hash
 
 object LocalParsedDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  override lazy val blockingPool: BlockingContext =
-    BlockingContext.cached("local-datasource")
+  override lazy val blocker: Blocker =
+    qc.Blocker.cached("local-datasource")
 
   val kind: DatasourceType = LocalParsedType
 
   def sanitizeConfig(config: Json): Json = config
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
-      config: Json)(
+  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+      config: Json,
+      rateLimiting: RateLimiting[F, A],
+      stateStore: ByteStore[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DS[F]]] = {
     val ds = for {
@@ -58,7 +62,7 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
         root,
         lc.readChunkSizeBytes,
         lc.format,
-        blockingPool)
+        blocker)
     }
 
     Resource.liftF(ds.value)

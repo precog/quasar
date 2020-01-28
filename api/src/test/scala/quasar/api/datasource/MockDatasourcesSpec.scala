@@ -24,7 +24,7 @@ import quasar.contrib.cats.effect.stateT.catsStateTEffect
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.data.StateT
 import cats.syntax.applicative._
 import eu.timepit.refined.auto._
@@ -43,9 +43,11 @@ final class MockDatasourcesSpec
   val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type] =
-    MockDatasources[String, MockM, List](
-      acceptedSet, _ => Condition.normal(), SStream.empty)
+  def datasources: Resource[MockM, Datasources[MockM, List, Int, String, MockSchemaConfig.type]] =
+    Resource.pure[MockM, Datasources[MockM, List, Int, String, MockSchemaConfig.type]] {
+      MockDatasources[String, MockM, List](
+        acceptedSet, _ => Condition.normal(), SStream.empty)
+    }
 
   def supportedType = DatasourceType("s3", 1L)
 

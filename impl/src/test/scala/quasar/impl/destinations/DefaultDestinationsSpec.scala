@@ -16,64 +16,76 @@
 
 package quasar.impl.destinations
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
-import quasar.{Condition, ConditionMatchers}
-import quasar.api.destination.{Destination, DestinationError, DestinationMeta, DestinationName, DestinationRef, DestinationType, Destinations}
-import quasar.connector.{DestinationModule, ResourceError}
+import quasar.ConditionMatchers
+import quasar.api.destination._
+import quasar.api.destination.DestinationError._
+import quasar.{concurrent => qc}
+import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.storage.RefIndexedStore
-
-import scala.concurrent.ExecutionContext.Implicits.global
+import quasar.impl.ResourceManager
+import quasar.impl.storage.{IndexedStore, ConcurrentMapIndexedStore}
 
 import argonaut.Json
-import cats.effect.IO
+import argonaut.JsonScalaz._
+
+import cats.Show
+import cats.instances.int._
+import cats.instances.string._
+import cats.instances.option._
+import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.Ref
+import cats.syntax.applicativeError._
+import cats.syntax.traverse._
+
 import eu.timepit.refined.auto._
-import fs2.Stream
-import scalaz.std.anyVal._
-import scalaz.std.list._
-import scalaz.std.option._
-import scalaz.syntax.monad._
-import scalaz.syntax.traverse._
-import scalaz.syntax.unzip._
-import scalaz.{IMap, ISet}
 
-import shims.monadToScalaz
+import scalaz.ISet
 
-object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
-  implicit val cs = IO.contextShift(global)
-  implicit val tmr = IO.timer(global)
+import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import shims.{showToCats, showToScalaz, orderToScalaz, applicativeToScalaz}
+
+object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
+  sequential
+  implicit val tm = IO.timer(global)
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
-  def freshId(ref: Ref[IO, Int]): IO[Int] =
-    ref.modify(i => (i + 1, i + 1))
+  final case class CreateErrorException(ce: CreateError[Json])
+      extends Exception(Show[DestinationError[Int, Json]].show(ce))
 
-  val mockModules: IMap[DestinationType, DestinationModule] =
-    IMap(MockDestinationModule.destinationType -> MockDestinationModule)
+  implicit val ioCreateErrorME: MonadError_[IO, CreateError[Json]] =
+    new MonadError_[IO, CreateError[Json]] {
+      def raiseError[A](e: CreateError[Json]): IO[A] =
+        IO.raiseError(new CreateErrorException(e))
 
-  def manager(
-    running: IMap[Int, (Destination[IO], IO[Unit])],
-    errors: IMap[Int, Exception],
-    modules: IMap[DestinationType, DestinationModule]): IO[DestinationManager[Int, Json, IO]] =
-    (Ref[IO].of(running) |@| Ref[IO].of(errors))(
-      DefaultDestinationManager[Int, IO](modules, _, _))
+      def handleError[A](fa: IO[A])(f: CreateError[Json] => IO[A]): IO[A] =
+        fa.recoverWith {
+          case CreateErrorException(e) => f(e)
+        }
+    }
 
-  def mkDestinations(
-    store: IMap[Int, DestinationRef[Json]],
-    running: IMap[Int, (Destination[IO], IO[Unit])],
-    errors: IMap[Int, Exception]): IO[Destinations[IO, Stream[IO, ?], Int, Json]] =
+  val blocker: Blocker = qc.Blocker.cached("rdestinations-spec")
+
+  def mkDestinations = {
+    val freshId = IO(java.util.UUID.randomUUID().toString())
+    val fRefs: IO[IndexedStore[IO, String, DestinationRef[Json]]] =
+      IO(new ConcurrentHashMap[String, DestinationRef[Json]]()).map { (mp: ConcurrentHashMap[String, DestinationRef[Json]]) =>
+        ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
+      }
+    val rCache = ResourceManager[IO, String, Destination[IO]]
+    val modules = DestinationModules[IO, String](List(MockDestinationModule))
     for {
-      initialIdRef <- Ref.of[IO, Int](0)
-      fId = freshId(initialIdRef)
-      storeRef <- Ref[IO].of(store)
-      store = RefIndexedStore[Int, DestinationRef[Json]](storeRef)
-      mgr <- manager(running, errors, mockModules)
-    } yield DefaultDestinations[Int, Json, IO](fId, store, mgr)
+      refs <- Resource.liftF(fRefs)
+      cache <- rCache
+      result <- Resource.liftF(DefaultDestinations(freshId, refs, cache, modules))
+    } yield (refs, result, cache)
+  }
 
-  def emptyDestinations: IO[Destinations[IO, Stream[IO, ?], Int, Json]] =
-    mkDestinations(IMap.empty, IMap.empty, IMap.empty)
+  def emptyDestinations = mkDestinations map (_._2)
 
   val MockDestinationType = MockDestinationModule.destinationType
 
@@ -84,219 +96,203 @@ object DefaultDestinationsSpec extends quasar.Qspec with ConditionMatchers {
 
   "destinations" >> {
     "add destination" >> {
-      "creates and saves destinations" >> {
-        val testRun = for {
-          dests <- emptyDestinations
+      "creates and saves destinations" >>* {
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
           result <- dests.addDestination(testRef)
           foundRef <- result.toOption.map(dests.destinationRef(_)).sequence
-        } yield (result, foundRef)
-
-        val (res, found) = testRun.unsafeRunSync
-
-        res must be_\/-
-        found must beSome
+          _ <- finalize
+        } yield {
+          result must be_\/-
+          foundRef must beSome
+        }
       }
-
-      "rejects duplicate names" >> {
-        val testRun = for {
-          dests <- emptyDestinations
+      "rejects duplicate names" >>* {
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
           original <- dests.addDestination(testRef)
           duplicate <- dests.addDestination(testRef)
-        } yield (original, duplicate)
-
-        val (original, duplicate) = testRun.unsafeRunSync
-
-        original must be_\/-
-        duplicate must be_-\/(
-          DestinationError.destinationNameExists(DestinationName("foo-mock")))
+          _ <- finalize
+        } yield {
+          original must be_\/-
+          duplicate must be_-\/(destinationNameExists(DestinationName("foo-mock")))
+        }
       }
-
-      "rejects unknown destination" >> {
+      "rejects unknown destination" >>* {
         val unknownType = DestinationType("unknown", 1L)
         val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
-
-        val testRun = for {
-          dests <- emptyDestinations
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
           addResult <- dests.addDestination(unknownRef)
-        } yield addResult
-
-        testRun.unsafeRunSync must be_-\/(
-          DestinationError.destinationUnsupported(unknownType, ISet.singleton(MockDestinationType)))
+        } yield {
+          addResult must be_-\/(destinationUnsupported(unknownType, ISet.singleton(MockDestinationType)))
+        }
       }
     }
-
     "replace destination" >> {
-      "replaces a destination" >> {
+      "replaces a destination" >>* {
         val newRef = DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
-        val testRun = for {
-          dests <- mkDestinations(
-            IMap(1 -> testRef),
-            IMap(1 -> ((new MockDestination, ().point[IO]))),
-            IMap.empty)
-          beforeReplace <- dests.destinationRef(1)
-          replaceResult <- dests.replaceDestination(1, newRef)
-          afterReplace <- dests.destinationRef(1)
-        } yield (beforeReplace, replaceResult, afterReplace)
-
-        val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
-
-        beforeReplace must be_\/-(sanitize(testRef))
-        replaceResult must beNormal
-        afterReplace must be_\/-(sanitize(newRef))
+        for {
+          ((store, dests, _), finalize) <- mkDestinations.allocated
+          _ <- store.insert("1", testRef)
+          beforeReplace <- dests.destinationRef("1")
+          replaceResult <- dests.replaceDestination("1", newRef)
+          afterReplace <- dests.destinationRef("1")
+          _ <- finalize
+        } yield {
+          beforeReplace must be_\/-(sanitize(testRef))
+          replaceResult must beNormal
+          afterReplace must be_\/-(sanitize(newRef))
+        }
       }
-
-      "verifies name uniqueness on replacement" >> {
+      "verifies name uniqueness on replacement" >>* {
         val testRef2 =
           DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
         val testRef3 =
           DestinationRef.name.set(DestinationName("foo-mock-2"))(testRef)
-
-        val testRun = for {
-          dests <- emptyDestinations
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
           addStatus1 <- dests.addDestination(testRef)
           addStatus2 <- dests.addDestination(testRef2)
-          replaceStatus <- dests.replaceDestination(1, testRef3)
-        } yield (addStatus1, addStatus2, replaceStatus)
-
-        val (addStatus1, addStatus2, replaceStatus) = testRun.unsafeRunSync
-
-        addStatus1 must be_\/-(1)
-        addStatus2 must be_\/-(2)
-
-        replaceStatus must beAbnormal(
-          DestinationError.destinationNameExists[DestinationError[Int, Json]](testRef3.name))
+          replaceStatus <- addStatus1.toOption.traverse { id => dests.replaceDestination(id, testRef2) }
+          _ <- finalize
+        } yield {
+          addStatus1 must be_\/-
+          addStatus2 must be_\/-
+          replaceStatus must beLike {
+            case Some(x) => x must beAbnormal(destinationNameExists[DestinationError[Int, Json]](testRef2.name))
+          }
+        }
       }
-
-      "allows replacement with the same name" >> {
+      "allows replacement with the same name" >>* {
         val testRef2 = DestinationRef.config.set(Json.jString("modified"))(testRef)
-
-        val testRun = for {
-          dests <- emptyDestinations
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
           addStatus <- dests.addDestination(testRef)
-          replaceStatus <- dests.replaceDestination(1, testRef2)
-        } yield (addStatus, replaceStatus)
-
-        val (addStatus, replaceStatus) = testRun.unsafeRunSync
-
-        addStatus must be_\/-(1)
-        replaceStatus must beNormal
+          replaceStatus <- addStatus.toOption.traverse { id => dests.replaceDestination(id, testRef2) }
+          _ <- finalize
+        } yield {
+          addStatus must be_\/-
+          replaceStatus must beLike { case Some(x) => x must beNormal }
+        }
       }
+      "shuts down replaced destination" >>* {
+        def tracking(ref: Ref[IO, Option[String]], i: String): (Destination[IO], IO[Unit]) =
+          (new MockDestination[IO], ref.set(Some(i)))
+        val testRef2 =
+          DestinationRef.config.set(Json.jString("modified"))(testRef)
 
-      "verifies support before removing the replaced destination" >> {
-        val testRef2 = DestinationRef.kind.set(DestinationType("unknown", 1337L))(testRef)
-
-        val testRun = for {
-          dests <- emptyDestinations
+        for {
+          ((store, dests, cache), finalize) <- mkDestinations.allocated
           addStatus <- dests.addDestination(testRef)
-          refBeforeReplace <- dests.destinationRef(1)
-          replaceStatus <- dests.replaceDestination(1, testRef2)
-          refAfterReplace <- dests.destinationRef(1)
-        } yield (addStatus, refBeforeReplace, replaceStatus, refAfterReplace)
-
-        val (addStatus, refBeforeReplace, replaceStatus, refAfterReplace) = testRun.unsafeRunSync
-
-        addStatus must be_\/-(1)
-        refBeforeReplace must be_\/-(sanitize(testRef))
-        replaceStatus must beAbnormal(
-          DestinationError.destinationUnsupported(testRef2.kind, ISet.singleton(MockDestinationType)))
-        refAfterReplace must be_\/-(sanitize(testRef))
-      }
-
-      "shuts down replaced destination" >> {
-        def mkRunning(ref: Ref[IO, List[Int]], id: Int): IMap[Int, (Destination[IO], IO[Unit])] =
-          IMap(id -> ((new MockDestination[IO], ref.set(List(id)))))
-
-        val testRun = for {
-          disposes <- Ref.of[IO, List[Int]](List.empty)
-          running = mkRunning(disposes, 1)
-          dests <- mkDestinations(IMap(1 -> testRef), running, IMap.empty)
-          beforeReplace <- disposes.get
-          replaceResult <- dests.replaceDestination(1, testRef)
-          afterReplace <- disposes.get
-        } yield (beforeReplace, replaceResult, afterReplace)
-
-        val (beforeReplace, replaceResult, afterReplace) = testRun.unsafeRunSync
-
-        beforeReplace must_== List()
-        replaceResult must beNormal
-        afterReplace must_== List(1)
+          i0 = addStatus.fold(x => "", x => x)
+          disposes <- Ref.of[IO, Option[String]](None)
+          beforeHack <- cache.get(i0)
+          _ <- cache.shutdown(i0)
+          _ <- cache.manage(i0, tracking(disposes, i0))
+          _ <- dests.replaceDestination(i0, testRef2)
+          afterHack <- cache.get(i0)
+          result <- disposes.get
+          _ <- finalize
+        } yield {
+          beforeHack must beSome
+          afterHack must beSome
+          result must beSome(i0)
+        }
       }
     }
-
     "destination status" >> {
-      "returns an error for an unknown destination" >> {
-        val testRun = for {
-          dests <- emptyDestinations
-          res <- dests.destinationStatus(42)
-        } yield res
-
-        testRun.unsafeRunSync must be_-\/(DestinationError.destinationNotFound(42))
+      "returns an error for an unknown destination" >>* {
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
+          res <- dests.destinationStatus("foo")
+          _ <- finalize
+        } yield {
+          res must be_-\/(destinationNotFound("foo"))
+        }
       }
-
-      "return a normal condition when no errors are present" >> {
-        val testRun = for {
-          dests <- mkDestinations(IMap(1 -> testRef), IMap.empty, IMap.empty)
-          res <- dests.destinationStatus(1)
-        } yield res
-
-        testRun.unsafeRunSync must be_\/-(beNormal[Exception])
-      }
-
-      "returns error for destinations with errors" >> {
-        val ex = new Exception("oh noes")
-        val testRun = for {
-          dests <- mkDestinations(IMap(1 -> testRef), IMap.empty, IMap(1 -> ex))
-          res <- dests.destinationStatus(1)
-        } yield res
-
-        testRun.unsafeRunSync must be_\/-(beAbnormal(ex))
+      "returns a normal condition for known destination" >>* {
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
+          a <- dests.addDestination(testRef)
+          res <- dests.destinationStatus(a.fold(x => "", x => x))
+          _ <- finalize
+        } yield {
+          res must be_\/-(beNormal[Exception])
+        }
       }
     }
-
-    "destination metadata" >> {
-      "includes exception when a destination has errored" >> {
-        val ex = new Exception("oh noes")
-
-        val testRun = for {
-          dests <- mkDestinations(IMap(1 -> testRef), IMap.empty, IMap(1 -> ex))
-          st <- dests.allDestinationMetadata
-          allMeta <- st.compile.toList
-        } yield allMeta.seconds
-
-        testRun.unsafeRunSync must_== List(
-          DestinationMeta(
-            MockDestinationModule.destinationType,
-            DestinationName("foo-mock"),
-            Condition.abnormal(ex)))
-      }
-    }
-
     "destination removal" >> {
-      "removes a destination" >> {
-        val testRun = for {
-          dests <- mkDestinations(IMap(10 -> testRef), IMap.empty, IMap.empty)
-          removed <- dests.removeDestination(10)
-          retrieved <- dests.destinationRef(10)
-        } yield (removed, retrieved)
-
-        val (removed, retrieved) = testRun.unsafeRunSync
-
-        removed must beNormal
-        retrieved must be_-\/(DestinationError.destinationNotFound(10))
+      "removes a destination" >>* {
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
+          i <- dests.addDestination(testRef)
+          removed <- i.toOption.traverse(id => dests.removeDestination(id))
+          _ <- finalize
+        } yield {
+          removed must beLike {
+            case Some(x) => x must beNormal
+          }
+        }
       }
     }
-
     "destination lookup" >> {
-      "returns sanitized refs" >> {
-        val testRun = for {
-          dests <- emptyDestinations
+      "returns sanitized refs" >>* {
+        for {
+          (dests, finalize) <- emptyDestinations.allocated
           addResult <- dests.addDestination(testRef)
-          found <- addResult.toOption.map(dests.destinationRef(_)).sequence
-          foundRef = found >>= (_.toOption)
-        } yield foundRef
+          found <- addResult.toOption.traverse(dests.destinationRef(_))
+          foundRef = found.flatMap(_.toOption)
+        } yield {
+          foundRef must beSome(DestinationRef.config.set(Json.jString("sanitized"))(testRef))
+        }
+      }
+    }
+  }
+  "clustering" >> {
+    "new ref appeared" >>* {
+      for {
+        ((store, dests, cache), finalize) <- mkDestinations.allocated
+        _ <- store.insert("foo", testRef)
+        d <- dests.destinationOf("foo")
+        _ <- finalize
+      } yield {
+        d must be_\/-
+      }
+    }
+    "ref disappered" >>* {
+      for {
+        ((store, dests, cache), finalize) <- mkDestinations.allocated
+        _ <- store.insert("foo", testRef)
+        d0 <- dests.destinationOf("foo")
+        _ <- store.delete("foo")
+        d1 <- dests.destinationOf("foo")
+        _ <- finalize
+      } yield {
+        d0 must be_\/-
+        d1 must be_-\/
+      }
+    }
+    "ref updated" >>* {
+      def tracking(ref: Ref[IO, Option[String]], i: String): (Destination[IO], IO[Unit]) =
+        (new MockDestination[IO], ref.set(Some(i)))
+      val testRef2 =
+        DestinationRef.config.set(Json.jString("modified"))(testRef)
 
-        testRun.unsafeRunSync must beSome(
-          DestinationRef.config.set(Json.jString("sanitized"))(testRef))
+      for {
+        ((store, dests, cache), finalize) <- mkDestinations.allocated
+        _ <- store.insert("foo", testRef)
+        _ <- dests.destinationOf("foo")
+        trackingRef <- Ref.of[IO, Option[String]](None)
+        _ <- cache.manage("foo", tracking(trackingRef, "foo"))
+        tracked0 <- trackingRef.get
+        _ <- store.insert("foo", testRef2)
+        _ <- dests.destinationOf("foo")
+        tracked1 <- trackingRef.get
+        _ <- finalize
+      } yield {
+        tracked0 must beNone
+        tracked1 must beSome("foo")
       }
     }
   }

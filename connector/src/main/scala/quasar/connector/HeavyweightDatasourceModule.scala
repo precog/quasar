@@ -38,7 +38,8 @@ trait HeavyweightDatasourceModule {
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: MonadPlannerErr: Timer](
-      config: Json)(
+      config: Json,
+      byteStore: ByteStore[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], Datasource[F, Stream[F, ?], T[QScriptEducated[T, ?]], QueryResult[F], ResourcePathType.Physical]]]
 }

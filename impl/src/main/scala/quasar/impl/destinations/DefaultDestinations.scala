@@ -22,11 +22,12 @@ import quasar.Condition
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.{CachedGetter, ResourceManager}, CachedGetter.Signal._
+import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
-import cats.effect.Sync
+import cats.effect.{Concurrent, ContextShift, Sync}
 import cats.effect.concurrent.Ref
+import cats.~>
 
 import fs2.Stream
 
@@ -41,6 +42,7 @@ import shims.{monadToScalaz, equalToCats}
 private[quasar] final class DefaultDestinations[
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     I: Order, C: Equal](
+    semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
     cache: ResourceManager[F, I, Destination[F]],
@@ -74,30 +76,31 @@ private[quasar] final class DefaultDestinations[
       case None => error
       case Some(a) => EitherT.pure(a)
     }
-
-    val action = for {
-      signal <- EitherT.rightT(getter(i))
-      res <- signal match {
-        case Empty =>
-          error
-        case Removed(_) =>
-          cache.shutdown(i).liftM[L] >> error
-        case Inserted(ref) => for {
-          allocated <- modules.create(ref).allocated.liftM[L]
-          _ <- cache.manage(i, allocated).liftM[L]
-        } yield allocated._1
-        case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
-          fromCache
-        case Preserved(_) =>
-          fromCache
-        case Updated(incoming, _) => for {
-          _ <- EitherT.rightT(cache.shutdown(i))
-          allocated <- modules.create(incoming).allocated.liftM[L]
-          _ <- cache.manage(i, allocated).liftM[L]
-        } yield allocated._1
-      }
-    } yield res
-    action.run
+    throughSemaphore(i) {
+      val action = for {
+        signal <- EitherT.rightT(getter(i))
+        res <- signal match {
+          case Empty =>
+            error
+          case Removed(_) =>
+            cache.shutdown(i).liftM[L] >> error
+          case Inserted(ref) => for {
+            allocated <- modules.create(ref).allocated.liftM[L]
+            _ <- cache.manage(i, allocated).liftM[L]
+          } yield allocated._1
+          case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
+            fromCache
+          case Preserved(_) =>
+            fromCache
+          case Updated(incoming, _) => for {
+            _ <- EitherT.rightT(cache.shutdown(i))
+            allocated <- modules.create(incoming).allocated.liftM[L]
+            _ <- cache.manage(i, allocated).liftM[L]
+          } yield allocated._1
+        }
+      } yield res
+      action.run
+    }
   }
 
   def destinationStatus(i: I): F[ExistentialError[I] \/ Condition[Exception]] =
@@ -114,30 +117,31 @@ private[quasar] final class DefaultDestinations[
 
   def replaceDestination(i: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] = {
     lazy val notFound = Condition.abnormal(destinationNotFound[I, DestinationError[I, C]](i))
-
-    getter(i) flatMap {
-      case Empty =>
-        notFound.point[F]
-      case Removed(_) =>
-        cache.shutdown(i) as notFound
-      case existed => for {
-        _ <- refs.insert(i, ref)
-        signal <- getter(i)
-        res <- signal match {
-          case Empty =>
-            notFound.point[F]
-          case Removed(_) =>
-            cache.shutdown(i) as notFound
-          case Inserted(_) =>
-            addRef[DestinationError[I, C]](i, ref)
-          case Preserved(_) =>
-            Condition.normal[DestinationError[I, C]]().point[F]
-          case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
-            setRef(i, incoming)
-          case Updated(_, _) =>
-            cache.shutdown(i) >> addRef[DestinationError[I, C]](i, ref)
-        }
-      } yield res
+    throughSemaphore(i) {
+      getter(i) flatMap {
+        case Empty =>
+          notFound.point[F]
+        case Removed(_) =>
+          cache.shutdown(i) as notFound
+        case existed => for {
+          _ <- refs.insert(i, ref)
+          signal <- getter(i)
+          res <- signal match {
+            case Empty =>
+              notFound.point[F]
+            case Removed(_) =>
+              cache.shutdown(i) as notFound
+            case Inserted(_) =>
+              addRef[DestinationError[I, C]](i, ref)
+            case Preserved(_) =>
+              Condition.normal[DestinationError[I, C]]().point[F]
+            case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
+              setRef(i, incoming)
+            case Updated(_, _) =>
+              cache.shutdown(i) >> addRef[DestinationError[I, C]](i, ref)
+          }
+        } yield res
+      }
     }
   }
 
@@ -179,16 +183,23 @@ private[quasar] final class DefaultDestinations[
         .fold(false)(_ || _)
         .map(_ ? destinationNameExists[E](name).left[Unit] | ().right)
     }
+
+  private def throughSemaphore(i: I): F ~> F = λ[F ~> F]{ fa =>
+    semaphore.get(i).use(_ => fa)
+  }
 }
 
 object DefaultDestinations {
-  def apply[F[_]: Sync: MonadError_[?[_], CreateError[C]], I: Order, C: Equal](
+  def apply[
+      F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
+      I: Order, C: Equal](
       freshId: F[I],
       refs: IndexedStore[F, I, DestinationRef[C]],
       cache: ResourceManager[F, I, Destination[F]],
       modules: DestinationModules[F, I, C])
       : F[DefaultDestinations[F, I, C]] = for {
+    semaphore <- IndexedSemaphore[F, I]
     errs <- Ref.of[F, IMap[I, Exception]](IMap.empty)
     getter <- CachedGetter(refs.lookup(_))
-  } yield new DefaultDestinations(freshId, refs, cache, getter, modules, errs)
+  } yield new DefaultDestinations(semaphore, freshId, refs, cache, getter, modules, errs)
 }

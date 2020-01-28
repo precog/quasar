@@ -68,7 +68,7 @@ object DestinationModules {
 
   private def handleInitErrors[F[_]: MonadError_[?[_], CreateError[Json]]: MonadError[?[_], Throwable], A](
       kind: DestinationType,
-      res: Resource[F, Either[InitializationError[Json], A]])
+      res: => Resource[F, Either[InitializationError[Json], A]])
       : Resource[F, A] = {
     import quasar.contrib.cats.monadError.monadError_CatsMonadError
 

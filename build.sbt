@@ -99,6 +99,7 @@ lazy val foundation = project
       "com.slamdata"               %% "slamdata-predef"           % "0.0.7",
       "org.scalaz"                 %% "scalaz-core"               % scalazVersion,
       "com.codecommit"             %% "shims"                     % "2.1.0",
+      "com.codecommit"             %% "shims-effect"              % "2.1.0",
       "com.codecommit"             %% "skolems"                   % "0.1.2",
       "org.typelevel"              %% "cats-effect"               % catsEffectVersion,
       "org.typelevel"              %% "cats-effect-laws"          % catsEffectVersion % Test,
@@ -275,8 +276,8 @@ lazy val impl = project
       "org.mapdb"      % "mapdb"                     % mapdbVersion,
       // woodstox is added here as a quick and dirty way to get azure working
       // see ch3385 for details
-      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.3"))
-  .evictToLocal("FS2_JOB_PATH", "core") 
+      "com.fasterxml.woodstox" % "woodstox-core" % "6.0.2"))
+  .evictToLocal("FS2_JOB_PATH", "core")
   .enablePlugins(AutomateHeaderPlugin)
 
 lazy val runp = (project in file("run"))

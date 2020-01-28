@@ -137,7 +137,7 @@ object DatasourceModules {
 
   private def handleInitErrors[F[_]: Bracket[?[_], Throwable]: MonadError[?[_], Throwable], A](
       kind: DatasourceType,
-      res: Resource[F, Either[InitializationError[Json], A]])
+      res: => Resource[F, Either[InitializationError[Json], A]])
       : EitherT[Resource[F, ?], CreateError[Json], A] = EitherT {
     linkDatasource(kind, res) map {
       case Right(a) => \/-(a)

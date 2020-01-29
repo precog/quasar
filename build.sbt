@@ -116,6 +116,8 @@ lazy val foundation = project
       "com.slamdata"               %% "qdata-time"                % qdataVersion.value,
       "eu.timepit"                 %% "refined"                   % refinedVersion,
       "com.chuusai"                %% "shapeless"                 % shapelessVersion,
+      // jawn-parser can be removed again once argonaut supports jawn 1.0.0
+      "org.typelevel"              %% "jawn-parser"               % jawnVersion,
       "org.scalacheck"             %% "scalacheck"                % scalacheckVersion,
       "com.propensive"             %% "contextual"                % "1.2.1",
       "io.frees"                   %% "iotaz-core"                % "0.3.10",
@@ -268,7 +270,9 @@ lazy val impl = project
       "com.slamdata"   %% "tectonic-fs2"             % tectonicVersion.value,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
-      "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
+      // Temporarily excluded because argonaut does not support jawn 1.0.0 yet.
+      // Code is added in quasar.contrib.argonaut.JawnParser for now.
+      // "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
       "org.typelevel"  %% "jawn-util"                % jawnVersion,
       "io.atomix"      % "atomix"                    % atomixVersion excludeAll(ExclusionRule(organization = "io.netty")),
       "org.scodec"     %% "scodec-bits"              % scodecBitsVersion,

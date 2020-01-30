@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,27 +18,24 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import scalaz.{Equal, Order, Show}
-import scalaz.std.list._
-import scalaz.std.tuple._
-import scalaz.std.string._
-import scalaz.syntax.show._
+import cats.{Eq, Order, Show}
+import cats.implicits._
 
 final case class TableName(name: String)
 
 object TableName {
-  implicit val orderTableName: Order[TableName] = Order.orderBy(_.name)
-  implicit val showTableName: Show[TableName] = Show.showFromToString
+  implicit val orderTableName: Order[TableName] = Order.by(_.name)
+  implicit val showTableName: Show[TableName] = Show.fromToString
 }
 
 final case class TableRef[Q](name: TableName, query: Q, columns: List[TableColumn])
 
 object TableRef {
-  implicit def equalTableRef[Q: Equal]: Equal[TableRef[Q]] =
-    Equal.equalBy(t => (t.name, t.query, t.columns))
+  implicit def equalTableRef[Q: Eq]: Eq[TableRef[Q]] =
+    Eq.by(t => (t.name, t.query, t.columns))
 
   implicit def showTableRef[Q: Show]: Show[TableRef[Q]] =
-    Show shows { t =>
-      "TableRef(" + t.name.shows + ", " + t.query.shows + ", " + t.columns.shows + ")"
+    Show show { t =>
+      "TableRef(" + t.name.show + ", " + t.query.show + ", " + t.columns.show + ")"
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,10 @@ package quasar.api.push
 
 import slamdata.Predef._
 
+import quasar.api.destination.param.ParamError
+
+import cats.data.NonEmptyList
+
 sealed trait ResultPushError[+T, +D] extends Product with Serializable
 
 object ResultPushError {
@@ -30,4 +34,14 @@ object ResultPushError {
   final case class FormatNotSupported[D](destinationId: D, format: String) extends ResultPushError[Nothing, D]
 
   final case class PushAlreadyRunning[T, D](tableId: T, destinationId: D) extends ResultPushError[T, D]
+
+  final case class TypeNotFound[D](destinationId: D, column: String, index: TypeIndex)
+      extends ResultPushError[Nothing, D]
+
+  final case class TypeConstructionFailed[D](
+      destinationId: D,
+      column: String,
+      typeLabel: String,
+      errors: NonEmptyList[ParamError])
+      extends ResultPushError[Nothing, D]
 }

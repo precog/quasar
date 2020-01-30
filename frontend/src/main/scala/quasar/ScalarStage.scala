@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import scalaz.std.string._
 import scalaz.std.tuple._
 import scalaz.syntax.equal._
 import scalaz.syntax.show._
+
+import shims._
 
 sealed trait ScalarStage extends Product with Serializable
 

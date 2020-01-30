@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package quasar.impl.datasource.local
 
-import slamdata.Predef.{Seq => _, Stream => _, _}
+import slamdata.Predef.{Seq => _, _}
 
 import quasar.api.datasource.DatasourceType
 import quasar.api.resource._

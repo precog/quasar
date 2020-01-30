@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,131 +18,203 @@ package quasar.impl.destinations
 
 import slamdata.Predef._
 
-import quasar.api.destination._
-import quasar.api.destination.DestinationError.{
-  CreateError,
-  ExistentialError
-}
 import quasar.Condition
+import quasar.api.destination._
+import quasar.api.destination.DestinationError._
+import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 
-import cats.effect.Sync
+import cats.effect.{Concurrent, ContextShift, Sync}
+import cats.effect.concurrent.Ref
+import cats.~>
+
 import fs2.Stream
+
+import scalaz.{\/, -\/, \/-, Equal, EitherT, IMap, ISet, OptionT, Order}
+import scalaz.syntax.monad._
 import scalaz.syntax.either._
 import scalaz.syntax.equal._
-import scalaz.syntax.monad._
-import scalaz.{\/, -\/, \/-, Bifunctor, Equal, EitherT, IMap, ISet, OptionT, Order}
+import scalaz.syntax.std.boolean._
 
-import shims.monadToScalaz
+import shims.{monadToScalaz, equalToCats}
 
-class DefaultDestinations[I: Equal: Order, C, F[_]: Sync] private (
+private[quasar] final class DefaultDestinations[F[_]: Sync, I: Order, C: Equal](
+    semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, DestinationRef[C]],
-    manager: DestinationManager[I, C, F])
+    cache: ResourceManager[F, I, Destination[F]],
+    getter: CachedGetter[F, I, DestinationRef[C]],
+    modules: DestinationModules[F, I, C],
+    currentErrors: Ref[F, IMap[I, Exception]])
     extends Destinations[F, Stream[F, ?], I, C] {
 
-  def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I] =
-    OptionT(refs.entries.filter {
-      case (_, r) => r.name === ref.name
-    }.compile.last).isDefined.ifM(
-      DestinationError.destinationNameExists[CreateError[C]](ref.name).left[I].point[F],
-      for {
-        newId <- freshId
-        destStatus <- manager.initDestination(newId, ref)
-        result <- destStatus match {
-          case \/-(_) =>
-            refs.insert(newId, ref) *> newId.right[CreateError[C]].point[F]
-          case -\/(e) =>
-            e.left[I].point[F]
-        }
-      } yield result)
+  def addDestination(ref: DestinationRef[C]): F[CreateError[C] \/ I] = for {
+    i <- freshId
+    c <- addRef[CreateError[C]](i, ref)
+  } yield Condition.disjunctionIso.get(c).as(i)
 
   def allDestinationMetadata: F[Stream[F, (I, DestinationMeta)]] =
-    (refs.entries.evalMap {
-      case (i, ref) =>
-        manager.errorsOf(i).map(ex => (i, DestinationMeta.fromOption(ref.kind, ref.name, ex)))
-    }).point[F]
+    Sync[F].pure {
+      refs.entries.evalMap { case (i, ref) =>
+        errorsOf(i).map(ex => (i, DestinationMeta.fromOption(ref.kind, ref.name, ex)))
+      }
+    }
 
-  def destinationRef(destinationId: I): F[ExistentialError[I] \/ DestinationRef[C]] =
-    OptionT(refs.lookup(destinationId))
-      .map(manager.sanitizedRef(_))
-      .toRight(DestinationError.destinationNotFound(destinationId))
+  def destinationRef(i: I): F[ExistentialError[I] \/ DestinationRef[C]] =
+    OptionT(refs.lookup(i))
+      .toRight(destinationNotFound(i))
+      .map(modules.sanitizeRef(_))
       .run
 
-  def destinationOf(destinationId: I): F[DestinationError[I, C] \/ Destination[F]] =
-    ((manager.destinationOf(destinationId) |@| refs.lookup(destinationId)) {
-      case (Some(alreadyRunning), _) =>
-        alreadyRunning.right[DestinationError[I, C]].point[F]
-      case (None, Some(stored)) =>
-        liftE[CreateError[C], DestinationError[I, C], Destination[F]](
-          manager.initDestination(destinationId, stored))
-      case _ =>
-        DestinationError.destinationNotFound[I, DestinationError[I, C]](destinationId)
-          .left[Destination[F]].point[F]
-    }).join
+  def destinationOf(i: I): F[DestinationError[I, C] \/ Destination[F]] = {
+    type DE = DestinationError[I, C]
+    type L[M[_], A] = EitherT[M, DE, A]
 
-  def destinationStatus(destinationId: I): F[ExistentialError[I] \/ Condition[Exception]] =
-    (refs.lookup(destinationId) |@| manager.errorsOf(destinationId)) {
+    lazy val error: EitherT[F, DestinationError[I, C], Destination[F]] =
+      EitherT.pureLeft(destinationNotFound[I, DE](i))
+
+    lazy val fromCache: EitherT[F, DE, Destination[F]] =
+      cache.get(i).liftM[L] flatMap {
+        case None => error
+        case Some(a) => EitherT.pure(a)
+      }
+
+    throughSemaphore(i) {
+      val action = for {
+        signal <- EitherT.rightT(getter(i))
+        res <- signal match {
+          case Empty =>
+            error
+          case Removed(_) =>
+            cache.shutdown(i).liftM[L] >> error
+          case Inserted(ref) => for {
+            allocated <- allocateDestination[DE](ref)
+            _ <- cache.manage(i, allocated).liftM[L]
+          } yield allocated._1
+          case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
+            fromCache
+          case Preserved(_) =>
+            fromCache
+          case Updated(incoming, _) => for {
+            _ <- EitherT.rightT(cache.shutdown(i))
+            allocated <- allocateDestination[DE](incoming)
+            _ <- cache.manage(i, allocated).liftM[L]
+          } yield allocated._1
+        }
+      } yield res
+
+      action.run
+    }
+  }
+
+  def destinationStatus(i: I): F[ExistentialError[I] \/ Condition[Exception]] =
+    (refs.lookup(i) |@| errorsOf(i)) {
       case (Some(_), Some(ex)) => Condition.Abnormal(ex).right
       case (Some(_), None) => Condition.normal().right
-      case _ =>  DestinationError.destinationNotFound(destinationId).left
+      case _ => destinationNotFound(i).left
     }
 
-  def removeDestination(destinationId: I): F[Condition[ExistentialError[I]]] =
-    OptionT(refs.lookup(destinationId)).fold(
-      _ => for {
-        _ <- refs.delete(destinationId)
-        _ <- manager.shutdownDestination(destinationId)
-      } yield Condition.normal[ExistentialError[I]](),
-      Condition.abnormal(
-        DestinationError.destinationNotFound(destinationId)).pure[F]).join
+  def removeDestination(i: I): F[Condition[ExistentialError[I]]] =
+    refs.delete(i).ifM(
+      cache.shutdown(i).as(Condition.normal[ExistentialError[I]]()),
+      Condition.abnormal(destinationNotFound[I, ExistentialError[I]](i)).point[F])
 
-  def replaceDestination(destinationId: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] =
-    refs.lookup(destinationId) >>= {
-      case Some(_) =>
-        (for {
-        _ <- uniqueName(destinationId, ref) >> refSupported(ref)
-        _ <- liftC[ExistentialError[I], DestinationError[I, C]](removeDestination(destinationId))
-        _ <- liftET[CreateError[C], DestinationError[I, C], Destination[F]](manager.initDestination(destinationId, ref))
-        _ <- EitherT.rightT(refs.insert(destinationId, ref))
-      } yield ()).run.map(Condition.disjunctionIso.reverseGet(_))
-      case None =>
-        Condition.abnormal(
-          DestinationError.destinationNotFound[I, DestinationError[I, C]](destinationId)).pure[F]
+  def replaceDestination(i: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] = {
+    lazy val notFound =
+      Condition.abnormal(destinationNotFound[I, DestinationError[I, C]](i))
+
+    throughSemaphore(i) {
+      getter(i) flatMap {
+        case Empty =>
+          notFound.point[F]
+        case Removed(_) =>
+          cache.shutdown(i) as notFound
+        case existed => for {
+          _ <- refs.insert(i, ref)
+          signal <- getter(i)
+          res <- signal match {
+            case Empty =>
+              notFound.point[F]
+            case Removed(_) =>
+              cache.shutdown(i) as notFound
+            case Inserted(_) =>
+              addRef[DestinationError[I, C]](i, ref)
+            case Preserved(_) =>
+              Condition.normal[DestinationError[I, C]]().point[F]
+            case Updated(incoming, old) if DestinationRef.atMostRenamed(incoming, old) =>
+              setRef(i, incoming)
+            case Updated(_, _) =>
+              cache.shutdown(i) >> addRef[DestinationError[I, C]](i, ref)
+          }
+        } yield res
+      }
     }
+  }
 
   def supportedDestinationTypes: F[ISet[DestinationType]] =
-    manager.supportedDestinationTypes
+    modules.supportedTypes
 
   def errors: F[IMap[I, Exception]] =
-    manager.errors
+    currentErrors.get
 
-  private def liftC[E, EE >: E](c: F[Condition[E]]): EitherT[F, EE, Unit] =
-    EitherT(c.map(Condition.disjunctionIso.get(_)))
+  private def errorsOf(i: I): F[Option[Exception]] =
+    errors.map(_.lookup(i))
 
-  private def liftET[E, EE >: E, A](e: F[E \/ A]): EitherT[F, EE, A] =
-    Bifunctor[EitherT[F, ?, ?]].widen[E, A, EE, A](EitherT(e))
+  private def addRef[E >: CreateError[C] <: DestinationError[I, C]](i: I, ref: DestinationRef[C]): F[Condition[E]] = {
+    val action = for {
+      _ <- verifyNameUnique[E](ref.name, i)
 
-  private def liftE[E, EE >: E, A](e: F[E \/ A]): F[EE \/ A] =
-    liftET[E, EE, A](e).run
+      mbCurrent <- EitherT.rightT(cache.get(i))
+      _ <- EitherT.rightT(mbCurrent.fold(().point[F])(x => cache.shutdown(i)))
 
-  private def refSupported(ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
-    EitherT(supportedDestinationTypes.map(_.member(ref.kind)).ifM(
-      ().right[DestinationError[I, C]].point[F],
-      supportedDestinationTypes.map(
-        DestinationError.destinationUnsupported[DestinationError[I, C]](ref.kind, _).left[Unit])))
+      allocated <- allocateDestination[E](ref)
 
-  private def uniqueName(replaceId: I, ref: DestinationRef[C]): EitherT[F, DestinationError[I, C], Unit] =
-    EitherT(refs.entries.filter {
-      case (i, r) => r.name === ref.name && i =/= replaceId
-    }.compile.last.map(_.fold(().right[DestinationError[I, C]])(_ =>
-      DestinationError.destinationNameExists[DestinationError[I, C]](ref.name).left[Unit])))
+      _ <- EitherT.rightT(refs.insert(i, ref))
+      _ <- EitherT.rightT(cache.manage(i, allocated))
+    } yield ()
+
+    action.run.map(Condition.disjunctionIso.reverseGet(_))
+  }
+
+  private def setRef(i: I, ref: DestinationRef[C]): F[Condition[DestinationError[I, C]]] = {
+    val action = for {
+      _ <- verifyNameUnique[DestinationError[I, C]](ref.name, i)
+      _ <- EitherT.rightT(refs.insert(i, ref))
+    } yield ()
+    action.run.map(Condition.disjunctionIso.reverseGet(_))
+  }
+
+  private def verifyNameUnique[E >: CreateError[C] <: DestinationError[I, C]](name: DestinationName, i: I): EitherT[F, E, Unit] =
+    EitherT {
+      refs.entries
+        .exists(t => t._2.name === name && t._1 =/= i)
+        .compile
+        .fold(false)(_ || _)
+        .map(_ ? destinationNameExists[E](name).left[Unit] | ().right)
+    }
+
+  private def allocateDestination[E >: CreateError[C] <: DestinationError[I, C]](
+      ref: DestinationRef[C])
+      : EitherT[F, E, (Destination[F], F[Unit])] =
+    EitherT(modules.create(ref).run.allocated map {
+      case (-\/(e), _) => -\/(e: E)
+      case (\/-(a), finalize) => \/-((a, finalize))
+    })
+
+  private def throughSemaphore(i: I): F ~> F = λ[F ~> F]{ fa =>
+    semaphore.get(i).use(_ => fa)
+  }
 }
 
 object DefaultDestinations {
-  def apply[I: Equal: Order, C, F[_]: Sync](
-    freshId: F[I],
-    refs: IndexedStore[F, I, DestinationRef[C]],
-    manager: DestinationManager[I, C, F]): DefaultDestinations[I, C, F] =
-    new DefaultDestinations[I, C, F](freshId, refs, manager)
+  def apply[F[_]: Concurrent: ContextShift, I: Order, C: Equal](
+      freshId: F[I],
+      refs: IndexedStore[F, I, DestinationRef[C]],
+      cache: ResourceManager[F, I, Destination[F]],
+      modules: DestinationModules[F, I, C])
+      : F[DefaultDestinations[F, I, C]] = for {
+    semaphore <- IndexedSemaphore[F, I]
+    errs <- Ref.of[F, IMap[I, Exception]](IMap.empty)
+    getter <- CachedGetter(refs.lookup(_))
+  } yield new DefaultDestinations(semaphore, freshId, refs, cache, getter, modules, errs)
 }

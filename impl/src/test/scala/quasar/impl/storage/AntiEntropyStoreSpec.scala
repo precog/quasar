@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.impl.storage
 
 import slamdata.Predef._
 
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.impl.cluster.{Timestamped, Atomix, Message}, Atomix.NodeInfo, Message._
 
 import cats.effect.{IO, Resource, Timer}
@@ -51,7 +51,7 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
     port <- portRef.modify((x: Int) => (x + 1, x + 1))
   } yield NodeInfo(id, "localhost", port)
 
-  val pool = BlockingContext.cached("antientropy-spec-pool")
+  val blocker = qc.Blocker.cached("antientropy-spec-pool")
   val sleep: IO[Unit] = timer.sleep(new FiniteDuration(4000, MILLISECONDS))
 
   type Persistence = ConcurrentHashMap[String, Timestamped[String]]
@@ -66,13 +66,13 @@ final class AntiEntropyStoreSpec extends IndexedStoreSpec[IO, String, String] {
     atomix <- Atomix.resource[IO](me, seeds.map(_.address))
     storage <- Resource.liftF(IO(new ConcurrentHashMap[String, Timestamped[String]]()))
     timestamped <- TimestampedStore[IO, String, String](underlying)
-    cluster = Atomix.cluster[IO](atomix, pool).contramap(printMessage(_))
-    store <- AntiEntropyStore.default[IO, String, String]("default", cluster, timestamped, pool)
+    cluster = Atomix.cluster[IO](atomix, blocker).contramap(printMessage(_))
+    store <- AntiEntropyStore.default[IO, String, String]("default", cluster, timestamped, blocker)
   } yield store
 
   val underlyingResource: Resource[IO, UnderlyingStore] =
     Resource.liftF[IO, Persistence](IO(new ConcurrentHashMap[String, Timestamped[String]]()))
-      .map(ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](_, pool))
+      .map(ConcurrentMapIndexedStore.unhooked[IO, String, Timestamped[String]](_, blocker))
 
   def mkStore(me: NodeInfo, seeds: List[NodeInfo]): Resource[IO, Store] =
     underlyingResource.flatMap(clusterify(me, seeds))

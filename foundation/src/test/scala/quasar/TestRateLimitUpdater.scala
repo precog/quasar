@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,12 @@ import scala.concurrent.duration.FiniteDuration
 
 import cats.effect.IO
 
-class TestRateLimitUpdater extends RateLimitUpdater[IO, Int] {
-  val plusOnes: ArrayBuffer[Int] = ArrayBuffer()
-  val waits: ArrayBuffer[Int] = ArrayBuffer()
-  val configs: ArrayBuffer[Int] = ArrayBuffer()
+class TestRateLimitUpdater[A] extends RateLimitUpdater[IO, A] {
+  val plusOnes: ArrayBuffer[A] = ArrayBuffer()
+  val waits: ArrayBuffer[A] = ArrayBuffer()
+  val configs: ArrayBuffer[A] = ArrayBuffer()
 
-  def plusOne(key: Int): IO[Unit] = IO.delay(plusOnes += key)
-  def wait(key: Int, duration: FiniteDuration): IO[Unit] = IO.delay(waits += key)
-  def config(key: Int, config: RateLimiterConfig): IO[Unit] = IO.delay(configs += key)
+  def plusOne(key: A): IO[Unit] = IO.delay(plusOnes += key)
+  def wait(key: A, duration: FiniteDuration): IO[Unit] = IO.delay(waits += key)
+  def config(key: A, config: RateLimiterConfig): IO[Unit] = IO.delay(configs += key)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,15 @@ import monocle.macros.Lenses
 import scalaz.{Apply, Equal, Order, Show, Traverse1}
 import scalaz.std.tuple._
 import scalaz.syntax.show._
+import scalaz.syntax.equal._
 
 @Lenses
 final case class DatasourceRef[C](kind: DatasourceType, name: DatasourceName, config: C)
 
 object DatasourceRef extends DatasourceRefInstances {
+  def atMostRenamed[C: Equal](a: DatasourceRef[C], b: DatasourceRef[C]) =
+    a.kind === b.kind && a.config === b.config
+
   def pConfig[C, D]: PLens[DatasourceRef[C], DatasourceRef[D], C, D] =
     PLens[DatasourceRef[C], DatasourceRef[D], C, D](
       _.config)(

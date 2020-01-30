@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,7 +157,10 @@ final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
 object RateLimiter {
   def apply[F[_]: Sync: Timer, A: Hash](
       caution: Double,
+      freshKey: F[A],
       updater: RateLimitUpdater[F, A])
-      : F[RateLimiter[F, A]] =
-    Sync[F].delay(new RateLimiter[F, A](caution, updater))
+      : F[RateLimiting[F, A]] =
+    Sync[F].delay(RateLimiting[F, A](
+      new RateLimiter[F, A](caution, updater),
+      freshKey))
 }

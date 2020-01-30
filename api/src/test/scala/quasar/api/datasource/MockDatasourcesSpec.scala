@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Int, List, String, Stream => SStream}
+import slamdata.Predef.{Int, List, String}
 import quasar.Condition
 import quasar.api.MockSchemaConfig
 import quasar.contrib.cats.stateT._
@@ -24,7 +24,7 @@ import quasar.contrib.cats.effect.stateT.catsStateTEffect
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.data.StateT
 import cats.syntax.applicative._
 import eu.timepit.refined.auto._
@@ -35,6 +35,8 @@ import scalaz.std.string._
 import shims.{monadToScalaz, monoidToCats}
 import MockDatasourcesSpec._
 
+import scala.{Stream => SStream}
+
 final class MockDatasourcesSpec
   extends DatasourcesSpec[MockM, List, Int, String, MockSchemaConfig.type] {
 
@@ -43,9 +45,11 @@ final class MockDatasourcesSpec
   val mongo: DatasourceType = DatasourceType("mongodb", 1L)
   val acceptedSet: ISet[DatasourceType] = ISet.fromList(List(s3, azure, mongo))
 
-  def datasources: Datasources[MockM, List, Int, String, MockSchemaConfig.type] =
-    MockDatasources[String, MockM, List](
-      acceptedSet, _ => Condition.normal(), SStream.empty)
+  def datasources: Resource[MockM, Datasources[MockM, List, Int, String, MockSchemaConfig.type]] =
+    Resource.pure[MockM, Datasources[MockM, List, Int, String, MockSchemaConfig.type]] {
+      MockDatasources[String, MockM, List](
+        acceptedSet, _ => Condition.normal(), SStream.empty)
+    }
 
   def supportedType = DatasourceType("s3", 1L)
 

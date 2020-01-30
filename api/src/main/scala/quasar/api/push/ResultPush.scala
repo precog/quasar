@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,18 @@ package quasar.api.push
 
 import slamdata.Predef._
 
-import quasar.Condition
-import quasar.api.destination.ResultType
+import quasar.{Condition, Exhaustive}
+import quasar.api.destination.{DestinationColumn, ResultType, TypeCoercion}
 import quasar.api.resource.ResourcePath
+import quasar.api.table.ColumnType
 
 import scala.collection.immutable.SortedMap
 
-import cats.Applicative
-import cats.data.{NonEmptyMap, NonEmptySet}
+import cats.{Applicative, Monad}
+import cats.data.{EitherT, NonEmptyList, NonEmptyMap, NonEmptySet}
 import cats.implicits._
+
+import shapeless._
 
 /** @tparam F effects
   * @tparam T Table Id
@@ -35,7 +38,14 @@ import cats.implicits._
 trait ResultPush[F[_], TableId, DestinationId] {
   import ResultPushError._
 
-  def cancel(tableId: TableId, destinationId: DestinationId)
+  def coerce(
+      destinationId: DestinationId,
+      tpe: ColumnType.Scalar)
+      : F[Either[DestinationNotFound[DestinationId], TypeCoercion[CoercedType]]]
+
+  def cancel(
+      tableId: TableId,
+      destinationId: DestinationId)
       : F[Condition[ExistentialError[TableId, DestinationId]]]
 
   def cancelAll: F[Unit]
@@ -45,11 +55,12 @@ trait ResultPush[F[_], TableId, DestinationId] {
 
   def start(
       tableId: TableId,
+      columns: NonEmptyList[DestinationColumn[SelectedType]],
       destinationId: DestinationId,
       path: ResourcePath,
       format: ResultType,
       limit: Option[Long])
-      : F[Condition[ResultPushError[TableId, DestinationId]]]
+      : F[Condition[NonEmptyList[ResultPushError[TableId, DestinationId]]]]
 
   /** Attempts to cancel the push to `destinationId` for each entry `tables`.
     *
@@ -81,21 +92,48 @@ trait ResultPush[F[_], TableId, DestinationId] {
     */
   def startThese(
       destinationId: DestinationId,
-      tables: NonEmptyMap[TableId, (ResourcePath, ResultType, Option[Long])])(
+      tables: NonEmptyMap[TableId, (NonEmptyList[DestinationColumn[SelectedType]], ResourcePath, ResultType, Option[Long])])(
       implicit F: Applicative[F])
-      : F[Map[TableId, ResultPushError[TableId, DestinationId]]] = {
+      : F[Map[TableId, NonEmptyList[ResultPushError[TableId, DestinationId]]]] = {
 
     val tablesM = tables.toSortedMap
 
-    val failed: Map[TableId, ResultPushError[TableId, DestinationId]] =
+    val failed: Map[TableId, NonEmptyList[ResultPushError[TableId, DestinationId]]] =
       SortedMap.empty(tablesM.ordering)
 
     tablesM.foldLeft(failed.pure[F]) {
-      case (f, (tid, (path, tpe, limit))) =>
-        (f, start(tid, destinationId, path, tpe, limit)) mapN {
-          case (m, Condition.Abnormal(err)) => m.updated(tid, err)
+      case (f, (tid, (cols, path, tpe, limit))) =>
+        (f, start(tid, cols, destinationId, path, tpe, limit)) mapN {
+          case (m, Condition.Abnormal(errs)) => m.updated(tid, errs)
           case (m, Condition.Normal()) => m
         }
     }
+  }
+
+  def coercions(destinationId: DestinationId)
+      (implicit F: Monad[F])
+      : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, TypeCoercion[CoercedType]]]] = {
+
+    // Ensures the map contains an entry for every ColumType.Scalar
+    def coercions0[H <: HList](l: H)(implicit E: Exhaustive[ColumnType.Scalar, H])
+        : F[Either[DestinationNotFound[DestinationId], NonEmptyMap[ColumnType.Scalar, TypeCoercion[CoercedType]]]] =
+      E.toNel(l)
+        .traverse(t => EitherT(coerce(destinationId, t)).tupleLeft(t))
+        .map(n => NonEmptyMap.of(n.head, n.tail: _*))
+        .value
+
+    coercions0(
+      ColumnType.Null ::
+      ColumnType.Boolean ::
+      ColumnType.LocalTime ::
+      ColumnType.OffsetTime ::
+      ColumnType.LocalDate ::
+      ColumnType.OffsetDate ::
+      ColumnType.LocalDateTime ::
+      ColumnType.OffsetDateTime ::
+      ColumnType.Interval ::
+      ColumnType.Number ::
+      ColumnType.String ::
+      HNil)
   }
 }

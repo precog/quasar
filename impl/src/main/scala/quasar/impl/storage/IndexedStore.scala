@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,28 +23,16 @@ import cats.syntax.apply._
 
 import monocle.Prism
 
+import quasar.Store
 import quasar.contrib.scalaz.MonadError_
 import quasar.higher.HFunctor
 
 import fs2.Stream
 import scalaz.{~>, Bind, Functor, InvariantFunctor, Monad, Scalaz, Applicative}, Scalaz._
 
-trait IndexedStore[F[_], I, V] {
+trait IndexedStore[F[_], I, V] extends Store[F, I, V] {
   /** All values in the store paired with their index. */
   def entries: Stream[F, (I, V)]
-
-  /** Retrieve the value at the specified index. */
-  def lookup(i: I): F[Option[V]]
-
-  /** Associate the given value with the specified index, replaces any
-    * existing association.
-    */
-  def insert(i: I, v: V): F[Unit]
-
-  /** Remove any value associated with the specified index, returning whether
-    * it existed.
-    */
-  def delete(i: I): F[Boolean]
 }
 
 object IndexedStore extends IndexedStoreInstances {

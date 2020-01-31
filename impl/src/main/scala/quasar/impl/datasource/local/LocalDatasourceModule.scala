@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import quasar.api.datasource.DatasourceError.{
   InitializationError,
   malformedConfiguration
 }
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector._, LightweightDatasourceModule.DS
 
 import scala.concurrent.ExecutionContext
@@ -35,8 +35,8 @@ import cats.kernel.Hash
 
 object LocalDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   // FIXME this is side effecting
-  override lazy val blockingPool: BlockingContext =
-    BlockingContext.cached("local-datasource")
+  override lazy val blocker: Blocker =
+    qc.Blocker.cached("local-datasource")
 
   val kind: DatasourceType = LocalType
 
@@ -62,7 +62,7 @@ object LocalDatasourceModule extends LightweightDatasourceModule with LocalDesti
         root,
         lc.readChunkSizeBytes,
         lc.format,
-        blockingPool)
+        blocker)
     }
 
     Resource.liftF(ds.value)

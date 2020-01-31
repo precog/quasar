@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,23 @@
 
 package quasar.impl.destinations
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import argonaut.Json
 
+import cats.Applicative
+import cats.data.NonEmptyList
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
-import cats.syntax.either._
+import cats.implicits._
 
 import eu.timepit.refined.auto._
 
 import fs2.Stream
 
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.api.destination.{Destination, DestinationType, ResultSink}
+import quasar.api.destination.{Destination, UntypedDestination, DestinationType, ResultSink}
 import quasar.api.push.RenderConfig
 import quasar.connector.{DestinationModule, MonadResourceErr}
-
-import scalaz.syntax.applicative._
-import scalaz.{Applicative, NonEmptyList}
-
-import shims.monadToScalaz
 
 object MockDestinationModule extends DestinationModule {
   def destinationType = DestinationType("mock", 1L)
@@ -45,15 +42,18 @@ object MockDestinationModule extends DestinationModule {
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json)
       : Resource[F, Either[InitializationError[Json], Destination[F]]] =
     (new MockDestination[F]: Destination[F])
-      .asRight[InitializationError[Json]].point[Resource[F, ?]]
+      .asRight[InitializationError[Json]]
+      .pure[Resource[F, ?]]
 }
 
-class MockDestination[F[_]: Applicative] extends Destination[F] {
+class MockDestination[F[_]: Applicative] extends UntypedDestination[F] {
+
   def destinationType: DestinationType =
     MockDestinationModule.destinationType
-  def sinks = NonEmptyList(mockCsvSink)
 
-  val mockCsvSink = ResultSink.csv[F](RenderConfig.Csv()) {
+  def sinks = NonEmptyList.one(mockCsvSink)
+
+  val mockCsvSink = ResultSink.csv[F, Unit](RenderConfig.Csv()) {
     case (_, _, _) => Stream(())
   }
 }

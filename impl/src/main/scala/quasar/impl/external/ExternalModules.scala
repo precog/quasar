@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package quasar.impl.external
 
-import quasar.concurrent.BlockingContext
+import quasar.contrib.argonaut.JawnParser, JawnParser._
 import quasar.contrib.fs2.convert
 import slamdata.Predef._
 
@@ -30,15 +30,13 @@ import java.nio.file.{Files, Path}
 import java.util.jar.JarFile
 
 import argonaut.Json
-import cats.effect.{ConcurrentEffect, ContextShift, Effect, Sync, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Effect, Sync, Timer}
 import cats.syntax.applicativeError._
 import fs2.io.file
 import fs2.{Chunk, Stream}
 import jawnfs2._
 import org.slf4s.Logging
 import org.typelevel.jawn.AsyncParser
-import org.typelevel.jawn.support.argonaut.Parser._
-import scalaz.syntax.tag._
 
 object ExternalModules extends Logging {
   import ExternalConfig._
@@ -48,7 +46,7 @@ object ExternalModules extends Logging {
   @SuppressWarnings(Array("org.wartremover.warts.ToString"))
   def apply[F[_]: ConcurrentEffect: ContextShift: Timer](
       config: ExternalConfig,
-      blockingPool: BlockingContext)
+      blocker: Blocker)
       : Stream[F, (ClassName, ClassLoader, PluginType)] =
     config match {
       case PluginDirectory(directory) =>
@@ -56,7 +54,7 @@ object ExternalModules extends Logging {
           case (true, true) =>
             convert.fromJavaStream(ConcurrentEffect[F].delay(Files.list(directory)))
               .filter(_.getFileName.toString.endsWith(PluginExtSuffix))
-              .flatMap(loadPlugin[F](_, blockingPool))
+              .flatMap(loadPlugin[F](_, blocker))
 
           case (true, false) =>
             warnStream[F](s"Unable to load plugins from '$directory', does not appear to be a directory", None)
@@ -67,7 +65,7 @@ object ExternalModules extends Logging {
 
       case PluginFiles(files) =>
         Stream.emits(files)
-          .flatMap(loadPlugin[F](_, blockingPool))
+          .flatMap(loadPlugin[F](_, blocker))
 
       case ExplodedDirs(modules) =>
         for {
@@ -99,10 +97,10 @@ object ExternalModules extends Logging {
 
   private def loadPlugin[F[_]: ContextShift: Effect: Timer](
       pluginFile: Path,
-      blockingPool: BlockingContext)
+      blocker: Blocker)
       : Stream[F, (ClassName, ClassLoader, PluginType)] =
     for {
-      plugin <- readPlugin(pluginFile, blockingPool)
+      plugin <- readPlugin(pluginFile, blocker)
       mainJar = new JarFile(plugin.mainJar.toFile)
 
       datasourceModuleAttr <- jarAttribute[F](mainJar, Plugin.ManifestAttributeName)
@@ -140,11 +138,11 @@ object ExternalModules extends Logging {
 
   private def readPlugin[F[_]: ContextShift: Effect: Timer](
       pluginFile: Path,
-      blockingPool: BlockingContext)
+      blocker: Blocker)
       : Stream[F, Plugin] =
     for {
       js <-
-        file.readAll[F](pluginFile, blockingPool.unwrap, PluginChunkSize)
+        file.readAll[F](pluginFile, blocker, PluginChunkSize)
           .chunks
           .map(_.toByteBuffer)
           .parseJson[Json](AsyncParser.SingleValue)

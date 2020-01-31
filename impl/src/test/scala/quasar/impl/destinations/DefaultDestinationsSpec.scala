@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.ConditionMatchers
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector.ResourceError
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
@@ -34,7 +34,7 @@ import cats.Show
 import cats.instances.int._
 import cats.instances.string._
 import cats.instances.option._
-import cats.effect.{IO, Resource}
+import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.Ref
 import cats.syntax.applicativeError._
 import cats.syntax.traverse._
@@ -46,11 +46,13 @@ import scalaz.ISet
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import shims.{showToCats, showToScalaz, orderToScalaz, applicativeToScalaz}
+import shims.{showToCats, showToScalaz, orderToScalaz}
 
 object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionMatchers {
   sequential
+
   implicit val tm = IO.timer(global)
+
   implicit val ioResourceErrorME: MonadError_[IO, ResourceError] =
     MonadError_.facet[IO](ResourceError.throwableP)
 
@@ -68,13 +70,13 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         }
     }
 
-  val pool: BlockingContext = BlockingContext.cached("rdestinations-spec")
+  val blocker: Blocker = qc.Blocker.cached("rdestinations-spec")
 
   def mkDestinations = {
     val freshId = IO(java.util.UUID.randomUUID().toString())
     val fRefs: IO[IndexedStore[IO, String, DestinationRef[Json]]] =
       IO(new ConcurrentHashMap[String, DestinationRef[Json]]()).map { (mp: ConcurrentHashMap[String, DestinationRef[Json]]) =>
-        ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, pool)
+        ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
       }
     val rCache = ResourceManager[IO, String, Destination[IO]]
     val modules = DestinationModules[IO, String](List(MockDestinationModule))
@@ -249,6 +251,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
       }
     }
   }
+
   "clustering" >> {
     "new ref appeared" >>* {
       for {
@@ -260,6 +263,21 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         d must be_\/-
       }
     }
+
+    "new unknown ref appeared" >>* {
+      val unknownType = DestinationType("unknown", 2L)
+      val unknownRef = DestinationRef.kind.set(unknownType)(testRef)
+
+      mkDestinations use { case (store, dests, cache) =>
+        for {
+          _ <- store.insert("unk", unknownRef)
+          d <- dests.destinationOf("unk")
+        } yield {
+          d must be_-\/(destinationUnsupported(unknownType, ISet.singleton(MockDestinationType)))
+        }
+      }
+    }
+
     "ref disappered" >>* {
       for {
         ((store, dests, cache), finalize) <- mkDestinations.allocated
@@ -273,6 +291,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         d1 must be_-\/
       }
     }
+
     "ref updated" >>* {
       def tracking(ref: Ref[IO, Option[String]], i: String): (Destination[IO], IO[Unit]) =
         (new MockDestination[IO], ref.set(Some(i)))

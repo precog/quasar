@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,39 +49,49 @@ trait DatasourceModules[T[_[_]], F[_], G[_], I, C, R, P <: ResourcePathType] { s
   def supportedTypes: F[ISet[DatasourceType]]
 
   def withMiddleware[H[_], S, Q <: ResourcePathType](
-    f: (I, ManagedDatasource[T, F, G, R, P]) => F[ManagedDatasource[T, F, H, S, Q]])(
-    implicit
-    AF: Monad[F])
-    : DatasourceModules[T, F, H, I, C, S, Q] =
+      f: (I, ManagedDatasource[T, F, G, R, P]) => F[ManagedDatasource[T, F, H, S, Q]])(
+      implicit
+      AF: Monad[F])
+      : DatasourceModules[T, F, H, I, C, S, Q] =
     new DatasourceModules[T, F, H, I, C, S, Q] {
       def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, H, S, Q]] =
         self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
           EitherT.rightT(Resource.liftF(f(i, mds)))
         }
+
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
+
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
     }
 
-  def withFinalizer(f: (I, ManagedDatasource[T, F, G, R, P]) => F[Unit])(implicit F: Monad[F]): DatasourceModules[T, F, G, I, C, R, P] =
+  def withFinalizer(
+      f: (I, ManagedDatasource[T, F, G, R, P]) => F[Unit])(
+      implicit F: Monad[F])
+      : DatasourceModules[T, F, G, I, C, R, P] =
     new DatasourceModules[T, F, G, I, C, R, P] {
       def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, P]] =
         self.create(i, ref) flatMap { (mds: ManagedDatasource[T, F, G, R, P]) =>
           EitherT.rightT(Resource.make(mds.pure[F])(x => f(i, x)))
         }
+
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
+
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
     }
 
-  def widenPathType[PP >: P <: ResourcePathType](implicit AF: Monad[F]): DatasourceModules[T, F, G, I, C, R, PP] =
+  def widenPathType[PP >: P <: ResourcePathType](implicit AF: Monad[F])
+      : DatasourceModules[T, F, G, I, C, R, PP] =
     new DatasourceModules[T, F, G, I, C, R, PP] {
       def create(i: I, ref: DatasourceRef[C]): EitherT[Resource[F, ?], CreateError[C], ManagedDatasource[T, F, G, R, PP]] =
         self.create(i, ref) map { ManagedDatasource.widenPathType[T, F, G, R, P, PP](_) }
+
       def sanitizeRef(inp: DatasourceRef[C]): DatasourceRef[C] =
         self.sanitizeRef(inp)
+
       def supportedTypes: F[ISet[DatasourceType]] =
         self.supportedTypes
     }
@@ -103,8 +113,11 @@ object DatasourceModules {
       ec: ExecutionContext)
       : Modules[T, F, I] = {
 
-    lazy val moduleSet: ISet[DatasourceType] = ISet.fromList(modules.map(_.kind))
-    lazy val moduleMap: Map[DatasourceType, DatasourceModule] = Map(modules.map(ds => (ds.kind, ds)): _*)
+    lazy val moduleSet: ISet[DatasourceType] =
+      ISet.fromList(modules.map(_.kind))
+
+    lazy val moduleMap: Map[DatasourceType, DatasourceModule] =
+      Map(modules.map(ds => (ds.kind, ds)): _*)
 
     new DatasourceModules[T, F, Stream[F, ?], I, Json, QueryResult[F], ResourcePathType.Physical] {
       def create(i: I, ref: DatasourceRef[Json]): EitherT[Resource[F, ?], CreateError[Json], MDS[T, F]] = moduleMap.get(ref.kind) match {
@@ -137,7 +150,7 @@ object DatasourceModules {
 
   private def handleInitErrors[F[_]: Bracket[?[_], Throwable]: MonadError[?[_], Throwable], A](
       kind: DatasourceType,
-      res: Resource[F, Either[InitializationError[Json], A]])
+      res: => Resource[F, Either[InitializationError[Json], A]])
       : EitherT[Resource[F, ?], CreateError[Json], A] = EitherT {
     linkDatasource(kind, res) map {
       case Right(a) => \/-(a)

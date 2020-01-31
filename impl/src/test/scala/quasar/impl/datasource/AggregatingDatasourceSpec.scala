@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
     ResourcePath.root() / ResourceName("x") / ResourceName("y")
 
   def gatherMultiple[A](fga: Stream[IO, A]): IO[List[A]] =
-    fga.compile.to[List]
+    fga.compile.to(List)
 
   "aggregate discovery" >> {
     "underlying prefix resources are preserved" >>* {
@@ -107,7 +107,7 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
       for {
         dres <- ds.prefixedChildPaths(ResourcePath.root())
-        meta <- dres.traverse(_.compile.to[List])
+        meta <- dres.traverse(_.compile.to(List))
         qres <- ds.evaluate(z)
       } yield {
         meta must beSome(equal[List[(ResourceName, ResourcePathType)]](List(
@@ -126,7 +126,7 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
     "children of prefix = agg resource + underlying children" >>* {
       datasource
         .prefixedChildPaths(ResourcePath.root() / ResourceName("a"))
-        .flatMap(_.cata(_.compile.to[List], IO.pure(Nil)))
+        .flatMap(_.cata(_.compile.to(List), IO.pure(Nil)))
         .map(_ must equal[List[(ResourceName, ResourcePathType)]](List(
           ResourceName("**") -> ResourcePathType.AggregateResource,
           ResourceName("b") -> ResourcePathType.LeafResource,
@@ -157,7 +157,7 @@ object AggregatingDatasourceSpec extends DatasourceSpec[IO, Stream[IO, ?], Resou
 
       datasource
         .evaluate(ResourcePath.root() / ResourceName("a") / ResourceName("**"))
-        .flatMap(_.traverse(_.compile.to[List]))
+        .flatMap(_.traverse(_.compile.to(List)))
         .map(_ must beRight(contain(exactly((b, 1), (c, 2), (r, 3), (s, 4), (t, 5)))))
     }
   }

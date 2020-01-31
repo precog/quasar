@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package quasar.api.datasource
 
-import slamdata.Predef.{Stream => SStream, _}
+import slamdata.Predef._
 import quasar.Condition
 import quasar.api.MockSchemaConfig
 import quasar.api.datasource.DatasourceError.InitializationError
@@ -36,6 +36,8 @@ import scalaz.syntax.std.boolean._
 import scalaz.syntax.std.option._
 
 import MockDatasources.MockState
+
+import scala.{Stream => SStream}
 
 final class MockDatasources[
     C,

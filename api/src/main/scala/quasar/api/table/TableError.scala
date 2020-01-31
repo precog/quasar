@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package quasar.api.table
 
 import slamdata.Predef._
 
-import scalaz.Show
-import scalaz.syntax.show._
+import cats.Show
+import cats.implicits._
 
 sealed trait TableError[+I] extends Product with Serializable
 
@@ -33,20 +33,20 @@ object TableError {
   final case class TableNotFound[I](tableId: I) extends ExistenceError[I]
 
   implicit def showCreateError[I]: Show[CreateError[I]] =
-    Show.shows {
+    Show show {
       case NameConflict(n) =>
-        "NameConflict(" + n.shows + ")"
+        "NameConflict(" + n.show + ")"
     }
 
   implicit def showExistenceError[I: Show]: Show[ExistenceError[I]] =
-    Show.shows {
+    Show show {
       case TableNotFound(id) =>
-        "TableNotFound(" + id.shows + ")"
+        "TableNotFound(" + id.show + ")"
     }
 
   implicit def showModificationError[I: Show]: Show[ModificationError[I]] =
-    Show.shows {
-      case c: CreateError[I] => c.shows
-      case e: ExistenceError[I] => e.shows
+    Show show {
+      case c: CreateError[I] => c.show
+      case e: ExistenceError[I] => e.show
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ object PlannerError {
     def message = dirs match {
       case Nil => "No paths provided to read from."
       case ds  =>
-        "None of these directories contain any files to read from: " ++
+        "None of these directories contain any files to read from: " +
           ds.map(posixCodec.printPath).mkString(", ")
       }
   }

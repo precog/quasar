@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import quasar.api.MockSchemaConfig
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.connector._
 import quasar.connector.DataFormat
 import quasar.contrib.scalaz._
@@ -37,7 +37,7 @@ import argonaut.JsonScalaz._
 import argonaut.Argonaut.jString
 
 import cats.Show
-import cats.effect.{IO, ConcurrentEffect, Resource, ContextShift, Timer}
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.effect.concurrent.Ref
 import cats.instances.string._
 import cats.instances.option._
@@ -141,7 +141,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
     }
   }
 
-  val pool: BlockingContext = BlockingContext.cached("rdatasources-spec")
+  val blocker: Blocker = qc.Blocker.cached("rdatasources-spec")
 
   def datasources: Resource[IO, Self] = prepare(Map()).map(_._1)
 
@@ -154,7 +154,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
 
     val fRefs: IO[IndexedStore[IO, String, DatasourceRef[Json]]] =
       IO(new ConcurrentHashMap[String, DatasourceRef[Json]]()).map { (mp: ConcurrentHashMap[String, DatasourceRef[Json]]) =>
-        ConcurrentMapIndexedStore.unhooked[IO, String, DatasourceRef[Json]](mp, pool)
+        ConcurrentMapIndexedStore.unhooked[IO, String, DatasourceRef[Json]](mp, blocker)
       }
 
     val rCache = ResourceManager[IO, String, ManagedDatasource[Fix, IO, Stream[IO, ?], QueryResult[IO], PathType]]

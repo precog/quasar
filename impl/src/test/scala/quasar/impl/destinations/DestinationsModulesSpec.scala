@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,12 @@ import quasar.EffectfulQSpec
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.api.push.RenderConfig
+import quasar.api.table.ColumnType
 import quasar.connector._
 import quasar.contrib.scalaz.MonadError_
 
 import cats.Show
+import cats.data.NonEmptyList
 import cats.instances.int._
 import cats.syntax.applicative._
 import cats.syntax.applicativeError._
@@ -42,7 +44,7 @@ import fs2.Stream
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-import scalaz.{NonEmptyList, ISet}
+import scalaz.{\/, -\/, NonEmptyList => ZNel, ISet}
 
 import shims.{showToCats, showToScalaz}
 
@@ -70,10 +72,10 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     def destinationType = kind
     def sanitizeDestinationConfig(inp: Json) = Json.jString("sanitized")
     def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](config: Json) = {
-      val dest: Destination[F] = new Destination[F] {
+      val dest: Destination[F] = new LegacyDestination[F] {
         def destinationType = kind
-        def sinks = NonEmptyList(mock)
-        val mock = ResultSink.csv[F](RenderConfig.Csv()) {
+        def sinks = NonEmptyList.of(mock)
+        val mock = ResultSink.csv[F, ColumnType.Scalar](RenderConfig.Csv()) {
           case _ => Stream(())
         }
       }
@@ -86,7 +88,6 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
 
   def mkModules(lst: List[DestinationModule]) = DestinationModules[IO, String](lst)
 
-
   "supported types" >> {
     "empty" >>* {
       for {
@@ -95,6 +96,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
         actual === ISet.empty
       }
     }
+
     "non-empty" >>* {
       val expected = ISet.fromList(List(DestinationType("foo", 1L), DestinationType("bar", 2L)))
       for {
@@ -119,25 +121,24 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     "work for supported" >>* {
       val kind = DestinationType("foo", 1L)
       val ref = DestinationRef(kind, DestinationName("supported"), Json.jString(""))
-      for {
-        (mod, finish) <- mkModules(List(module(kind))).create(ref).allocated
-        _ <- finish
-      } yield {
-        mod.destinationType === kind
+
+      mkModules(List(module(kind))).create(ref).run use { res =>
+        IO.pure(res.map(_.destinationType) must_=== \/.right(kind))
       }
     }
+
     "doesn't work for unsupported" >>* {
       val kind = DestinationType("foo", 1L)
       val ref = DestinationRef(DestinationType("bar", 2L), DestinationName("unsupported"), Json.jString(""))
-      for {
-        res <- mkModules(List(module(kind))).create(ref).allocated.attempt
-      } yield {
-        res must beLike {
-          case Left(CreateErrorException(ce)) =>
+
+      mkModules(List(module(kind))).create(ref).run use { res =>
+        IO.pure(res must beLike {
+          case -\/(ce) =>
             ce === DestinationUnsupported(DestinationType("bar", 2L), ISet.singleton(DestinationType("foo", 1L)))
-        }
+        })
       }
     }
+
     "errors with initialization error" >>* {
       val malformed =
         DestinationType("malformed", 1L)
@@ -157,32 +158,35 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
         DestinationRef(accessDenied, DestinationName("doesn't matter"), Json.jString("access-denied-config"))
       val modules = mkModules(List(
           module(malformed, Some(MalformedConfiguration(malformed, Json.jString("a"), "malformed configuration"))),
-          module(invalid, Some(InvalidConfiguration(invalid, Json.jString("b"), NonEmptyList("invalid configuration")))),
+          module(invalid, Some(InvalidConfiguration(invalid, Json.jString("b"), ZNel("invalid configuration")))),
           module(connFailed, Some(ConnectionFailed(connFailed, Json.jString("c"), new Exception("conn failed")))),
           module(accessDenied, Some(AccessDenied(accessDenied, Json.jString("d"), "access denied")))))
 
       for {
-        malformedDs <- modules.create(malformedRef).allocated.attempt
-        invalidDs <- modules.create(invalidRef).allocated.attempt
-        connFailedDs <- modules.create(connFailedRef).allocated.attempt
-        accessDeniedDs <- modules.create(accessDeniedRef).allocated.attempt
+        malformedDs <- modules.create(malformedRef).run.allocated
+        invalidDs <- modules.create(invalidRef).run.allocated
+        connFailedDs <- modules.create(connFailedRef).run.allocated
+        accessDeniedDs <- modules.create(accessDeniedRef).run.allocated
       } yield {
         malformedDs must beLike {
-          case Left(CreateErrorException(ce)) =>
+          case (-\/(ce), _) =>
             ce === MalformedConfiguration(malformed, Json.jString("a"), "malformed configuration")
         }
+
         invalidDs must beLike {
-          case Left(CreateErrorException(ce)) =>
-            ce === InvalidConfiguration(invalid, Json.jString("b"), NonEmptyList("invalid configuration"))
+          case (-\/(ce), _) =>
+            ce === InvalidConfiguration(invalid, Json.jString("b"), ZNel("invalid configuration"))
         }
+
         connFailedDs must beLike {
-          case Left(CreateErrorException(ConnectionFailed(kind, config, cause))) =>
+          case (-\/(ConnectionFailed(kind, config, cause)), _) =>
             kind === connFailed
             config === Json.jString("c")
             cause.getMessage === "conn failed"
         }
+
         accessDeniedDs must beLike {
-          case Left(CreateErrorException(ce)) =>
+          case (-\/(ce), _) =>
             ce === AccessDenied(accessDenied, Json.jString("d"), "access denied")
         }
       }

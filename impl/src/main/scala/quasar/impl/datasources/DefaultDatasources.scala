@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,11 +25,11 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.contrib.iota._
 import quasar.contrib.scalaz.MonadError_
-import quasar.impl.{CachedGetter, ResourceManager}, CachedGetter.Signal._
+import quasar.impl.{CachedGetter, ResourceManager, IndexedSemaphore}, CachedGetter.Signal._
 import quasar.impl.storage.IndexedStore
 import quasar.qscript.{construction, educatedToTotal, InterpretedRead, QScriptEducated}
 
-import cats.effect.{Sync, Resource}
+import cats.effect.{Concurrent, ContextShift, Sync, Resource}
 import cats.~>
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
@@ -41,14 +41,17 @@ import scalaz.syntax.either._
 import scalaz.syntax.equal._
 import scalaz.syntax.monad._
 import scalaz.syntax.std.boolean._
+import scalaz.syntax.std.option._
 
 import shims.{monadToScalaz, equalToCats}
+import shims.effect.scalazEitherTSync
 
 private[quasar] final class DefaultDatasources[
     T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
     F[_]: Sync: MonadError_[?[_], CreateError[C]],
     I: Equal, C: Equal, S <: SchemaConfig,
     R] private(
+    semaphore: IndexedSemaphore[F, I],
     freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     modules: DatasourceModules[T, F, Stream[F, ?], I, C, R, ResourcePathType],
@@ -85,65 +88,56 @@ private[quasar] final class DefaultDatasources[
       .map(Condition.optionIso.reverseGet(_))
       .run
 
-  def pathIsResource(i: I, path: ResourcePath): F[ExistentialError[I] \/ Boolean] = {
-    val action = for {
-      ds <- getMDS[ExistentialError[I]](i)
-      res <- EitherT.rightT(ds.pathIsResource(path))
-    } yield res
-    action.run
-  }
+  def pathIsResource(i: I, path: ResourcePath): F[ExistentialError[I] \/ Boolean] =
+    getMDS[ExistentialError[I]](i)
+      .flatMap(ds => EitherT.rightT(ds.pathIsResource(path)))
+      .run
 
-  def prefixedChildPaths(i: I, prefixPath: ResourcePath): F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] = {
-    val action = for {
-      ds <- getMDS[DiscoveryError[I]](i)
-      mbRes <- EitherT.rightT(ds.prefixedChildPaths(prefixPath))
-      res <- mbRes match {
-        case None =>
-          EitherT.pureLeft[F, DiscoveryError[I], Stream[F, (ResourceName, ResourcePathType)]](pathNotFound[DiscoveryError[I]](prefixPath))
-        case Some(str) =>
-          EitherT.pure[F, DiscoveryError[I], Stream[F, (ResourceName, ResourcePathType)]](str)
-      }
-    } yield res
-    action.run
-  }
+  def prefixedChildPaths(i: I, prefixPath: ResourcePath): F[DiscoveryError[I] \/ Stream[F, (ResourceName, ResourcePathType)]] =
+    getMDS[DiscoveryError[I]](i)
+      .flatMapF(_.prefixedChildPaths(prefixPath) map {
+        _.toRightDisjunction(pathNotFound[DiscoveryError[I]](prefixPath))
+      })
+      .run
 
   def removeDatasource(i: I): F[Condition[ExistentialError[I]]] =
     refs.delete(i).ifM(
       dispose(i).as(Condition.normal[ExistentialError[I]]()),
       Condition.abnormal(datasourceNotFound[I, ExistentialError[I]](i)).point[F])
 
-  def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] = {
-    lazy val notFound = Condition.abnormal(datasourceNotFound[I, DatasourceError[I, C]](i))
+  def replaceDatasource(i: I, ref: DatasourceRef[C]): F[Condition[DatasourceError[I, C]]] =
+    throughSemaphore[F](i, λ[F ~> F](x => x)) apply {
+      lazy val notFound = Condition.abnormal(datasourceNotFound[I, DatasourceError[I, C]](i))
 
-    getter(i) flatMap {
-      // We're replacing, emit abnormal condition if there was no ref
-      case Empty =>
-        notFound.point[F]
-      case Removed(_) =>
-        // it's removed, but resource hasn't been finalized
-        dispose(i).as(notFound)
-      case existed => for {
-        // We have a ref, start replacement
-        _ <- refs.insert(i, ref)
-        signal <- getter(i)
-        res <- signal match {
-          case Inserted(_) =>
-            addRef[DatasourceError[I, C]](i, ref)
-          case Preserved(_) =>
-            Condition.normal[DatasourceError[I, C]]().point[F]
-          case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
-            setRef(i, incoming)
-          case Updated(_, _) =>
-            dispose(i) >> addRef[DatasourceError[I, C]](i, ref)
-          // These two cases can't happen.
-          case Empty =>
-            notFound.point[F]
-          case Removed(_) =>
-            dispose(i).as(notFound)
-        }
-      } yield res
+      getter(i) flatMap {
+        // We're replacing, emit abnormal condition if there was no ref
+        case Empty =>
+          notFound.point[F]
+        case Removed(_) =>
+          // it's removed, but resource hasn't been finalized
+          dispose(i).as(notFound)
+        case existed => for {
+          // We have a ref, start replacement
+          _ <- refs.insert(i, ref)
+          signal <- getter(i)
+          res <- signal match {
+            case Inserted(_) =>
+              addRef[DatasourceError[I, C]](i, ref)
+            case Preserved(_) =>
+              Condition.normal[DatasourceError[I, C]]().point[F]
+            case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
+              setRef(i, incoming)
+            case Updated(_, _) =>
+              dispose(i) >> addRef[DatasourceError[I, C]](i, ref)
+            // These two cases can't happen.
+            case Empty =>
+              notFound.point[F]
+            case Removed(_) =>
+              dispose(i).as(notFound)
+          }
+        } yield res
+      }
     }
-  }
 
   def resourceSchema(i: I, path: ResourcePath, schemaConfig: S): F[DiscoveryError[I] \/ schemaConfig.Schema] = {
     val action = for {
@@ -157,6 +151,7 @@ private[quasar] final class DefaultDatasources[
       r <- EitherT.rightT(fr)
       res <- EitherT.rightT(schema(schemaConfig, (path, r)))
     } yield res
+
     action.run
   }
 
@@ -176,25 +171,26 @@ private[quasar] final class DefaultDatasources[
       case None => error
       case Some(a) => EitherT.pure(a)
     }
-
-    getter(i).liftM[L] flatMap {
-      case Empty =>
-        error
-      case Removed(_) =>
-        dispose(i).liftM[L] >> error
-      case Inserted(ref) => for {
-        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-        _ <- cache.manage(i, allocated).liftM[L]
-      } yield allocated._1
-      case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
-        fromCache
-      case Preserved(_) =>
-        fromCache
-      case Updated(ref, _) => for {
-        _ <- dispose(i).liftM[L]
-        allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-        _ <- cache.manage(i, allocated).liftM[L]
-      } yield allocated._1
+    throughSemaphore[Res](i, λ[F ~> Res](x => x.liftM[L])).apply {
+      getter(i).liftM[L] flatMap {
+        case Empty =>
+          error
+        case Removed(_) =>
+          dispose(i).liftM[L] >> error
+        case Inserted(ref) => for {
+          allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
+          _ <- cache.manage(i, allocated).liftM[L]
+        } yield allocated._1
+        case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
+          fromCache
+        case Preserved(_) =>
+          fromCache
+        case Updated(ref, _) => for {
+          _ <- dispose(i).liftM[L]
+          allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
+          _ <- cache.manage(i, allocated).liftM[L]
+        } yield allocated._1
+      }
     }
   }
 
@@ -206,13 +202,14 @@ private[quasar] final class DefaultDatasources[
       // Grab managed ds and if it's presented shut it down
       mbCurrent <- EitherT.rightT(cache.get(i))
       _ <- EitherT.rightT(mbCurrent.fold(().point[F])(_ => dispose(i)))
-      allocated <- EitherT(modules.create(i, ref).leftMap(x => x: E).run.allocated.map { (x: (E \/ MDS, F[Unit])) => x match {
-        case (-\/(e), _) => -\/(e)
+      allocated <- EitherT(modules.create(i, ref).run.allocated map {
+        case (-\/(e), _) => -\/(e: E)
         case (\/-(a), finalize) => \/-((a, finalize))
-      }})
+      })
       _ <- EitherT.rightT(refs.insert(i, ref))
       _ <- EitherT.rightT(cache.manage(i, allocated))
     } yield ()
+
     action.run.map(Condition.disjunctionIso.reverseGet(_))
   }
 
@@ -221,6 +218,7 @@ private[quasar] final class DefaultDatasources[
       _ <- verifyNameUnique[DatasourceError[I, C]](ref.name, i)
       _ <- EitherT.rightT(refs.insert(i, ref))
     } yield ()
+
     action.run.map(Condition.disjunctionIso.reverseGet(_))
   }
 
@@ -247,12 +245,16 @@ private[quasar] final class DefaultDatasources[
       inp.run.flatMap(_.fold(
         (x: CreateError[C]) => Resource.liftF(MonadError_[F, CreateError[C]].raiseError(x)),
         _.point[Resource[F, ?]])))
+
+  private def throughSemaphore[G[_]: Sync](i: I, fg: F ~> G): G ~> G = λ[G ~> G]{ ga =>
+    semaphore.get(i).mapK(fg).use(_ => ga)
+  }
 }
 
 object DefaultDatasources {
   def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
-      F[_]: Sync: MonadError_[?[_], CreateError[C]],
+      F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
       I: Equal, C: Equal, S <: SchemaConfig,
       R](
       freshId: F[I],
@@ -262,8 +264,8 @@ object DefaultDatasources {
       errors: DatasourceErrors[F, I],
       schema: ResourceSchema[F, S, (ResourcePath, R)],
       byteStores: ByteStores[F, I])
-      : F[DefaultDatasources[T, F, I, C, S, R]] =
-    CachedGetter(refs.lookup(_)).map { getter =>
-      new DefaultDatasources(freshId, refs, modules, getter, cache, errors, schema, byteStores)
-    }
+      : F[DefaultDatasources[T, F, I, C, S, R]] = for {
+    semaphore <- IndexedSemaphore[F, I]
+    getter <- CachedGetter(refs.lookup(_))
+  } yield new DefaultDatasources(semaphore, freshId, refs, modules, getter, cache, errors, schema, byteStores)
 }

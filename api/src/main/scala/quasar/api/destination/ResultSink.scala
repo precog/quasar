@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +16,26 @@
 
 package quasar.api.destination
 
-import slamdata.Predef.{Stream => _, _}
+import slamdata.Predef._
 
 import quasar.api.push.RenderConfig
 import quasar.api.resource.ResourcePath
-import quasar.api.table.TableColumn
+
+import cats.data.NonEmptyList
 
 import fs2.Stream
 
-sealed trait ResultSink[F[_]]
+sealed trait ResultSink[F[_], T]
 
 object ResultSink {
-  final case class Csv[F[_]](
-    config: RenderConfig.Csv,
-    run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => Stream[F, Unit])
-      extends ResultSink[F]
+  final case class Csv[F[_], T](
+      config: RenderConfig.Csv,
+      run: (ResourcePath, NonEmptyList[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
+      extends ResultSink[F, T]
 
-  def csv[F[_]](config: RenderConfig.Csv)(
-    run: (ResourcePath, List[TableColumn], Stream[F, Byte]) => Stream[F, Unit]): ResultSink[F] =
-    Csv[F](config, run)
+  def csv[F[_], T](
+      config: RenderConfig.Csv)(
+      run: (ResourcePath, NonEmptyList[DestinationColumn[T]], Stream[F, Byte]) => Stream[F, Unit])
+      : ResultSink[F, T] =
+    Csv[F, T](config, run)
 }

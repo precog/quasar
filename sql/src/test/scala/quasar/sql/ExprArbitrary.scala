@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import org.scalacheck.Shrink.shrink
 import java.time.{Duration, Instant}
 import scalaz._, Scalaz._
 import scalaz.scalacheck.ScalaCheckBinding._
+
+import scala.Stream
 
 trait ExprArbitrary {
   implicit val exprArbitrary: Arbitrary[Fix[Sql]] = Arbitrary(selectGen(4))

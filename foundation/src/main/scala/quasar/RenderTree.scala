@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@
 package quasar
 
 import slamdata.Predef._
-import quasar.RenderTree.make
-import quasar.RenderTree.ops._
 import quasar.fp._
 
 import matryoshka._
@@ -34,6 +32,8 @@ import iotaz.{CopK, TListK}
 
 @SuppressWarnings(Array("org.wartremover.warts.ImplicitConversion"))
 object RenderTree extends RenderTreeInstances {
+  import ops._
+
   def contramap[A, B: RenderTree](f: A => B): RenderTree[A] =
     new RenderTree[A] { def render(v: A) = RenderTree[B].render(f(v)) }
 
@@ -74,6 +74,9 @@ object RenderTree extends RenderTreeInstances {
 }
 
 sealed abstract class RenderTreeInstances extends RenderTreeInstances0 {
+  import RenderTree.make
+  import RenderTree.ops._
+
   implicit def const[A: RenderTree]: Delay[RenderTree, Const[A, ?]] =
     Delay.fromNT(λ[RenderTree ~> DelayedA[A]#RenderTree](_ =>
       make(_.getConst.render)))
@@ -197,6 +200,8 @@ sealed abstract class RenderTreeInstances0 extends RenderTreeInstances1 {
 }
 
 sealed abstract class RenderTreeInstances1 {
+  import RenderTree.make
+
   implicit def tuple2RenderTree[A, B](
     implicit RA: RenderTree[A], RB: RenderTree[B]
   ): RenderTree[(A, B)] =

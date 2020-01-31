@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package quasar.contrib.scalaz
 import slamdata.Predef._
 
 import scalaz._, Scalaz._
+import scala.{#::, Stream}
 
 final class ZipperOps[A] private[scalaz] (self: Zipper[A]) {
   /** Returns a `Zipper` focused on the first value for which the function was

@@ -9,7 +9,7 @@ object Versions {
   val jawnVersion         = "1.0.0"
   val jawnfs2Version      = "1.0.0-RC2"
   val matryoshkaVersion   = "0.18.3"
-  val monocleVersion      = "1.6.0"
+  val monocleVersion      = "2.0.1"
   val pathyVersion        = "0.3.0"
   val refinedVersion      = "0.9.10"
   val scodecBitsVersion   = "1.1.12"

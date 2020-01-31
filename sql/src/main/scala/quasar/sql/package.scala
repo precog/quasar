@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -263,7 +263,7 @@ package object sql {
           ((cases.map(caseSql) ++ default.map("else " + _._2).toList) :+
             "end")).mkString(" ")
       case Let(ident, bindTo, in) =>
-        ident.shows ++ " := " ++ bindTo._2 ++ "; " ++ in._2
+        ident.shows + " := " + bindTo._2 + "; " + in._2
       case IntLiteral(v) => v.toString
       case FloatLiteral(v) => v.toString
       case StringLiteral(v) => _q(v)

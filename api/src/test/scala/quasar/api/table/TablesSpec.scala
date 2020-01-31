@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,11 +24,14 @@ import cats.effect.Sync
 import org.specs2.execute.AsResult
 import org.specs2.specification.BeforeEach
 import org.specs2.specification.core.Fragment
-import scalaz.{~>, \/, \/-, -\/, Equal, Id, Monad, Show}, Id.Id
+import scalaz.{~>, \/, \/-, -\/, Equal, Id, Show}, Id.Id
 import scalaz.std.list._
 import scalaz.syntax.monad._
 
-abstract class TablesSpec[F[_]: Monad: Sync, I: Equal: Show, Q: Equal: Show]
+// NB: this one proved sufficiently annoying to make specific that I left it alone
+import shims._
+
+abstract class TablesSpec[F[_]: Sync, I: Equal: Show, Q: Equal: Show]
     extends Qspec
     with ConditionMatchers
     with BeforeEach {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.impl.push
 
 import slamdata.Predef._
 
-import cats.data.{NonEmptyMap, NonEmptySet}
+import cats.data.{Ior, NonEmptyList, NonEmptyMap, NonEmptySet}
 import cats.effect.IO
 import cats.effect.concurrent.Deferred
 import cats.implicits._
@@ -29,20 +29,23 @@ import fs2.{Stream, text}
 import fs2.concurrent.{Enqueue, Queue}
 import fs2.job.JobManager
 
+import monocle.Prism
+
+import quasar.{Condition, ConditionMatchers, EffectfulQSpec}
 import quasar.api.QueryEvaluator
-import quasar.api.destination.{Destination, DestinationType, ResultSink, ResultType}
-import quasar.api.push.{PushMeta, RenderConfig, ResultPush, ResultPushError, ResultRender, Status}
+import quasar.api.destination._
+import quasar.api.destination.param._
+import quasar.api.push._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
-import quasar.api.table.{TableColumn, TableName, TableRef}
-import quasar.{ConditionMatchers, EffectfulQSpec}
-
-import scalaz.NonEmptyList
+import quasar.api.table.{ColumnType, TableColumn, TableName, TableRef}
 
 import shims.{eqToScalaz, orderToCats, showToCats, showToScalaz}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+
+import skolems.∃
 
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   implicit val tmr = IO.timer(global)
@@ -65,12 +68,76 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val dataString = W1 + W2 + W3
 
   final class QDestination(q: Enqueue[IO, Option[Filesystem]]) extends Destination[IO] {
+    sealed trait Constructor[P] extends ConstructorLike[P] with Product with Serializable
+
+    sealed trait Type extends Product with Serializable
+
+    case object Bool extends Type
+
+    case class Varchar(length: Int) extends Type
+    case object Varchar extends Constructor[Int]
+
+    case class Num(width: Int) extends Type
+    case object Num extends Constructor[Int]
+
+    sealed trait TypeId extends Product with Serializable
+    case object BoolId extends TypeId
+    case object VarcharId extends TypeId
+    case object NumId extends TypeId
+
+    val typeIdOrdinal =
+      Prism.partial[Int, TypeId] {
+        case 0 => BoolId
+        case 1 => VarcharId
+        case 2 => NumId
+      } {
+        case BoolId => 0
+        case VarcharId => 1
+        case NumId => 2
+      }
+
+    val typeIdLabel =
+      Label label {
+        case BoolId => "BOOLEAN"
+        case VarcharId => "VARCHAR"
+        case NumId => "NUMBER"
+      }
+
+    def coerce(s: ColumnType.Scalar): TypeCoercion[TypeId] =
+      s match {
+        case ColumnType.Boolean => TypeCoercion.Satisfied(NonEmptyList.one(BoolId))
+        case ColumnType.String => TypeCoercion.Satisfied(NonEmptyList.one(VarcharId))
+        case ColumnType.Number => TypeCoercion.Satisfied(NonEmptyList.one(NumId))
+        case other => TypeCoercion.Unsatisfied(Nil, None)
+      }
+
+    def construct(id: TypeId): Either[Type, ∃[λ[α => (Constructor[α], Labeled[Formal[α]])]]] =
+      id match {
+        case BoolId =>
+          Left(Bool)
+
+        case VarcharId =>
+          Right(formalConstructor(
+            Varchar,
+            "Length",
+            Formal.integer(Some(Ior.both(1, 256)), None)))
+
+        case NumId =>
+          Right(formalConstructor(
+            Num,
+            "Width",
+            Formal.enum[Int](
+              "4-bits" -> 4,
+              "8-bits" -> 8,
+              "16-bits" -> 16)))
+      }
+
     def destinationType: DestinationType = QDestinationType
 
-    def sinks = NonEmptyList(csvSink)
+    def sinks = NonEmptyList.one(csvSink)
 
-    val csvSink: ResultSink[IO] = ResultSink.csv[IO](RenderConfig.Csv()) {
-      case (dst, columns, bytes) =>
+    val csvSink: ResultSink[IO, Type] = ResultSink.csv[IO, Type](RenderConfig.Csv()) {
+      case (dst, _, bytes) =>
         bytes.through(text.utf8Decode)
           .evalMap(s => q.enqueue1(Some(Map(dst -> s))))
           .onFinalize(q.enqueue1(None))
@@ -170,9 +237,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
   val jobManager =
     JobManager[IO, (Int, Int), Nothing]()
-      .compile
-      .resource
-      .lastOrError
 
   def awaitFs(fss: Stream[IO, Filesystem], count: Long = -1): IO[Filesystem] = {
     val (s, msg) =
@@ -209,6 +273,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       .timeoutTo(Timeout, IO.raiseError(new RuntimeException(s"Expected a matching `PushMeta` $Timeout.")))
   }
 
+  val colX = NonEmptyList.one(DestinationColumn("X", SelectedType(TypeIndex(0), None)))
+
   "start" >> {
     "asynchronously pushes a table to a destination" >>* {
       val pushPath = ResourcePath.root() / ResourceName("foo") / ResourceName("bar")
@@ -225,7 +291,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           push <- mkResultPush(Map(TableId -> testTable), Map(DestinationId -> destination), jm, evaluator)
 
-          startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
+          startRes <- push.start(TableId, colX, DestinationId, pushPath, ResultType.Csv, None)
 
           _ <- await(halted)
 
@@ -253,11 +319,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
-          secondStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+          firstStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
+          secondStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
         } yield {
           firstStartStatus must beNormal
-          secondStartStatus must beAbnormal(ResultPushError.PushAlreadyRunning(TableId, DestinationId))
+          secondStartStatus must beAbnormal(NonEmptyList.one(ResultPushError.PushAlreadyRunning(TableId, DestinationId)))
         }
       }
     }
@@ -277,8 +343,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => controlledStream.map(_._2)))
 
-          firstStartStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
-          secondStartStatus <- push.start(TableId, dest2, path, ResultType.Csv, None)
+          firstStartStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
+          secondStartStatus <- push.start(TableId, colX, dest2, path, ResultType.Csv, None)
         } yield {
           firstStartStatus must beNormal
           secondStartStatus must beNormal
@@ -297,9 +363,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             Map(),
             jm,
             mkEvaluator(_ => IO(Stream())))
-          startStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+          startStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
         } yield {
-          startStatus must beAbnormal(ResultPushError.DestinationNotFound(DestinationId))
+          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.DestinationNotFound(DestinationId)))
         }
       }
     }
@@ -316,14 +382,170 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             Map(DestinationId -> dest),
             jm,
             mkEvaluator(_ => IO(Stream())))
-          startStatus <- push.start(TableId, DestinationId, path, ResultType.Csv, None)
+          startStatus <- push.start(TableId, colX, DestinationId, path, ResultType.Csv, None)
         } yield {
-          startStatus must beAbnormal(ResultPushError.TableNotFound(TableId))
+          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TableNotFound(TableId)))
         }
       }
     }
 
     "fails when destination doesn't support requested format" >> todo
+
+    "fails when selected type isn't found" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(-1)
+          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, None)))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beAbnormal(NonEmptyList.one(ResultPushError.TypeNotFound(DestinationId, "A", idx)))
+        }
+      }
+    }
+
+    "fails when a required type argument is missing" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(1)
+          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, None)))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.ParamMissing("Length", _), Nil)), Nil)) => ok
+          }
+        }
+      }
+    }
+
+    "fails when wrong kind of type argument given" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(1)
+          cols = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.boolean(false))))))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.ParamMismatch("Length", _, _), Nil)), Nil)) => ok
+          }
+        }
+      }
+    }
+
+    "fails when integer type argument is out of bounds" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(1)
+
+          colsLow = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(0))))))
+          startLow <- push.start(TableId, colsLow, DestinationId, path, ResultType.Csv, None)
+
+          colsHigh = NonEmptyList.one(DestinationColumn("A", SelectedType(idx, Some(∃(Actual.integer(300))))))
+          startHigh <- push.start(TableId, colsHigh, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startLow must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.IntOutOfBounds("Length", 0, Ior.Both(1, 256)), Nil)), Nil)) => ok
+          }
+
+          startHigh must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "A",
+              "VARCHAR",
+              NonEmptyList(ParamError.IntOutOfBounds("Length", 300, Ior.Both(1, 256)), Nil)), Nil)) => ok
+          }
+        }
+      }
+    }
+
+    "fails when enum type argument selection is not found" >>* {
+      val path = ResourcePath.root()
+      val testTable = TableRef(TableName("baz"), "query", List())
+
+      jobManager use { jm =>
+        for {
+          (dest, _) <- QDestination()
+
+          push <- mkResultPush(
+            Map(TableId -> testTable),
+            Map(DestinationId -> dest),
+            jm,
+            mkEvaluator(_ => IO(Stream())))
+
+          idx = TypeIndex(2)
+          cols = NonEmptyList.one(DestinationColumn("B", SelectedType(idx, Some(∃(Actual.enumSelect("32-bits"))))))
+
+          startStatus <- push.start(TableId, cols, DestinationId, path, ResultType.Csv, None)
+        } yield {
+          startStatus must beLike {
+            case Condition.Abnormal(NonEmptyList(ResultPushError.TypeConstructionFailed(
+              DestinationId,
+              "B",
+              "NUMBER",
+              NonEmptyList(ParamError.ValueNotInEnum("Width", "32-bits", xs), Nil)), Nil)) =>
+                xs must_=== NonEmptySet.of("4-bits", "8-bits", "16-bits")
+          }
+        }
+      }
+    }
   }
 
   "start these" >> {
@@ -351,8 +573,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             })
 
           errors <- push.startThese(DestinationId, NonEmptyMap.of(
-            1 -> ((path1, ResultType.Csv, None)),
-            2 -> ((path2, ResultType.Csv, None))))
+            1 -> ((colX, path1, ResultType.Csv, None)),
+            2 -> ((colX, path2, ResultType.Csv, None))))
 
           _ <- await(fooHalted)
           _ <- await(barHalted)
@@ -379,12 +601,12 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             })
 
           errors <- push.startThese(DestinationId, NonEmptyMap.of(
-            1 -> ((path1, ResultType.Csv, None)),
-            2 -> ((path2, ResultType.Csv, None))))
+            1 -> ((colX, path1, ResultType.Csv, None)),
+            2 -> ((colX, path2, ResultType.Csv, None))))
 
           _ <- await(barHalted)
         } yield {
-          errors must_=== Map(1 -> ResultPushError.TableNotFound(1))
+          errors must_=== Map(1 -> NonEmptyList.one(ResultPushError.TableNotFound(1)))
         }
       }
     }
@@ -408,7 +630,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          startRes <- push.start(TableId, DestinationId, pushPath, ResultType.Csv, None)
+          startRes <- push.start(TableId, colX, DestinationId, pushPath, ResultType.Csv, None)
 
           _ <- ctl.emit(W1)
 
@@ -442,7 +664,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          startRes <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          startRes <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           _ <- awaitFs(filesystem)
           _ <- await(halted)
@@ -551,8 +773,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           startRes <- push.startThese(
             DestinationId,
             NonEmptyMap.of(
-              idA -> ((pushPathA, ResultType.Csv, None)),
-              idB -> ((pushPathB, ResultType.Csv, None))))
+              idA -> ((colX, pushPathA, ResultType.Csv, None)),
+              idB -> ((colX, pushPathB, ResultType.Csv, None))))
 
           _ <- ctlA.emit(W1)
           _ <- ctlB.emit(W2)
@@ -601,6 +823,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
           startRes <- push.start(
             idA,
+            colX,
             DestinationId,
             pushPathA,
             ResultType.Csv,
@@ -662,7 +885,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           _ <- ctl.emit(W1)
           _ <- awaitFs(filesystem, 1)
@@ -689,7 +912,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           _ <- ctl.emit(W1)
           _ <- awaitFs(filesystem, 1)
@@ -720,7 +943,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data)))
 
-          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
           _ <- await(halted)
 
           _ <- awaitStatusLike(push, TableId, DestinationId) {
@@ -743,7 +966,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO.raiseError[Stream[IO, String]](new Exception("boom"))))
 
-          pushStatus <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          pushStatus <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
 
           status <- awaitStatusLike(push, TableId, DestinationId) {
             case PushMeta(_, _, _, Status.Failed(_, _, _)) => true
@@ -773,7 +996,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             jm,
             mkEvaluator(_ => IO(data ++ Stream.raiseError[IO](ex))))
 
-          _ <- push.start(TableId, DestinationId, ResourcePath.root(), ResultType.Csv, None)
+          _ <- push.start(TableId, colX, DestinationId, ResourcePath.root(), ResultType.Csv, None)
           _ <- await(halted)
 
           status <- awaitStatusLike(push, TableId, DestinationId) {
@@ -830,8 +1053,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
               case "queryBar" => IO(dataB)
             })
 
-          _ <- push.start(1, DestinationId, path1, ResultType.Csv, None)
-          _ <- push.start(2, DestinationId, path2, ResultType.Csv, None)
+          _ <- push.start(1, colX, DestinationId, path1, ResultType.Csv, None)
+          _ <- push.start(2, colX, DestinationId, path2, ResultType.Csv, None)
 
           _ <- ctlA.emit(W1)
           _ <- ctlB.emit(W2)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,15 @@ import quasar.api.destination.DestinationError.{
   InitializationError,
   malformedConfiguration
 }
-import quasar.concurrent.BlockingContext
 import quasar.connector.{DestinationModule, MonadResourceErr}
 
 import scala.util.Either
 
 import argonaut.Json
-import cats.effect.{ContextShift, ConcurrentEffect, Resource, Timer}
+import cats.effect.{Blocker, ContextShift, ConcurrentEffect, Resource, Timer}
 
 trait LocalDestinationModule extends DestinationModule {
-  def blockingPool: BlockingContext
+  def blocker: Blocker
 
   val destinationType = LocalDestinationType
 
@@ -48,7 +47,7 @@ trait LocalDestinationModule extends DestinationModule {
       root <- validatedPath(ld.rootDir, "Invalid destination path: ") { d =>
         malformedConfiguration((destinationType, config, d))
       }
-    } yield LocalDestination[F](root, blockingPool): Destination[F]
+    } yield LocalDestination[F](root, blocker): Destination[F]
 
     Resource.liftF(dest.value)
   }

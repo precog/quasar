@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,4 +77,12 @@ object ManagedDatasource {
       ds: Datasource[F, G, T[QScriptEducated[T, ?]], R, P])
       : ManagedDatasource[T, F, G, R, P] =
     ManagedHeavyweight(ds)
+
+  def widenPathType[T[_[_]], F[_], G[_], R, PI <: ResourcePathType, P0 >: PI <: ResourcePathType](
+      mds: ManagedDatasource[T, F, G, R, PI])
+      : ManagedDatasource[T, F, G, R, P0] = mds match {
+    case ManagedLightweight(lw) => ManagedLightweight(Datasource.widenPathType(lw))
+    case ManagedHeavyweight(hw) => ManagedHeavyweight(Datasource.widenPathType(hw))
+  }
+
 }

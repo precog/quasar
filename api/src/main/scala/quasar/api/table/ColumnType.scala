@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,13 @@ package quasar.api.table
 
 import slamdata.Predef.{Int, Product, Serializable, Set}
 
-import scalaz.{Order, Show}
-import scalaz.std.anyVal._
-import scalaz.syntax.order._
+import cats.{Order, Show}
+import cats.implicits._
+
+import monocle.Prism
+
+import java.lang.{String => JString}
+import scala.Some
 
 sealed abstract class ColumnType(final val ordinal: Int) extends Product with Serializable
 
@@ -61,9 +65,45 @@ object ColumnType {
       Array,
       Object)
 
+  val stringP: Prism[JString, ColumnType] =
+    Prism((s: JString) => Some(s) collect {
+      case "null" => Null
+      case "boolean" => Boolean
+      case "localtime" => LocalTime
+      case "offsettime" => OffsetTime
+      case "localdate" => LocalDate
+      case "offsetdate" => OffsetDate
+      case "localdatetime" => LocalDateTime
+      case "offsetdatetime" => OffsetDateTime
+      case "interval" => Interval
+      case "number" => Number
+      case "string" => String
+      case "array" => Array
+      case "object" => Object
+    }) {
+      case Null => "null"
+      case Boolean => "boolean"
+      case LocalTime => "localtime"
+      case OffsetTime => "offsettime"
+      case LocalDate => "localdate"
+      case OffsetDate => "offsetdate"
+      case LocalDateTime => "localdatetime"
+      case OffsetDateTime => "offsetdatetime"
+      case Interval => "interval"
+      case Number => "number"
+      case String => "string"
+      case Array => "array"
+      case Object => "object"
+    }
+
+  val scalarP: Prism[JString, ColumnType.Scalar] =
+    Prism((s: JString) => stringP.getOption(s) collect {
+      case s: ColumnType.Scalar => s
+    })(stringP(_))
+
   implicit def columnTypeOrder[T <: ColumnType]: Order[T] =
-    Order.order((x, y) => x.ordinal ?|? y.ordinal)
+    Order.by(_.ordinal)
 
   implicit def columnTypeShow[T <: ColumnType]: Show[T] =
-    Show.showFromToString
+    Show.fromToString
 }

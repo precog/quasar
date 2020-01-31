@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,14 @@
 
 package quasar
 
+import scala.{Array, Byte}
+
 import quasar.contrib.scalaz.MonadError_
 
+import java.lang.String
+
 package object connector {
+  type ByteStore[F[_]] = Store[F, String, Array[Byte]]
 
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]
 

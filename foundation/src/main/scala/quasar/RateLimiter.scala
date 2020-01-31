@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,62 +25,124 @@ import java.util.concurrent.TimeUnit
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.reflect.{ClassTag, classTag}
 
 import cats.effect.{Sync, Timer}
 import cats.effect.concurrent.Ref
 import cats.kernel.Hash
 import cats.implicits._
 
-import skolems._
+final class RateLimiter[F[_]: Sync: Timer, A: Hash] private (
+    caution: Double,
+    updater: RateLimitUpdater[F, A]) {
 
-final class RateLimiter[F[_]: Sync: Timer] private (caution: Double) {
-  // TODO make these things clustering-aware
-  private val configs: TrieMap[Exists[Key], Config] =
-    new TrieMap[Exists[Key], Config](
-      toHashing[Exists[Key]],
-      toEquiv[Exists[Key]])
+  // TODO make this clustering-aware
+  private val configs: TrieMap[A, RateLimiterConfig] =
+    new TrieMap[A, RateLimiterConfig](toHashing[A], toEquiv[A])
 
-  private val states: TrieMap[Exists[Key], Ref[F, State]] =
-    new TrieMap[Exists[Key], Ref[F, State]](
-      toHashing[Exists[Key]],
-      toEquiv[Exists[Key]])
+  // TODO make this clustering-aware
+  private val states: TrieMap[A, Ref[F, State]] =
+    new TrieMap[A, Ref[F, State]](toHashing[A], toEquiv[A])
 
-  def apply[A: Hash: ClassTag](key: A, max: Int, window: FiniteDuration)
-      : F[F[Unit]] =
+  def configure(key: A, config: RateLimiterConfig)
+      : F[Option[RateLimiterConfig]] =
+    Sync[F].delay(configs.putIfAbsent(key, config))
+
+  // TODO implement with TrieMap#updateWith when we're on Scala 2.13
+  def plusOne(key: A): F[Unit] =
+    for {
+      ref <- Sync[F].delay(states.get(key))
+      now <- nowF
+      _ <- ref match {
+        case Some(r) =>
+          r.modify(s => (s.copy(count = s.count + 1), ()))
+        case None =>
+          for {
+            now <- nowF
+            ref <- Ref.of[F, State](State(1, now))
+            put <- Sync[F].delay(states.putIfAbsent(key, ref))
+            _ <- put match {
+              case Some(_) => plusOne(key) // retry
+              case None => ().pure[F]
+            }
+          } yield ()
+      }
+    } yield ()
+
+  // TODO implement with TrieMap#updateWith when we're on Scala 2.13
+  def wait(key: A, duration: FiniteDuration): F[Unit] =
+    for {
+      ref <- Sync[F].delay(states.get(key))
+      now <- nowF
+      _ <- ref match {
+        case Some(r) =>
+          r.update(_ => State(0, now + duration))
+        case None =>
+          for {
+            ref <- Ref.of[F, State](State(0, now + duration))
+            put <- Sync[F].delay(states.putIfAbsent(key, ref))
+              _ <- put match {
+                case Some(_) => wait(key, duration) // retry
+                case None => ().pure[F]
+              }
+          } yield ()
+      }
+    } yield ()
+
+  def apply(key: A, max: Int, window: FiniteDuration)
+      : F[RateLimiterEffects[F]] =
     for {
       config <- Sync[F] delay {
-        val c = Config(max, window)
-        configs.putIfAbsent(Key(key, Hash[A], classTag[A]), c).getOrElse(c)
+        val c = RateLimiterConfig(max, window)
+        configs.putIfAbsent(key, c).getOrElse(c)
       }
+
+      _ <- updater.config(key, config)
 
       now <- nowF
       maybeR <- Ref.of[F, State](State(0, now))
       stateRef <- Sync[F] delay {
-        states.putIfAbsent(Key(key, Hash[A], classTag[A]), maybeR).getOrElse(maybeR)
+        states.putIfAbsent(key, maybeR).getOrElse(maybeR)
       }
-    } yield limit(config, stateRef)
+    } yield {
+      RateLimiterEffects[F](
+        limit(key, config, stateRef),
+        backoff(key, config, stateRef))
+    }
 
-  private def limit(config: Config, stateRef: Ref[F, State]): F[Unit] = {
+  // TODO wait smarter (i.e. not for an entire window)
+  // the server's window falls in our previous window between
+  // max and max+1 requests prior to the server-throttled request
+  private def backoff(key: A, config: RateLimiterConfig, stateRef: Ref[F, State])
+      : F[Unit] =
+    nowF.flatMap(now =>
+      stateRef.update(_ => State(0, now + config.window)) >>
+        updater.wait(key, config.window))
+
+  private def limit(key: A, config: RateLimiterConfig, stateRef: Ref[F, State])
+      : F[Unit] = {
     import config._
-
-    val emptyStateF: F[Boolean] =
-      nowF.flatMap(now => stateRef.tryUpdate(_ => State(0, now)))
 
     for {
       now <- nowF
       state <- stateRef.get
       back <-
-        if (state.start + window < now) {
-          emptyStateF >> limit(config, stateRef)
-        } else {
+        if (state.start > now) { // waiting
+          Timer[F].sleep(state.start - now) >>
+            limit(key, config, stateRef)
+        } else if (state.start + window < now) { // in the next window
+          stateRef.update(_ => State(0, state.start + window)) >>
+            limit(key, config, stateRef)
+        } else { // in the current window
           stateRef.modify(s => (s.copy(count = s.count + 1), s.count)) flatMap { count =>
-            if (count >= max * caution) {
-              Timer[F].sleep((state.start + window) - now) >>
-                emptyStateF >>
-                limit(config, stateRef)
-            } else
-              ().pure[F]
+            if (count >= max * caution) { // max exceeded
+              val duration = (state.start + window) - now
+              updater.wait(key, duration) >>
+                Timer[F].sleep(duration) >>
+                stateRef.update(_ => State(0, state.start + window)) >>
+                limit(key, config, stateRef)
+            } else { // continue
+              updater.plusOne(key)
+            }
           }
         }
     } yield back
@@ -89,29 +151,16 @@ final class RateLimiter[F[_]: Sync: Timer] private (caution: Double) {
   private val nowF: F[FiniteDuration] =
     Timer[F].clock.realTime(TimeUnit.MILLISECONDS).map(_.millis)
 
-  private case class Config(max: Int, window: FiniteDuration)
   private case class State(count: Int, start: FiniteDuration)
-
-  private case class Key[A](value: A, hash: Hash[A], tag: ClassTag[A])
-
-  private object Key {
-    implicit def hash: Hash[Exists[Key]] =
-      new Hash[Exists[Key]] {
-
-        def hash(k: Exists[Key]) =
-          k().hash.hash(k().value)
-
-        def eqv(left: Exists[Key], right: Exists[Key]) = {
-          (left().tag == right().tag) &&
-            left().hash.eqv(
-              left().value,
-              right().value.asInstanceOf[left.A])
-        }
-      }
-  }
 }
 
 object RateLimiter {
-  def apply[F[_]: Sync: Timer](caution: Double): F[RateLimiter[F]] =
-    Sync[F].delay(new RateLimiter[F](caution))
+  def apply[F[_]: Sync: Timer, A: Hash](
+      caution: Double,
+      freshKey: F[A],
+      updater: RateLimitUpdater[F, A])
+      : F[RateLimiting[F, A]] =
+    Sync[F].delay(RateLimiting[F, A](
+      new RateLimiter[F, A](caution, updater),
+      freshKey))
 }

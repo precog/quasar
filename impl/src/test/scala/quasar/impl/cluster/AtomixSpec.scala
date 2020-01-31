@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package quasar.impl.cluster
 
 import slamdata.Predef._
 
-import quasar.concurrent.BlockingContext
+import quasar.{concurrent => qc}
 import quasar.EffectfulQSpec
 
 import cats.effect.{IO, Resource, Timer, Concurrent}
@@ -83,9 +83,9 @@ class AtomixSpec (implicit ec: ExecutionContext) extends EffectfulQSpec[IO]{
     }
   }
   "atomix cluster" >> {
-    val pool = BlockingContext.cached("atomix-spec-pool")
+    val blocker = qc.Blocker.cached("atomix-spec-pool")
     def resource(me: NodeInfo, seeds: List[NodeAddress]): Resource[IO, Cluster[IO, String]] =
-      Atomix.resource[IO](me, seeds).map(Atomix.cluster(_, pool))
+      Atomix.resource[IO](me, seeds).map(Atomix.cluster(_, blocker))
     def threeNodeCluster: Resource[IO, List[Cluster[IO, String]]] = {
       val ioRes: IO[Resource[IO, List[Cluster[IO, String]]]] = for {
         node0 <- mkNode("0")

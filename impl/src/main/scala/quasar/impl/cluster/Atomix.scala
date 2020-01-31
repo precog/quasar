@@ -1,5 +1,5 @@
 /*
- * Copyright 2014–2019 SlamData Inc.
+ * Copyright 2014–2020 SlamData Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,7 @@ package quasar.impl.cluster
 
 import slamdata.Predef._
 
-import quasar.concurrent.BlockingContext
-
-import cats.effect.{Sync, Async, ConcurrentEffect, ContextShift, IO, Resource}
+import cats.effect.{Async, Blocker, ConcurrentEffect, ContextShift, IO, Resource, Sync}
 import cats.syntax.applicative._
 import cats.syntax.apply._
 import cats.syntax.eq._
@@ -34,8 +32,6 @@ import cats.instances.option._
 
 import fs2.Stream
 import fs2.concurrent.InspectableQueue
-
-import scalaz.syntax.tag._
 
 import io.atomix.cluster.{AtomixCluster, MemberId, Member, ClusterMembershipService, Node, ClusterConfig}
 import io.atomix.cluster.discovery.BootstrapDiscoveryProvider
@@ -132,7 +128,7 @@ object Atomix extends Logging {
   private def communication[F[_]: ConcurrentEffect: ContextShift](
       service: ClusterCommunicationService,
       membership: Membership[F, MemberId],
-      pool: BlockingContext)
+      blocker: Blocker)
       : Communication[F, MemberId, String] = new Communication[F, MemberId, String] {
     val F = ConcurrentEffect[F]
 
@@ -206,7 +202,7 @@ object Atomix extends Logging {
       cfToAsync(service.subscribe[Array[Byte]](
         eventName,
         biconsumer,
-        blockingContextExecutor(pool))).void
+        blockingContextExecutor(blocker))).void
     }
 
     private def run(action: F[Unit]) =
@@ -215,13 +211,13 @@ object Atomix extends Logging {
 
   def cluster[F[_]: ConcurrentEffect: ContextShift](
       atomix: AtomixCluster,
-      pool: BlockingContext)
+      blocker: Blocker)
       : Cluster[F, String] = new Cluster[F, String] {
 
     type Id = MemberId
 
     val membership: Membership[F, Id] = Atomix.membership[F](atomix.getMembershipService())
-    val communication: Communication[F, Id, String] = Atomix.communication[F](atomix.getCommunicationService(), membership, pool)
+    val communication: Communication[F, Id, String] = Atomix.communication[F](atomix.getCommunicationService(), membership, blocker)
 
     def gossip[P: Codec](msg: String, p: P): F[Unit] = for {
       targets <- membership.sample
@@ -251,7 +247,7 @@ object Atomix extends Logging {
       communication.subscribe(msg, limit)
   }
 
-  private def blockingContextExecutor(pool: BlockingContext): Executor = new Executor {
-    def execute(r: java.lang.Runnable) = pool.unwrap.execute(r)
+  private def blockingContextExecutor(blocker: Blocker): Executor = new Executor {
+    def execute(r: java.lang.Runnable) = blocker.blockingContext.execute(r)
   }
 }

@@ -29,11 +29,6 @@ jobs:
         with:
           name: target
           path: target
-      - name: Upload coursier
-        uses: actions/upload-artifact@v1
-        with:
-          name: coursier
-          path: .coursier
       - name: Upload ivy2
         uses: actions/upload-artifact@v1
         with:
@@ -56,10 +51,6 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: target
-      - name: Download coursier artifacts
-        uses: actions/download-artifact@v1
-        with:
-          name: coursier
       - name: Download ivy2 artifacts
         uses: actions/download-artifact@v1
         with:

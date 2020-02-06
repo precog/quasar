@@ -21,6 +21,10 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
+      - name: Setup Git Actor
+        run: |
+          if ! git config github.actor; then git config --global github.actor slamdata-bot; fi
+          git config --global github.token $GITHUB_TOKEN
       - name: Compile and test
         run: |
           ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++${{ matrix.scala }} checkHeaders test:compile "testOnly -- failtrace"

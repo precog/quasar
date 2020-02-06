@@ -1,4 +1,4 @@
-name: build
+name: quasarbuild
 
 on:
   pull_request:
@@ -45,6 +45,8 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: target
+      - name: Setup Git Actor
+        run: git config github.actor slamdata-bot
       - name: Install common resources
         run: ./sbt transferCommonResources
       - name: Install ruby

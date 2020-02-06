@@ -29,3 +29,55 @@ jobs:
         with:
           name: target
           path: target
+      - name: Upload coursier
+        uses: actions/upload-artifact@v1
+        with:
+          name: coursier
+          path: .coursier
+      - name: Upload ivy2
+        uses: actions/upload-artifact@v1
+        with:
+          name: ivy2
+          path: .ivy2
+      - name: Upload sbt
+        uses: actions/upload-artifact@v1
+        with:
+          name: sbt
+          path: .sbt
+
+  commonResources:
+    name: Run common scripts
+    needs: [build]
+    runs-on: [ubuntu-latest]
+      - name: Checkout branch
+        uses: actions/checkout@v2
+      - name: Download target artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: target
+      - name: Download coursier artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: coursier
+      - name: Download ivy2 artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: ivy2
+      - name: Download sbt artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: sbt
+      - name: Install common resources
+        run: ./sbt transferCommonResources
+      - name: Install ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: '2.6' 
+      - name: Common setup
+        run: ./scripts/commonSetup
+      #- name: Publish and Tag
+      #  run: ./scripts/quasarPublishAndTag
+      #- name: Check auto merge
+      #  run: ./scripts/checkAndAutoMerge
+      #- name: Discord Post 
+      #  run: ./scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS

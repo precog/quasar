@@ -29,11 +29,6 @@ jobs:
         with:
           name: target
           path: target
-      - name: Upload ivy2
-        uses: actions/upload-artifact@v1
-        with:
-          name: ivy2
-          path: .ivy2
       - name: Upload sbt
         uses: actions/upload-artifact@v1
         with:
@@ -51,10 +46,6 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: target
-      - name: Download ivy2 artifacts
-        uses: actions/download-artifact@v1
-        with:
-          name: ivy2
       - name: Download sbt artifacts
         uses: actions/download-artifact@v1
         with:

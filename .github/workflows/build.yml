@@ -11,8 +11,8 @@ jobs:
     name: Build
     strategy:
       matrix:
-        os: ubuntu-latest
-        scala: 2.12.10
+        os: [ubuntu-latest]
+        scala: [2.12.10]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout branch

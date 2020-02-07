@@ -51,7 +51,7 @@ jobs:
       - name: Run tectonicPublishAndTag
         run: ./scripts/tectonicPublishAndTag
 
-   commonResources:
+  commonResources:
     name: Auto Merge
     if: github.event_name == 'pull_request' && contains(github.head_ref, 'version-bump')
     needs: [build]

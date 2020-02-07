@@ -65,7 +65,7 @@ jobs:
         run: echo "run checkAndAutoMerge here"
         #run: ./scripts/checkAndAutoMerge
 
-   publishandtag:
+  publishandtag:
     name: Publish and Tag
     needs: [quasarbuild]
     if: github.event_name == 'pull_request'  #&& (contains(github.head_ref, 'backport/v.*') || contains(github.head_ref, 'master'))

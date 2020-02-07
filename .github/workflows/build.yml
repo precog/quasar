@@ -31,12 +31,11 @@ jobs:
         with:
           name: target
           path: target
-      - name: Echo GitHub Worlflow
-        run: echo $GITHUB_WORKFLOW
 
   commonResources:
-    name: Run common scripts
-    needs: [build]
+    name: Auto Merge
+    if: github.event_name == 'pull_request' #&& contains(github.head_ref, 'version-bump')
+    needs: [quasarbuild]
     runs-on: [ubuntu-latest]
     steps:
       - name: Checkout branch
@@ -55,16 +54,33 @@ jobs:
           ruby-version: '2.6' 
       - name: Common setup
         run: ./scripts/commonSetup
-      - name: Publish and Tag
-        run: ./scripts/quasarPublishAndTag
       - name: Check auto merge
+        if: 
         env:
           VERSIONS: $(git diff HEAD^ | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)
           CLONE_DIR: $(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
           IS_REVISION_LABEL: contains( github.event.pull_request.labels.*.name, 'revision')
           REPO_SLUG: ${{ github.repository }}
           PR_NUMBER: $(echo "$GITHUB_REF" | cut -d'/' -f3)
-        run: ./scripts/checkAndAutoMerge
+        run: echo "run checkAndAutoMerge here"
+        #run: ./scripts/checkAndAutoMerge
 
-      #- name: Discord Post 
-      #  run: ./scripts/discordTravisPost success https://discordapp.com/api/webhooks/$DISCORD_WEBHOOK_TOKENS
+   publishandtag:
+    name: Publish and Tag
+    needs: [quasarbuild]
+    if: github.event_name == 'pull_request'  #&& (contains(github.head_ref, 'backport/v.*') || contains(github.head_ref, 'master'))
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v2
+      - name: Download target artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: target
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+      - name: Run tectonicPublishAndTag
+        run: echo "run tectonicPublishAndTag here"
+        #run: ./scripts/tectonicPublishAndTag

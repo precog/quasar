@@ -32,46 +32,6 @@ jobs:
           name: target
           path: target
 
-  commonResources:
-    name: Auto Merge
-    if: github.event_name == 'pull_request' #&& contains(github.head_ref, 'version-bump')
-    needs: [build]
-    runs-on: [ubuntu-latest]
-    steps:
-      - name: Checkout branch
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 2
-      - name: Download target artifacts
-        uses: actions/download-artifact@v1
-        with:
-          name: target
-      - name: Setup Git Actor
-        run: git config github.actor slamdata-bot
-      - name: Install common resources
-        run: ./sbt transferCommonResources
-      - name: Install ruby
-        uses: actions/setup-ruby@v1
-        with:
-          ruby-version: '2.6' 
-      - name: Common setup
-        run: ./scripts/core/commonSetup
-      - name: Set env vars
-        run: |
-          echo ::set-env name=VERSIONS::$(git diff HEAD^1 | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)
-          echo ::set-env name=CLONE_DIR::$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
-          echo ::set-env name=IS_REVISION_LABEL::${{ contains(github.event.pull_request.labels.*.name, 'revision') }}
-          echo ::set-env name=REPO_SLUG::${{ github.repository }}
-          echo ::set-env name=PR_NUMBER::$(echo "$GITHUB_REF" | cut -d'/' -f3)
-      - name: Check auto merge
-        run: |
-          echo "versions: $VERSIONS"
-          echo "clone dir: $CLONE_DIR"
-          echo "is revision label: $IS_REVISION_LABEL"
-          echo "repo slug: $REPO_SLUG"
-          echo "pr number: $PR_NUMBER"
-        #run: ./scripts/core/checkAndAutoMerge
-
   publishandtag:
     name: Publish and Tag
     needs: [build]
@@ -90,3 +50,37 @@ jobs:
           java-version: 1.8
       - name: Run tectonicPublishAndTag
         run: ./scripts/tectonicPublishAndTag
+
+   commonResources:
+    name: Auto Merge
+    if: github.event_name == 'pull_request' && contains(github.head_ref, 'version-bump')
+    needs: [build]
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - name: Download target artifacts
+        uses: actions/download-artifact@v1
+        with:
+          name: target
+      - name: Setup Git Actor
+        run: git config github.actor slamdata-bot
+      - name: Install common resources
+        run: ./sbt transferCommonResources
+      - name: Install ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: '2.6'
+      - name: Common setup
+        run: ./scripts/core/commonSetup
+      - name: Set env vars
+        run: |
+          echo ::set-env name=VERSIONS::$(git diff HEAD^1 | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)
+          echo ::set-env name=CLONE_DIR::$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
+          echo ::set-env name=IS_REVISION_LABEL::${{ contains(github.event.pull_request.labels.*.name, 'revision') }}
+          echo ::set-env name=REPO_SLUG::${{ github.repository }}
+          echo ::set-env name=PR_NUMBER::$(echo "$GITHUB_REF" | cut -d'/' -f3)
+      - name: Check auto merge
+        run: ./scripts/core/checkAndAutoMerge

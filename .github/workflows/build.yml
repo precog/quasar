@@ -35,7 +35,7 @@ jobs:
   commonResources:
     name: Auto Merge
     if: github.event_name == 'pull_request' #&& contains(github.head_ref, 'version-bump')
-    needs: [quasarbuild]
+    needs: [build]
     runs-on: [ubuntu-latest]
     steps:
       - name: Checkout branch
@@ -67,7 +67,7 @@ jobs:
 
   publishandtag:
     name: Publish and Tag
-    needs: [quasarbuild]
+    needs: [build]
     if: github.event_name == 'pull_request'  #&& (contains(github.head_ref, 'backport/v.*') || contains(github.head_ref, 'master'))
     runs-on: [ubuntu-latest]
     steps:

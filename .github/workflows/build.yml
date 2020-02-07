@@ -54,14 +54,15 @@ jobs:
           ruby-version: '2.6' 
       - name: Common setup
         run: ./scripts/core/commonSetup
+      - name: Set env vars
+        run: |
+          echo ::set-env name=GITHUB_SHA_SHORT::$(echo $GITHUB_SHA | cut -c 1-6)
+          echo ::set-env name=VERSIONS::$(git diff HEAD^ | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)
+          echo ::set-env name=CLONE_DIR::$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
+          echo ::set-env name=IS_REVISION_LABEL::contains( github.event.pull_request.labels.*.name, 'revision')
+          echo ::set-env name=REPO_SLUG::${{ github.repository }}
+          echo ::set-env name=PR_NUMBER::$(echo "$GITHUB_REF" | cut -d'/' -f3)
       - name: Check auto merge
-        if: 
-        env:
-          VERSIONS: $(git diff HEAD^ | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)
-          CLONE_DIR: $(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
-          IS_REVISION_LABEL: contains( github.event.pull_request.labels.*.name, 'revision')
-          REPO_SLUG: ${{ github.repository }}
-          PR_NUMBER: $(echo "$GITHUB_REF" | cut -d'/' -f3)
         run: |
           echo "versions: $VERSIONS"
           echo "clone dir: $CLONE_DIR"

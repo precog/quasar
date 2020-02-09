@@ -2,7 +2,7 @@ package quasar.project
 
 object Versions {
   val algebraVersion      = "2.0.0"
-  val argonautVersion     = "6.2.3"
+  val argonautVersion     = "6.2.4"
   val catsVersion         = "2.1.0"
   val catsEffectVersion   = "2.0.0"
   val disciplineVersion   = "0.11.1"

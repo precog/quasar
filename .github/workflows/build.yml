@@ -20,14 +20,14 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
-      - name: Set up JDK ${ JDK }
+      - name: Set up JDK ${JDK}
         uses: actions/setup-java@v1
         with:
           java-version: $JDK
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
       - name: Run tests
-        run: ${ SBT } ++${{ matrix.scala }} ci
+        run: ${SBT} ++${{ matrix.scala }} ci
       - name: Upload target
         uses: actions/upload-artifact@v1
         with:

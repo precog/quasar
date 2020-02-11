@@ -28,9 +28,10 @@ jobs:
           java-version: ${{ env.JDK }}
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
-      - name: Test
+      - name: echo repo slug
+        run: echo "REPO_SLUG: $REPO_SLUG"
+      - name: Run Tests
         run: |
-          echo "REPO_SLUG: $REPO_SLUG"
           $SBT ++${{ matrix.scala }} ci
       - name: Upload target
         uses: actions/upload-artifact@v1

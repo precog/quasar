@@ -20,21 +20,21 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
-      - name: Set up JDK $JDK
+      - name: Set up JDK ${ JDK }
         uses: actions/setup-java@v1
         with:
           java-version: $JDK
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
       - name: Run tests
-        run: $SBT ++${{ matrix.scala }} ci
+        run: ${ SBT } ++${{ matrix.scala }} ci
       - name: Upload target
         uses: actions/upload-artifact@v1
         with:
           name: target
           path: target
 
-  publishandtag:
+  publish-and-tag:
     name: Publish and Tag
     needs: [build]
     if: github.event_name != 'pull_request' && (contains(github.head_ref, 'backport/v.*') || contains(github.head_ref, 'master'))
@@ -53,7 +53,7 @@ jobs:
       - name: Run tectonicPublishAndTag
         run: ./scripts/tectonicPublishAndTag
 
-  commonResources:
+  common-resources:
     name: Auto Merge
     if: github.event_name == 'pull_request' && contains(github.head_ref, 'version-bump')
     needs: [build]
@@ -72,11 +72,11 @@ jobs:
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
       - name: Install common resources
-        run: $SBT transferCommonResources
+        run: ${ SBT } transferCommonResources
       - name: Install ruby
         uses: actions/setup-ruby@v1
         with:
-          ruby-version: $RUBYVER
+          ruby-version: ${ RUBYVER }
       - name: Common setup
         run: ./scripts/core/commonSetup
       - name: Set env vars

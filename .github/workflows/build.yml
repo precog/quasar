@@ -29,7 +29,7 @@ jobs:
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
       - name: echo repo slug
-        run: echo "REPO_SLUG: $REPO_SLUG"
+        run: echo $REPO_SLUG
       - name: Run Tests
         run: |
           $SBT ++${{ matrix.scala }} ci

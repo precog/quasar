@@ -9,6 +9,7 @@ on:
 env:
   SBT: ./sbt
   JDK: 1.8
+  REPO_SLUG: ${{ github.repository }}
 
 jobs:
   build:
@@ -27,8 +28,10 @@ jobs:
           java-version: ${{ env.JDK }}
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
-      - name: Run tests
-        run: $SBT ++${{ matrix.scala }} ci
+      - name: Test
+        run: |
+          echo "REPO_SLUG: $REPO_SLUG"
+          $SBT ++${{ matrix.scala }} ci
       - name: Upload target
         uses: actions/upload-artifact@v1
         with:
@@ -83,7 +86,6 @@ jobs:
           echo ::set-env name=VERSIONS::$(git diff HEAD^1 | grep -e '^[-+][0-9]' | sed 's/^[+\-]//' | sed 's/\.[0-9]*$//' | uniq | wc -l)
           echo ::set-env name=CLONE_DIR::$(mktemp -d "/tmp/slamdata-bump.XXXXXXXX")
           echo ::set-env name=IS_REVISION_LABEL::${{ contains(github.event.pull_request.labels.*.name, 'revision') }}
-          echo ::set-env name=REPO_SLUG::${{ github.repository }}
           echo ::set-env name=PR_NUMBER::$(echo "$GITHUB_REF" | cut -d'/' -f3)
       - name: Check auto merge
         run: ./scripts/core/checkAndAutoMerge

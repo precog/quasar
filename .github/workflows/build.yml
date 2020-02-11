@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     name: Build
+    env:
+      SBT: ./sbt
+      JDK: 1.8
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -17,15 +20,14 @@ jobs:
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
-      - name: Set up JDK 1.8
+      - name: Set up JDK $JDK
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: $JDK
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
-      - name: Compile and test
-        run: |
-          ./sbt -DisIsolatedEnv=${ISOLATED_ENV:=false} ++${{ matrix.scala }} checkHeaders test:compile "testOnly -- failtrace"
+      - name: Run tests
+        run: $SBT ++${{ matrix.scala }} ci
       - name: Upload target
         uses: actions/upload-artifact@v1
         with:
@@ -44,10 +46,10 @@ jobs:
         uses: actions/download-artifact@v1
         with:
           name: target
-      - name: Set up JDK 1.8
+      - name: Set up JDK $JDK
         uses: actions/setup-java@v1
         with:
-          java-version: 1.8
+          java-version: $JDK
       - name: Run tectonicPublishAndTag
         run: ./scripts/tectonicPublishAndTag
 
@@ -56,6 +58,8 @@ jobs:
     if: github.event_name == 'pull_request' && contains(github.head_ref, 'version-bump')
     needs: [build]
     runs-on: [ubuntu-latest]
+    env:
+      RUBYVER: 2.6
     steps:
       - name: Checkout branch
         uses: actions/checkout@v2
@@ -68,11 +72,11 @@ jobs:
       - name: Setup Git Actor
         run: git config github.actor slamdata-bot
       - name: Install common resources
-        run: ./sbt transferCommonResources
+        run: $SBT transferCommonResources
       - name: Install ruby
         uses: actions/setup-ruby@v1
         with:
-          ruby-version: '2.6'
+          ruby-version: $RUBYVER
       - name: Common setup
         run: ./scripts/core/commonSetup
       - name: Set env vars

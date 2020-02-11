@@ -9,6 +9,8 @@ import scala.collection.Seq
 
 import Versions._
 
+ThisBuild / scalaVersion := "2.12.10"
+
 def readVersion(path: File): String =
   IO.read(path).trim
 

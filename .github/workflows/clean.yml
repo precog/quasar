@@ -1,0 +1,17 @@
+name: clean
+
+on: create
+
+jobs:
+  delete-artifacts:
+    name: Delete Artifacts
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Clone devtools
+        uses: actions/checkout@v2
+        with:
+          repository: slamdata/devtools
+      - name: Delete artifacts
+        run: bin/delete-gh-artifacts ${{ github.repository }}

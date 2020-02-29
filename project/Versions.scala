@@ -17,7 +17,7 @@ object Versions {
   val scalazVersion       = "7.2.30"
   val scoptVersion        = "3.7.1"
   val shapelessVersion    = "2.3.3"
-  val specsVersion        = "4.8.3"
+  val specsVersion        = "4.9.1"
   val spireVersion        = "0.16.2"
   val akkaVersion         = "2.5.1"
   val fs2Version          = "2.2.2"

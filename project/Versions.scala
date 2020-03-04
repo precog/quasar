@@ -11,7 +11,7 @@ object Versions {
   val matryoshkaVersion   = "0.18.5"
   val monocleVersion      = "1.6.0"
   val pathyVersion        = "0.3.1"
-  val refinedVersion      = "0.9.10"
+  val refinedVersion      = "0.9.13"
   val scodecBitsVersion   = "1.1.12"
   val scalacheckVersion   = "1.14.3"
   val scalazVersion       = "7.2.30"

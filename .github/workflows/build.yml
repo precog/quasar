@@ -68,8 +68,8 @@ jobs:
         run: $SBT exportSecretsForActions
       - name: Common setup
         run: ./scripts/commonSetup
-      - name: Run quasarPublishAndTag
-        run: ./scripts/quasarPublishAndTag
+      - name: Run publish and tag
+        run: ./scripts/publishAndTag 'slamdata/quasar'
 
   auto-merge:
     name: Auto Merge

@@ -60,12 +60,6 @@ concurrentRestrictions in Global := {
 lazy val publishSettings = Seq(
   performMavenCentralSync := false,   // publishes quasar to bintray only, skipping sonatype and maven central
   homepage := Some(url("https://github.com/slamdata/quasar")),
-  scmInfo := Some(
-    ScmInfo(
-      url("https://github.com/slamdata/quasar"),
-      "scm:git@github.com:slamdata/quasar.git"
-    )
-  ),
   publishArtifact in (Compile, packageDoc) := false,
   publishArtifact in (Test, packageBin) := true
 )

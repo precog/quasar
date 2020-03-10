@@ -11,6 +11,10 @@ import Versions._
 
 ThisBuild / scalaVersion := "2.12.10"
 
+ThisBuild / scmInfo in ThisBuild := Some(ScmInfo(
+  url("https://github.com/slamdata/quasar"),
+  "scm:git@github.com:slamdata/quasar.git"))
+
 def readVersion(path: File): String =
   IO.read(path).trim
 

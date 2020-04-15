@@ -47,6 +47,9 @@ package object connector {
     def long(k: Long): ActualKey[Long] =
       Key.LongKey[Id](k)
 
+    def bigDecimal[T](t: T): TypedKey[T, BigDecimal] =
+      Key.BigDecimalKey(Const(t))
+
     def string(k: String): ActualKey[String] =
       Key.StringKey[Id](k)
 
@@ -62,6 +65,9 @@ package object connector {
 
     def long[T](t: T): TypedKey[T, Long] =
       Key.LongKey(Const(t))
+
+    def bigDecimal[T](t: T): TypedKey[T, BigDecimal] =
+      Key.BigDecimalKey(Const(t))
 
     def string[T](t: T): TypedKey[T, String] =
       Key.StringKey(Const(t))

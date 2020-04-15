@@ -39,6 +39,11 @@ object Key {
     val reify = Is.refl
   }
 
+  final case class BigDecimalKey[F[_]](value: F[BigDecimal]) extends Key[F, BigDecimal] {
+    type Repr = BigDecimal
+    val reify = Is.refl
+  }
+
   final case class StringKey[F[_]](value: F[String]) extends Key[F, String] {
     type Repr = String
     val reify = Is.refl

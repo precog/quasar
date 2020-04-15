@@ -18,10 +18,6 @@ package quasar.connector
 
 import slamdata.Predef.{Eq => _, _}
 
-import quasar.contrib.std.errorImpossible
-
-import java.util.Arrays
-
 import cats._
 import cats.implicits._
 
@@ -35,27 +31,33 @@ object IdBatch {
   final case class Doubles(values: Array[Double], size: Int) extends IdBatch[Double]
   final case class BigDecimals(values: Array[BigDecimal], size: Int) extends IdBatch[BigDecimal]
 
+  private def arrayequals[A: Eq](xs: Array[A], ys: Array[A], size: Int): Boolean = {
+    var i = 0
+    var back = true
+    while (i < size && back) {
+      if (xs(i) === ys(i)) i += 1
+      else back = false
+    }
+    back
+  }
+
   implicit def idBatchEq[I]: Eq[IdBatch[I]] =
     new Eq[IdBatch[I]] {
       def eqv(x: IdBatch[I], y: IdBatch[I]) =
         (x, y) match {
-          case (Strings(xs, sizex), Strings(ys, sizey)) =>
-            sizex === sizey &&
-              Arrays.equals(xs.asInstanceOf[Array[AnyRef]], ys.asInstanceOf[Array[AnyRef]])
+          case (Strings(xs, sizex), Strings(ys, sizey)) if sizex === sizey =>
+            arrayequals(xs, ys, sizex)
 
-          case (Longs(xs, sizex), Longs(ys, sizey)) =>
-            sizex === sizey &&
-              Arrays.equals(xs, ys)
+          case (Longs(xs, sizex), Longs(ys, sizey)) if sizex === sizey =>
+            arrayequals(xs, ys, sizex)
 
-          case (Doubles(xs, sizex), Doubles(ys, sizey)) =>
-            sizex === sizey &&
-              Arrays.equals(xs, ys)
+          case (Doubles(xs, sizex), Doubles(ys, sizey)) if sizex === sizey =>
+            arrayequals(xs, ys, sizex)
 
-          case (BigDecimals(xs, sizex), BigDecimals(ys, sizey)) =>
-            sizex === sizey &&
-              Arrays.equals(xs.asInstanceOf[Array[AnyRef]], ys.asInstanceOf[Array[AnyRef]])
+          case (BigDecimals(xs, sizex), BigDecimals(ys, sizey)) if sizex === sizey =>
+            arrayequals(xs, ys, sizex)
 
-          case _ => errorImpossible
+          case _ => false
         }
     }
 

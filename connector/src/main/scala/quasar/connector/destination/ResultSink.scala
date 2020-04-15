@@ -24,7 +24,6 @@ import quasar.connector._
 import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
-import cats.syntax.functor._
 
 import fs2.Stream
 
@@ -39,21 +38,20 @@ object ResultSink {
       extends ResultSink[F, T]
 
   object UpsertSink {
-    final case class Args[F[_], T, A](
+    final case class Args[F[_], T](
         path: ResourcePath,
-        idColumn: Column[TypedKey[T, A]],
-        otherColumns: NonEmptyList[Column[T]],
+        idColumn: Column[T],
+        otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Stream[F, DataEvent.Primitive[A, Offset]]) {
+        input: ∀[λ[α => Stream[F, DataEvent.Primitive[α, Offset]]]]) {
 
-      def columns =
-        idColumn.map(_.value.getConst) :: otherColumns
+      def columns = idColumn :: otherColumns
     }
   }
 
   final case class UpsertSink[F[_], T](
       renderConfig: RenderConfig,
-      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, Offset]]])
+      consume: UpsertSink.Args[F, T] => Stream[F, Offset])
       extends ResultSink[F, T]
 
   def create[F[_], T](
@@ -64,7 +62,7 @@ object ResultSink {
 
   def upsert[F[_], T](
       config: RenderConfig)(
-      consume: ∀[λ[α => UpsertSink.Args[F, T, α] => Stream[F, Offset]]])
+      consume: UpsertSink.Args[F, T] => Stream[F, Offset])
       : ResultSink[F, T] =
     UpsertSink(config, consume)
 }

@@ -47,8 +47,8 @@ package object connector {
     def long(k: Long): ActualKey[Long] =
       Key.LongKey[Id](k)
 
-    def bigDecimal[T](t: T): TypedKey[T, BigDecimal] =
-      Key.BigDecimalKey(Const(t))
+    def bigDecimal[T](k: BigDecimal): ActualKey[BigDecimal] =
+      Key.BigDecimalKey[Id](k)
 
     def string(k: String): ActualKey[String] =
       Key.StringKey[Id](k)

@@ -26,14 +26,14 @@ import cats._
 import cats.implicits._
 
 sealed trait IdBatch[I] extends Product with Serializable {
-  val size: Long
+  val size: Int
 }
 
 object IdBatch {
-  final case class Strings(values: Array[String], size: Long) extends IdBatch[String]
-  final case class Longs(values: Array[Long], size: Long) extends IdBatch[Long]
-  final case class Doubles(values: Array[Double], size: Long) extends IdBatch[Double]
-  final case class BigDecimals(values: Array[BigDecimal], size: Long) extends IdBatch[BigDecimal]
+  final case class Strings(values: Array[String], size: Int) extends IdBatch[String]
+  final case class Longs(values: Array[Long], size: Int) extends IdBatch[Long]
+  final case class Doubles(values: Array[Double], size: Int) extends IdBatch[Double]
+  final case class BigDecimals(values: Array[BigDecimal], size: Int) extends IdBatch[BigDecimal]
 
   implicit def idBatchEq[I]: Eq[IdBatch[I]] =
     new Eq[IdBatch[I]] {

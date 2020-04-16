@@ -27,8 +27,6 @@ import cats.data.NonEmptyList
 
 import fs2.Stream
 
-import skolems.Exists
-
 sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
@@ -43,7 +41,7 @@ object ResultSink {
         idColumn: Column[T],
         otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Exists[λ[α => Stream[F, DataEvent.Primitive[α, Offset]]]]) {
+        input: Stream[F, DataEvent.Primitive[_, Offset]]) {
 
       def columns = idColumn :: otherColumns
     }

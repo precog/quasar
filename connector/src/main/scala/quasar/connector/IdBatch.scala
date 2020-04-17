@@ -21,15 +21,15 @@ import slamdata.Predef.{Eq => _, _}
 import cats._
 import cats.implicits._
 
-sealed trait IdBatch[I] extends Product with Serializable {
+sealed trait IdBatch extends Product with Serializable {
   val size: Int
 }
 
 object IdBatch {
-  final case class Strings(values: Array[String], size: Int) extends IdBatch[String]
-  final case class Longs(values: Array[Long], size: Int) extends IdBatch[Long]
-  final case class Doubles(values: Array[Double], size: Int) extends IdBatch[Double]
-  final case class BigDecimals(values: Array[BigDecimal], size: Int) extends IdBatch[BigDecimal]
+  final case class Strings(values: Array[String], size: Int) extends IdBatch
+  final case class Longs(values: Array[Long], size: Int) extends IdBatch
+  final case class Doubles(values: Array[Double], size: Int) extends IdBatch
+  final case class BigDecimals(values: Array[BigDecimal], size: Int) extends IdBatch
 
   private def arrayequals[A: Eq](xs: Array[A], ys: Array[A], size: Int): Boolean = {
     var i = 0
@@ -41,9 +41,9 @@ object IdBatch {
     back
   }
 
-  implicit def idBatchEq[I]: Eq[IdBatch[I]] =
-    new Eq[IdBatch[I]] {
-      def eqv(x: IdBatch[I], y: IdBatch[I]) =
+  implicit def idBatchEq: Eq[IdBatch] =
+    new Eq[IdBatch] {
+      def eqv(x: IdBatch, y: IdBatch) =
         (x, y) match {
           case (Strings(xs, sizex), Strings(ys, sizey)) if sizex === sizey =>
             arrayequals(xs, ys, sizex)
@@ -61,7 +61,7 @@ object IdBatch {
         }
     }
 
-  implicit def idBatchShow[I]: Show[IdBatch[I]] =
+  implicit def idBatchShow: Show[IdBatch] =
     Show show {
       case Strings(values, size) => s"Strings(${values.toList.map(_.show)}, $size)"
       case Longs(values, size) => s"Longs(${values.toList.map(_.show)}, $size)"

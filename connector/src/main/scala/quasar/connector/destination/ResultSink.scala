@@ -41,7 +41,7 @@ object ResultSink {
         idColumn: Column[T],
         otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Stream[F, DataEvent.Primitive[_, Offset]]) {
+        input: Stream[F, DataEvent[Offset]]) {
 
       def columns = idColumn :: otherColumns
     }

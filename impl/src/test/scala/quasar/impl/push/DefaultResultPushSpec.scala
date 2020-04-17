@@ -39,7 +39,7 @@ import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
 import quasar.api.table.{TableColumn, TableName, TableRef}
-import quasar.connector.{ActualKey, DataEvent, OffsetKey}
+import quasar.connector.{ActualKey, DataEvent, IdType, OffsetKey}
 import quasar.connector.destination._
 import quasar.connector.render._
 
@@ -165,7 +165,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     def renderUpserts[A](
         input: Input[String],
-        idColumn: TableColumn,
+        idColumn: Column[IdType],
         offsetColumn: Column[OffsetKey[Const[Unit, ?], A]],
         renderedColumns: NonEmptyList[TableColumn],
         config: RenderConfig.Csv,

@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.Column
 import quasar.api.table.TableColumn
-import quasar.connector.{ActualKey, DataEvent, OffsetKey}
+import quasar.connector.{ActualKey, DataEvent, IdType, OffsetKey}
 
 import cats.data.{Const, NonEmptyList}
 
@@ -36,7 +36,7 @@ trait ResultRender[F[_], I] {
 
   def renderUpserts[A](
       input: Input[I],
-      idColumn: TableColumn,
+      idColumn: Column[IdType],
       offsetColumn: Column[OffsetKey[Const[Unit, ?], A]],
       renderedColumns: NonEmptyList[TableColumn],
       config: RenderConfig.Csv,

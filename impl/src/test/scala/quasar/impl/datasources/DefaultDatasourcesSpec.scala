@@ -52,7 +52,7 @@ import fs2.Stream
 
 import matryoshka.data.Fix
 
-import scalaz.{IMap, \/-}
+import scalaz.{IMap, \/-, -\/}
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -206,6 +206,33 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           }
         }
       }
+      "returns created datasources" >>* {
+        for {
+          ((dses, _, starts, shuts), finalize) <- prepare(Map()).allocated
+          md0 <- dses.allDatasourceMetadata.flatMap(_.compile.toList)
+          b <- refB
+          addStatus <- dses.addDatasource(b)
+          md1 <- dses.allDatasourceMetadata.flatMap(_.compile.toList)
+          d <- addStatus match {
+            case -\/(_) => None.pure[IO]
+            case \/-(s) => dses.quasarDatasourceOf(s)
+          }
+          ended0 <- shuts.get
+          started <- starts.get
+          _ <- finalize
+          ended1 <- shuts.get
+        } yield {
+          md0 must_== List[(String, DatasourceMeta)]()
+          addStatus must be_\/-
+          md1.map(_._2) must_== List(
+            DatasourceMeta(supportedType, b.name, Condition.Normal[Exception])
+          )
+          d must beSome
+          started.size === 1
+          ended0.size === 0
+          ended1.size === 1
+        }
+      }
       "doesn't store config when initialization fails" >>* {
         val err3: InitializationError[Json] =
           MalformedConfiguration(supportedType, jString("three"), "3 isn't a config!")
@@ -331,7 +358,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           started === List("foo")
         }
       }
-      "ref disappered" >>* {
+      "ref disappeared" >>* {
         for {
           ((dses, refs, starts, shuts), finalize) <- prepare(Map()).allocated
           a <- refA
@@ -348,8 +375,8 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
           // with any way of unifying inner `F[_]` in lightweightdatasource :(
           res0 must beSome
           res1 must beNone
-          started === List(i, i)
-          ended === List(i, i)
+          started === List(i)
+          ended === List(i)
         }
       }
       "ref updated" >>* {

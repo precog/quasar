@@ -21,6 +21,7 @@ import quasar._
 import quasar.common.JoinType
 import quasar.common.data.Data
 import quasar.common.effect.NameGenerator
+import quasar.contrib.cats.stateT._
 import quasar.contrib.shapeless._
 import quasar.fp._
 import quasar.fp.binder._
@@ -29,12 +30,16 @@ import quasar.frontend.logicalplan.{LogicalPlan => LP}
 
 import scala.Predef.$conforms
 
+import cats.data.State
+
 import matryoshka._
 import matryoshka.data._
 import matryoshka.implicits._
 import matryoshka.patterns._
-import scalaz.{Free => Freez, _}, Scalaz.{ToIdOps => _, _}
+import scalaz.{State => _, Free => Freez, _}, Scalaz.{ToIdOps => _, _}
 import shapeless.{Data => _, :: => _, _}
+
+import shims.monadToScalaz
 
 sealed abstract class Component[T, A] {
   def run(l: T, r: T): A = this match {
@@ -340,7 +345,7 @@ final class Optimizer[T: Equal]
       lpr.normalizeLets(_),
 
       // Now for the big one:
-      (t: T) => boundParaS(t)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
+      (t: T) => boundParaM(t)(rewriteCrossJoinsƒ[State[Long, ?]]).runA(0L).value,
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
       simplify(_),
@@ -367,7 +372,7 @@ final class Optimizer[T: Equal]
       lpr.normalizeTempNames(_),
 
       // Now for the big one:
-      (t: T) => boundParaS(t)(rewriteCrossJoinsƒ[State[Long, ?]]).evalZero[Long],
+      (t: T) => boundParaM(t)(rewriteCrossJoinsƒ[State[Long, ?]]).runA(0L).value,
 
       // Eliminate trivial bindings introduced in rewriteCrossJoins:
       simplify(_),

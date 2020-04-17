@@ -17,11 +17,13 @@
 package quasar.common.effect
 
 import slamdata.Predef._
+
+import quasar.contrib.scalaz.MonadState_
 import quasar.fp.ski.κ
 
 import simulacrum.typeclass
 import scalaz._
-import scalaz.syntax.functor._
+import scalaz.syntax.bind._
 
 /** A source of strings unique within `F[_]`, an implementation must have the
   * property that, if Applicative[F], then (freshName |@| freshName)(_ != _).
@@ -40,9 +42,9 @@ import scalaz.syntax.functor._
 object NameGenerator extends NameGeneratorInstances
 
 sealed abstract class NameGeneratorInstances extends NameGeneratorInstances0 {
-  implicit def sequenceNameGenerator[F[_]](implicit F: MonadState[F, Long]): NameGenerator[F] =
+  implicit def sequenceNameGenerator[F[_]: Monad](implicit F: MonadState_[F, Long]): NameGenerator[F] =
     new NameGenerator[F] {
-      def freshName = F.bind(F.get)(n => F.put(n + 1) as n.toString)
+      def freshName = F.get.flatMap(n => F.put(n + 1) as n.toString)
     }
 }
 

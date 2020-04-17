@@ -140,10 +140,15 @@ private[quasar] final class DefaultDatasources[
           error
         case Removed(_) =>
           dispose(i).liftM[L] >> error
-        case Inserted(ref) => for {
-          allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
-          _ <- cache.manage(i, allocated).liftM[L]
-        } yield allocated._1
+        case Inserted(ref) =>
+          cache.get(i).liftM[L] flatMap {
+            case None =>
+              for {
+                allocated <- createErrorHandling(modules.create(i, ref)).allocated.liftM[L]
+                _ <- cache.manage(i, allocated).liftM[L]
+              } yield allocated._1
+            case Some(a) => EitherT.pure(a)
+          }
         case Updated(incoming, old) if DatasourceRef.atMostRenamed(incoming, old) =>
           fromCache
         case Preserved(_) =>

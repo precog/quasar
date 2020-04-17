@@ -48,7 +48,7 @@ package object binder {
     (f: F[A] => A)
     (implicit T: Recursive.Aux[T, F], B: Binder[F])
       : A = {
-    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))  
+    @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
     def loop(t: F[T], b: B.G[A]): A = {
       val newB = B.bindings(t, b)(loop(_, b))
       B.subst(t, newB).getOrElse(f(t.map(x => loop(x.project, newB))))

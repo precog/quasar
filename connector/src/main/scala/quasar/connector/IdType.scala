@@ -24,7 +24,7 @@ sealed trait IdType extends Product with Serializable
 
 object IdType {
   case object StringId extends IdType
-  case object DateTimeId extends IdType
+  case object NumberId extends IdType
 
   implicit def idTypeEq: Eq[IdType] = Eq.fromUniversalEquals
   implicit def idTypeShow: Show[IdType] = Show.fromToString

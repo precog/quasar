@@ -18,7 +18,11 @@ package quasar.connector.render
 
 import slamdata.Predef._
 
+import quasar.api.Column
 import quasar.api.table.TableColumn
+import quasar.connector.{ActualKey, DataEvent, OffsetKey}
+
+import cats.data.{Const, NonEmptyList}
 
 import fs2.Stream
 
@@ -29,4 +33,13 @@ trait ResultRender[F[_], I] {
       config: RenderConfig,
       rowLimit: Option[Long])
       : Stream[F, Byte]
+
+  def renderUpserts[A](
+      input: Input[I],
+      idColumn: TableColumn,
+      offsetColumn: Column[OffsetKey[Const[Unit, ?], A]],
+      renderedColumns: NonEmptyList[TableColumn],
+      config: RenderConfig.Csv,
+      limit: Option[Long])
+      : Stream[F, DataEvent[ActualKey[A]]]
 }

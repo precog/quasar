@@ -134,7 +134,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
           qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
           qs.recFunc.Now))
 
-    federator((query, Some(Column("ts", ∃(ActualKey.long(16)))))) must beLike {
+    federator((query, Some(Column("ts", ∃(ActualKey.real(16)))))) must beLike {
       case Left(ResourceError.TooManyResources(ps, _)) =>
         ps must_= NonEmptyList.of(absf, xysf).map(ResourcePath.leaf(_))
     }
@@ -151,7 +151,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
           qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
           qs.recFunc.Now))
 
-    federator((query, Some(Column("ts", ∃(ActualKey.long(100)))))) must beLike {
+    federator((query, Some(Column("ts", ∃(ActualKey.real(100)))))) must beLike {
       case Left(ResourceError.SeekUnsupported(p)) => p must_= abs
     }
   }
@@ -194,7 +194,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
           qs.recFunc.ProjectKeyS(qs.recFunc.Hole, "ts"),
           qs.recFunc.Now))
 
-    federator((query, Some(Column("ts", ∃(ActualKey.long(42)))))) map { fq =>
+    federator((query, Some(Column("ts", ∃(ActualKey.real(42)))))) map { fq =>
       fq.query must beTreeEqual(query)
       fq.sources(xysf).map(_.path) must_= Some(ResourcePath.leaf(xysf))
     } getOrElse ko("Unexpected evaluate failure.")

@@ -54,16 +54,16 @@ package object connector {
       OffsetKey.DateTimeKey[Id](k)
   }
 
-  type TypedKey[T, A] = OffsetKey[Const[T, ?], A]
+  type FormalKey[T, A] = OffsetKey[Const[T, ?], A]
 
-  object TypedKey {
-    def real[T](t: T): TypedKey[T, Real] =
+  object FormalKey {
+    def real[T](t: T): FormalKey[T, Real] =
       OffsetKey.RealKey(Const(t))
 
-    def string[T](t: T): TypedKey[T, String] =
+    def string[T](t: T): FormalKey[T, String] =
       OffsetKey.StringKey(Const(t))
 
-    def dateTime[T](t: T): TypedKey[T, OffsetDateTime] =
+    def dateTime[T](t: T): FormalKey[T, OffsetDateTime] =
       OffsetKey.DateTimeKey(Const(t))
   }
 }

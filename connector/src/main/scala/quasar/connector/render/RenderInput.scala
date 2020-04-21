@@ -21,17 +21,17 @@ import slamdata.Predef.{Eq => _, _}
 import cats._
 import cats.implicits._
 
-sealed trait Input[+A] {
+sealed trait RenderInput[+A] {
   def value: A
 }
 
-object Input {
-  final case class Initial[A](value: A) extends Input[A]
-  final case class Incremental[A](value: A) extends Input[A]
+object RenderInput {
+  final case class Initial[A](value: A) extends RenderInput[A]
+  final case class Incremental[A](value: A) extends RenderInput[A]
 
-  implicit def inputEq[A: Eq]: Eq[Input[A]] =
-    new Eq[Input[A]] {
-      def eqv(x: Input[A], y: Input[A]): Boolean =
+  implicit def inputEq[A: Eq]: Eq[RenderInput[A]] =
+    new Eq[RenderInput[A]] {
+      def eqv(x: RenderInput[A], y: RenderInput[A]): Boolean =
         (x, y) match {
           case (Initial(vx), Initial(vy)) => vx === vy
           case (Incremental(vx), Incremental(vy)) => vx === vy
@@ -39,7 +39,7 @@ object Input {
         }
     }
 
-  implicit def inputShow[A: Show]: Show[Input[A]] =
+  implicit def inputShow[A: Show]: Show[RenderInput[A]] =
     Show show {
       case Initial(value) => s"Initial(${value.show})"
       case Incremental(value) => s"Incremental(${value.show})"

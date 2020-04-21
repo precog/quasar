@@ -35,7 +35,7 @@ trait ResultRender[F[_], I] {
       : Stream[F, Byte]
 
   def renderUpserts[A](
-      input: Input[I],
+      input: RenderInput[I],
       idColumn: Column[IdType],
       offsetColumn: Column[FormalKey[Unit, A]],
       renderedColumns: NonEmptyList[TableColumn],

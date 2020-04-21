@@ -164,7 +164,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       Stream(input).through(text.utf8Encode)
 
     def renderUpserts[A](
-        input: Input[String],
+        input: RenderInput[String],
         idColumn: Column[IdType],
         offsetColumn: Column[FormalKey[Unit, A]],
         renderedColumns: NonEmptyList[TableColumn],

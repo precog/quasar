@@ -27,6 +27,8 @@ import cats.data.NonEmptyList
 
 import fs2.Stream
 
+import skolems.Forall
+
 sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
@@ -36,12 +38,12 @@ object ResultSink {
       extends ResultSink[F, T]
 
   object UpsertSink {
-    final case class Args[F[_], T](
+    final case class Args[F[_], T, O](
         path: ResourcePath,
         idColumn: Column[T],
         otherColumns: List[Column[T]],
         writeMode: WriteMode,
-        input: Stream[F, DataEvent[Offset]]) {
+        input: Stream[F, DataEvent[ActualKey[O]]]) {
 
       def columns = idColumn :: otherColumns
     }
@@ -49,7 +51,7 @@ object ResultSink {
 
   final case class UpsertSink[F[_], T](
       renderConfig: RenderConfig,
-      consume: UpsertSink.Args[F, T] => Stream[F, Offset])
+      consume: Forall[λ[α => UpsertSink.Args[F, T, α] => Stream[F, ActualKey[α]]]])
       extends ResultSink[F, T]
 
   def create[F[_], T](
@@ -60,7 +62,7 @@ object ResultSink {
 
   def upsert[F[_], T](
       config: RenderConfig)(
-      consume: UpsertSink.Args[F, T] => Stream[F, Offset])
+      consume: Forall[λ[α => UpsertSink.Args[F, T, α] => Stream[F, ActualKey[α]]]])
       : ResultSink[F, T] =
     UpsertSink(config, consume)
 }

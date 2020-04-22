@@ -50,7 +50,7 @@ object ResultSink {
   }
 
   final case class UpsertSink[F[_], T](
-      renderConfig: RenderConfig,
+      config: RenderConfig.Csv,
       consume: Forall[λ[α => UpsertSink.Args[F, T, α] => Stream[F, ActualKey[α]]]])
       extends ResultSink[F, T]
 
@@ -61,7 +61,7 @@ object ResultSink {
     CreateSink(config, consume)
 
   def upsert[F[_], T](
-      config: RenderConfig)(
+      config: RenderConfig.Csv)(
       consume: Forall[λ[α => UpsertSink.Args[F, T, α] => Stream[F, ActualKey[α]]]])
       : ResultSink[F, T] =
     UpsertSink(config, consume)

@@ -37,7 +37,7 @@ object DataEvent {
     */
   final case class Commit[O](offset: O) extends DataEvent[O]
 
-  implicit def dataEventEq[O: Eq, E <: DataEvent[O]]: Eq[E] =
+  implicit def dataEventEq[O: Eq]: Eq[DataEvent[O]] =
     Eq instance {
       case (Create(rx), Create(ry)) => rx === ry
       case (Delete(idsx), Delete(idsy)) => idsx === idsy
@@ -45,11 +45,10 @@ object DataEvent {
       case _ => false
     }
 
-  implicit def dataEventShow[O: Show, E <: DataEvent[O]]: Show[E] = {
+  implicit def dataEventShow[O: Show]: Show[DataEvent[O]] =
     Show show {
       case Create(rs) => s"Create(${rs.size} bytes)"
       case Delete(ids) => s"Delete(${ids.show})"
       case Commit(o) => s"Commit(${o.show})"
     }
-  }
 }

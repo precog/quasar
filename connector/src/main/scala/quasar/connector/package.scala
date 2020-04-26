@@ -16,15 +16,16 @@
 
 package quasar
 
-import slamdata.Predef._
+import slamdata.Predef.{Eq => _, _}
 
 import quasar.api.Column
 import quasar.contrib.scalaz.MonadError_
 
 import java.time.OffsetDateTime
 
-import cats.Id
+import cats.{Eq, Id}
 import cats.data.Const
+import cats.implicits._
 
 import skolems.Exists
 
@@ -52,6 +53,16 @@ package object connector {
 
     def dateTime(k: OffsetDateTime): ActualKey[OffsetDateTime] =
       OffsetKey.DateTimeKey[Id](k)
+
+    implicit def actualKeyEq[A: Eq] = new Eq[ActualKey[A]] {
+      def eqv(a1: ActualKey[A], a2: ActualKey[A]): Boolean =
+        (a1, a2) match {
+          case (OffsetKey.RealKey(k1), OffsetKey.RealKey(k2)) => k1 === k2
+          case (OffsetKey.StringKey(k1), OffsetKey.StringKey(k2)) => k1 === k2
+          case (OffsetKey.DateTimeKey(k1), OffsetKey.DateTimeKey(k2)) => k1 === k2
+          case (_, _) => false
+        }
+    }
   }
 
   type FormalKey[T, A] = OffsetKey[Const[T, ?], A]

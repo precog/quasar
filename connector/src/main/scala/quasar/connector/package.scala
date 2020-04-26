@@ -64,7 +64,8 @@ package object connector {
         }
     }
 
-    implicit def actualKeyShow[A: Show] = Show.fromToString[A]
+    implicit def actualKeyShow[A: Show]: Show[ActualKey[A]] =
+      Show.fromToString[ActualKey[A]]
   }
 
   type FormalKey[T, A] = OffsetKey[Const[T, ?], A]

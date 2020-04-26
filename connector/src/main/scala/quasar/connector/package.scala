@@ -23,7 +23,7 @@ import quasar.contrib.scalaz.MonadError_
 
 import java.time.OffsetDateTime
 
-import cats.{Eq, Id}
+import cats.{Eq, Id, Show}
 import cats.data.Const
 import cats.implicits._
 
@@ -63,6 +63,8 @@ package object connector {
           case (_, _) => false
         }
     }
+
+    implicit def actualKeyShow[A: Show] = Show.fromToString[A]
   }
 
   type FormalKey[T, A] = OffsetKey[Const[T, ?], A]

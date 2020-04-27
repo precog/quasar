@@ -63,9 +63,13 @@ object IdBatch {
 
   implicit def idBatchShow: Show[IdBatch] =
     Show show {
-      case Strings(values, size) => s"Strings(${values.toList.map(_.show)}, $size)"
-      case Longs(values, size) => s"Longs(${values.toList.map(_.show)}, $size)"
-      case Doubles(values, size) => s"Doubles(${values.toList.map(_.show)}, $size)"
-      case BigDecimals(values, size) => s"BigDecimals(${values.toList.map(_.show)}, $size)"
+      case Strings(values, size) =>
+        s"Strings(${values.toList.take(size).map(_.show)}, $size)"
+      case Longs(values, size) =>
+        s"Longs(${values.toList.take(size).map(_.show)}, $size)"
+      case Doubles(values, size) =>
+        s"Doubles(${values.toList.take(size).map(_.show)}, $size)"
+      case BigDecimals(values, size) =>
+        s"BigDecimals(${values.take(size).toList.map(_.show)}, $size)"
     }
 }

@@ -302,11 +302,6 @@ jobs:
           name: target-${{ matrix.os }}-${{ matrix.java }}-project_target
           path: project/target
 
-      - name: Install Ruby
-        uses: actions/setup-ruby@v1
-        with:
-          ruby-version: 2.6
-
       - name: Common sbt setup
         run: $SBT ++${{ matrix.scala }} transferCommonResources transferPublishAndTagResources exportSecretsForActions
 
@@ -318,7 +313,7 @@ jobs:
   auto-merge:
     name: Auto Merge
     needs: [build]
-    if: github.event_name == 'pull_request' && contains(github.head_ref, 'version-bump')
+    if: 'github.event_name == ''pull_request'' && contains(github.head_ref, ''version-bump'') && contains(github.event.pull_request.labels, ''version: revision'')'
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -334,20 +329,18 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
 
-      - name: Install Ruby
-        uses: actions/setup-ruby@v1
-        with:
-          ruby-version: 2.6
-
       - name: Common sbt setup
         run: $SBT ++${{ matrix.scala }} transferCommonResources exportSecretsForActions
 
-      - run: ./scripts/commonSetup
+      - name: Fetch the latest sdmerge
+        run: |
+          curl -L https://github.com/precog/devtools/raw/master/bin/sdmerge > /tmp/sdmerge
+          chmod +x /tmp/sdmerge
 
-      - name: Export CLONE_DIR
-        run: 'echo ::set-env name=CLONE_DIR::$(mktemp -d /tmp/precog-bump.XXXXXXXX)'
-
-      - name: Export PR_NUMBER
-        run: 'echo ::set-env name=PR_NUMBER::$(echo $GITHUB_REF | cut -d''/'' -f3)'
-
-      - run: ./scripts/checkAndAutoMerge
+      - name: Self-merge
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config --global user.email "bot@precog.com"
+          git config --global user.name "Precog Bot"
+          /tmp/sdmerge $PR_NUMBER

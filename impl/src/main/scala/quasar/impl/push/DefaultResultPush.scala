@@ -69,6 +69,7 @@ private[impl] final class DefaultResultPush[
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
     pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
     offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
+    pushPull: PushmiPullyu[F],
     log: Logger[F])
     extends ResultPush[F, D, Q] {
 
@@ -257,7 +258,7 @@ private[impl] final class DefaultResultPush[
           Stream.resource(evaluator((query, None)))
             .flatMap(render.render(_, renderColumns, sink.renderConfig, limit))
 
-        sink.consume(ResultSink.CreateSink.Args(path, destColumns, renderedResults))
+        sink.consume(ResultSink.CreateSink.Args(path, destColumns, pushPull, renderedResults))
       }
     }
 
@@ -321,6 +322,7 @@ private[impl] final class DefaultResultPush[
             idDestColumn,
             nonIdDestColumns,
             if (isUpdate) WriteMode.Append else WriteMode.Replace,
+            pushPull,
             dataEvents)
 
       } yield sink.consume[A](upsertArgs)
@@ -570,7 +572,8 @@ private[impl] object DefaultResultPush {
       evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
       render: ResultRender[F, R],
       pushes: PrefixStore[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
-      offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])
+      offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
+      pushPull: PushmiPullyu[F])
       : Resource[F, ResultPush[F, D, Q]] = {
 
     def epochToInstant(e: FiniteDuration): Instant =
@@ -684,6 +687,7 @@ private[impl] object DefaultResultPush {
           active,
           pushes,
           offsets,
+          pushPull,
           log)
       }
 

@@ -26,16 +26,13 @@ import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
 
-import fs2.{Pipe, Stream}
+import fs2.Stream
 
 import skolems.∀
-
-import java.net.URI
 
 sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
-  type PushmiPullyu[F[_]] = (URI => F[Unit]) => Pipe[F, Byte, Unit]
 
   final case class CreateSink[F[_], T](
       renderConfig: RenderConfig,

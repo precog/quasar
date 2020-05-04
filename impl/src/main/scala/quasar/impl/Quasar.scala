@@ -32,7 +32,7 @@ import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
 import quasar.connector.{Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.Datasource
-import quasar.connector.destination.{Destination, DestinationModule}
+import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.connector.evaluate._
 import quasar.connector.render.ResultRender
 import quasar.connector.scheduler.{Scheduler, SchedulerModule}
@@ -99,6 +99,7 @@ object Quasar extends Logging {
       tableRefs: IndexedStore[F, UUID, TableRef[SqlQuery]],
       pushes: PrefixStore[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
       offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
+      pushPull: PushmiPullyu[F],
       queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], R],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
@@ -166,7 +167,8 @@ object Quasar extends Logging {
           sqlEvaluator,
           resultRender,
           pushes,
-          offsets)
+          offsets,
+          pushPull)
 
       intentions = DefaultIntentions(
         schedulerRefs.entries.map(_._1),

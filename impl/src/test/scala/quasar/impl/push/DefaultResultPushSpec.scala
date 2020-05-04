@@ -333,7 +333,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           evaluator,
           render,
           pushes,
-          offsets)
+          offsets,
+          _ => _ => Stream.empty)   // these specs don't use the push/pull, so we can stub it
 
     } yield resultPush
   }

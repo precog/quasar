@@ -257,7 +257,7 @@ private[impl] final class DefaultResultPush[
           Stream.resource(evaluator((query, None)))
             .flatMap(render.render(_, renderColumns, sink.renderConfig, limit))
 
-        sink.consume(path, destColumns, renderedResults)
+        sink.consume(ResultSink.CreateSink.Args(path, destColumns, renderedResults))
       }
     }
 

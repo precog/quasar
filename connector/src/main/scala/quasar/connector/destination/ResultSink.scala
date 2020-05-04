@@ -26,17 +26,29 @@ import quasar.connector.render.RenderConfig
 
 import cats.data.NonEmptyList
 
-import fs2.Stream
+import fs2.{Pipe, Stream}
 
 import skolems.∀
+
+import java.net.URI
 
 sealed trait ResultSink[F[_], T] extends Product with Serializable
 
 object ResultSink {
+  type PushmiPullyu[F[_]] = (URI => F[Unit]) => Pipe[F, Byte, Unit]
+
   final case class CreateSink[F[_], T](
       renderConfig: RenderConfig,
-      consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+      consume: CreateSink.Args[F, T] => Stream[F, Unit])
       extends ResultSink[F, T]
+
+  object CreateSink {
+    final case class Args[F[_], T](
+        path: ResourcePath,
+        columns: NonEmptyList[Column[T]],
+        pushPull: PushmiPullyu[F],
+        bytes: Stream[F, Byte])
+  }
 
   object UpsertSink {
     final case class Args[F[_], T, A](
@@ -44,6 +56,7 @@ object ResultSink {
         idColumn: Column[T],
         otherColumns: List[Column[T]],
         writeMode: WriteMode,
+        pushPull: PushmiPullyu[F],
         input: Stream[F, DataEvent[OffsetKey.Actual[A]]]) {
 
       def columns: NonEmptyList[Column[T]] =
@@ -58,7 +71,7 @@ object ResultSink {
 
   def create[F[_], T](
       renderConfig: RenderConfig)(
-      consume: (ResourcePath, NonEmptyList[Column[T]], Stream[F, Byte]) => Stream[F, Unit])
+      consume: CreateSink.Args[F, T] => Stream[F, Unit])
       : ResultSink[F, T] =
     CreateSink(renderConfig, consume)
 

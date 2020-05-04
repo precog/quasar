@@ -19,7 +19,6 @@ package quasar.impl.local
 import slamdata.Predef._
 
 import cats.data.NonEmptyList
-import cats.implicits._
 import cats.effect.{Blocker, ContextShift, Effect}
 
 import fs2.{io, Stream}
@@ -40,17 +39,19 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
     NonEmptyList.of(createSink(root, blocker))
 
   private def createSink(root: JPath, blocker: Blocker): ResultSink[F, Unit] =
-    ResultSink.create(RenderConfig.Csv())((dst, columns, bytes) =>
-        Stream.eval(resolvedResourcePath[F](root, dst)) >>= {
-          case Some(writePath) =>
-            val fileSink = io.file.writeAll[F](writePath, blocker)
+    ResultSink.create(RenderConfig.Csv()) { args =>
+      val ResultSink.CreateSink.Args(dst, columns, bytes) = args
 
-            bytes.through(fileSink)
+      Stream.eval(resolvedResourcePath[F](root, dst)) flatMap {
+        case Some(writePath) =>
+          val fileSink = io.file.writeAll[F](writePath, blocker)
+          bytes.through(fileSink)
 
-          case None =>
-            Stream.eval(
-              MonadResourceErr[F].raiseError(ResourceError.notAResource(dst)))
-        })
+        case None =>
+          Stream.eval(
+            MonadResourceErr[F].raiseError(ResourceError.notAResource(dst)))
+      }
+    }
 }
 
 object LocalDestination {

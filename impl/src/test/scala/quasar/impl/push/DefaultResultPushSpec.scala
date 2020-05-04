@@ -176,12 +176,14 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       case All => NonEmptyList.of(createSink, upsertSink)
     }
 
-    val createSink: ResultSink[IO, Type] = ResultSink.create[IO, Type](RenderConfig.Csv()) {
-      case (dst, _, bytes) =>
+    val createSink: ResultSink[IO, Type] =
+      ResultSink.create[IO, Type](RenderConfig.Csv()) { args =>
+        val ResultSink.CreateSink.Args(dst, _, _, bytes) = args
+
         bytes.through(text.utf8Decode)
           .evalMap(s => q.enqueue1(Some(Map(dst -> s))))
           .onFinalize(q.enqueue1(None))
-    }
+      }
 
     val upsertSink: ResultSink[IO, Type] = {
       val consume = Forall[λ[α => ResultSink.UpsertSink.Args[IO, Type, α] => Stream[IO, OffsetKey.Actual[α]]]] { args =>

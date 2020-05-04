@@ -40,7 +40,7 @@ final class LocalDestination[F[_]: Effect: ContextShift: MonadResourceErr] priva
 
   private def createSink(root: JPath, blocker: Blocker): ResultSink[F, Unit] =
     ResultSink.create(RenderConfig.Csv()) { args =>
-      val ResultSink.CreateSink.Args(dst, columns, bytes) = args
+      val ResultSink.CreateSink.Args(dst, columns, _, bytes) = args
 
       Stream.eval(resolvedResourcePath[F](root, dst)) flatMap {
         case Some(writePath) =>

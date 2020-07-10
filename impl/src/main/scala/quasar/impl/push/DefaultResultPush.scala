@@ -471,27 +471,35 @@ private[impl] final class DefaultResultPush[
         case Left(t) => Right(t)
 
         case Right(e) =>
-          val (c, Labeled(label, formal)) = e.value
+          val (cstr, Labeled(label, formal)) = e.value
 
-          val back = for {
-            actual <- selected.arg.toRight(ParamError.ParamMissing(label, formal))
+          def mkConstructorArg(formal: ∃[Formal], actual: ∃[Actual]): Either[ParamError, e.A] =
+            (formal.value: Formal[A] forSome { type A }, actual) match {
+              case (Formal.Pair(formalA, formalB), ∃(Actual.Pair(actualA, actualB))) =>
+                val exA: ∃[Formal] = ∃(formalA)
+                val exB: ∃[Formal] = ∃(formalB)
+                val exAA: ∃[Actual] = ∃(actualA)
+                val exBA: ∃[Actual] = ∃(actualB)
+                for {
+                  a <- mkConstructorArg(∃(formalA), ∃(actualA))
+                  b <- mkConstructorArg(∃(formalB), ∃(actualB))
+                } yield ((a, b)).asInstanceOf[e.A]
 
-            t <- (formal: Formal[A] forSome { type A }, actual) match {
               case (Boolean(_), ∃(Boolean(Const(b)))) =>
-                Right(c(b.asInstanceOf[e.A]))
+                Right(b.asInstanceOf[e.A])
 
               case (Integer(Integer.Args(None, None)), ∃(Integer(Const(i)))) =>
-                Right(c(i.asInstanceOf[e.A]))
+                Right(i.asInstanceOf[e.A])
 
               case (Integer(Integer.Args(Some(bounds), None)), ∃(Integer(Const(i)))) =>
                 if (checkBounds(bounds, i))
-                  Right(c(i.asInstanceOf[e.A]))
+                  Right(i.asInstanceOf[e.A])
                 else
                   Left(ParamError.IntOutOfBounds(label, i, bounds))
 
               case (Integer(Integer.Args(None, Some(step))), ∃(Integer(Const(i)))) =>
                 if (step(i))
-                  Right(c(i.asInstanceOf[e.A]))
+                  Right(i.asInstanceOf[e.A])
                 else
                   Left(ParamError.IntOutOfStep(label, i, step))
 
@@ -501,16 +509,21 @@ private[impl] final class DefaultResultPush[
                 else if (!step(i))
                   Left(ParamError.IntOutOfStep(label, i, step))
                 else
-                  Right(c(i.asInstanceOf[e.A]))
+                  Right(i.asInstanceOf[e.A])
 
               case (Enum(possiblities), ∃(EnumSelect(Const(key)))) =>
                 possiblities.lookup(key)
-                  .map(a => c(a.asInstanceOf[e.A]))
+                  .map(a => a.asInstanceOf[e.A])
                   .toRight(ParamError.ValueNotInEnum(label, key, possiblities.keys))
 
               case _ => Left(ParamError.ParamMismatch(label, formal, actual))
             }
-          } yield t
+
+
+          val back = for {
+            actual <- selected.arg.toRight(ParamError.ParamMissing(label, formal))
+            arg <- mkConstructorArg(formal, actual)
+          } yield cstr(arg)
 
           back.leftMap(err =>
             TypeConstructionFailed(destId, name, id.label, NonEmptyList.one(err)))

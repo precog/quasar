@@ -36,6 +36,8 @@ package object param {
 
     def enum[A](x: (String, A), xs: (String, A)*): Formal[A] =
       ParamType.Enum[Id, A](NonEmptyMap.of(x, xs: _*))
+
+    final case class Pair[A, B](fst: Formal[A], snd: Formal[B]) extends Formal[(A, B)]
   }
 
   object Actual {
@@ -47,5 +49,7 @@ package object param {
 
     def enumSelect(s: String): Actual[String] =
       ParamType.EnumSelect(Const(s))
+
+    final case class Pair[A, B](fst: Actual[A], snd: Actual[B]) extends Actual[(A, B)]
   }
 }

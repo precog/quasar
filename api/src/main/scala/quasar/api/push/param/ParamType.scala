@@ -24,7 +24,7 @@ import java.lang.String
 
 import scala.{Boolean => SBoolean, Int, Nothing, Option, Product, Serializable, Unit}
 
-sealed trait ParamType[F[_], A] extends Product with Serializable
+trait ParamType[F[_], A] extends Product with Serializable
 
 object ParamType {
   final case class Boolean[F[_]](value: F[Unit])

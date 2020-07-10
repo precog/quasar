@@ -21,7 +21,10 @@ import cats.data.{Const, Ior, NonEmptyMap}
 import cats.instances.string._
 
 import java.lang.String
-import scala.{Boolean, Int, Option}
+import scala._
+import scala.Predef._
+
+import skolems.∃
 
 package object param {
   type Formal[A] = ParamType[Id, A]
@@ -37,7 +40,21 @@ package object param {
     def enum[A](x: (String, A), xs: (String, A)*): Formal[A] =
       ParamType.Enum[Id, A](NonEmptyMap.of(x, xs: _*))
 
-    final case class Pair[A, B](fst: Formal[A], snd: Formal[B]) extends Formal[(A, B)]
+    final case class Pair[A](fst: ∃[Formal], snd: ∃[Formal]) extends Formal[A] {
+      val toList: List[∃[Formal]] = toList0(List(), fst, snd).reverse
+
+      @annotation.tailrec
+      private def toList0(acc: List[∃[Formal]], fst: ∃[Formal], snd: ∃[Formal]): List[∃[Formal]] = snd match {
+        case ∃(Pair(hd, tl)) => toList0(fst :: acc, hd, tl)
+        case other => other :: fst :: acc
+      }
+    }
+    object Pair {
+      def fromList[A]: List[∃[Formal]] =>  Option[Pair[A]] = {
+        case hd :: tl => tl.headOption.map(Pair(hd, _))
+        case Nil => None
+      }
+    }
   }
 
   object Actual {
@@ -50,6 +67,20 @@ package object param {
     def enumSelect(s: String): Actual[String] =
       ParamType.EnumSelect(Const(s))
 
-    final case class Pair[A, B](fst: Actual[A], snd: Actual[B]) extends Actual[(A, B)]
+    final case class Pair[A](fst: ∃[Actual], snd: ∃[Actual]) extends Actual[A] {
+      val toList: List[∃[Actual]] = toList0(List(), fst, snd).reverse
+
+      @annotation.tailrec
+      private def toList0(acc: List[∃[Actual]], fst: ∃[Actual], snd: ∃[Actual]): List[∃[Actual]] = snd match {
+        case ∃(Pair(hd, tl)) => toList0(fst :: acc, hd, tl)
+        case other => other :: fst :: acc
+      }
+    }
+    object Pair {
+      def fromList[A]: List[∃[Actual]] => Option[Pair[A]] = {
+        case hd :: tl => tl.headOption.map(Pair(hd, _))
+        case Nil => None
+      }
+    }
   }
 }

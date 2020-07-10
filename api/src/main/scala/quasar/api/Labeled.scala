@@ -17,9 +17,10 @@
 package quasar.api
 
 import cats.{Applicative, Eq, Eval, Order, Show, Traverse}
+import cats.data._
 import cats.implicits._
 
-import scala.{Predef, StringContext}, Predef._
+import scala._, Predef._
 
 import java.lang.String
 
@@ -34,7 +35,6 @@ private[api] trait LowPriorityImplicits {
 }
 
 object Labeled extends LowPriorityImplicits {
-
   implicit def label[A]: Label[Labeled[A]] =
     Label.label(_.label)
 

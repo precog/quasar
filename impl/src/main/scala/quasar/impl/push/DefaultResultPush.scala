@@ -476,13 +476,9 @@ private[impl] final class DefaultResultPush[
           def mkConstructorArg(formal: ∃[Formal], actual: ∃[Actual]): Either[ParamError, e.A] =
             (formal.value: Formal[A] forSome { type A }, actual) match {
               case (Formal.Pair(formalA, formalB), ∃(Actual.Pair(actualA, actualB))) =>
-                val exA: ∃[Formal] = ∃(formalA)
-                val exB: ∃[Formal] = ∃(formalB)
-                val exAA: ∃[Actual] = ∃(actualA)
-                val exBA: ∃[Actual] = ∃(actualB)
                 for {
-                  a <- mkConstructorArg(∃(formalA), ∃(actualA))
-                  b <- mkConstructorArg(∃(formalB), ∃(actualB))
+                  a <- mkConstructorArg(formalA, actualA)
+                  b <- mkConstructorArg(formalB, actualB)
                 } yield ((a, b)).asInstanceOf[e.A]
 
               case (Boolean(_), ∃(Boolean(Const(b)))) =>

@@ -23,6 +23,7 @@ import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   ConfigurationError,
   InitializationError,
+  MalformedConfiguration,
   malformedConfiguration
 }
 import quasar.common.data.RValue
@@ -33,6 +34,7 @@ import quasar.connector.datasource.{LightweightDatasourceModule, Reconfiguration
 import scala.concurrent.ExecutionContext
 
 import argonaut.Json
+import argonaut.Argonaut._
 
 import cats.effect._
 import cats.kernel.Hash
@@ -46,11 +48,21 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
 
   def sanitizeConfig(config: Json): Json = config
 
+  def migrateConfig(config: Json)
+      : Either[ConfigurationError[Json], Json] =
+    config.as[LocalConfig].toOption match {
+      case None => Left(MalformedConfiguration(kind, config, s"Failed to migrate config: $config"))
+      case Some(c) => Right(c.asJson)
+    }
+
   // there are no sensitive components, so we use the entire patch
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+  def reconfigure(original: Json, patch: Json)
+      : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
     Right((Reconfiguration.Preserve, patch))
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+  def lightweightDatasource[
+      F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer,
+      A: Hash](
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F])(
@@ -60,10 +72,10 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       lc <- attemptConfig[F, LocalConfig, InitializationError[Json]](
         config,
         "Failed to decode LocalDatasource config: ")(
-        (c, d) => malformedConfiguration((LocalParsedType, c, d)))
+        (c, d) => malformedConfiguration((kind, c, d)))
 
       root <- validatedPath(lc.rootDir, "Invalid path: ") { d =>
-        malformedConfiguration((LocalParsedType, config, d))
+        malformedConfiguration((kind, config, d))
       }
     } yield {
       LocalParsedDatasource[F, RValue](

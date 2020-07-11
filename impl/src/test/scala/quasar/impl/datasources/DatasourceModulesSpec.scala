@@ -98,16 +98,24 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
         ScalarStages.Id))
   }
 
-  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
+  def lightMod(k: DatasourceType, err: Option[InitializationError[Json]] = None)
+      : DatasourceModule =
     DatasourceModule.Lightweight(new LightweightDatasourceModule {
       val kind = k
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+      def migrateConfig(config: Json)
+          : Either[ConfigurationError[Json], Json] =
+        Right(jString("migrated"))
+
+      def reconfigure(original: Json, patch: Json)
+          : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         Right((Reconfiguration.Reset, jArray(List(original, patch))))
 
-      def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+      def lightweightDatasource[
+          F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer,
+          A: Hash](
           config: Json,
           rateLimiting: RateLimiting[F, A],
           byteStore: ByteStore[F])(
@@ -121,13 +129,19 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       }
     })
 
-  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None): DatasourceModule =
+  def heavyMod(k: DatasourceType, err: Option[InitializationError[Json]] = None)
+      : DatasourceModule =
     DatasourceModule.Heavyweight(new HeavyweightDatasourceModule {
       val kind = k
 
       def sanitizeConfig(config: Json): Json = jString("sanitized")
 
-      def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)] =
+      def migrateConfig(config: Json)
+          : Either[ConfigurationError[Json], Json] =
+        Right(jString("migrated"))
+
+      def reconfigure(original: Json, patch: Json)
+          : Either[ConfigurationError[Json], (Reconfiguration, Json)] =
         Right((Reconfiguration.Reset, jArray(List(original, patch))))
 
       def heavyweightDatasource[

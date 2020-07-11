@@ -36,9 +36,15 @@ trait LightweightDatasourceModule {
 
   def sanitizeConfig(config: Json): Json
 
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)]
+  def migrateConfig(config: Json)
+      : Either[ConfigurationError[Json], Json]
 
-  def lightweightDatasource[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer, A: Hash](
+  def reconfigure(original: Json, patch: Json)
+      : Either[ConfigurationError[Json], (Reconfiguration, Json)]
+
+  def lightweightDatasource[
+      F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer,
+      A: Hash](
       config: Json,
       rateLimiting: RateLimiting[F, A],
       byteStore: ByteStore[F])(

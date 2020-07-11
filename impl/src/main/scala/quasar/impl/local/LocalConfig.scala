@@ -20,7 +20,8 @@ import slamdata.Predef.{Int, Option, String, StringContext}
 
 import quasar.connector.{CompressionScheme, DataFormat}
 
-import argonaut.{DecodeJson, DecodeResult}
+import argonaut.{CodecJson, DecodeResult}
+import argonaut.Argonaut._
 
 import cats.{Eq, Show}
 import cats.instances.int._
@@ -37,22 +38,24 @@ object LocalConfig {
   /** Default to 1MB chunks when unspecified. */
   val DefaultReadChunkSizeBytes: Int = 1048576
 
-  implicit val decodeJson: DecodeJson[LocalConfig] = {
-    implicit val decodeCompressionScheme: DecodeJson[CompressionScheme] =
-      DecodeJson(c => c.as[String] flatMap {
-        case "gzip" => DecodeResult.ok(CompressionScheme.Gzip)
-        case _ => DecodeResult.fail("CompressionScheme", c.history)
-      })
+  implicit val codecCompressionScheme: CodecJson[CompressionScheme] = CodecJson({
+      case CompressionScheme.Gzip => "gzip".asJson
+    }, (c => c.as[String] flatMap {
+      case "gzip" => DecodeResult.ok(CompressionScheme.Gzip)
+      case _ => DecodeResult.fail("CompressionScheme", c.history)
+    }))
 
-    DecodeJson(c => for {
-      rootDir <- (c --\ "rootDir").as[String]
-
-      maybeChunkSize <- (c --\ "readChunkSizeBytes").as[Option[Int]]
-      chunkSize = maybeChunkSize getOrElse DefaultReadChunkSizeBytes
-      format = c.as[DataFormat].toOption getOrElse DataFormat.precise(DataFormat.ldjson)
-
-    } yield LocalConfig(rootDir, chunkSize, format))
-  }
+  implicit val codecLocalConfig: CodecJson[LocalConfig] = CodecJson({
+    case LocalConfig(rootDir, chunkSize, dataFormat) =>
+      ("rootDir" := rootDir) ->:
+      ("readChunkSizeBytes" := chunkSize) ->:
+      dataFormat.asJson
+  }, (c => for {
+    rootDir <- (c --\ "rootDir").as[String]
+    maybeChunkSize <- (c --\ "readChunkSizeBytes").as[Option[Int]]
+    chunkSize = maybeChunkSize getOrElse DefaultReadChunkSizeBytes
+    format = c.as[DataFormat].toOption getOrElse DataFormat.precise(DataFormat.ldjson)
+  } yield LocalConfig(rootDir, chunkSize, format)))
 
   implicit val eqv: Eq[LocalConfig] =
     Eq.by(lc => (lc.rootDir, lc.readChunkSizeBytes, lc.format))

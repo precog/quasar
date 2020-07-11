@@ -36,7 +36,11 @@ trait HeavyweightDatasourceModule {
 
   def sanitizeConfig(config: Json): Json
 
-  def reconfigure(original: Json, patch: Json): Either[ConfigurationError[Json], (Reconfiguration, Json)]
+  def migrateConfig(config: Json)
+      : Either[ConfigurationError[Json], Json]
+
+  def reconfigure(original: Json, patch: Json)
+      : Either[ConfigurationError[Json], (Reconfiguration, Json)]
 
   def heavyweightDatasource[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,

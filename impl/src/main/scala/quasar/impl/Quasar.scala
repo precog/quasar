@@ -49,6 +49,7 @@ import quasar.impl.scheduler._
 import quasar.impl.storage.{IndexedStore, PrefixStore}
 import quasar.qscript.{construction, Map => QSMap}
 
+import java.lang.Runtime
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 
@@ -56,12 +57,9 @@ import argonaut.Json
 import argonaut.JsonScalaz._
 
 import cats.{~>, Functor, Show}
-import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
-import cats.instances.uuid._
+import cats.effect.{Concurrent, ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import cats.kernel.Hash
-import cats.syntax.applicative._
-import cats.syntax.functor._
-import cats.syntax.show._
+import cats.implicits._
 
 import fs2.Stream
 
@@ -116,7 +114,13 @@ object Quasar extends Logging {
       _ <- Resource.liftF(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))
       _ <- Resource.liftF(warnDuplicates[F, DestinationModule, DestinationType](destinationModules)(_.destinationType))
 
-      freshUUID = Sync[F].delay(UUID.randomUUID)
+      modulesByKind = datasourceModules.groupBy(_.kind) collect {
+        case (kind, List(module)) => (kind, module)
+      }
+
+      concurrency <- Resource.liftF(Sync[F].delay(Runtime.getRuntime.availableProcessors))
+
+      _ <- migrateDatasourceConfigs[F](datasourceRefs, modulesByKind)(concurrency)
 
       (dsErrors, onCondition) <- Resource.liftF(DefaultDatasourceErrors[F, UUID])
 
@@ -130,6 +134,8 @@ object Quasar extends Logging {
         DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(report)(_, _))
+
+      freshUUID = Sync[F].delay(UUID.randomUUID)
 
       dsCache <- ResourceManager[
         F, UUID, QuasarDatasource[Fix, Resource[F, ?], Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
@@ -205,4 +211,29 @@ object Quasar extends Logging {
     s map { case (rp, a) =>
       (rp, QSMap(a, rec.Hole))
     }
+
+  private def migrateDatasourceConfigs[F[_]: Concurrent](
+      datasourceRefs: IndexedStore[F, UUID, DatasourceRef[Json]],
+      modules: Map[DatasourceType, DatasourceModule])(
+      concurrency: Int)
+      : Resource[F, Unit] = {
+    val inserts: Stream[F, Unit] =
+      datasourceRefs.entries.parEvalMap[F, Unit](concurrency) {
+        case (id, ref) =>
+          modules.get(ref.kind) match {
+            case Some(module) =>
+              module.migrateConfig(ref.config) match {
+                case Right(c) =>
+                  if (c === ref.config)
+                    ().pure[F]
+                  else
+                    datasourceRefs.insert(id, ref.copy(config = c))
+                case Left(_) => ().pure[F]
+              }
+            case None => ().pure[F]
+          }
+      }
+
+    inserts.compile.resource.drain
+  }
 }

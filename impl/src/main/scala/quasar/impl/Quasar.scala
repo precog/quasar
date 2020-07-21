@@ -20,7 +20,8 @@ import slamdata.Predef._
 
 import quasar.{Condition, RateLimiting, Store}
 import quasar.api.QueryEvaluator
-import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
+import quasar.api.auth.Credentials
+import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources, DatasourceError}, DatasourceError.CreateError
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.discovery.{Discovery, SchemaConfig}
 import quasar.api.intentions.Intentions
@@ -100,7 +101,8 @@ object Quasar extends Logging {
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID],
-      pushPull: PushmiPullyu[F])(
+      pushPull: PushmiPullyu[F],
+      getAuth: UUID => F[Either[CreateError[Json], Option[Credentials[F]]]])(
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],
@@ -127,7 +129,7 @@ object Quasar extends Logging {
       }
 
       dsModules =
-        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores)
+        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores, getAuth)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(report)(_, _))
 

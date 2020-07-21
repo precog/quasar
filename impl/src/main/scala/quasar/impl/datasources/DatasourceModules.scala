@@ -19,6 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{RateLimiting, RenderTreeT}
+import quasar.api.auth.Credentials
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -42,7 +43,7 @@ import fs2.Stream
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import scalaz.{ISet, EitherT, -\/, \/-}
+import scalaz.{ISet, EitherT, -\/, \/-, \/}
 
 import shims.{monadToScalaz, monadToCats}
 
@@ -131,10 +132,12 @@ object DatasourceModules {
   private[impl] def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr: MonadPlannerErr,
-      I, A: Hash](
+      I,
+      A: Hash](
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],
-      byteStores: ByteStores[F, I])(
+      byteStores: ByteStores[F, I],
+      getAuth: I => F[Either[CreateError[Json], Option[Credentials[F]]]])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {
@@ -152,18 +155,18 @@ object DatasourceModules {
           case None =>
             EitherT.pureLeft(DatasourceUnsupported(ref.kind, moduleSet))
 
-          case Some(module) =>
-            EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i))) flatMap { store =>
-              module match {
-                case DatasourceModule.Lightweight(lw) =>
-                  handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store))
-                    .map(QuasarDatasource.lightweight[T](_))
-
-                case DatasourceModule.Heavyweight(hw) =>
-                  handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
-                    .map(QuasarDatasource.heavyweight(_))
-              }
+          case Some(module) => for {
+            store <- EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i)))
+            auth <- EitherT.eitherT(Resource.liftF(getAuth(i).map(\/.fromEither)))
+            res <- module match {
+              case DatasourceModule.Lightweight(lw) =>
+                handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store, auth))
+                  .map(QuasarDatasource.lightweight[T](_))
+              case DatasourceModule.Heavyweight(hw) =>
+                handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))
+                  .map(QuasarDatasource.heavyweight(_))
             }
+          } yield res
         }
 
       def sanitizeRef(inp: DatasourceRef[Json]): DatasourceRef[Json] =

@@ -38,7 +38,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 
 import cats.{Applicative, Functor, Order, Show, Traverse}
-import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList}
+import cats.data.{Const, EitherT, Ior, OptionT, NonEmptyList, ValidatedNel}
 import cats.effect.{Concurrent, Resource, Sync, Timer}
 import cats.effect.concurrent.Deferred
 import cats.effect.implicits._
@@ -409,6 +409,9 @@ private[impl] final class DefaultResultPush[
         case Right(Constructor.Binary(p1, p2, _)) =>
           List(p1, p2).map(_.map(∃(_)))
 
+        case Right(Constructor.Ternary(p1, p2, p3, _)) =>
+          List(p1, p2, p3).map(_.map(∃(_)))
+
         case Left(_) => List()
       }
 
@@ -469,42 +472,41 @@ private[impl] final class DefaultResultPush[
       b.fold(_ <= i, _ >= i, (min, max) => min <= i && i <= max)
 
     def validatedParam[A](label: String, formal: Formal[A], actual: ∃[Actual])
-        : Either[ParamError, A] =
+        : ValidatedNel[ParamError, A] =
       (formal, actual) match {
         case (Boolean(_), ∃(Boolean(Const(b)))) =>
-          Right(b)
+          b.validNel
 
         case (Integer(Integer.Args(None, None)), ∃(Integer(Const(i)))) =>
-          Right(i)
+          i.validNel
 
         case (Integer(Integer.Args(Some(bounds), None)), ∃(Integer(Const(i)))) =>
           if (checkBounds(bounds, i))
-            Right(i)
+            i.validNel
           else
-            Left(ParamError.IntOutOfBounds(label, i, bounds))
+            ParamError.IntOutOfBounds(label, i, bounds).invalidNel
 
         case (Integer(Integer.Args(None, Some(step))), ∃(Integer(Const(i)))) =>
           if (step(i))
-            Right(i)
+            i.validNel
           else
-            Left(ParamError.IntOutOfStep(label, i, step))
+            ParamError.IntOutOfStep(label, i, step).invalidNel
 
         case (Integer(Integer.Args(Some(bounds), Some(step))), ∃(Integer(Const(i)))) =>
           if (!checkBounds(bounds, i))
-            Left(ParamError.IntOutOfBounds(label, i, bounds))
+            ParamError.IntOutOfBounds(label, i, bounds).invalidNel
           else if (!step(i))
-            Left(ParamError.IntOutOfStep(label, i, step))
+            ParamError.IntOutOfStep(label, i, step).invalidNel
           else
-            Right(i)
+            i.validNel
 
         case (Enum(possiblities), ∃(EnumSelect(Const(key)))) =>
           possiblities.lookup(key)
-            .toRight(ParamError.ValueNotInEnum(label, key, possiblities.keys))
+            .toValidNel(ParamError.ValueNotInEnum(label, key, possiblities.keys))
 
-        case _ => Left(ParamError.ParamMismatch(label, ∃(formal), actual))
+        case _ => ParamError.ParamMismatch(label, ∃(formal), actual).invalidNel
       }
 
-    // TODO: error for too many args
     typeIdOrdinal.getOption(selected.index.ordinal) match {
       case Some(id) => construct(id) match {
         case Left(t) => Right(t)
@@ -517,10 +519,10 @@ private[impl] final class DefaultResultPush[
                   validatedParam(l1, p1, a1).map(f)
 
                 case Nil =>
-                  Left(ParamError.ParamMissing(l1, p1))
+                  ParamError.ParamMissing(l1, p1).invalidNel
 
-                case List(_, rs @ _*) =>
-                  Left(ParamError.RedundantParams(l1, rs.toList))
+                case List(_, r, rs @ _*) =>
+                  ParamError.ExcessiveParams(1, 2 + rs.length, NonEmptyList.of(r, rs: _*)).invalidNel
               }
 
             case Constructor.Binary(Labeled(l1, p1), Labeled(l2, p2), f) =>
@@ -529,18 +531,45 @@ private[impl] final class DefaultResultPush[
                   (validatedParam(l1, p1, a1), validatedParam(l2, p2, a2)).mapN(f)
 
                 case List(a1) =>
-                  Left(ParamError.ParamMissing(l2, p2))
+                  ParamError.ParamMissing(l2, p2).invalidNel
 
                 case Nil =>
-                  Left(ParamError.ParamMissing(l1, p1))
+                  NonEmptyList.of(
+                    ParamError.ParamMissing(l1, p1),
+                    ParamError.ParamMissing(l2, p2))
+                    .invalid
 
-                case List(_, _, rs @ _*) =>
-                  Left(ParamError.RedundantParams(l1, rs.toList))
+                case List(_, _, r, rs @ _*) =>
+                  ParamError.ExcessiveParams(2, 3 + rs.length, NonEmptyList.of(r, rs: _*)).invalidNel
+              }
+
+            case Constructor.Ternary(Labeled(l1, p1), Labeled(l2, p2), Labeled(l3, p3), f) =>
+              selected.args match {
+                case List(a1, a2, a3) =>
+                  (validatedParam(l1, p1, a1), validatedParam(l2, p2, a2), validatedParam(l3, p3, a3)).mapN(f)
+
+                case List(_, _) =>
+                  ParamError.ParamMissing(l3, p3).invalidNel
+
+                case List(_) =>
+                  NonEmptyList.of(
+                    ParamError.ParamMissing(l2, p2),
+                    ParamError.ParamMissing(l3, p3))
+                    .invalid
+
+                case Nil =>
+                  NonEmptyList.of(
+                    ParamError.ParamMissing(l1, p1),
+                    ParamError.ParamMissing(l2, p2),
+                    ParamError.ParamMissing(l3, p3))
+                    .invalid
+
+                case List(_, _, _, r, rs @ _*) =>
+                  ParamError.ExcessiveParams(3, 4 + rs.length, NonEmptyList.of(r, rs: _*)).invalidNel
               }
           }
 
-          back.leftMap(err =>
-            TypeConstructionFailed(destId, name, id.label, NonEmptyList.one(err)))
+          back.leftMap(TypeConstructionFailed(destId, name, id.label, _)).toEither
       }
 
       case None =>

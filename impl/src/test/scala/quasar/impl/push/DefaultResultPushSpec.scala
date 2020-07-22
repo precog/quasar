@@ -629,6 +629,28 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     }
 
+    "fails when excessive arguments given" >> forallConfigs { config =>
+      val idx = TypeIndex(1)
+      val bad = Column("A", (ColumnType.String, SelectedType(idx, List(∃(Actual.integer(5)), ∃(Actual.boolean(true))))))
+      val cfg = outputColumns.set(bad)(config)
+
+      for {
+        (dest, _) <- QDestination()
+
+        startStatus <-
+          mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
+            .use(_.start(DestinationId, cfg, None))
+      } yield {
+        startStatus must beLeft.like {
+          case NonEmptyList(TypeConstructionFailed(
+            DestinationId,
+            "A",
+            "VARCHAR",
+            NonEmptyList(ParamError.ExcessiveParams(1, 2, NonEmptyList(∃(ParamType.Boolean(_)), Nil)), Nil)), Nil) => ok
+        }
+      }
+    }
+
     "replaces a previous full push to path" >> forallConfigs { config =>
       for {
         (dest, filesystem) <- QDestination()

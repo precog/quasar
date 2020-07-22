@@ -16,23 +16,20 @@
 
 package quasar.api.push.param
 
-import cats.data.{Ior, NonEmptySet}
-
 import java.lang.String
 import scala.{Int, Product, Serializable}
-import scala.collection.immutable.List
+
+import cats.data.{Ior, NonEmptyList, NonEmptySet}
 
 import skolems.∃
 
-sealed trait ParamError extends Product with Serializable {
-  def name: String
-}
+sealed trait ParamError extends Product with Serializable
 
 object ParamError {
   final case class IntOutOfBounds(name: String, i: Int, bounds: Ior[Int, Int]) extends ParamError
   final case class IntOutOfStep(name: String, i: Int, step: IntegerStep) extends ParamError
   final case class ParamMismatch(name: String, expected: ∃[Formal], actual: ∃[Actual]) extends ParamError
   final case class ParamMissing(name: String, expected: ∃[Formal]) extends ParamError
-  final case class RedundantParams(name: String, params: List[∃[Actual]]) extends ParamError
+  final case class ExcessiveParams(expected: Int, actual: Int, extra: NonEmptyList[∃[Actual]]) extends ParamError
   final case class ValueNotInEnum(name: String, selector: String, possibilities: NonEmptySet[String]) extends ParamError
 }

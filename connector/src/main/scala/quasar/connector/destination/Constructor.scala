@@ -34,4 +34,11 @@ object Constructor {
       param2: Labeled[Formal[B]],
       apply: (A, B) => T)
       extends Constructor[T]
+
+  final case class Ternary[A, B, C, T](
+      param1: Labeled[Formal[A]],
+      param2: Labeled[Formal[B]],
+      param3: Labeled[Formal[C]],
+      apply: (A, B, C) => T)
+      extends Constructor[T]
 }

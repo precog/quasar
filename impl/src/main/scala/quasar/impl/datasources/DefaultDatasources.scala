@@ -56,8 +56,11 @@ private[impl] final class DefaultDatasources[
     byteStores: ByteStores[F, I])
     extends Datasources[F, Stream[F, ?], I, C] {
 
-  def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I] = for {
-    i <- freshId
+  def addDatasource(ref: DatasourceRef[C], predefinedId: Option[I]): F[CreateError[C] \/ I] = for {
+    i <- predefinedId match {
+      case None => freshId
+      case Some(id) => id.pure[F]
+    }
     c <- addRef[CreateError[C]](i, Reconfiguration.Preserve, ref)
   } yield Condition.disjunctionIso.get(c).as(i)
 

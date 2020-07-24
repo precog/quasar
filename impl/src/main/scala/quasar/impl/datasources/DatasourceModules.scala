@@ -137,7 +137,7 @@ object DatasourceModules {
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, I],
-      getAuth: I => F[Either[CreateError[Json], Option[Credentials[F]]]])(
+      getAuth: I => F[Option[Credentials[F]]])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {
@@ -157,7 +157,10 @@ object DatasourceModules {
 
           case Some(module) => for {
             store <- EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i)))
-            auth <- EitherT.eitherT(Resource.liftF(getAuth(i).map(\/.fromEither)))
+            auth <- EitherT.eitherT(Resource.liftF(getAuth(i).map({
+              case None => -\/(externalCredentialsNotFound[Json, CreateError[Json]](ref.kind, sanitizeRef(ref).config))
+              case Some(a) => \/-(a)
+            })))
             res <- module match {
               case DatasourceModule.Lightweight(lw) =>
                 handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store, auth))

@@ -102,7 +102,7 @@ object Quasar extends Logging {
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID],
       pushPull: PushmiPullyu[F],
-      getAuth: UUID => F[Either[CreateError[Json], Option[Credentials[F]]]])(
+      getAuth: UUID => F[Option[Credentials[F]]])(
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],

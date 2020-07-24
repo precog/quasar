@@ -70,7 +70,7 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F],
-      auth: Option[Credentials[F]])(
+      auth: Credentials[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] = {
     val ds = for {

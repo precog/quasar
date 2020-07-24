@@ -50,7 +50,7 @@ trait LightweightDatasourceModule {
       config: Json,
       rateLimiting: RateLimiting[F, A],
       byteStore: ByteStore[F],
-      auth: Option[Credentials[F]])(
+      auth: Credentials[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]]
 }

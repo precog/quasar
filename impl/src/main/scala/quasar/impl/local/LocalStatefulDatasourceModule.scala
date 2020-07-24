@@ -69,7 +69,7 @@ object LocalStatefulDatasourceModule extends LightweightDatasourceModule with Lo
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F],
-      auth: Option[Credentials[F]])(
+      auth: Credentials[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] = {
     val ds = for {

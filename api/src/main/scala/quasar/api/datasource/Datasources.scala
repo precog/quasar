@@ -34,7 +34,7 @@ trait Datasources[F[_], G[_], I, C] {
     * set of datasources, returning its identifier or an error if it could
     * not be added.
     */
-  def addDatasource(datasourceId: I, ref: DatasourceRef[C]): F[Condition[CreateError[C]]]
+  def addDatasource(ref: DatasourceRef[C]): F[CreateError[C] \/ I]
 
   /** Metadata for all datasources. */
   def allDatasourceMetadata: F[G[(I, DatasourceMeta)]]

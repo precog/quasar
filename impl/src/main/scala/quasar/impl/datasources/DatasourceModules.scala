@@ -47,6 +47,8 @@ import scalaz.{ISet, EitherT, -\/, \/-, \/}
 
 import shims.{monadToScalaz, monadToCats}
 
+import java.util.UUID
+
 trait DatasourceModules[T[_[_]], F[_], G[_], H[_], I, C, R, P <: ResourcePathType] { self =>
   def create(i: I, ref: DatasourceRef[C])
       : EitherT[Resource[F, ?], CreateError[C], QuasarDatasource[T, G, H, R, P]]
@@ -132,12 +134,12 @@ object DatasourceModules {
   private[impl] def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr: MonadPlannerErr,
-      I,
+      I, B,
       A: Hash](
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, I],
-      getAuth: I => F[Option[Credentials[F]]])(
+      getAuth: UUID => F[Option[Credentials[F]]])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {
@@ -157,13 +159,9 @@ object DatasourceModules {
 
           case Some(module) => for {
             store <- EitherT.rightU[CreateError[Json]](Resource.liftF(byteStores.get(i)))
-            auth <- EitherT.eitherT(Resource.liftF(getAuth(i).map({
-              case None => -\/(externalCredentialsNotFound[Json, CreateError[Json]](ref.kind, sanitizeRef(ref).config))
-              case Some(a) => \/-(a)
-            })))
             res <- module match {
               case DatasourceModule.Lightweight(lw) =>
-                handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store, auth))
+                handleInitErrors(module.kind, lw.lightweightDatasource[F, A](ref.config, rateLimiting, store, getAuth))
                   .map(QuasarDatasource.lightweight[T](_))
               case DatasourceModule.Heavyweight(hw) =>
                 handleInitErrors(module.kind, hw.heavyweightDatasource[T, F](ref.config, store))

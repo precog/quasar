@@ -129,13 +129,13 @@ object Quasar extends Logging {
       }
 
       dsModules =
-        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores, getAuth)
+        DatasourceModules[Fix, F, UUID, UUID, A](datasourceModules, rateLimiting, byteStores, getAuth)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(report)(_, _))
 
       dsCache <- ResourceManager[
         F, UUID, QuasarDatasource[Fix, Resource[F, ?], Stream[F, ?], CompositeResult[F, QueryResult[F]], ResourcePathType]]
-      datasources <- Resource.liftF(DefaultDatasources(datasourceRefs, dsModules, dsCache, dsErrors, byteStores))
+      datasources <- Resource.liftF(DefaultDatasources(freshUUID, datasourceRefs, dsModules, dsCache, dsErrors, byteStores))
 
       destCache <- ResourceManager[F, UUID, Destination[F]]
       destinations <- Resource.liftF(DefaultDestinations(freshUUID, destinationRefs, destCache, destModules))

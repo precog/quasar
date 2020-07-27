@@ -32,6 +32,7 @@ import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource, Sync}
 import cats.kernel.Hash
 import fs2.Stream
+import java.util.UUID
 
 trait LightweightDatasourceModule {
   def kind: DatasourceType
@@ -50,7 +51,7 @@ trait LightweightDatasourceModule {
       config: Json,
       rateLimiting: RateLimiting[F, A],
       byteStore: ByteStore[F],
-      auth: Credentials[F])(
+      auth: UUID => F[Option[Credentials[F]]])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]]
 }

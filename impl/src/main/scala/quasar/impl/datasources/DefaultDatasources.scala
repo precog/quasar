@@ -47,7 +47,6 @@ private[impl] final class DefaultDatasources[
     G[_], H[_],
     I: Equal, C: Equal, R] private (
     semaphore: IndexedSemaphore[F, I],
-    freshId: F[I],
     refs: IndexedStore[F, I, DatasourceRef[C]],
     modules: DatasourceModules[T, F, G, H, I, C, R, ResourcePathType],
     getter: CachedGetter[F, I, DatasourceRef[C]],
@@ -56,13 +55,8 @@ private[impl] final class DefaultDatasources[
     byteStores: ByteStores[F, I])
     extends Datasources[F, Stream[F, ?], I, C] {
 
-  def addDatasource(ref: DatasourceRef[C], predefinedId: Option[I]): F[CreateError[C] \/ I] = for {
-    i <- predefinedId match {
-      case None => freshId
-      case Some(id) => id.pure[F]
-    }
-    c <- addRef[CreateError[C]](i, Reconfiguration.Preserve, ref)
-  } yield Condition.disjunctionIso.get(c).as(i)
+  def addDatasource(datasourceId: I, ref: DatasourceRef[C]): F[Condition[CreateError[C]]] =
+    addRef[CreateError[C]](datasourceId, Reconfiguration.Preserve, ref)
 
   def allDatasourceMetadata: F[Stream[F, (I, DatasourceMeta)]] =
     Sync[F].pure(refs.entries.evalMap {
@@ -245,7 +239,6 @@ object DefaultDatasources {
       F[_]: Concurrent: ContextShift: MonadError_[?[_], CreateError[C]],
       G[_], H[_],
       I: Equal, C: Equal, R](
-      freshId: F[I],
       refs: IndexedStore[F, I, DatasourceRef[C]],
       modules: DatasourceModules[T, F, G, H, I, C, R, ResourcePathType],
       cache: ResourceManager[F, I, QuasarDatasource[T, G, H, R, ResourcePathType]],
@@ -254,5 +247,5 @@ object DefaultDatasources {
       : F[DefaultDatasources[T, F, G, H, I, C, R]] = for {
     semaphore <- IndexedSemaphore[F, I]
     getter <- CachedGetter(refs.lookup(_))
-  } yield new DefaultDatasources(semaphore, freshId, refs, modules, getter, cache, errors, byteStores)
+  } yield new DefaultDatasources(semaphore, refs, modules, getter, cache, errors, byteStores)
 }

@@ -26,6 +26,6 @@ import AuthError._
 trait Auth[F[_], Subject, Scheme] {
   def create(scheme: Scheme): F[Either[InvalidScheme[Scheme], Subject]]
   def transfer(source: Subject, target: Subject): F[Condition[CredentialsNotFound[Subject]]]
-  def authorize(subject: Subject, scheme: Scheme): F[Either[InvalidScheme[Scheme], Credentials[F]]]
   def authorized(subject: Subject): F[Either[CredentialsNotFound[Subject], Credentials[F]]]
+  def forget(subject: Subject): F[Condition[CredentialsNotFound[Subject]]]
 }

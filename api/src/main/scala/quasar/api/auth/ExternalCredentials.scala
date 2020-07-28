@@ -18,12 +18,9 @@ package quasar.api.auth
 
 import scala._
 
-trait Credentials[+F[_]] extends Product with Serializable
+trait ExternalCredentials[+F[_]] extends Product with Serializable
 
-object Credentials {
-  final case class Perpetual[F[_]](get: F[Array[Byte]]) extends Credentials[F]
-  final case class Temporary[F[_]](get: F[Array[Byte]], renew: F[Unit]) extends Credentials[F]
-  final case object Omitted extends Credentials[Nothing]
-
-  def omitted[F[_]]: Credentials[F] = Omitted
+object ExternalCredentials {
+  final case class Perpetual[F[_]](get: F[Array[Byte]]) extends ExternalCredentials[F]
+  final case class Temporary[F[_]](get: F[Array[Byte]], renew: F[Unit]) extends ExternalCredentials[F]
 }

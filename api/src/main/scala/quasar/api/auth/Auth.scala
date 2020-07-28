@@ -19,11 +19,10 @@ package quasar.api.auth
 import scala.{Boolean, Option}
 
 import scala.util.Either
-import quasar.Condition
 
 import AuthError._
 
 trait Auth[F[_], Subject, Scheme] {
   def create(scheme: Scheme): F[Either[InvalidScheme[Scheme], Subject]]
-  def authorized(subject: Subject): F[Either[CredentialsNotFound[Subject], Credentials[F]]]
+  def authorized(subject: Subject): F[Option[ExternalCredentials[F]]]
 }

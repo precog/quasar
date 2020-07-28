@@ -18,9 +18,8 @@ package quasar.api.auth
 
 import scala.{Product, Serializable, Nothing}
 
-trait AuthError[+S, +B] extends Product with Serializable
+trait AuthError[+S] extends Product with Serializable
 
 object AuthError {
-  final case class InvalidScheme[S](scheme: S) extends AuthError[S, Nothing]
-  final case class CredentialsNotFound[B](subject: B) extends AuthError[Nothing, B]
+  final case class InvalidScheme[S](scheme: S) extends AuthError[S]
 }

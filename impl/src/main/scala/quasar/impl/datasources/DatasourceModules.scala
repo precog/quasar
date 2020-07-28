@@ -19,7 +19,7 @@ package quasar.impl.datasources
 import slamdata.Predef._
 
 import quasar.{RateLimiting, RenderTreeT}
-import quasar.api.auth.Credentials
+import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource._
 import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
@@ -139,7 +139,7 @@ object DatasourceModules {
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, I],
-      getAuth: UUID => F[Option[Credentials[F]]])(
+      getAuth: UUID => F[Option[ExternalCredentials[F]]])(
       implicit
       ec: ExecutionContext)
       : Modules[T, F, I] = {

@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.{Condition, RateLimiting, Store}
 import quasar.api.QueryEvaluator
-import quasar.api.auth.Credentials
+import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources, DatasourceError}, DatasourceError.CreateError
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.discovery.{Discovery, SchemaConfig}
@@ -102,7 +102,7 @@ object Quasar extends Logging {
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID],
       pushPull: PushmiPullyu[F],
-      getAuth: UUID => F[Option[Credentials[F]]])(
+      getAuth: UUID => F[Option[ExternalCredentials[F]]])(
       maxConcurrentPushes: Int,
       datasourceModules: List[DatasourceModule],
       destinationModules: List[DestinationModule],

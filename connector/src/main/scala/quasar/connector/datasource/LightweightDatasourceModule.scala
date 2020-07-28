@@ -17,7 +17,7 @@
 package quasar.connector.datasource
 
 import quasar.RateLimiting
-import quasar.api.auth.Credentials
+import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{ConfigurationError, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
@@ -51,7 +51,7 @@ trait LightweightDatasourceModule {
       config: Json,
       rateLimiting: RateLimiting[F, A],
       byteStore: ByteStore[F],
-      auth: UUID => F[Option[Credentials[F]]])(
+      auth: UUID => F[Option[ExternalCredentials[F]]])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]]
 }

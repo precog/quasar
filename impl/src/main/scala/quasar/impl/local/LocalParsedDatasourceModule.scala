@@ -19,7 +19,7 @@ package quasar.impl.local
 import slamdata.Predef._
 
 import quasar.RateLimiting
-import quasar.api.auth.Credentials
+import quasar.api.auth.ExternalCredentials
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{
   ConfigurationError,
@@ -72,7 +72,7 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F],
-      auth: UUID => F[Option[Credentials[F]]])(
+      auth: UUID => F[Option[ExternalCredentials[F]]])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] = {
     val ds = for {

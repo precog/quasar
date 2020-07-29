@@ -20,9 +20,7 @@ import scala.{Boolean, Option}
 
 import scala.util.Either
 
-import AuthError._
-
 trait Auth[F[_], Subject, Scheme] {
-  def create(scheme: Scheme): F[Either[InvalidScheme[Scheme], Subject]]
+  def create(scheme: Scheme): F[Either[AuthError, Subject]]
   def authorized(subject: Subject): F[Option[ExternalCredentials[F]]]
 }

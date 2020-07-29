@@ -129,7 +129,7 @@ object Quasar extends Logging {
       }
 
       dsModules =
-        DatasourceModules[Fix, F, UUID, UUID, A](datasourceModules, rateLimiting, byteStores, getAuth)
+        DatasourceModules[Fix, F, UUID, A](datasourceModules, rateLimiting, byteStores, getAuth)
           .withMiddleware(AggregatingMiddleware(_, _))
           .withMiddleware(ConditionReportingMiddleware(report)(_, _))
 

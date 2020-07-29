@@ -43,7 +43,7 @@ import fs2.Stream
 
 import matryoshka.{BirecursiveT, EqualT, ShowT}
 
-import scalaz.{ISet, EitherT, -\/, \/-, \/}
+import scalaz.{ISet, EitherT, -\/, \/-}
 
 import shims.{monadToScalaz, monadToCats}
 
@@ -134,7 +134,7 @@ object DatasourceModules {
   private[impl] def apply[
       T[_[_]]: BirecursiveT: EqualT: ShowT: RenderTreeT,
       F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr: MonadPlannerErr,
-      I, B,
+      I,
       A: Hash](
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],

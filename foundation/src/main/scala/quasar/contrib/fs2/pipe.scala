@@ -23,7 +23,7 @@ import quasar.byte
 import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets
 
-import fs2.{Chunk, Pipe, Stream}
+import fs2.{Chunk, Pipe, Stream, Pull}
 
 object pipe {
   private val Utf8Bom = Chunk.bytes(byte.Utf8Bom)
@@ -46,5 +46,25 @@ object pipe {
       str.flatMap(cb =>
         Stream.chunk(Chunk.ByteBuffer(encoder.encode(cb))))
     }
+  }
+
+  def limitSize[F[_]](
+      target: Int,
+      onTargetExceeded: Pull[F, Nothing, Nothing])
+      : Pipe[F, Byte, Byte] = { bytes =>
+
+    def loop(acc: Int, remaining: Stream[F, Byte]): Pull[F, Byte, Int] =
+      remaining.pull.uncons flatMap {
+        case Some((hd, tl)) =>
+          val size = acc + hd.size
+          if (size > target)
+            onTargetExceeded
+          else
+            Pull.output(hd) >> loop(size, tl)
+        case None =>
+          Pull.pure(acc)
+      }
+
+    loop(0, bytes).void.stream
   }
 }

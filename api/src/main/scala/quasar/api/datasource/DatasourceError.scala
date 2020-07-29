@@ -58,9 +58,6 @@ object DatasourceError extends DatasourceErrorInstances {
   final case class InvalidConfiguration[C](kind: DatasourceType, config: C, reasons: NonEmptyList[String])
       extends ConfigurationError[C]
 
-  final case class ExternalCredentialsNotFound[C](kind: DatasourceType, config: C)
-      extends ConfigurationError[C]
-
   sealed trait ExistentialError[+I] extends DatasourceError[I, Nothing]
 
   final case class DatasourceNotFound[I](datasourceId: I)
@@ -103,12 +100,6 @@ object DatasourceError extends DatasourceErrorInstances {
       case MalformedConfiguration(t, c, r) => (t, c, r)
     } ((MalformedConfiguration[C](_, _, _)).tupled)
 
-  def externalCredentialsNotFound[C, E >: InitializationError[C] <: DatasourceError[_, C]]
-      : Prism[E, (DatasourceType, C)] =
-    Prism.partial[E, (DatasourceType, C)] {
-      case ExternalCredentialsNotFound(a, b) => (a, b)
-    } ((ExternalCredentialsNotFound[C](_, _)).tupled)
-
   def invalidConfiguration[C, E >: InitializationError[C] <: DatasourceError[_, C]]
       : Prism[E, (DatasourceType, C, NonEmptyList[String])] =
     Prism.partial[E, (DatasourceType, C, NonEmptyList[String])] {
@@ -129,8 +120,7 @@ sealed abstract class DatasourceErrorInstances {
       datasourceNotFound[I, DatasourceError[I, C]].getOption(de),
       datasourceUnsupported[DatasourceError[I, C]].getOption(de),
       invalidConfiguration[C, DatasourceError[I, C]].getOption(de),
-      malformedConfiguration[C, DatasourceError[I, C]].getOption(de),
-      externalCredentialsNotFound[C, DatasourceError[I, C]].getOption(de)
+      malformedConfiguration[C, DatasourceError[I, C]].getOption(de)
     )}
   }
 
@@ -159,9 +149,6 @@ sealed abstract class DatasourceErrorInstances {
 
       case MalformedConfiguration(k, c, r) =>
         "MalformedConfiguration(" + k.show + ", " + c.show + ", " + r.show + ")"
-
-      case ExternalCredentialsNotFound(a, b) =>
-        "ExternalCredentialsNotFound(" + a.show + ", " + b.show + ")"
 
       case ConnectionFailed(k, c, e) =>
         "ConnectionFailed(" + k.show + ", " + c.show + s")\n\n$e"

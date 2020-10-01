@@ -26,7 +26,7 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 
 import fs2.{Stream, text}
-import fs2.concurrent.{Enqueue, Queue}
+import fs2.concurrent.Queue
 
 import java.lang.Integer
 import java.time.{Instant, ZoneOffset}

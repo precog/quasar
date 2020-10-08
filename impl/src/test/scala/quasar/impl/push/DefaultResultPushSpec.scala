@@ -68,6 +68,7 @@ import skolems.{∃, Forall}
 
 import spire.math.Real
 
+// FIXME: Switch to cats-effect-test
 object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   import ResultPushError._
 

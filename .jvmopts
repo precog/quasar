@@ -1,6 +1,5 @@
 -Xms512m
 -Xmx3g
--Xss1m
 -XX:+UseG1GC
 -XX:+UseStringDeduplication
 -XX:ParallelGCThreads=2

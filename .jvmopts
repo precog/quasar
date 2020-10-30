@@ -1,9 +1,9 @@
 -Xms512m
 -Xmx3g
--Xss2m
 -XX:+UseG1GC
 -XX:+UseStringDeduplication
 -XX:ParallelGCThreads=2
 -XX:ConcGCThreads=1
 -XX:ReservedCodeCacheSize=512m
 -XX:+PrintFlagsFinal
+-XX:LoadExecStackDllInVMThread=false

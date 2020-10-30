@@ -5,3 +5,4 @@
 -XX:ParallelGCThreads=2
 -XX:ConcGCThreads=1
 -XX:ReservedCodeCacheSize=512m
+-XX:+PrintFlagsFinal

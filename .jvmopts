@@ -6,4 +6,6 @@
 -XX:ConcGCThreads=1
 -XX:ReservedCodeCacheSize=512m
 -XX:+PrintFlagsFinal
--XX:LoadExecStackDllInVMThread=false
+-XX:+UnlockDiagnosticVMOptions
+-XX:NativeMemoryTracking=summary
+-XX:+PrintNMTStatistics

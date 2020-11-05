@@ -290,6 +290,7 @@ lazy val impl = project
       "com.precog"     %% "fs2-job"                  % fs2JobVersion.value,
       "com.precog"     %% "qdata-tectonic"           % qdataVersion.value,
       "com.precog"     %% "tectonic-fs2"             % tectonicVersion.value,
+      "com.precog"     %% "http4s-async-http-client" % http4sVersion,
       "org.http4s"     %% "jawn-fs2"                 % jawnfs2Version,
       "org.slf4s"      %% "slf4s-api"                % slf4sVersion,
       "io.argonaut"    %% "argonaut-jawn"            % argonautVersion,
@@ -307,5 +308,6 @@ lazy val impl = project
       // if it is not added here then no HttpClientProvider implementation can be found.
       // See ch11286.
       "com.azure" % "azure-core-http-netty" % "1.5.1",
-      "org.typelevel" %% "kittens" % kittensVersion % Test))
+      "org.typelevel" %% "kittens"    % kittensVersion % Test,
+      "com.precog"    %% "http4s-dsl" % http4sVersion  % Test))
   .evictToLocal("FS2_JOB_PATH", "core")

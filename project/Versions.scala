@@ -29,4 +29,5 @@ object Versions {
   val iotaVersion         = "0.3.10"
   val drosteVersion       = "0.8.0"
   val h2Version           = "1.4.200"
+  val http4sVersion       = "0.21.2"
 }

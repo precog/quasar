@@ -24,16 +24,17 @@ import cats.implicits._
 import fs2.Chunk
 
 sealed trait DataEvent[+P, +O] extends Product with Serializable
+sealed trait AppendEvent[+P, +O] extends DataEvent[P, O]
 
 object DataEvent {
-  final case class Create[P](records: Chunk[P]) extends DataEvent[P, Nothing]
+  final case class Create[P](records: Chunk[P]) extends AppendEvent[P, Nothing]
   final case class Delete(recordIds: IdBatch) extends DataEvent[Nothing, Nothing]
 
   /** A transaction boundary, consumers should treat all events since the
     * previous `Commit` (or the start of the stream) as part of a single
     * transaction, if possible.
     */
-  final case class Commit[O](offset: O) extends DataEvent[Nothing, O]
+  final case class Commit[O](offset: O) extends AppendEvent[Nothing, O]
 
   def create[P, O](records: Chunk[P]): DataEvent[P, O] =
     Create(records)

@@ -59,6 +59,15 @@ object PushConfig {
         outputColumns)
   }
 
+  final case class SourceDriven[O, +Q](
+      path: ResourcePath,
+      query: Q,
+      columns: Columns,
+      offsetTag: OffsetKey.Formal[Unit, O],
+      offsetPath: OffsetPath)
+      extends PushConfig[O, Q]
+
+
   def full[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, Columns)] =
     Prism.partial[PushConfig[O, Q], (ResourcePath, Q, Columns)] {
       case Full(p, q, c) => (p, q, c)
@@ -69,20 +78,27 @@ object PushConfig {
       case Incremental(p, q, c, r, o) => (p, q, c, r, o)
     } ((Incremental[O, Q] _).tupled)
 
+  def sourceDriven[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, Columns, OffsetKey.Formal[Unit, O], OffsetPath)] =
+    Prism.partial[PushConfig[O, Q], (ResourcePath, Q, Columns, OffsetKey.Formal[Unit, O], OffsetPath)] {
+      case SourceDriven(p, q, c, r, op) => (p, q, c, r, op)
+    } ((SourceDriven[O, Q] _).tupled)
+
   def query[O, Q1, Q2]: PLens[PushConfig[O, Q1], PushConfig[O, Q2], Q1, Q2] =
     PLens[PushConfig[O, Q1], PushConfig[O, Q2], Q1, Q2](_.query)(q2 => {
       case f @ Full(_, _, _) => f.copy(query = q2)
       case i @ Incremental(_, _, _, _, _) => i.copy(query = q2)
+      case s @ SourceDriven(_, _, _, _, _) => s.copy(query = q2)
     })
 
   def path[O, Q]: Lens[PushConfig[O, Q], ResourcePath] =
     Lens[PushConfig[O, Q], ResourcePath](_.path)(p2 => {
       case f @ Full(_, _, _) => f.copy(path = p2)
       case i @ Incremental(_, _, _, _, _) => i.copy(path = p2)
+      case s @ SourceDriven(_, _, _, _, _) => s.copy(path = p2)
     })
 
   implicit def pushConfigEq[O, Q: Eq]: Eq[PushConfig[O, Q]] =
-    Eq.by(p => (full[O, Q].getOption(p), incremental[O, Q].getOption(p)))
+    Eq.by(p => (full[O, Q].getOption(p), incremental[O, Q].getOption(p), sourceDriven[O, Q].getOption(p)))
 
   implicit def pushConfigShow[O, Q: Show]: Show[PushConfig[O, Q]] =
     Show show {
@@ -91,6 +107,9 @@ object PushConfig {
 
       case i @ Incremental(p, q, c, r, o) =>
         s"Incremental(${p.show}, ${q.show}, ${c.map(_.name).show}, ${r.show}, ${o.show})"
+
+      case s @ SourceDriven(p, q, c, r, op) =>
+        s"SourceDriven(${p.show}, ${q.show}, ${c.map(_.name).show}, ${r.show}, ${op.show})"
     }
 
   implicit def pushConfigNonEmptyTraverse[O]: NonEmptyTraverse[PushConfig[O, ?]] =

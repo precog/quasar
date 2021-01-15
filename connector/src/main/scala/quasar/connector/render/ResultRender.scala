@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.{Column, ColumnType}
 import quasar.api.push.{IdType, OffsetKey}
-import quasar.connector.DataEvent
+import quasar.connector.{AppendEvent, DataEvent}
 
 import cats.data.NonEmptyList
 
@@ -42,4 +42,11 @@ trait ResultRender[F[_], I] {
       config: RenderConfig[P],
       rowLimit: Option[Long])
       : Stream[F, DataEvent[P, OffsetKey.Actual[A]]]
+
+  def renderAppend[A, P](
+      input: RenderInput[I],
+      columns: NonEmptyList[Column[ColumnType.Scalar]],
+      config: RenderConfig[P],
+      rowLimit: Option[Long])
+      : Stream[F, AppendEvent[P, OffsetKey.Actual[A]]]
 }

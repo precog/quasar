@@ -37,6 +37,22 @@ object ResultSink {
       consume: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[A], Pipe[F, A, Unit]))
       extends ResultSink[F, T]
 
+  final case class UpsertSink[F[_], T, A](
+      consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
+      extends ResultSink[F, T]
+
+  final case class AppendSink[F[_], T] (
+      consume: (ResourcePath, NonEmptyList[Column[T]]) => AppendSink.Result[F])
+      extends ResultSink[F, T]
+
+  object AppendSink {
+    trait Result[F[_]] {
+      type A
+      val renderConfig: RenderConfig[A]
+      val pipe: ∀[λ[α => Pipe[F, AppendEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]
+    }
+  }
+
   object UpsertSink {
     final case class Args[T](
         path: ResourcePath,
@@ -49,10 +65,6 @@ object ResultSink {
     }
   }
 
-  final case class UpsertSink[F[_], T, A](
-      consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
-      extends ResultSink[F, T]
-
   def create[F[_], T, A](
       consume: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[A], Pipe[F, A, Unit]))
       : ResultSink[F, T] =
@@ -62,4 +74,15 @@ object ResultSink {
       consume: UpsertSink.Args[T] => (RenderConfig[A], ∀[λ[α => Pipe[F, DataEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
       : ResultSink[F, T] =
     UpsertSink(consume)
+
+  def append[F[_], T, X](
+      f: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[X], ∀[λ[α => Pipe[F, AppendEvent[X, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
+      : ResultSink[F, T] =
+    AppendSink { (path, cols) => f(path, cols) match {
+      case (renderConfig0, pipe0) => new AppendSink.Result[F] {
+        type A = X
+        val renderConfig = renderConfig0
+        val pipe = pipe0
+      }
+    }}
 }

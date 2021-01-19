@@ -49,7 +49,7 @@ object ResultSink {
     trait Result[F[_]] {
       type A
       val renderConfig: RenderConfig[A]
-      val pipe: ∀[λ[α => Pipe[F, AppendEvent[A, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]
+      val pipe: ∀[λ[α => Pipe[F, AppendEvent[A], OffsetKey.Actual[α]]]]
     }
   }
 
@@ -76,7 +76,7 @@ object ResultSink {
     UpsertSink(consume)
 
   def append[F[_], T, X](
-      f: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[X], ∀[λ[α => Pipe[F, AppendEvent[X, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]]))
+      f: (ResourcePath, NonEmptyList[Column[T]]) => (RenderConfig[X], ∀[λ[α => Pipe[F, AppendEvent[X], OffsetKey.Actual[α]]]]))
       : ResultSink[F, T] =
     AppendSink { (path, cols) => f(path, cols) match {
       case (renderConfig0, pipe0) => new AppendSink.Result[F] {

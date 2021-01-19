@@ -43,10 +43,10 @@ trait ResultRender[F[_], I] {
       rowLimit: Option[Long])
       : Stream[F, DataEvent[P, OffsetKey.Actual[A]]]
 
-  def renderAppend[A, P](
-      input: RenderInput[I],
+  def renderAppend[P](
+      input: I,
       columns: NonEmptyList[Column[ColumnType.Scalar]],
       config: RenderConfig[P],
       rowLimit: Option[Long])
-      : Stream[F, AppendEvent[P, OffsetKey.Actual[A]]]
+      : Stream[F, AppendEvent[P]]
 }

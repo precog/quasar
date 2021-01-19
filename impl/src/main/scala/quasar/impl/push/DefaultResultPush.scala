@@ -381,14 +381,8 @@ private[impl] final class DefaultResultPush[
 
         dataEvents =
           Stream.resource(evaluator((query, offset))) flatMap { results =>
-            val input = actualOffset match {
-              case Some(_) =>
-                RenderInput.Incremental(results)
-              case None =>
-                RenderInput.Initial(results)
-            }
-            render.renderAppend[A, consumed.A](
-              input,
+            render.renderAppend[consumed.A](
+              results,
               renderColumns,
               consumed.renderConfig,
               limit)

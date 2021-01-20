@@ -90,7 +90,7 @@ object ResultParser {
       queryResult: QueryResult[F],
       blocker: Blocker)
       : Stream[F, A] = {
-    def parsedStream(qr: QueryResult[F]): Stream[F, A] =
+    def parsedStream0(qr: QueryResult.Unwrapped[F]): Stream[F, A] =
       qr match {
         case QueryResult.Parsed(qdd, data, _) =>
           data.map(QData.convert(_)(qdd, QDataEncode[A]))
@@ -106,6 +106,11 @@ object ResultParser {
               recurseStateful(state(plate), data, pipe)
           }
       }
+
+    def parsedStream(qr: QueryResult[F]): Stream[F, A] = qr match {
+      case uw: QueryResult.Unwrapped[F] => parsedStream0(uw)
+      case QueryResult.Keyed(_, uw) => parsedStream0(uw)
+    }
 
     if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)

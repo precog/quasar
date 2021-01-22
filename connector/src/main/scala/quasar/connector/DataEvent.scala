@@ -45,9 +45,6 @@ object DataEvent {
   def commit[P, O](offset: O): DataEvent[P, O] =
     Commit(offset)
 
-//  def append[P, O]: DataEvent[P, O] =
-//    AppendCommit
-
   implicit def dataEventTraverse[P]: Traverse[DataEvent[P, ?]] =
     new Traverse[DataEvent[P, ?]] {
       def foldLeft[A, B](fa: DataEvent[P, A], b: B)(f: (B, A) => B): B =
@@ -55,7 +52,6 @@ object DataEvent {
           case Create(_) => b
           case Delete(_) => b
           case Commit(a) => f(b, a)
-//          case AppendCommit => b
         }
 
       def foldRight[A, B](fa: DataEvent[P, A], b: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
@@ -63,7 +59,6 @@ object DataEvent {
           case Create(_) => b
           case Delete(_) => b
           case Commit(a) => f(a, b)
-//          case AppendCommit => b
         }
 
       def traverse[F[_]: Applicative, A, B](fa: DataEvent[P, A])(f: A => F[B]): F[DataEvent[P, B]] =
@@ -71,7 +66,6 @@ object DataEvent {
           case c @ Create(_) => (c: DataEvent[P, B]).pure[F]
           case d @ Delete(_) => (d: DataEvent[P, B]).pure[F]
           case Commit(a) => f(a).map(Commit(_))
-//          case AppendCommit => (AppendCommit: DataEvent[P, B]).pure[F]
         }
     }
 
@@ -80,7 +74,6 @@ object DataEvent {
       case Create(cs) => (Some(cs), None, None)//, None)
       case Delete(ids) => (None, Some(ids), None)//, None)
       case Commit(o) => (None, None, Some(o))//, None)
-//      case AppendCommit => (None, None, None, Some(true))
     }
 
   implicit def dataEventShow[P, O: Show]: Show[DataEvent[P, O]] =
@@ -88,6 +81,5 @@ object DataEvent {
       case Create(rs) => s"Create(${rs.size} elements)"
       case Delete(ids) => s"Delete(${ids.show})"
       case Commit(o) => s"Commit(${o.show})"
-//      case AppendCommit => "AppendCommit"
     }
 }

@@ -65,7 +65,7 @@ import skolems.∃
 private[impl] final class DefaultResultPush[
     F[_]: Concurrent: Timer, D: Codec: Show, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
-    evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), (Stream[F, ExternalOffsetKey], R)],
+    evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), (Stream[F, ∃[OffsetKey.Actual]], R)],
     jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
@@ -351,7 +351,8 @@ private[impl] final class DefaultResultPush[
             renderConfig,
             limit)
 
-          rendered.through(toOffsets[A]).map(∃(_)) ++ offs.map((x: ExternalOffsetKey) => ∃(OffsetKey.Actual.external(x)))
+          val renderedOffsets = rendered.through(toOffsets[A]).map(∃(_))
+          Stream.emits(List(renderedOffsets, offs)).parJoinUnbounded
         }
       }
     }
@@ -383,7 +384,8 @@ private[impl] final class DefaultResultPush[
             renderColumns,
             consumed.renderConfig,
             limit)
-          dataEvents.through(consumed.pipe[A]).map(∃(_)) ++ offsets.map((x: ExternalOffsetKey) => ∃(OffsetKey.Actual.external(x)))
+          val renderedOffsets = dataEvents.through(consumed.pipe[A]).map(∃(_))
+          Stream.emits(List(renderedOffsets, offsets)).parJoinUnbounded
         }
       }
     }
@@ -691,7 +693,7 @@ private[impl] object DefaultResultPush {
       maxConcurrentPushes: Int,
       maxOutstandingPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
-      evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), (Stream[F, ExternalOffsetKey], R)],
+      evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), (Stream[F, ∃[OffsetKey.Actual]], R)],
       render: ResultRender[F, R],
       pushes: PrefixStore.SCodec[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
       offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])

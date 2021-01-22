@@ -19,7 +19,7 @@ package quasar.connector
 import slamdata.Predef._
 
 import quasar.{NonTerminal, RenderTree, ScalarStages}, RenderTree.ops._
-import quasar.api.push.ExternalOffsetKey
+import quasar.api.push.OffsetKey
 
 import cats.~>
 import cats.implicits._
@@ -35,6 +35,8 @@ import scalaz.syntax.show._
 
 import shims.showToScalaz
 
+import skolems.∃
+
 import tectonic.Plate
 
 sealed trait QueryResult[F[_]] extends Product with Serializable {
@@ -43,7 +45,7 @@ sealed trait QueryResult[F[_]] extends Product with Serializable {
 
   def mapK[G[_]](f: F ~> G): QueryResult[G]
 
-  def offsets: Stream[F, ExternalOffsetKey]
+  def offsets: Stream[F, ∃[OffsetKey.Actual]]
 }
 
 object QueryResult extends QueryResultInstances {
@@ -89,7 +91,7 @@ object QueryResult extends QueryResultInstances {
   }
 
   final case class Keyed[F[_]](
-      offsets: Stream[F, ExternalOffsetKey],
+      offsets: Stream[F, ∃[OffsetKey.Actual]],
       unwrapped: Unwrapped[F])
       extends QueryResult[F] {
     def stages = unwrapped.stages

@@ -24,7 +24,7 @@ import quasar.api.datasource.{DatasourceRef, DatasourceType, Datasources}
 import quasar.api.destination.{DestinationRef, DestinationType, Destinations}
 import quasar.api.discovery.{Discovery, SchemaConfig}
 import quasar.api.intentions.Intentions
-import quasar.api.push.{OffsetKey, Push, ResultPush, ExternalOffsetKey}
+import quasar.api.push.{OffsetKey, Push, ResultPush}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
@@ -81,7 +81,7 @@ final class Quasar[F[_], R, C <: SchemaConfig](
     val datasources: Datasources[F, Stream[F, ?], UUID, Json],
     val destinations: Destinations[F, Stream[F, ?], UUID, Json],
     val schedulers: Schedulers.Aux[F, Stream[F, ?], UUID, Json, SchedulerBuilder[F], SchedulerType],
-    val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, (Stream[F, ExternalOffsetKey], R)],
+    val queryEvaluator: QueryEvaluator[Resource[F, ?], SqlQuery, (Stream[F, ∃[OffsetKey.Actual]], R)],
     val discovery: Discovery[Resource[F, ?], Stream[F, ?], UUID, C],
     val resultPush: ResultPush[F, UUID, SqlQuery],
     val intentions: Intentions[F, Stream[F, ?], UUID, Array[Byte], Json])
@@ -97,7 +97,7 @@ object Quasar extends Logging {
       schedulerRefs: IndexedStore[F, UUID, SchedulerRef[Json]],
       pushes: PrefixStore.SCodec[F, UUID :: ResourcePath :: HNil, ∃[Push[?, SqlQuery]]],
       offsets: Store[F, UUID :: ResourcePath :: HNil, ∃[OffsetKey.Actual]],
-      queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], (Stream[F, ExternalOffsetKey], R)],
+      queryFederation: QueryFederation[Fix, Resource[F, ?], QueryAssociate[Fix, Resource[F, ?], EvalResult[F]], (Stream[F, ∃[OffsetKey.Actual]], R)],
       resultRender: ResultRender[F, R],
       resourceSchema: ResourceSchema[F, C, (ResourcePath, CompositeResult[F, QueryResult[F]])],
       rateLimiting: RateLimiting[F, A],

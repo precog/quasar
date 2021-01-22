@@ -49,7 +49,7 @@ sealed trait QueryResult[F[_]] extends Product with Serializable {
 }
 
 object QueryResult extends QueryResultInstances {
-  sealed trait Unwrapped[F[_]] extends QueryResult[F] {
+  sealed trait Full[F[_]] extends QueryResult[F] {
     def offsets = Stream.empty
   }
 
@@ -57,7 +57,7 @@ object QueryResult extends QueryResultInstances {
       decode: QDataDecode[A],
       data: Stream[F, A],
       stages: ScalarStages)
-      extends Unwrapped[F] {
+      extends Full[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
       Parsed[G, A](decode, data.translate[F, G](f), stages)
@@ -67,7 +67,7 @@ object QueryResult extends QueryResultInstances {
       format: DataFormat,
       data: Stream[F, Byte],
       stages: ScalarStages)
-      extends Unwrapped[F] {
+      extends Full[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
       Typed[G](format, data.translate[F, G](f), stages)
@@ -79,7 +79,7 @@ object QueryResult extends QueryResultInstances {
       state: P => F[Option[S]],
       data: Option[S] => Stream[F, Byte],
       stages: ScalarStages)
-      extends Unwrapped[F] {
+      extends Full[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
       Stateful[G, P, S](
@@ -90,13 +90,13 @@ object QueryResult extends QueryResultInstances {
         stages)
   }
 
-  final case class Keyed[F[_]](
+  final case class Offseted[F[_]](
       offsets: Stream[F, ∃[OffsetKey.Actual]],
-      unwrapped: Unwrapped[F])
+      Full: Full[F])
       extends QueryResult[F] {
-    def stages = unwrapped.stages
-    def mapK[G[_]](f: F ~> G) = unwrapped.mapK(f) match {
-      case u: Unwrapped[G] => Keyed[G](offsets.translate[F, G](f), u)
+    def stages = Full.stages
+    def mapK[G[_]](f: F ~> G) = Full.mapK(f) match {
+      case u: Full[G] => Offseted[G](offsets.translate[F, G](f), u)
       case w => w
     }
   }
@@ -118,33 +118,33 @@ object QueryResult extends QueryResultInstances {
       : QueryResult[F] =
     Stateful(format, plateF, state, data, stages)
 
-  def stages0[F[_]]: Lens[Unwrapped[F], ScalarStages] =
-    Lens((_: Unwrapped[F]).stages)(ss => {
+  def stages0[F[_]]: Lens[Full[F], ScalarStages] =
+    Lens((_: Full[F]).stages)(ss => {
       case Parsed(q, d, _) => Parsed(q, d, ss)
       case Typed(f, d, _) => Typed(f, d, ss)
       case Stateful(f, p, s, d, _) => Stateful(f, p, s, d, ss)
     })
 
-  def unwrapped[F[_]]: Lens[QueryResult[F], Unwrapped[F]] = {
+  def full[F[_]]: Lens[QueryResult[F], Full[F]] = {
     val get = (q: QueryResult[F]) => q match {
-      case uw: Unwrapped[F] => uw
-      case Keyed(_, uw) => uw
+      case uw: Full[F] => uw
+      case Offseted(_, uw) => uw
     }
-    val set = (uw: Unwrapped[F]) => (q: QueryResult[F]) => q match {
-      case e: Unwrapped[F] => uw
-      case Keyed(keys, _) => Keyed(keys, uw)
+    val set = (uw: Full[F]) => (q: QueryResult[F]) => q match {
+      case e: Full[F] => uw
+      case Offseted(keys, _) => Offseted(keys, uw)
     }
     Lens(get)(set)
   }
 
   def stages[F[_]]: Lens[QueryResult[F], ScalarStages] =
-    unwrapped composeLens stages0
+    full composeLens stages0
 }
 
 sealed abstract class QueryResultInstances {
   import QueryResult._
 
-  implicit def renderTree0[F[_]]: RenderTree[Unwrapped[F]] =
+  implicit def renderTree0[F[_]]: RenderTree[Full[F]] =
     RenderTree make {
       case Parsed(_, _, ss) =>
         NonTerminal(List("Parsed"), none, List(ss.render))
@@ -156,9 +156,9 @@ sealed abstract class QueryResultInstances {
 
   implicit def renderTree[F[_]]: RenderTree[QueryResult[F]] =
     RenderTree make {
-      case uw: Unwrapped[F] => uw.render
-      case Keyed(_, uw) =>
-        NonTerminal(List("Keyed"), none, List(uw.render))
+      case uw: Full[F] => uw.render
+      case Offseted(_, uw) =>
+        NonTerminal(List("Offseted"), none, List(uw.render))
     }
 
   implicit def show[F[_]]: Show[QueryResult[F]] =

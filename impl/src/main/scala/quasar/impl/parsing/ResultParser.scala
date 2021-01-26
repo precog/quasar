@@ -109,7 +109,7 @@ object ResultParser {
 
     def parsedStream(qr: QueryResult[F]): Stream[F, A] = qr match {
       case uw: QueryResult.Full[F] => parsedStream0(uw)
-      case QueryResult.Offseted(_, uw) => parsedStream0(uw)
+      case QueryResult.Offsetted(_, uw) => parsedStream0(uw)
     }
 
     if (queryResult.stages === ScalarStages.Id)

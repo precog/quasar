@@ -19,14 +19,17 @@ package quasar.api.push
 import slamdata.Predef._
 
 import cats.{Eq, Show}
-import cats.implicits._
+
+import scodec.bits.BitVector
 
 final case class ExternalOffsetKey(value: Array[Byte])
 
 object ExternalOffsetKey {
-  implicit val eqExternalOffsetKey: Eq[ExternalOffsetKey] =
-    Eq.by { x => new String(x.value) }
+  implicit val eqExternalOffsetKey: Eq[ExternalOffsetKey] = new Eq[ExternalOffsetKey] {
+    def eqv(x: ExternalOffsetKey, y: ExternalOffsetKey): Boolean = 
+      java.util.Arrays.equals(x.value, y.value)
+  }
 
   implicit val showExternalOffsetKey: Show[ExternalOffsetKey] =
-    Show.show { x => new String(x.value) }
+    Show.show { x => BitVector(x.value).toHex }
 }

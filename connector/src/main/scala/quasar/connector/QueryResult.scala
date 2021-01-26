@@ -45,12 +45,12 @@ sealed trait QueryResult[F[_]] extends Product with Serializable {
 
   def mapK[G[_]](f: F ~> G): QueryResult[G]
 
-  def offsets: Stream[F, ∃[OffsetKey.Actual]]
+  def offset: Option[F[∃[OffsetKey.Actual]]]
 }
 
 object QueryResult extends QueryResultInstances {
   sealed trait Full[F[_]] extends QueryResult[F] {
-    def offsets = Stream.empty
+    def offset = None
   }
 
   final case class Parsed[F[_], A](
@@ -90,13 +90,15 @@ object QueryResult extends QueryResultInstances {
         stages)
   }
 
-  final case class Offseted[F[_]](
-      offsets: Stream[F, ∃[OffsetKey.Actual]],
-      Full: Full[F])
+  final case class Offsetted[F[_]](
+      offset0: F[∃[OffsetKey.Actual]],
+      full: Full[F])
       extends QueryResult[F] {
-    def stages = Full.stages
-    def mapK[G[_]](f: F ~> G) = Full.mapK(f) match {
-      case u: Full[G] => Offseted[G](offsets.translate[F, G](f), u)
+    def stages = full.stages
+    def offset = Some(offset0)
+    def mapK[G[_]](f: F ~> G) = full.mapK(f) match {
+      case u: Full[G] => 
+        Offsetted[G](f(offset0), u)
       case w => w
     }
   }
@@ -128,11 +130,11 @@ object QueryResult extends QueryResultInstances {
   def full[F[_]]: Lens[QueryResult[F], Full[F]] = {
     val get = (q: QueryResult[F]) => q match {
       case uw: Full[F] => uw
-      case Offseted(_, uw) => uw
+      case Offsetted(_, uw) => uw
     }
     val set = (uw: Full[F]) => (q: QueryResult[F]) => q match {
       case e: Full[F] => uw
-      case Offseted(keys, _) => Offseted(keys, uw)
+      case Offsetted(keys, _) => Offsetted(keys, uw)
     }
     Lens(get)(set)
   }
@@ -157,8 +159,8 @@ sealed abstract class QueryResultInstances {
   implicit def renderTree[F[_]]: RenderTree[QueryResult[F]] =
     RenderTree make {
       case uw: Full[F] => uw.render
-      case Offseted(_, uw) =>
-        NonTerminal(List("Offseted"), none, List(uw.render))
+      case Offsetted(_, uw) =>
+        NonTerminal(List("Offsetted"), none, List(uw.render))
     }
 
   implicit def show[F[_]]: Show[QueryResult[F]] =

@@ -24,7 +24,7 @@ import quasar.api.Label.Syntax._
 import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
-import quasar.connector.Offset
+import quasar.connector.{DataEvent, AppendEvent, Offset}
 import quasar.connector.destination._
 import quasar.connector.render.{RenderInput, ResultRender}
 import quasar.impl.storage.PrefixStore
@@ -380,20 +380,15 @@ private[impl] final class DefaultResultPush[
 
         val offset = actualOffset.map(o => Offset(offsetPath, ∃(o)))
 
-        val consumed = sink.consume(path, destColumns)
+        val consumer = sink.consume(path, destColumns)
 
         Stream.resource(evaluator((query, offset))) flatMap { case (offsets, results) =>
-          val dataEvents = render.renderAppend[A, consumed.A](
+          val dataEvents: Stream[F, AppendEvent[consumer.A]] = render.renderAppend[consumer.A](
             results,
             renderColumns,
-            consumed.renderConfig,
+            consumer.renderConfig,
             limit)
-          val renderedOffsets = dataEvents.through(consumed.pipe[A]).map(∃(_))
-          val externalOffsets = offsets match {
-            case None => Stream.empty
-            case Some(fa) => Stream.eval(fa)
-          }
-          renderedOffsets ++ externalOffsets
+          dataEvents.through(consumer.pipe).map(x => ∃(OffsetKey.Actual.external(x)))
         }
       }
     }

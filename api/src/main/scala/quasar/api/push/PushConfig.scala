@@ -18,6 +18,7 @@ package quasar.api.push
 
 import slamdata.Predef.{Eq => _, _}
 
+import quasar.PointedList
 import quasar.api.{Column, ColumnType}
 import quasar.api.resource.ResourcePath
 
@@ -62,10 +63,12 @@ object PushConfig {
   final case class SourceDriven[O, +Q](
       path: ResourcePath,
       query: Q,
-      columns: Columns,
+      outputColumns: PointedList[OutputColumn],
       offsetTag: OffsetKey.Formal[Unit, O],
       offsetPath: OffsetPath)
-      extends PushConfig[O, Q]
+      extends PushConfig[O, Q] {
+    def columns: Columns = outputColumns.toNel
+  }
 
 
   def full[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, Columns)] =
@@ -78,8 +81,8 @@ object PushConfig {
       case Incremental(p, q, c, r, o) => (p, q, c, r, o)
     } ((Incremental[O, Q] _).tupled)
 
-  def sourceDriven[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, Columns, OffsetKey.Formal[Unit, O], OffsetPath)] =
-    Prism.partial[PushConfig[O, Q], (ResourcePath, Q, Columns, OffsetKey.Formal[Unit, O], OffsetPath)] {
+  def sourceDriven[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, PointedList[OutputColumn], OffsetKey.Formal[Unit, O], OffsetPath)] =
+    Prism.partial[PushConfig[O, Q], (ResourcePath, Q, PointedList[OutputColumn], OffsetKey.Formal[Unit, O], OffsetPath)] {
       case SourceDriven(p, q, c, r, op) => (p, q, c, r, op)
     } ((SourceDriven[O, Q] _).tupled)
 

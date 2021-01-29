@@ -18,7 +18,7 @@ package quasar.impl.push
 
 import slamdata.Predef.{Boolean => SBoolean, _}
 
-import quasar.{Condition, Store}
+import quasar.{Condition, PointedList, Store}
 import quasar.api.{Column, ColumnType, Labeled, QueryEvaluator}
 import quasar.api.Label.Syntax._
 import quasar.api.push._
@@ -335,7 +335,7 @@ private[impl] final class DefaultResultPush[
 
         val (renderConfig, toOffsets) = sink.consume(upsertArgs)
 
-        Stream.resource(evaluator((query, offset))) flatMap { results => 
+        Stream.resource(evaluator((query, offset))) flatMap { results =>
           val input =
             if (isUpdate)
               RenderInput.Incremental(results)
@@ -351,7 +351,7 @@ private[impl] final class DefaultResultPush[
             limit)
 
           val renderedOffsets = rendered.through(toOffsets[A]).map(∃(_))
-          renderedOffsets 
+          renderedOffsets
         }
       }
     }
@@ -361,7 +361,7 @@ private[impl] final class DefaultResultPush[
         path: ResourcePath,
         query: Q,
         actualOffset: Option[OffsetKey.Actual[A]],
-        columns: NonEmptyList[Column[(ColumnType.Scalar, dest.Type)]],
+        columns: PointedList[Column[(ColumnType.Scalar, dest.Type)]],
         offsetPath: OffsetPath)
         : EitherT[F, Errs, Stream[F, ∃[OffsetKey.Actual]]] = {
       val C = Functor[Column]
@@ -371,7 +371,7 @@ private[impl] final class DefaultResultPush[
       }
       EitherT.fromOption[F](appendSink, err(IncrementalNotSupported(destinationId))) map { sink =>
         val (renderColumns, destColumns) =
-          Functor[NonEmptyList].compose[Column].unzip(columns)
+          Functor[PointedList].compose[Column].unzip(columns)
 
         val offset = actualOffset.map(o => Offset(offsetPath, ∃(o)))
 

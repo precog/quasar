@@ -18,6 +18,7 @@ package quasar.connector.render
 
 import slamdata.Predef._
 
+import quasar.PointedList
 import quasar.api.{Column, ColumnType}
 import quasar.api.push.{IdType, OffsetKey}
 import quasar.connector.{AppendEvent, DataEvent}
@@ -45,7 +46,7 @@ trait ResultRender[F[_], I] {
 
   def renderAppend[P](
       input: I,
-      columns: NonEmptyList[Column[ColumnType.Scalar]],
+      columns: PointedList[Column[ColumnType.Scalar]],
       config: RenderConfig[P],
       rowLimit: Option[Long])
       : Stream[F, AppendEvent[P]]

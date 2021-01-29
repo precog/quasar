@@ -40,7 +40,7 @@ object LocalDatasource {
       val content =
         io.file.readAll[F](iRead.path, blocker, readChunkSizeBytes)
 
-      QueryResult.typed(format, content, iRead.stages)
+      QueryResult.typed(format, ResultData.Continuous(content), iRead.stages)
     }
   }
 }

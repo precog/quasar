@@ -65,7 +65,7 @@ import skolems.∃
 private[impl] final class DefaultResultPush[
     F[_]: Concurrent: Timer, D: Codec: Show, Q, R] private (
     lookupDestination: D => F[Option[Destination[F]]],
-    evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), (Option[F[∃[OffsetKey.Actual]]], R)],
+    evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
     jobManager: JobManager[F, D :: ResourcePath :: HNil, Nothing],
     render: ResultRender[F, R],
     active: ConcurrentNavigableMap[D :: Option[ResourcePath] :: HNil, DefaultResultPush.ActiveState[F, Q]],
@@ -284,7 +284,6 @@ private[impl] final class DefaultResultPush[
         val (renderConfig, pipe) = sink.consume(path, destColumns)
 
         Stream.resource(evaluator((query, None)))
-          .map(_._2)
           .flatMap(render.render(_, renderColumns, renderConfig, limit))
           .through(pipe)
       }
@@ -336,7 +335,7 @@ private[impl] final class DefaultResultPush[
 
         val (renderConfig, toOffsets) = sink.consume(upsertArgs)
 
-        Stream.resource(evaluator((query, offset))) flatMap { case (offs, results) =>
+        Stream.resource(evaluator((query, offset))) flatMap { results => 
           val input =
             if (isUpdate)
               RenderInput.Incremental(results)
@@ -352,11 +351,7 @@ private[impl] final class DefaultResultPush[
             limit)
 
           val renderedOffsets = rendered.through(toOffsets[A]).map(∃(_))
-          val externalOffsets = offs match {
-            case None => Stream.empty 
-            case Some(fa) => Stream.eval(fa)
-          }
-          renderedOffsets ++ externalOffsets 
+          renderedOffsets 
         }
       }
     }
@@ -382,7 +377,7 @@ private[impl] final class DefaultResultPush[
 
         val consumer = sink.consume(path, destColumns)
 
-        Stream.resource(evaluator((query, offset))) flatMap { case (offsets, results) =>
+        Stream.resource(evaluator((query, offset))) flatMap { results =>
           val dataEvents: Stream[F, AppendEvent[consumer.A]] = render.renderAppend[consumer.A](
             results,
             renderColumns,
@@ -696,7 +691,7 @@ private[impl] object DefaultResultPush {
       maxConcurrentPushes: Int,
       maxOutstandingPushes: Int,
       lookupDestination: D => F[Option[Destination[F]]],
-      evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), (Option[F[∃[OffsetKey.Actual]]], R)],
+      evaluator: QueryEvaluator[Resource[F, ?], (Q, Option[Offset]), R],
       render: ResultRender[F, R],
       pushes: PrefixStore.SCodec[F, D :: ResourcePath :: HNil, ∃[Push[?, Q]]],
       offsets: Store[F, D :: ResourcePath :: HNil, ∃[OffsetKey.Actual]])

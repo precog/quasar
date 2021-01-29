@@ -48,7 +48,7 @@ object LocalParsedDatasource {
       val parsedValues =
         rawBytes.through(ResultParser.typed(format, blocker))
 
-      QueryResult.parsed[F, A](QDataDecode[A], parsedValues, iRead.stages)
+      QueryResult.parsed[F, A](QDataDecode[A], ResultData.Continuous(parsedValues), iRead.stages)
     }
   }
 }

@@ -19,7 +19,6 @@ package quasar.connector
 import slamdata.Predef._
 
 import quasar.{NonTerminal, RenderTree, ScalarStages}, RenderTree.ops._
-import quasar.api.push.OffsetKey
 
 import cats.~>
 import cats.implicits._
@@ -35,8 +34,6 @@ import scalaz.syntax.show._
 
 import shims.showToScalaz
 
-import skolems.∃
-
 import tectonic.Plate
 
 sealed trait QueryResult[F[_]] extends Product with Serializable {
@@ -44,33 +41,27 @@ sealed trait QueryResult[F[_]] extends Product with Serializable {
   def stages: ScalarStages
 
   def mapK[G[_]](f: F ~> G): QueryResult[G]
-
-  def offset: Option[F[∃[OffsetKey.Actual]]]
 }
 
 object QueryResult extends QueryResultInstances {
-  sealed trait Full[F[_]] extends QueryResult[F] {
-    def offset = None
-  }
-
   final case class Parsed[F[_], A](
       decode: QDataDecode[A],
-      data: Stream[F, A],
+      data: ResultData[F, A],
       stages: ScalarStages)
-      extends Full[F] {
+      extends QueryResult[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
-      Parsed[G, A](decode, data.translate[F, G](f), stages)
+      Parsed[G, A](decode, data.mapK(f), stages)
   }
 
   final case class Typed[F[_]](
       format: DataFormat,
-      data: Stream[F, Byte],
+      data: ResultData[F, Byte],
       stages: ScalarStages)
-      extends Full[F] {
+      extends QueryResult[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
-      Typed[G](format, data.translate[F, G](f), stages)
+      Typed[G](format, data.mapK(f), stages)
   }
 
   final case class Stateful[F[_], P <: Plate[Unit], S](
@@ -79,35 +70,22 @@ object QueryResult extends QueryResultInstances {
       state: P => F[Option[S]],
       data: Option[S] => Stream[F, Byte],
       stages: ScalarStages)
-      extends Full[F] {
+      extends QueryResult[F] {
 
     def mapK[G[_]](f: F ~> G): QueryResult[G] =
       Stateful[G, P, S](
         format,
         f(plateF),
         p => f(state(p)),
-        data(_).translate[F, G](f),
+        data.map(_.translate[F, G](f)),
         stages)
   }
 
-  final case class Offsetted[F[_]](
-      offset0: F[∃[OffsetKey.Actual]],
-      full: Full[F])
-      extends QueryResult[F] {
-    def stages = full.stages
-    def offset = Some(offset0)
-    def mapK[G[_]](f: F ~> G) = full.mapK(f) match {
-      case u: Full[G] => 
-        Offsetted[G](f(offset0), u)
-      case w => w
-    }
-  }
-
-  def parsed[F[_], A](q: QDataDecode[A], d: Stream[F, A], ss: ScalarStages)
+  def parsed[F[_], A](q: QDataDecode[A], data: ResultData[F, A], ss: ScalarStages)
       : QueryResult[F] =
-    Parsed(q, d, ss)
+    Parsed(q, data, ss)
 
-  def typed[F[_]](tpe: DataFormat, data: Stream[F, Byte], ss: ScalarStages)
+  def typed[F[_]](tpe: DataFormat, data: ResultData[F, Byte], ss: ScalarStages)
       : QueryResult[F] =
     Typed(tpe, data, ss)
 
@@ -120,33 +98,18 @@ object QueryResult extends QueryResultInstances {
       : QueryResult[F] =
     Stateful(format, plateF, state, data, stages)
 
-  def stages0[F[_]]: Lens[Full[F], ScalarStages] =
-    Lens((_: Full[F]).stages)(ss => {
+  def stages[F[_]]: Lens[QueryResult[F], ScalarStages] =
+    Lens((_: QueryResult[F]).stages)(ss => {
       case Parsed(q, d, _) => Parsed(q, d, ss)
       case Typed(f, d, _) => Typed(f, d, ss)
       case Stateful(f, p, s, d, _) => Stateful(f, p, s, d, ss)
     })
-
-  def full[F[_]]: Lens[QueryResult[F], Full[F]] = {
-    val get = (q: QueryResult[F]) => q match {
-      case uw: Full[F] => uw
-      case Offsetted(_, uw) => uw
-    }
-    val set = (uw: Full[F]) => (q: QueryResult[F]) => q match {
-      case e: Full[F] => uw
-      case Offsetted(keys, _) => Offsetted(keys, uw)
-    }
-    Lens(get)(set)
-  }
-
-  def stages[F[_]]: Lens[QueryResult[F], ScalarStages] =
-    full composeLens stages0
 }
 
 sealed abstract class QueryResultInstances {
   import QueryResult._
 
-  implicit def renderTree0[F[_]]: RenderTree[Full[F]] =
+  implicit def renderTree[F[_]]: RenderTree[QueryResult[F]] =
     RenderTree make {
       case Parsed(_, _, ss) =>
         NonTerminal(List("Parsed"), none, List(ss.render))
@@ -154,13 +117,6 @@ sealed abstract class QueryResultInstances {
         NonTerminal(List("Typed"), none, List(f.shows.render, ss.render))
       case Stateful(f, _, _, _, ss) =>
         NonTerminal(List("Stateful"), none, List(f.shows.render, ss.render))
-    }
-
-  implicit def renderTree[F[_]]: RenderTree[QueryResult[F]] =
-    RenderTree make {
-      case uw: Full[F] => uw.render
-      case Offsetted(_, uw) =>
-        NonTerminal(List("Offsetted"), none, List(uw.render))
     }
 
   implicit def show[F[_]]: Show[QueryResult[F]] =

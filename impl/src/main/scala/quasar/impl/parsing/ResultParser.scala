@@ -90,27 +90,22 @@ object ResultParser {
       queryResult: QueryResult[F],
       blocker: Blocker)
       : Stream[F, A] = {
-    def parsedStream0(qr: QueryResult.Full[F]): Stream[F, A] =
+    def parsedStream(qr: QueryResult[F]): Stream[F, A] =
       qr match {
-        case QueryResult.Parsed(qdd, data, _) =>
-          data.map(QData.convert(_)(qdd, QDataEncode[A]))
+        case QueryResult.Parsed(qdd, resultData, _) =>
+          resultData.data.map(QData.convert(_)(qdd, QDataEncode[A]))
 
-        case QueryResult.Typed(pt, data, _) =>
-          data.through(typed[F, A](pt, blocker))
+        case QueryResult.Typed(pt, resultData, _) =>
+          resultData.data.through(typed[F, A](pt, blocker))
 
         case QueryResult.Stateful(format, plateF, state, data, stages) =>
           Stream.eval(plateF) flatMap { plate =>
             val pipe = stateful(format, plate, state, data, blocker)
 
-            data(None).through(pipe) ++
+           data(None).through(pipe) ++
               recurseStateful(state(plate), data, pipe)
           }
       }
-
-    def parsedStream(qr: QueryResult[F]): Stream[F, A] = qr match {
-      case uw: QueryResult.Full[F] => parsedStream0(uw)
-      case QueryResult.Offsetted(_, uw) => parsedStream0(uw)
-    }
 
     if (queryResult.stages === ScalarStages.Id)
       parsedStream(queryResult)
@@ -121,13 +116,13 @@ object ResultParser {
 
   private def recurseStateful[F[_]: Sync, P <: Plate[Unit], S, A](
       state: F[Option[S]],
-      data: Option[S] => Stream[F, Byte],
+      resultData: Option[S] => Stream[F, Byte],
       pipe: Pipe[F, Byte, A])
       : Stream[F, A] =
     Stream.eval(state) flatMap {
       case s @ Some(_) =>
-        data(s).through(pipe) ++
-          recurseStateful(state, data, pipe)
+        resultData(s).through(pipe) ++
+          recurseStateful(state, resultData, pipe)
       case None =>
         Stream.empty
     }

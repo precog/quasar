@@ -41,7 +41,7 @@ object LocalStatefulDatasource {
 
       val plate = Effect[F].delay(new LocalStatefulPlate())
 
-      def data(more: Option[Long]): Stream[F, Byte] =
+      def data(more: Option[Long]): Stream[F, Byte] = 
         more match {
           case Some(start) =>
             io.file.readRange[F](

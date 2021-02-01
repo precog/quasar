@@ -21,7 +21,9 @@ import quasar.api.push.{OffsetKey, OffsetPath, ExternalOffsetKey}
 
 import skolems.∃
 
-sealed trait Offset extends Product with Serializable
+sealed trait Offset extends Product with Serializable {
+  val value: ∃[OffsetKey.Actual]
+}
 
 object Offset {
   final case class Internal(path: OffsetPath, value: ∃[OffsetKey.Actual])

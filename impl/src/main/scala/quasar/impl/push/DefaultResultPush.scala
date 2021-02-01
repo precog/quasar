@@ -24,7 +24,7 @@ import quasar.api.Label.Syntax._
 import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
-import quasar.connector.{DataEvent, AppendEvent, Offset}
+import quasar.connector.{AppendEvent, Offset}
 import quasar.connector.destination._
 import quasar.connector.render.{RenderInput, ResultRender}
 import quasar.impl.storage.PrefixStore
@@ -174,32 +174,32 @@ private[impl] final class DefaultResultPush[
       : F[Either[NonEmptyList[ResultPushError[D]], F[Status.Terminal]]] = {
 
     val key = destinationId :: path :: HNil
-     def resume[A](inc: PushConfig.Incremental[A, Q], createdAt: Instant)
-         : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
+    def resume[A](inc: PushConfig.Incremental[A, Q], createdAt: Instant)
+        : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
 
-       case Some(resumeFrom) =>
-         val actualKey: OffsetKey.Actual[_] = resumeFrom.value
-         val expectedKey: OffsetKey.Formal[Unit, A] = inc.resumeConfig.resultOffsetColumn.tpe
+      case Some(resumeFrom) =>
+        val actualKey: OffsetKey.Actual[_] = resumeFrom.value
+        val expectedKey: OffsetKey.Formal[Unit, A] = inc.resumeConfig.resultOffsetColumn.tpe
 
-         (actualKey, expectedKey) match {
-           case (realKey @ OffsetKey.RealKey(_), OffsetKey.RealKey(_)) =>
-             runPush(destinationId, inc, None, createdAt, Some(realKey))
+        (actualKey, expectedKey) match {
+          case (realKey @ OffsetKey.RealKey(_), OffsetKey.RealKey(_)) =>
+            runPush(destinationId, inc, None, createdAt, Some(realKey))
 
-           case (stringKey @ OffsetKey.StringKey(_), OffsetKey.StringKey(_)) =>
-             runPush(destinationId, inc, None, createdAt, Some(stringKey))
+          case (stringKey @ OffsetKey.StringKey(_), OffsetKey.StringKey(_)) =>
+            runPush(destinationId, inc, None, createdAt, Some(stringKey))
 
-           case (dateTimeKey @ OffsetKey.DateTimeKey(_), OffsetKey.DateTimeKey(_)) =>
-             runPush(destinationId, inc, None, createdAt, Some(dateTimeKey))
+          case (dateTimeKey @ OffsetKey.DateTimeKey(_), OffsetKey.DateTimeKey(_)) =>
+            runPush(destinationId, inc, None, createdAt, Some(dateTimeKey))
 
-           case _ =>
-             val ex = new IllegalStateException(
-               s"Invalid offset, expected ${expectedKey.show}, found ${actualKey.show}")
+          case _ =>
+            val ex = new IllegalStateException(
+              s"Invalid offset, expected ${expectedKey.show}, found ${actualKey.show}")
 
-             EitherT {
-               log.error(ex)(s"${debugKey(key)} Unable to resume incremental push")
-                 .productR(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
-             }
-         }
+            EitherT {
+              log.error(ex)(s"${debugKey(key)} Unable to resume incremental push")
+                .productR(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
+            }
+        }
 
        case None =>
          EitherT.right[Errs](log.warn(s"${debugKey(key)} Offset not found, updating from initial"))

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package quasar.connector 
+package quasar.connector
 
 import slamdata.Predef._
 import quasar.api.push.ExternalOffsetKey
@@ -26,13 +26,13 @@ sealed trait ResultData[F[_], A] extends Product with Serializable { self =>
   type Elem = A
   def delimited: Stream[F, Either[ExternalOffsetKey, Chunk[A]]]
   def data: Stream[F, A]
-  def mapK[G[_]](f: F ~> G): ResultData[G, A] 
+  def mapK[G[_]](f: F ~> G): ResultData[G, A]
 }
 
 object ResultData {
   final case class Delimited[F[_], A](
-      delimited: Stream[F, Either[ExternalOffsetKey, Chunk[A]]]) 
-      extends ResultData[F, A] {  
+      delimited: Stream[F, Either[ExternalOffsetKey, Chunk[A]]])
+      extends ResultData[F, A] {
     def data: Stream[F, A] = delimited.flatMap(_.fold(x => Stream.empty, Stream.chunk))
     def mapK[G[_]](f: F ~> G): ResultData[G, A] = Delimited(delimited.translate[F, G](f))
   }
@@ -46,4 +46,5 @@ object ResultData {
       case Delimited(delimited) => Delimited(delimited.map(_.map(_.map(f))))
     }
   }
+  def empty[F[_], A]: ResultData[F, A] = Continuous(Stream.empty)
 }

@@ -26,10 +26,12 @@ final case class ExternalOffsetKey(value: Array[Byte])
 
 object ExternalOffsetKey {
   implicit val eqExternalOffsetKey: Eq[ExternalOffsetKey] = new Eq[ExternalOffsetKey] {
-    def eqv(x: ExternalOffsetKey, y: ExternalOffsetKey): Boolean = 
+    def eqv(x: ExternalOffsetKey, y: ExternalOffsetKey): Boolean =
       java.util.Arrays.equals(x.value, y.value)
   }
 
   implicit val showExternalOffsetKey: Show[ExternalOffsetKey] =
     Show.show { x => BitVector(x.value).toHex }
+
+  def empty: ExternalOffsetKey = ExternalOffsetKey(Array.emptyByteArray)
 }

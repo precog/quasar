@@ -57,8 +57,8 @@ abstract class LocalDatasourceSpec
 
   def compileData(qr: QueryResult[IO]): IO[Int] =
     qr match {
-      case QueryResult.Parsed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
-      case QueryResult.Typed(_, data, _) => data.foldMap(κ(1)).compile.lastOrError
+      case QueryResult.Parsed(_, data, _) => data.data.foldMap(κ(1)).compile.lastOrError
+      case QueryResult.Typed(_, data, _) => data.data.foldMap(κ(1)).compile.lastOrError
       case QueryResult.Stateful(_, plate, state, data, _) =>
         val bytes = data(None) ++ recurseStateful(plate, state, data)
         bytes.foldMap(κ(1)).compile.lastOrError

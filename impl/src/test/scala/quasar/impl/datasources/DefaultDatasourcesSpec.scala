@@ -146,7 +146,7 @@ object DefaultDatasourcesSpec extends DatasourcesSpec[IO, Stream[IO, ?], String,
               supportedType,
               QueryResult.typed(
                 DataFormat.ldjson,
-                Stream.empty,
+                ResultData.empty,
                 ScalarStages.Id))
           }
 

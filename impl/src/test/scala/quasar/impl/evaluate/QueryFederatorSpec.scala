@@ -85,7 +85,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
   val qs = construction.mkDefaults[Fix, QScriptEducated[Fix, ?]]
 
   def offset(r: Real): Offset =
-    Offset(OffsetPath(DataPathSegment.Field("ts")), ∃(OffsetKey.Actual.real(r)))
+    Offset.Internal(OffsetPath(DataPathSegment.Field("ts")), ∃(OffsetKey.Actual.real(r)))
 
   "returns 'not a resource' for root" >> {
     val query =

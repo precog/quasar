@@ -95,7 +95,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
       kind,
       QueryResult.typed(
         DataFormat.ldjson,
-        Stream.empty,
+        ResultData.empty,
         ScalarStages.Id))
   }
 

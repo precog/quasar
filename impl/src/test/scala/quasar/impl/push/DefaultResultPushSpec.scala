@@ -36,14 +36,14 @@ import monocle.Traversal
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
 
-import quasar.{ConditionMatchers, EffectfulQSpec}
+import quasar.{ConditionMatchers, EffectfulQSpec, PointedList}
 import quasar.api.{Column, ColumnType, DataPathSegment, Label, Labeled, QueryEvaluator}
 import quasar.api.destination._
 import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
 import quasar.api.resource.{ResourcePath, ResourceName}
-import quasar.connector.{DataEvent, Offset}
+import quasar.connector.{AppendEvent, DataEvent, Offset}
 import quasar.connector.destination._
 import quasar.connector.render._
 import quasar.contrib.scalaz.MonadError_
@@ -280,7 +280,34 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         case OffsetKey.DateTimeKey(_) =>
           val epoch = Instant.EPOCH.atOffset(ZoneOffset.UTC)
           creates ++ Stream.emit(DataEvent.Commit(OffsetKey.Actual.dateTime(epoch)))
+
+        case OffsetKey.ExternalKey(ex) =>
+          creates ++ Stream.emit(DataEvent.Commit(OffsetKey.Actual.external(ExternalOffsetKey.empty)))
       }
+    }
+
+    def renderAppend[P](
+        input: Stream[IO, String],
+        columns: PointedList[Column[ColumnType.Scalar]],
+        config: RenderConfig[P],
+        limit: Option[Long])
+        : Stream[IO, AppendEvent[P]] = {
+      val creates: Stream[IO, AppendEvent[P]] = {
+        config match {
+          case (r: RenderConfig.Csv) =>
+            limit.fold(input)(input.take(_))
+              .through(text.utf8Encode)
+              .chunks
+              .map(DataEvent.Create(_))
+          case (r: RenderConfig.Separated) =>
+            limit.fold(input)(input.take(_))
+              .chunks
+              .map(DataEvent.Create(_))
+          case _ =>
+            Stream.raiseError[IO](new RuntimeException("renderJson not implemented"))
+        }
+      }
+      creates ++ Stream.emit(DataEvent.Append(ExternalOffsetKey.empty))
     }
   }
 
@@ -391,6 +418,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             cs.traverse(f).map(xs => ∃[PushConfig[?, String]](x.copy(columns = xs)))
 
           case x @ PushConfig.Incremental(_, _, cs, _, _) =>
+            cs.traverse(f).map(xs => ∃[PushConfig[?, String]](x.copy(outputColumns = xs)))
+
+          case x @ PushConfig.SourceDriven(_, _, cs, _) =>
             cs.traverse(f).map(xs => ∃[PushConfig[?, String]](x.copy(outputColumns = xs)))
         }
       }
@@ -810,7 +840,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           initial = Some(OffsetKey.Actual.real(99)))
 
         eval = mkEvaluator {
-          case ("initial-offset", Some(Offset(NonEmptyList(DataPathSegment.Field("pos"), Nil), ∃(k)))) =>
+          case ("initial-offset", Some(Offset.Internal(NonEmptyList(DataPathSegment.Field("pos"), Nil), ∃(k)))) =>
             val key: OffsetKey.Actual[_] = k
 
             key match {
@@ -899,7 +929,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           case ("resume", None) =>
             IO(Stream(W1, W1, W1).covary[IO])
 
-          case ("resume", Some(Offset(_, ∃(k)))) =>
+          case ("resume", Some(Offset.Internal(_, ∃(k)))) =>
             (k: OffsetKey.Actual[_]) match {
               case OffsetKey.RealKey(r) if r.toInt == 15 =>
                 IO(Stream(W2, W2, W2).covary[IO])
@@ -1016,7 +1046,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
         // only emits for offset = 17
         eval = mkEvaluator {
-          case ("abc", Some(Offset(_, ∃(k)))) =>
+          case ("abc", Some(Offset.Internal(_, ∃(k)))) =>
             (k: OffsetKey.Actual[_]) match {
               case OffsetKey.RealKey(r) if r.toInt == 17 => IO(failOn2)
               case _ => IO.never
@@ -1074,7 +1104,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
         eval = mkEvaluator {
           case ("xyz", None) => IO(data)
-          case ("xyz", Some(Offset(_, ∃(k)))) =>
+          case ("xyz", Some(Offset.Internal(_, ∃(k)))) =>
             (k: OffsetKey.Actual[_]) match {
               case OffsetKey.RealKey(r) if r.toInt == 5 => IO(fail3rd)
               case OffsetKey.RealKey(r) if r.toInt == 10 => IO(data)

@@ -18,17 +18,13 @@ package quasar.api.push
 
 import slamdata.Predef.{Eq => _, _}
 
-import quasar.PointedList
 import quasar.api.{Column, ColumnType}
 import quasar.api.resource.ResourcePath
 
-import cats.{Apply, Eq, Eval, NonEmptyTraverse, Show}
 import cats.data.NonEmptyList
 import cats.implicits._
 
 import monocle.{Lens, PLens, Prism}
-
-import shims.{equalToCats, functorToScalaz, showToCats}
 
 sealed trait PushConfig[O, +Q] extends Product with Serializable {
   def path: ResourcePath
@@ -63,7 +59,7 @@ object PushConfig {
   final case class SourceDriven[+Q](
       path: ResourcePath,
       query: Q,
-      outputColumns: PointedList[OutputColumn])
+      outputColumns: PushColumns[OutputColumn])
       extends PushConfig[ExternalOffsetKey, Q] {
     def columns: Columns = outputColumns.toNel
   }
@@ -79,8 +75,8 @@ object PushConfig {
       case Incremental(p, q, c, r, o) => (p, q, c, r, o)
     } ((Incremental[O, Q] _).tupled)
 
-  def sourceDriven[Q]: Prism[PushConfig[ExternalOffsetKey, Q], (ResourcePath, Q, PointedList[OutputColumn])] =
-    Prism.partial[PushConfig[ExternalOffsetKey, Q], (ResourcePath, Q, PointedList[OutputColumn])] {
+  def sourceDriven[Q]: Prism[PushConfig[ExternalOffsetKey, Q], (ResourcePath, Q, PushColumns[OutputColumn])] =
+    Prism.partial[PushConfig[ExternalOffsetKey, Q], (ResourcePath, Q, PushColumns[OutputColumn])] {
       case SourceDriven(p, q, c) => (p, q, c)
     } ((SourceDriven[Q] _).tupled)
 

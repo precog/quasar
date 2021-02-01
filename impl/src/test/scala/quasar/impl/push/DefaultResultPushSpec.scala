@@ -36,7 +36,7 @@ import monocle.Traversal
 import org.specs2.execute.AsResult
 import org.specs2.specification.core.Fragment
 
-import quasar.{ConditionMatchers, EffectfulQSpec, PointedList}
+import quasar.{ConditionMatchers, EffectfulQSpec}
 import quasar.api.{Column, ColumnType, DataPathSegment, Label, Labeled, QueryEvaluator}
 import quasar.api.destination._
 import quasar.api.push._
@@ -288,7 +288,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     def renderAppend[P](
         input: Stream[IO, String],
-        columns: PointedList[Column[ColumnType.Scalar]],
+        columns: PushColumns[Column[ColumnType.Scalar]],
         config: RenderConfig[P],
         limit: Option[Long])
         : Stream[IO, AppendEvent[P]] = {

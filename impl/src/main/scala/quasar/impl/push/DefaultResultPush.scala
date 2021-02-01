@@ -18,7 +18,7 @@ package quasar.impl.push
 
 import slamdata.Predef.{Boolean => SBoolean, _}
 
-import quasar.{Condition, PointedList, Store}
+import quasar.{Condition, Store}
 import quasar.api.{Column, ColumnType, Labeled, QueryEvaluator}
 import quasar.api.Label.Syntax._
 import quasar.api.push._
@@ -348,8 +348,7 @@ private[impl] final class DefaultResultPush[
             renderConfig,
             limit)
 
-          val renderedOffsets = rendered.through(toOffsets[A]).map(∃(_))
-          renderedOffsets
+          rendered.through(toOffsets[A]).map(∃(_))
         }
       }
     }
@@ -359,7 +358,7 @@ private[impl] final class DefaultResultPush[
         path: ResourcePath,
         query: Q,
         actualOffset: Option[OffsetKey.Actual[A]],
-        columns: PointedList[Column[(ColumnType.Scalar, dest.Type)]])
+        columns: PushColumns[Column[(ColumnType.Scalar, dest.Type)]])
         : EitherT[F, Errs, Stream[F, ∃[OffsetKey.Actual]]] = {
       val C = Functor[Column]
 
@@ -368,7 +367,7 @@ private[impl] final class DefaultResultPush[
       }
       EitherT.fromOption[F](appendSink, err(IncrementalNotSupported(destinationId))) map { sink =>
         val (renderColumns, destColumns) =
-          Functor[PointedList].compose[Column].unzip(columns)
+          Functor[PushColumns].compose[Column].unzip(columns)
 
         val offset = actualOffset.map(o => Offset.External(∃(o)))
 

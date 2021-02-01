@@ -18,9 +18,8 @@ package quasar.connector.destination
 
 import slamdata.Predef._
 
-import quasar.PointedList
 import quasar.api.Column
-import quasar.api.push.{ExternalOffsetKey, OffsetKey}
+import quasar.api.push.{ExternalOffsetKey, OffsetKey, PushColumns}
 import quasar.api.resource.ResourcePath
 import quasar.connector._
 import quasar.connector.render.RenderConfig
@@ -55,7 +54,7 @@ object ResultSink {
   }
 
   final case class AppendSink[F[_], T] (
-      consume: (ResourcePath, PointedList[Column[T]]) => AppendSink.Result[F])
+      consume: (ResourcePath, PushColumns[Column[T]]) => AppendSink.Result[F])
       extends ResultSink[F, T]
 
   object AppendSink {
@@ -77,8 +76,7 @@ object ResultSink {
     UpsertSink(consume)
 
   def append[F[_], T, X](
-      f: (ResourcePath, PointedList[Column[T]]) => (RenderConfig[X], Pipe[F, AppendEvent[X], ExternalOffsetKey]))
-      : ResultSink[F, T] =
+      f: (ResourcePath, PushColumns[Column[T]]) => (RenderConfig[X], Pipe[F, AppendEvent[X], ExternalOffsetKey])) : ResultSink[F, T] =
     AppendSink { (path, cols) => f(path, cols) match {
       case (renderConfig0, pipe0) => new AppendSink.Result[F] {
         type A = X

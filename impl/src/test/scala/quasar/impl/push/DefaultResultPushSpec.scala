@@ -420,7 +420,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           case x @ PushConfig.Incremental(_, _, cs, _, _) =>
             cs.traverse(f).map(xs => ∃[PushConfig[?, String]](x.copy(outputColumns = xs)))
 
-          case x @ PushConfig.SourceDriven(_, _, cs, _) =>
+          case x @ PushConfig.SourceDriven(_, _, cs) =>
             cs.traverse(f).map(xs => ∃[PushConfig[?, String]](x.copy(outputColumns = xs)))
         }
       }

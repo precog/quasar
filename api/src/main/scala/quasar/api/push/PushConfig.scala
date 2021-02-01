@@ -60,12 +60,11 @@ object PushConfig {
         outputColumns)
   }
 
-  final case class SourceDriven[O, +Q](
+  final case class SourceDriven[+Q](
       path: ResourcePath,
       query: Q,
-      outputColumns: PointedList[OutputColumn],
-      offsetTag: OffsetKey.Formal[Unit, O])
-      extends PushConfig[O, Q] {
+      outputColumns: PointedList[OutputColumn])
+      extends PushConfig[ExternalOffsetKey, Q] {
     def columns: Columns = outputColumns.toNel
   }
 
@@ -80,55 +79,22 @@ object PushConfig {
       case Incremental(p, q, c, r, o) => (p, q, c, r, o)
     } ((Incremental[O, Q] _).tupled)
 
-  def sourceDriven[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, PointedList[OutputColumn], OffsetKey.Formal[Unit, O])] =
-    Prism.partial[PushConfig[O, Q], (ResourcePath, Q, PointedList[OutputColumn], OffsetKey.Formal[Unit, O])] {
-      case SourceDriven(p, q, c, r) => (p, q, c, r)
-    } ((SourceDriven[O, Q] _).tupled)
+  def sourceDriven[Q]: Prism[PushConfig[ExternalOffsetKey, Q], (ResourcePath, Q, PointedList[OutputColumn])] =
+    Prism.partial[PushConfig[ExternalOffsetKey, Q], (ResourcePath, Q, PointedList[OutputColumn])] {
+      case SourceDriven(p, q, c) => (p, q, c)
+    } ((SourceDriven[Q] _).tupled)
 
   def query[O, Q1, Q2]: PLens[PushConfig[O, Q1], PushConfig[O, Q2], Q1, Q2] =
     PLens[PushConfig[O, Q1], PushConfig[O, Q2], Q1, Q2](_.query)(q2 => {
       case f @ Full(_, _, _) => f.copy(query = q2)
       case i @ Incremental(_, _, _, _, _) => i.copy(query = q2)
-      case s @ SourceDriven(_, _, _, _) => s.copy(query = q2)
+      case s @ SourceDriven(_, _, _) => s.copy(query = q2)
     })
 
   def path[O, Q]: Lens[PushConfig[O, Q], ResourcePath] =
     Lens[PushConfig[O, Q], ResourcePath](_.path)(p2 => {
       case f @ Full(_, _, _) => f.copy(path = p2)
       case i @ Incremental(_, _, _, _, _) => i.copy(path = p2)
-      case s @ SourceDriven(_, _, _, _) => s.copy(path = p2)
+      case s @ SourceDriven(_, _, _) => s.copy(path = p2)
     })
-
-  implicit def pushConfigEq[O, Q: Eq]: Eq[PushConfig[O, Q]] =
-    Eq.by(p => (full[O, Q].getOption(p), incremental[O, Q].getOption(p), sourceDriven[O, Q].getOption(p)))
-
-  implicit def pushConfigShow[O, Q: Show]: Show[PushConfig[O, Q]] =
-    Show show {
-      case Full(p, q, c) =>
-        s"Full(${p.show}, ${q.show}, ${c.map(_.name).show})"
-
-      case i @ Incremental(p, q, c, r, o) =>
-        s"Incremental(${p.show}, ${q.show}, ${c.map(_.name).show}, ${r.show}, ${o.show})"
-
-      case s @ SourceDriven(p, q, c, r) =>
-        s"SourceDriven(${p.show}, ${q.show}, ${c.map(_.name).show}, ${r.show})"
-    }
-
-  implicit def pushConfigNonEmptyTraverse[O]: NonEmptyTraverse[PushConfig[O, ?]] =
-    new NonEmptyTraverse[PushConfig[O, ?]] {
-      def nonEmptyTraverse[F[_]: Apply, A, B](fa: PushConfig[O, A])(f: A => F[B]) =
-        query[O, A, B].modifyF(f)(fa)
-
-      def foldLeft[A, B](fa: PushConfig[O, A], b: B)(f: (B, A) => B): B =
-        f(b, query[O, A, A].get(fa))
-
-      def foldRight[A, B](fa: PushConfig[O, A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
-        f(query[O, A, A].get(fa), lb)
-
-      def reduceLeftTo[A, B](fa: PushConfig[O, A])(f: A => B)(g: (B, A) => B): B =
-        f(query[O, A, A].get(fa))
-
-      def reduceRightTo[A, B](fa: PushConfig[O, A])(f: A => B)(g: (A, Eval[B]) => Eval[B]): Eval[B] =
-        Eval.now(f(query[O, A, A].get(fa)))
-    }
 }

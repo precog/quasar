@@ -206,34 +206,32 @@ private[impl] final class DefaultResultPush[
            .productR(runPush(destinationId, inc, None, createdAt, None))
      }
 
-    def appendData[A](conf: PushConfig.SourceDriven[A, Q], createdAt: Instant)
+    def appendData[A](conf: PushConfig.SourceDriven[Q], createdAt: Instant)
         : Option[∃[OffsetKey.Actual]] => EitherT[F, Errs, F[Status.Terminal]] = {
       case Some(resumeFrom) =>
         val actualKey: OffsetKey.Actual[_] = resumeFrom.value
-        val formal: OffsetKey.Formal[Unit, A] = conf.offsetTag
-        (actualKey, formal) match {
-            case (exKey @ OffsetKey.ExternalKey(_), OffsetKey.ExternalKey(_)) =>
-              runPush(destinationId, conf, None, createdAt, Some(exKey))
+        actualKey match {
+          case exKey @ OffsetKey.ExternalKey(_) =>
+            runPush(destinationId, conf, None, createdAt, Some(exKey))
           case _ =>
             val ex = new IllegalStateException(
-              s"Invalid offset, append pushes can work only with external encoded keys")
+              s"${actualKey} is invalid offset, append pushes can work only with external encoded keys")
 
             EitherT {
               log.error(ex)(s"${debugKey(key)} Unable to resume incremental push")
                 .productR(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
             }
         }
-       case None =>
-         EitherT.right[Errs](log.warn(s"${debugKey(key)} Offset not found, updating from initial"))
-           .productR(runPush(destinationId, conf, None, createdAt, None))
+      case None =>
+        EitherT.right[Errs](log.warn(s"${debugKey(key)} Offset not found, updating from initial"))
+          .productR(runPush(destinationId, conf, None, createdAt, None))
     }
-
 
 
     OptionT(pushes.lookup(key))
       .toRight(err(PushNotFound(destinationId, path)))
       .flatMap { push0 =>
-        val push = push0.value
+        val push: Push[_, Q] = push0.value
 
         push.config match {
           case full @ PushConfig.Full(_, _, _) =>
@@ -241,7 +239,7 @@ private[impl] final class DefaultResultPush[
           case inc @ PushConfig.Incremental(_, _, _, _, _) =>
             EitherT.right[Errs](offsets.lookup(key))
               .flatMap(resume(inc, push.createdAt))
-          case bySource @ PushConfig.SourceDriven(_, _, _, _) =>
+          case bySource @ PushConfig.SourceDriven(_, _, _) =>
             EitherT.right[Errs](offsets.lookup(key))
               .flatMap(appendData(bySource, push.createdAt))
         }
@@ -412,7 +410,7 @@ private[impl] final class DefaultResultPush[
             .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, offset))
             .map(_.evalMap(o => offsets.insert(key, o)))
 
-        case PushConfig.SourceDriven(path, q, columns, tag) =>
+        case PushConfig.SourceDriven(path, q, columns) =>
           EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
             .flatMap(handleAppend(dest)(path, q, resumeFrom, _))
             .map(_.evalMap(o => offsets.insert(key, o)))

@@ -291,23 +291,23 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         columns: PushColumns[Column[ColumnType.Scalar]],
         config: RenderConfig[P],
         limit: Option[Long])
-        : Stream[IO, AppendEvent[P]] = {
-      val creates: Stream[IO, AppendEvent[P]] = {
-        config match {
-          case (r: RenderConfig.Csv) =>
-            limit.fold(input)(input.take(_))
-              .through(text.utf8Encode)
-              .chunks
-              .map(DataEvent.Create(_))
-          case (r: RenderConfig.Separated) =>
-            limit.fold(input)(input.take(_))
-              .chunks
-              .map(DataEvent.Create(_))
-          case _ =>
-            Stream.raiseError[IO](new RuntimeException("renderJson not implemented"))
-        }
+        : Stream[IO, AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]]] = {
+      val creates: Stream[IO, AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]]] = config match {
+        case (r: RenderConfig.Csv) =>
+          limit.fold(input)(input.take(_))
+            .through(text.utf8Encode)
+            .chunks
+            .map(DataEvent.Create(_))
+        case (r: RenderConfig.Separated) =>
+          limit.fold(input)(input.take(_))
+            .chunks
+            .map(DataEvent.Create(_))
+        case _ =>
+          Stream.raiseError[IO](new RuntimeException("renderJson not implemented"))
       }
-      creates ++ Stream.emit(DataEvent.Append(ExternalOffsetKey.empty))
+      val commit: AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]] =
+        DataEvent.Commit(OffsetKey.Actual.external(ExternalOffsetKey.empty))
+      creates ++ Stream.emit(commit)
     }
   }
 

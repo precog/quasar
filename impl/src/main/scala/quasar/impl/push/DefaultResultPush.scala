@@ -353,11 +353,11 @@ private[impl] final class DefaultResultPush[
       }
     }
 
-    def handleAppend[A](
+    def handleAppend(
         dest: Destination[F])(
         path: ResourcePath,
         query: Q,
-        actualOffset: Option[OffsetKey.Actual[A]],
+        actualOffset: Option[OffsetKey.Actual[ExternalOffsetKey]],
         columns: PushColumns[Column[(ColumnType.Scalar, dest.Type)]])
         : EitherT[F, Errs, Stream[F, ∃[OffsetKey.Actual]]] = {
       val C = Functor[Column]
@@ -374,12 +374,12 @@ private[impl] final class DefaultResultPush[
         val consumer = sink.consume(path, destColumns)
 
         Stream.resource(evaluator((query, offset))) flatMap { results =>
-          val dataEvents: Stream[F, AppendEvent[consumer.A]] = render.renderAppend[consumer.A](
+          val dataEvents = render.renderAppend[consumer.A](
             results,
             renderColumns,
             consumer.renderConfig,
             limit)
-          dataEvents.through(consumer.pipe).map(x => ∃(OffsetKey.Actual.external(x)))
+          dataEvents.through(consumer.pipe[ExternalOffsetKey]).map(∃(_))
         }
       }
     }

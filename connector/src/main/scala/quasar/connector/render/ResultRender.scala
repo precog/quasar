@@ -19,7 +19,7 @@ package quasar.connector.render
 import slamdata.Predef._
 
 import quasar.api.{Column, ColumnType}
-import quasar.api.push.{IdType, OffsetKey, PushColumns}
+import quasar.api.push.{IdType, OffsetKey, PushColumns, ExternalOffsetKey}
 import quasar.connector.{AppendEvent, DataEvent}
 
 import cats.data.NonEmptyList
@@ -48,5 +48,5 @@ trait ResultRender[F[_], I] {
       columns: PushColumns[Column[ColumnType.Scalar]],
       config: RenderConfig[P],
       rowLimit: Option[Long])
-      : Stream[F, AppendEvent[P]]
+      : Stream[F, AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]]]
 }

@@ -241,7 +241,7 @@ private[impl] final class DefaultResultPush[
           case inc @ PushConfig.Incremental(_, _, _, _, _) =>
             EitherT.right[Errs](offsets.lookup(key))
               .flatMap(resume(inc, push.createdAt))
-          case bySource @ PushConfig.SourceDriven(_, _, _, _, _) =>
+          case bySource @ PushConfig.SourceDriven(_, _, _, _) =>
             EitherT.right[Errs](offsets.lookup(key))
               .flatMap(appendData(bySource, push.createdAt))
         }
@@ -324,7 +324,7 @@ private[impl] final class DefaultResultPush[
           case Right(resume) => (Some(resume), true)
         }
 
-        val offset = offsetValue.map(o => Offset(resumeConfig.sourceOffsetPath, ∃(o)))
+        val offset = offsetValue.map(o => Offset.Internal(resumeConfig.sourceOffsetPath, ∃(o)))
 
         val upsertArgs =
           ResultSink.UpsertSink.Args(
@@ -361,8 +361,7 @@ private[impl] final class DefaultResultPush[
         path: ResourcePath,
         query: Q,
         actualOffset: Option[OffsetKey.Actual[A]],
-        columns: PointedList[Column[(ColumnType.Scalar, dest.Type)]],
-        offsetPath: OffsetPath)
+        columns: PointedList[Column[(ColumnType.Scalar, dest.Type)]])
         : EitherT[F, Errs, Stream[F, ∃[OffsetKey.Actual]]] = {
       val C = Functor[Column]
 
@@ -373,7 +372,7 @@ private[impl] final class DefaultResultPush[
         val (renderColumns, destColumns) =
           Functor[PointedList].compose[Column].unzip(columns)
 
-        val offset = actualOffset.map(o => Offset(offsetPath, ∃(o)))
+        val offset = actualOffset.map(o => Offset.External(∃(o)))
 
         val consumer = sink.consume(path, destColumns)
 
@@ -413,9 +412,9 @@ private[impl] final class DefaultResultPush[
             .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, offset))
             .map(_.evalMap(o => offsets.insert(key, o)))
 
-        case PushConfig.SourceDriven(path, q, columns, tag, op) =>
+        case PushConfig.SourceDriven(path, q, columns, tag) =>
           EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
-            .flatMap(handleAppend(dest)(path, q, resumeFrom, _, op))
+            .flatMap(handleAppend(dest)(path, q, resumeFrom, _))
             .map(_.evalMap(o => offsets.insert(key, o)))
       }
 

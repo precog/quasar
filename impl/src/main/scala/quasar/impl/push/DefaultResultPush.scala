@@ -24,7 +24,7 @@ import quasar.api.Label.Syntax._
 import quasar.api.push._
 import quasar.api.push.param._
 import quasar.api.resource.ResourcePath
-import quasar.connector.{AppendEvent, Offset}
+import quasar.connector.Offset
 import quasar.connector.destination._
 import quasar.connector.render.{RenderInput, ResultRender}
 import quasar.impl.storage.PrefixStore
@@ -294,7 +294,7 @@ private[impl] final class DefaultResultPush[
         nonIdOutputColumns: List[Column[(ColumnType.Scalar, dest.Type)]],
         resumeConfig: ResumeConfig[A],
         actualOffset: Either[Option[OffsetKey.Actual[A]], OffsetKey.Actual[A]])
-        : EitherT[F, Errs, Stream[F, ∃[OffsetKey.Actual]]] = {
+        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] = {
 
       val C = Functor[Column]
 
@@ -348,7 +348,7 @@ private[impl] final class DefaultResultPush[
             renderConfig,
             limit)
 
-          rendered.through(toOffsets[A]).map(∃(_))
+          rendered.through(toOffsets[A])
         }
       }
     }
@@ -359,7 +359,7 @@ private[impl] final class DefaultResultPush[
         query: Q,
         actualOffset: Option[OffsetKey.Actual[ExternalOffsetKey]],
         columns: PushColumns[Column[(ColumnType.Scalar, dest.Type)]])
-        : EitherT[F, Errs, Stream[F, ∃[OffsetKey.Actual]]] = {
+        : EitherT[F, Errs, Stream[F, OffsetKey.Actual[ExternalOffsetKey]]] = {
       val C = Functor[Column]
 
       val appendSink = dest.sinks collectFirst {
@@ -379,7 +379,7 @@ private[impl] final class DefaultResultPush[
             renderColumns,
             consumer.renderConfig,
             limit)
-          dataEvents.through(consumer.pipe[ExternalOffsetKey]).map(∃(_))
+          dataEvents.through(consumer.pipe[ExternalOffsetKey])
         }
       }
     }
@@ -407,12 +407,12 @@ private[impl] final class DefaultResultPush[
 
           EitherT.fromEither[F](typedColumns(destinationId, dest, otherCols))
             .flatMap(handleIncremental(dest)(path, q, _, resumeCfg, offset))
-            .map(_.evalMap(o => offsets.insert(key, o)))
+            .map(_.evalMap(o => offsets.insert(key, ∃(o))))
 
         case PushConfig.SourceDriven(path, q, columns) =>
           EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
             .flatMap(handleAppend(dest)(path, q, resumeFrom, _))
-            .map(_.evalMap(o => offsets.insert(key, o)))
+            .map(_.evalMap(o => offsets.insert(key, ∃(o))))
       }
 
       terminal <- EitherT.right[Errs](Deferred[F, Status.Terminal])

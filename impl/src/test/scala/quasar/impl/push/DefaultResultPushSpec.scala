@@ -24,7 +24,7 @@ import cats.effect.{Blocker, IO, Resource}
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 
-import fs2.{Pipe, Stream, text}
+import fs2.{Pipe, Stream, text, Pull}
 import fs2.concurrent.Queue
 
 import java.time.{Instant, ZoneOffset}
@@ -163,7 +163,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     def sinks = support match {
       case Create => NonEmptyList.one(createSink)
       case Upsert => NonEmptyList.one(upsertSink)
-      case All => NonEmptyList.of(createSink, upsertSink)
+      case Append => NonEmptyList.one(appendSink)
+      case All => NonEmptyList.of(createSink, upsertSink, appendSink)
     }
 
     val createSink: ResultSink[IO, Type] =
@@ -205,12 +206,27 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         (RenderConfig.Csv(),
           ∀[λ[α => Pipe[IO, DataEvent[Byte, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]](pipe))
       }
+    val appendSink: ResultSink[IO, Type] =
+      ResultSink.append[IO, Type, Byte] { (path, columns) =>
+        def pipe[A]: Pipe[IO, AppendEvent[Byte, OffsetKey.Actual[A]], OffsetKey.Actual[A]] = _.flatMap {
+          case DataEvent.Create(c) =>
+            Stream.chunk(c)
+                .through(text.utf8Decode)
+                .evalMap(s => fs.update(_ |+| Map(path -> s)))
+                .drain
+            case DataEvent.Commit(k) =>
+              Stream.emit(k)
+        }
+        (RenderConfig.Csv(),
+          ∀[λ[α => Pipe[IO, AppendEvent[Byte, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]](pipe))
+      }
   }
 
   object QDestination {
     sealed trait Support
     object Create extends Support
     object Upsert extends Support
+    object Append extends Support
     object All extends Support
 
     def apply(supports: Support = All): IO[(QDestination, IO[Filesystem])] =
@@ -305,9 +321,19 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         case _ =>
           Stream.raiseError[IO](new RuntimeException("renderJson not implemented"))
       }
-      val commit: AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]] =
-        DataEvent.Commit(OffsetKey.Actual.external(ExternalOffsetKey.empty))
-      creates ++ Stream.emit(commit)
+      def commit(i: Int): AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]] =
+        DataEvent.Commit(OffsetKey.Actual.external(ExternalOffsetKey(new Array(i))))
+
+      def go(stream: Stream[IO, AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]]], acc: Int)
+          : Pull[IO, AppendEvent[P, OffsetKey.Actual[ExternalOffsetKey]], Unit] = stream.pull.uncons1 flatMap {
+        case None =>
+          Pull.output1(commit(acc)) >> Pull.done
+        case Some((a@DataEvent.Create(chnk), tail)) =>
+          Pull.output1(a) >> go(tail, acc + chnk.size)
+        case Some((a, tail)) =>
+          Pull.output1(a) >> go(tail, acc)
+      }
+      go(creates, 0).stream
     }
   }
 
@@ -446,7 +472,20 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       : ∃[PushConfig[?, String]] =
     ∃[PushConfig[?, String]](PushConfig.Incremental(path, q, cols, resume, initial))
 
+  def sourceDriven(
+      path: ResourcePath,
+      q: String,
+      cols: PushConfig.Columns = colX)
+      : ∃[PushConfig[*, String]] =
+    ∃[PushConfig[*, String]](PushConfig.SourceDriven(path, q, PushColumns.NoPrimary(cols)))
+
   def forallConfigs[A: AsResult](f: ∃[PushConfig[?, String]] => IO[A]): Fragment = {
+    "full" >>* f(full(ResourcePath.root() / ResourceName("full"), "fullq"))
+    "incremental" >>* f(incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"))
+    "sourceDriven" >>* f(sourceDriven(ResourcePath.root() / ResourceName("sourceDriven"), "sourceDrivenq"))
+  }
+
+  def nonAppendConfigs[A: AsResult](f: ∃[PushConfig[*, String]] => IO[A]): Fragment = {
     "full" >>* f(full(ResourcePath.root() / ResourceName("full"), "fullq"))
     "incremental" >>* f(incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"))
   }
@@ -715,8 +754,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
       }
     }
-
-    "replaces a previous full push to path" >> forallConfigs { config =>
+    "replaces a previous full push to path" >> nonAppendConfigs { config =>
       for {
         (dest, filesystem) <- QDestination()
 
@@ -748,7 +786,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       } yield r
     }
 
-    "replaces a previous incremental push to path" >> forallConfigs { config =>
+    "replaces a previous incremental push to path" >> nonAppendConfigs { config =>
       for {
         (dest, filesystem) <- QDestination()
 
@@ -775,6 +813,65 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             }
             fs0.get(config.value.path) must beSome(W1)
             fs1.get(config.value.path) must beSome(dataString)
+          }
+        }
+      } yield r
+    }
+
+    "replaces a previous source driven push to path" >> nonAppendConfigs { config =>
+      for {
+        (dest, filesystem) <- QDestination()
+
+        prev = sourceDriven(config.value.path, "prevQ")
+
+        eval = mkEvaluator {
+          case ("prevQ", _) => IO(dataStream.take(1))
+          case _ => IO(dataStream)
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            prv <- rp.start(DestinationId, prev, None)
+            _ <- await(prv.sequence)
+            fs0 <- filesystem
+
+            res <- rp.start(DestinationId, config, None)
+            terminal <- await(res.sequence)
+
+            fs1 <- filesystem
+          } yield {
+            terminal must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs0.get(config.value.path) must beSome(W1)
+            fs1.get(config.value.path) must beSome(dataString)
+          }
+        }
+      } yield r
+    }
+    "appends to previous push result for append configs" >> forallConfigs { prevConfig =>
+      for {
+        (dest, filesystem) <- QDestination()
+        config = sourceDriven(prevConfig.value.path, prevConfig.value.query)
+        eval = mkEvaluator {
+          case (q, _) if q === prevConfig.value.query => IO(dataStream)
+          case _ => IO.never
+        }
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            first <- rp.start(DestinationId, config, None)
+            _ <- await(first.sequence)
+            fs0 <- filesystem
+
+            res <- rp.start(DestinationId, config, None)
+            terminal <- await(res.sequence)
+            fs1 <- filesystem
+          } yield {
+            terminal must beRight.like {
+              case Status.Finished(_, _, _) => ok
+            }
+            fs0.get(config.value.path) must beSome(dataString)
+            fs1.get(config.value.path) must beSome(dataString + dataString)
           }
         }
       } yield r
@@ -1088,6 +1185,50 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       } yield r
     }
 
+    "resumes append push from saved offset" >>* {
+      for {
+        (dest, filesystem) <- QDestination()
+
+        path = ResourcePath.root() / ResourceName("qrs")
+        config = sourceDriven(path, "append")
+
+        eval = mkEvaluator {
+          case ("append", None) =>
+            IO(Stream(W1, W1, W1).covary[IO])
+
+          case ("append", Some(Offset.External(∃(k)))) =>
+            (k: OffsetKey.Actual[_]) match {
+              case OffsetKey.ExternalKey(ek) if ek.value.length === 15 =>
+                IO(Stream(W2, W2, W2).covary[IO])
+              case _ => IO.never
+            }
+        }
+
+        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+
+            startRes <- await(started.sequence)
+            fs1 <- filesystem
+
+            updated <- rp.update(DestinationId, config.value.path)
+
+            updateRes <- await(updated.sequence)
+            fs2 <- filesystem
+            } yield {
+              startRes must beRight.like {
+                case Status.Finished(_, _, _) => ok
+              }
+              fs1.get(path) must beSome(W1+W1+W1)
+
+              updateRes must beRight.like {
+                case Status.Finished(_, _, _) => ok
+              }
+              fs2.get(path) must beSome(W1+W1+W1+W2+W2+W2)
+            }
+        }
+      } yield r
+    }
     "retains committed incremental offset on failure" >>* {
       for {
         (dest, filesystem) <- QDestination()

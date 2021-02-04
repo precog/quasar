@@ -218,7 +218,7 @@ private[impl] final class DefaultResultPush[
               s"${actualKey} is invalid offset, append pushes can work only with external encoded keys")
 
             EitherT {
-              log.error(ex)(s"${debugKey(key)} Unable to resume incremental push")
+              log.error(ex)(s"${debugKey(key)} Unable to resume source driven push")
                 .productR(Concurrent[F].raiseError[Either[Errs, F[Status.Terminal]]](ex))
             }
         }

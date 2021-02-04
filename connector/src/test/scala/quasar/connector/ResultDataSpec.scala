@@ -87,31 +87,4 @@ final class ResultDataSpec extends quasar.Qspec {
       delimited1.data.compile.to(List) must_=== expected1.compile.to(List)
     }
   }
-  "through" >> {
-    "for Continuous applied to constructor argument" >> {
-      val arg = Stream.emits(List(0, 1, 2, 3, 4))
-      val pipe: Pipe[fs2.Pure, Int, Int] = _.map(_ + 1)
-      val actual = Continuous(arg).through(pipe).data.compile.to(List)
-      val expected = Continuous(arg.through(pipe)).data.compile.to(List)
-      Continuous(arg).through(pipe).data.compile.to(List) must_=== Continuous(arg.through(pipe)).data.compile.to(List)
-    }
-    "for Delimeted applied to every chunk" >> {
-      val arg = Stream.emits(List(Right(Chunk(0, 1)), Left(emptyKey), Right(Chunk(2, 3)), Left(emptyKey)))
-      val pipe0: Pipe[fs2.Pure, Int, Int] = _.map(_ + 1)
-      val pipe1: Pipe[fs2.Pure, Int, Int] = (x: Stream[fs2.Pure, Int]) => Stream.emit(x.compile.to(List).length)
-      val input = Delimited(arg)
-      val actual0 = input.through(pipe0).delimited.flatMap {
-        case Left(a) => Stream.emit(Left(a))
-        case Right(chnk) => Stream.chunk(chnk).map(Right(_))
-      }
-      val actual1 = input.through(pipe1).delimited.flatMap {
-        case Left(a) => Stream.emit(Left(a))
-        case Right(chnk) => Stream.chunk(chnk).map(Right(_))
-      }
-      val expected0 = List(Right(1), Right(2), Left(emptyKey), Right(3), Right(4), Left(emptyKey))
-      val expected1 = List(Right(2), Left(emptyKey), Right(2), Left(emptyKey))
-      actual0.compile.to(List) must_=== expected0
-      actual1.compile.to(List) must_=== expected1
-    }
-  }
 }

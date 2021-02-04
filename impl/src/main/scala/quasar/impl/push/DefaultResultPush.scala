@@ -371,7 +371,11 @@ private[impl] final class DefaultResultPush[
 
         val offset = actualOffset.map(o => Offset.External(∃(o)))
 
-        val consumer = sink.consume(path, destColumns)
+        val args = ResultSink.AppendSink.Args(path, destColumns, offset match {
+          case None => WriteMode.Replace
+          case Some(_) => WriteMode.Append
+        })
+        val consumer = sink.consume(args)
 
         Stream.resource(evaluator((query, offset))) flatMap { results =>
           val dataEvents = render.renderAppend[consumer.A](

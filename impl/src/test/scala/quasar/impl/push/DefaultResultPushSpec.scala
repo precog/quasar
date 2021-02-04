@@ -207,16 +207,25 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           ∀[λ[α => Pipe[IO, DataEvent[Byte, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]](pipe))
       }
     val appendSink: ResultSink[IO, Type] =
-      ResultSink.append[IO, Type, Byte] { (path, columns) =>
-        def pipe[A]: Pipe[IO, AppendEvent[Byte, OffsetKey.Actual[A]], OffsetKey.Actual[A]] = _.flatMap {
-          case DataEvent.Create(c) =>
-            Stream.chunk(c)
+      ResultSink.append[IO, Type, Byte] { (args) =>
+        val init = args.writeMode match {
+          case WriteMode.Replace =>
+            Stream.eval_(fs.update(_.updated(args.path, "")))
+
+          case WriteMode.Append =>
+            Stream.empty
+        }
+        def pipe[A](dataEvents: Stream[IO, AppendEvent[Byte, OffsetKey.Actual[A]]])
+            : Stream[IO, OffsetKey.Actual[A]] =
+          (init ++ dataEvents) flatMap {
+            case DataEvent.Create(c) =>
+              Stream.chunk(c)
                 .through(text.utf8Decode)
-                .evalMap(s => fs.update(_ |+| Map(path -> s)))
+                .evalMap(s => fs.update(_ |+| Map(args.path -> s)))
                 .drain
             case DataEvent.Commit(k) =>
               Stream.emit(k)
-        }
+          }
         (RenderConfig.Csv(),
           ∀[λ[α => Pipe[IO, AppendEvent[Byte, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]](pipe))
       }
@@ -485,11 +494,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     "sourceDriven" >>* f(sourceDriven(ResourcePath.root() / ResourceName("sourceDriven"), "sourceDrivenq"))
   }
 
-  def nonAppendConfigs[A: AsResult](f: ∃[PushConfig[*, String]] => IO[A]): Fragment = {
-    "full" >>* f(full(ResourcePath.root() / ResourceName("full"), "fullq"))
-    "incremental" >>* f(incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"))
-  }
-
   "start" >> {
     "asynchronously pushes results to a destination" >> forallConfigs { config =>
       for {
@@ -754,7 +758,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
       }
     }
-    "replaces a previous full push to path" >> nonAppendConfigs { config =>
+    "replaces a previous full push to path" >> forallConfigs { config =>
       for {
         (dest, filesystem) <- QDestination()
 
@@ -786,7 +790,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       } yield r
     }
 
-    "replaces a previous incremental push to path" >> nonAppendConfigs { config =>
+    "replaces a previous incremental push to path" >> forallConfigs { config =>
       for {
         (dest, filesystem) <- QDestination()
 
@@ -818,7 +822,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       } yield r
     }
 
-    "replaces a previous source driven push to path" >> nonAppendConfigs { config =>
+    "replaces a previous source driven push to path" >> forallConfigs { config =>
       for {
         (dest, filesystem) <- QDestination()
 
@@ -845,33 +849,6 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
             }
             fs0.get(config.value.path) must beSome(W1)
             fs1.get(config.value.path) must beSome(dataString)
-          }
-        }
-      } yield r
-    }
-    "appends to previous push result for append configs" >> forallConfigs { prevConfig =>
-      for {
-        (dest, filesystem) <- QDestination()
-        config = sourceDriven(prevConfig.value.path, prevConfig.value.query)
-        eval = mkEvaluator {
-          case (q, _) if q === prevConfig.value.query => IO(dataStream)
-          case _ => IO.never
-        }
-        r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>
-          for {
-            first <- rp.start(DestinationId, config, None)
-            _ <- await(first.sequence)
-            fs0 <- filesystem
-
-            res <- rp.start(DestinationId, config, None)
-            terminal <- await(res.sequence)
-            fs1 <- filesystem
-          } yield {
-            terminal must beRight.like {
-              case Status.Finished(_, _, _) => ok
-            }
-            fs0.get(config.value.path) must beSome(dataString)
-            fs1.get(config.value.path) must beSome(dataString + dataString)
           }
         }
       } yield r

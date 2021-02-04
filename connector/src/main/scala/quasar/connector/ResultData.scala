@@ -20,23 +20,13 @@ import slamdata.Predef._
 import quasar.api.push.ExternalOffsetKey
 
 import cats._
-import cats.implicits._
-import fs2.{Stream, Chunk, Pipe}
-
-import ResultData._
+import fs2.{Stream, Chunk}
 
 sealed trait ResultData[F[_], A] extends Product with Serializable { self =>
   type Elem = A
   def delimited: Stream[F, Either[ExternalOffsetKey, Chunk[A]]]
   def data: Stream[F, A]
   def mapK[G[_]](f: F ~> G): ResultData[G, A]
-  def through[B](pipe: Pipe[F, A, B]): ResultData[F, B] = self match {
-    case Continuous(data) => Continuous(data.through(pipe))
-    case Delimited(delimited) => Delimited { delimited flatMap {
-      case Left(a) => Stream.emit(Left(a))
-      case Right(chunk) => Stream.chunk(chunk).through(pipe).chunks.map(_.asRight)
-    }}
-  }
 }
 
 object ResultData {

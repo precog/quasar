@@ -17,7 +17,7 @@
 package quasar.connector
 
 import scala.{Product, Serializable}
-import quasar.api.push.{OffsetKey, OffsetPath, ExternalOffsetKey}
+import quasar.api.push.{OffsetKey, OffsetPath}
 
 import skolems.∃
 

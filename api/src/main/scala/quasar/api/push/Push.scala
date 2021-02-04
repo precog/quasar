@@ -16,16 +16,7 @@
 
 package quasar.api.push
 
-import slamdata.Predef._
-
 import java.time.Instant
-
-import cats.{Eq, Show}
-import cats.implicits._
-
-import monocle.macros.Lenses
-
-import shims.{equalToCats, showToCats}
 
 final case class Push[O, Q](
     config: PushConfig[O, Q],

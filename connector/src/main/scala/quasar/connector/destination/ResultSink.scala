@@ -54,10 +54,17 @@ object ResultSink {
   }
 
   final case class AppendSink[F[_], T] (
-      consume: (ResourcePath, PushColumns[Column[T]]) => AppendSink.Result[F])
+      consume: AppendSink.Args[T] => AppendSink.Result[F])
       extends ResultSink[F, T]
 
   object AppendSink {
+    final case class Args[T](
+        path: ResourcePath,
+        pushColumns: PushColumns[Column[T]],
+        writeMode: WriteMode) {
+      def columns: NonEmptyList[Column[T]] =
+        pushColumns.toNel
+    }
     trait Result[F[_]] {
       type A
       val renderConfig: RenderConfig[A]
@@ -76,8 +83,8 @@ object ResultSink {
     UpsertSink(consume)
 
   def append[F[_], T, X](
-    f: (ResourcePath, PushColumns[Column[T]]) => (RenderConfig[X], ∀[λ[α => Pipe[F, AppendEvent[X, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]])) : ResultSink[F, T] =
-    AppendSink { (path, cols) => f(path, cols) match {
+    consume: AppendSink.Args[T] => (RenderConfig[X], ∀[λ[α => Pipe[F, AppendEvent[X, OffsetKey.Actual[α]], OffsetKey.Actual[α]]]])) : ResultSink[F, T] =
+    AppendSink { (args: AppendSink.Args[T]) => consume(args) match {
       case (renderConfig0, pipe0) => new AppendSink.Result[F] {
         type A = X
         val renderConfig = renderConfig0

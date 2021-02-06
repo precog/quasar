@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.api.DataPathSegment
 import quasar.api.datasource.DatasourceType
-import quasar.api.push.{OffsetKey, OffsetPath}
+import quasar.api.push.{OffsetKey, OffsetPath, InternalKey}
 import quasar.api.resource._
 import quasar.connector._
 import quasar.connector.evaluate._
@@ -85,7 +85,7 @@ final class QueryFederatorSpec extends Qspec with TreeMatchers {
   val qs = construction.mkDefaults[Fix, QScriptEducated[Fix, ?]]
 
   def offset(r: Real): Offset =
-    Offset.Internal(OffsetPath(DataPathSegment.Field("ts")), ∃(OffsetKey.Actual.real(r)))
+    Offset.Internal(OffsetPath(DataPathSegment.Field("ts")), ∃(InternalKey.Actual.real(r)))
 
   "returns 'not a resource' for root" >> {
     val query =

@@ -29,9 +29,9 @@ import monocle.macros.Lenses
 @Lenses
 final case class ResumeConfig[O](
     resultIdColumn: Column[(IdType, SelectedType)],
-    resultOffsetColumn: Column[OffsetKey.Formal[Unit, O]],
+    resultOffsetColumn: Column[InternalKey.Formal[Unit, O]],
     sourceOffsetPath: OffsetPath)
-
+/*
 object ResumeConfig {
   implicit def resumeConfigEq[O]: Eq[ResumeConfig[O]] =
     Eq.by(c => (c.resultIdColumn, c.resultOffsetColumn, c.sourceOffsetPath))
@@ -39,4 +39,4 @@ object ResumeConfig {
   implicit def resumeConfigShow[O]: Show[ResumeConfig[O]] =
     Show.show(rc =>
       s"ResumeConfig(${rc.resultIdColumn.show}, ${rc.resultOffsetColumn.show}, ${rc.sourceOffsetPath.show})")
-}
+  */

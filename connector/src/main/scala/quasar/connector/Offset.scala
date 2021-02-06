@@ -17,7 +17,7 @@
 package quasar.connector
 
 import scala.{Product, Serializable}
-import quasar.api.push.{OffsetKey, OffsetPath}
+import quasar.api.push.{OffsetKey, OffsetPath, InternalKey}
 
 import skolems.∃
 
@@ -26,7 +26,7 @@ sealed trait Offset extends Product with Serializable {
 }
 
 object Offset {
-  final case class Internal(path: OffsetPath, value: ∃[OffsetKey.Actual])
+  final case class Internal(path: OffsetPath, value: ∃[InternalKey.Actual])
       extends Offset
 
   final case class External(value: ∃[OffsetKey.Actual])

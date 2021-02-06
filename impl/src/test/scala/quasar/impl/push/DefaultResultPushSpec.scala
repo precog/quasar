@@ -466,7 +466,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val resumePos =
     ResumeConfig(
       Column("id", (IdType.StringId, SelectedType(TypeIndex(1), List(∃(Actual.integer(10)))))),
-      Column("pos", OffsetKey.Formal.real(())),
+      Column("pos", InternalKey.Formal.real(())),
       OffsetPath(DataPathSegment.Field("pos")))
 
   def full(path: ResourcePath, q: String, cols: PushConfig.Columns = colX): ∃[PushConfig[?, String]] =
@@ -477,7 +477,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       q: String,
       cols: List[PushConfig.OutputColumn] = colX.toList,
       resume: ResumeConfig[Real] = resumePos,
-      initial: Option[OffsetKey.Actual[Real]] = None)
+      initial: Option[InternalKey.Actual[Real]] = None)
       : ∃[PushConfig[?, String]] =
     ∃[PushConfig[?, String]](PushConfig.Incremental(path, q, cols, resume, initial))
 
@@ -911,11 +911,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         incCfg = incremental(
           path = ResourcePath.root() / ResourceName("initial"),
           q = "initial-offset",
-          initial = Some(OffsetKey.Actual.real(99)))
+          initial = Some(InternalKey.Actual.real(99)))
 
         eval = mkEvaluator {
           case ("initial-offset", Some(Offset.Internal(NonEmptyList(DataPathSegment.Field("pos"), Nil), ∃(k)))) =>
-            val key: OffsetKey.Actual[_] = k
+            val key: InternalKey.Actual[_] = k
 
             key match {
               case OffsetKey.RealKey(r) if r.toInt == 99 => IO(dataStream)
@@ -1116,7 +1116,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
         path = ResourcePath.root() / ResourceName("abc")
         // initial offset = 17
-        config = incremental(path, "abc", initial = Some(OffsetKey.Actual.real(17)))
+        config = incremental(path, "abc", initial = Some(InternalKey.Actual.real(17)))
 
         // only emits for offset = 17
         eval = mkEvaluator {

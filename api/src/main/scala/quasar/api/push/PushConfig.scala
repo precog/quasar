@@ -47,7 +47,7 @@ object PushConfig {
       query: Q,
       outputColumns: List[OutputColumn],
       resumeConfig: ResumeConfig[O],
-      initialOffset: Option[OffsetKey.Actual[O]])
+      initialOffset: Option[InternalKey.Actual[O]])
       extends PushConfig[O, Q] {
 
     def columns: Columns =
@@ -70,8 +70,8 @@ object PushConfig {
       case Full(p, q, c) => (p, q, c)
     } ((Full[O, Q] _).tupled)
 
-  def incremental[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, List[OutputColumn], ResumeConfig[O], Option[OffsetKey.Actual[O]])] =
-    Prism.partial[PushConfig[O, Q], (ResourcePath, Q, List[OutputColumn], ResumeConfig[O], Option[OffsetKey.Actual[O]])] {
+  def incremental[O, Q]: Prism[PushConfig[O, Q], (ResourcePath, Q, List[OutputColumn], ResumeConfig[O], Option[InternalKey.Actual[O]])] =
+    Prism.partial[PushConfig[O, Q], (ResourcePath, Q, List[OutputColumn], ResumeConfig[O], Option[InternalKey.Actual[O]])] {
       case Incremental(p, q, c, r, o) => (p, q, c, r, o)
     } ((Incremental[O, Q] _).tupled)
 

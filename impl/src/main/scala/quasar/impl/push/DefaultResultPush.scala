@@ -293,7 +293,7 @@ private[impl] final class DefaultResultPush[
         query: Q,
         nonIdOutputColumns: List[Column[(ColumnType.Scalar, dest.Type)]],
         resumeConfig: ResumeConfig[A],
-        actualOffset: Either[Option[OffsetKey.Actual[A]], OffsetKey.Actual[A]])
+        actualOffset: Either[Option[InternalKey.Actual[A]], OffsetKey.Actual[A]])
         : EitherT[F, Errs, Stream[F, OffsetKey.Actual[A]]] = {
 
       val C = Functor[Column]
@@ -319,7 +319,7 @@ private[impl] final class DefaultResultPush[
 
         val (offsetValue, isUpdate) = actualOffset match {
           case Left(initial) => (initial, false)
-          case Right(resume) => (Some(resume), true)
+          case Right(resume) => (InternalKey.fromOffset(resume), true)
         }
 
         val offset = offsetValue.map(o => Offset.Internal(resumeConfig.sourceOffsetPath, ∃(o)))

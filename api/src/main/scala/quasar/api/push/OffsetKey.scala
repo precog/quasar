@@ -32,22 +32,55 @@ sealed trait OffsetKey[F[_], A] extends Product with Serializable {
   val value: F[A]
   val reify: A === Repr
 }
+sealed trait InternalKey[F[_], A] extends OffsetKey[F, A]
 
+object InternalKey {
+  import OffsetKey._
+  type Actual[A] = InternalKey[Id, A]
+  type Formal[T, A] = InternalKey[Const[T, ?], A]
+
+  object Actual {
+    def real(k: Real): Actual[Real] =
+      RealKey[Id](k)
+
+    def string(k: String): Actual[String] =
+      StringKey[Id](k)
+
+    def dateTime(k: OffsetDateTime): Actual[OffsetDateTime] =
+      DateTimeKey[Id](k)
+  }
+
+  object Formal {
+    def real[T](t: T): Formal[T, Real] =
+      RealKey(Const[T, Real](t))
+
+    def string[T](t: T): Formal[T, String] =
+      StringKey(Const[T, String](t))
+
+    def dateTime[T](t: T): Formal[T, OffsetDateTime] =
+      DateTimeKey(Const[T, OffsetDateTime](t))
+  }
+
+  def fromOffset[F[_], A](inp: OffsetKey[F, A]): Option[InternalKey[F, A]] = inp match {
+    case i: InternalKey[F, A] => Some(i)
+    case _ => None
+  }
+}
 object OffsetKey {
   type Actual[A] = OffsetKey[Id, A]
   type Formal[T, A] = OffsetKey[Const[T, ?], A]
 
-  final case class RealKey[F[_]](value: F[Real]) extends OffsetKey[F, Real] {
+  final case class RealKey[F[_]](value: F[Real]) extends InternalKey[F, Real] {
     type Repr = Real
     val reify = Is.refl
   }
 
-  final case class StringKey[F[_]](value: F[String]) extends OffsetKey[F, String] {
+  final case class StringKey[F[_]](value: F[String]) extends InternalKey[F, String] {
     type Repr = String
     val reify = Is.refl
   }
 
-  final case class DateTimeKey[F[_]](value: F[OffsetDateTime]) extends OffsetKey[F, OffsetDateTime] {
+  final case class DateTimeKey[F[_]](value: F[OffsetDateTime]) extends InternalKey[F, OffsetDateTime] {
     type Repr = OffsetDateTime
     val reify = Is.refl
   }

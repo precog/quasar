@@ -488,10 +488,18 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       : ∃[PushConfig[*, String]] =
     ∃[PushConfig[*, String]](PushConfig.SourceDriven(path, q, PushColumns.NoPrimary(cols)))
 
+  def sourceDrivenPrimary(
+      path: ResourcePath,
+      q: String,
+      cols: PushConfig.Columns = colX)
+      : ∃[PushConfig[*, String]] =
+    ∃[PushConfig[*, String]](PushConfig.SourceDriven(path, q, PushColumns.HasPrimary(cols.head, cols.tail)))
+
   def forallConfigs[A: AsResult](f: ∃[PushConfig[?, String]] => IO[A]): Fragment = {
     "full" >>* f(full(ResourcePath.root() / ResourceName("full"), "fullq"))
     "incremental" >>* f(incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"))
     "sourceDriven" >>* f(sourceDriven(ResourcePath.root() / ResourceName("sourceDriven"), "sourceDrivenq"))
+    "sourceDriven with primary column" >>* f(sourceDrivenPrimary(ResourcePath.root() / ResourceName("primary"), "primaryq"))
   }
 
   "start" >> {

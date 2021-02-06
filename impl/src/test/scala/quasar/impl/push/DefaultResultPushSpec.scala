@@ -34,7 +34,7 @@ import monocle.Prism
 import monocle.Traversal
 
 import org.specs2.execute.AsResult
-import org.specs2.specification.core.Fragment
+import org.specs2.specification.core.{Fragment, Fragments}
 
 import quasar.{ConditionMatchers, EffectfulQSpec}
 import quasar.api.{Column, ColumnType, DataPathSegment, Label, Labeled, QueryEvaluator}
@@ -85,6 +85,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   val QDestinationType = DestinationType("ref", 1)
 
   type Filesystem = Map[ResourcePath, String]
+  type PrimaryKeys = Map[ResourcePath, String]
 
   // NB: These must be at least 3 bytes each to ensure they're
   //     emitted from utf8Decode without additional input.
@@ -95,7 +96,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   // The string formed by concatentating Ws
   val dataString = W1 + W2 + W3
 
-  final class QDestination(fs: Ref[IO, Filesystem], support: QDestination.Support)
+  final class QDestination(fs: Ref[IO, Filesystem], pris: Ref[IO, PrimaryKeys], support: QDestination.Support)
       extends Destination[IO] {
 
     import QDestination._
@@ -179,6 +180,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     val upsertSink: ResultSink[IO, Type] =
       ResultSink.upsert[IO, Type, Byte] { args =>
+        val putPrimary =
+          Stream.eval_(pris.update(_.updated(args.path, args.idColumn.name)))
+
         val init = args.writeMode match {
           case WriteMode.Replace =>
             Stream.eval_(fs.update(_.updated(args.path, "")))
@@ -189,7 +193,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
         def pipe[A](dataEvents: Stream[IO, DataEvent[Byte, OffsetKey.Actual[A]]])
             : Stream[IO, OffsetKey.Actual[A]] =
-          (init ++ dataEvents) flatMap {
+          (putPrimary ++ init ++ dataEvents) flatMap {
             case DataEvent.Create(c) =>
               Stream.chunk(c)
                 .through(text.utf8Decode)
@@ -208,6 +212,9 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       }
     val appendSink: ResultSink[IO, Type] =
       ResultSink.append[IO, Type, Byte] { (args) =>
+        val putPrimary =
+          Stream.eval_(args.pushColumns.primary.traverse_(col => pris.update(_.updated(args.path, col.name))))
+
         val init = args.writeMode match {
           case WriteMode.Replace =>
             Stream.eval_(fs.update(_.updated(args.path, "")))
@@ -217,7 +224,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
         def pipe[A](dataEvents: Stream[IO, AppendEvent[Byte, OffsetKey.Actual[A]]])
             : Stream[IO, OffsetKey.Actual[A]] =
-          (init ++ dataEvents) flatMap {
+          (putPrimary ++ init ++ dataEvents) flatMap {
             case DataEvent.Create(c) =>
               Stream.chunk(c)
                 .through(text.utf8Decode)
@@ -238,10 +245,10 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     object Append extends Support
     object All extends Support
 
-    def apply(supports: Support = All): IO[(QDestination, IO[Filesystem])] =
-      Ref.of[IO, Filesystem](Map()) map { fs =>
-        (new QDestination(fs, supports), fs.get)
-      }
+    def apply(supports: Support = All): IO[(QDestination, IO[Filesystem], IO[PrimaryKeys])] = for {
+      fs <- Ref.of[IO, Filesystem](Map())
+      pris <- Ref.of[IO, PrimaryKeys](Map())
+    } yield (new QDestination(fs, pris, supports), fs.get, pris.get)
   }
 
   final class MockResultRender extends ResultRender[IO, Stream[IO, String]] {
@@ -495,17 +502,33 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       : ∃[PushConfig[*, String]] =
     ∃[PushConfig[*, String]](PushConfig.SourceDriven(path, q, PushColumns.HasPrimary(cols.head, cols.tail)))
 
-  def forallConfigs[A: AsResult](f: ∃[PushConfig[?, String]] => IO[A]): Fragment = {
-    "full" >>* f(full(ResourcePath.root() / ResourceName("full"), "fullq"))
-    "incremental" >>* f(incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"))
-    "sourceDriven" >>* f(sourceDriven(ResourcePath.root() / ResourceName("sourceDriven"), "sourceDrivenq"))
-    "sourceDriven with primary column" >>* f(sourceDrivenPrimary(ResourcePath.root() / ResourceName("primary"), "primaryq"))
+  val configs: Map[String, ∃[PushConfig[*, String]]] = Map(
+    "full" -> full(ResourcePath.root() / ResourceName("full"), "fullq"),
+    "incremental" -> incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"),
+    "sourceDriven" -> sourceDriven(ResourcePath.root() / ResourceName("sourceDriven"), "sourceDrivenq"),
+    "sourceDrivenPrimary" -> sourceDrivenPrimary(ResourcePath.root() / ResourceName("primary"), "primaryq"))
+
+  def forallConfigs[A: AsResult](f: ∃[PushConfig[?, String]] => IO[A]): Fragments =
+    Fragment.foreach(configs.toList) { case (name, config) =>
+      name >>* f(config)
+    }
+
+  def zippedConfigs[A: AsResult, B](
+      additionalInfo: Map[String, B])(
+      f: (∃[PushConfig[*, String]], B) => IO[A])
+      : Fragments = {
+    val aligned = configs.align(additionalInfo).collect {
+      case (name, Ior.Both(config, info)) => (name, (config, info))
+    }
+    Fragment.foreach(aligned.toList) { case (name, (config, info)) =>
+      name >>* f(config, info)
+    }
   }
 
   "start" >> {
     "asynchronously pushes results to a destination" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, filesystem, _) <- QDestination()
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
@@ -524,13 +547,38 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
         }
       } yield r
     }
+    val ExpectedKeys = Map(
+      "full" -> None,
+      "incremental" -> Some("id"),
+      "sourceDriven" -> None,
+      "sourceDrivenPrimary" -> Some("X"))
+
+    "provides primary key column" >> zippedConfigs(ExpectedKeys) { (config, expectedKey) =>
+      for {
+        (destination, _, pris) <- QDestination()
+        r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
+          for {
+            started <- rp.start(DestinationId, config, None)
+            result <- await(started.sequence)
+            primaryKeysCollected <- pris
+            } yield {
+              val expectedKeys: Set[ResourcePath] = expectedKey match {
+                case None => Set()
+                case Some(_) => Set(config.value.path)
+              }
+              primaryKeysCollected.keySet must equal(expectedKeys)
+              primaryKeysCollected.get(config.value.path) must equal(expectedKey)
+            }
+        }
+      } yield r
+    }
 
     "rejects when full push running for same path" >> forallConfigs { config =>
       val path = config.value.path
       val fullCfg = full(path, "conflictq")
 
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, filesystem, _) <- QDestination()
         (ctl, data0) <- controlledStream
         (data, awaitStart) <- startLatch(data0)
 
@@ -556,7 +604,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val incCfg = incremental(path, "conflictq")
 
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, filesystem, _) <- QDestination()
         (ctl, data0) <- controlledStream
         (data, awaitStart) <- startLatch(data0)
 
@@ -581,7 +629,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val dest2 = DestinationId.intValue + 1
 
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         eval = constEvaluator(controlledStream.map(_._2))
 
@@ -610,7 +658,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfg = outputColumns.set(bad)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         startStatus <- mkResultPush(Map(DestinationId -> dest), emptyEvaluator) use { rp =>
           rp.start(DestinationId, cfg, None)
@@ -626,7 +674,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfg = outputColumns.set(bad)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -648,7 +696,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfg = outputColumns.set(bad)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -673,7 +721,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfgH = outputColumns.set(high)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         r <- mkResultPush(Map(DestinationId -> dest), emptyEvaluator) use { rp =>
           for {
@@ -706,7 +754,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfg = outputColumns.set(bad)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -729,7 +777,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfg = outputColumns.set(bad)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -751,7 +799,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val cfg = outputColumns.set(bad)(config)
 
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -768,7 +816,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
     "replaces a previous full push to path" >> forallConfigs { config =>
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         prev = full(config.value.path, "prevQ")
 
@@ -800,7 +848,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "replaces a previous incremental push to path" >> forallConfigs { config =>
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         prev = incremental(config.value.path, "prevQ")
 
@@ -832,7 +880,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "replaces a previous source driven push to path" >> forallConfigs { config =>
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         prev = sourceDriven(config.value.path, "prevQ")
 
@@ -864,7 +912,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "limit restricts the number of rows pushed" >> forallConfigs { config =>
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, filesystem, _) <- QDestination()
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
@@ -886,7 +934,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "full fails when destination doesn't support full push" >>* {
       for {
-        (dest, _) <- QDestination(supports = QDestination.Upsert)
+        (dest, _, _) <- QDestination(supports = QDestination.Upsert)
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -900,7 +948,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "incremental fails when destination doesn't support incremental push" >>* {
       for {
-        (dest, _) <- QDestination(supports = QDestination.Create)
+        (dest, _, _) <- QDestination(supports = QDestination.Create)
 
         startStatus <-
           mkResultPush(Map(DestinationId -> dest), emptyEvaluator)
@@ -914,7 +962,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "starts incremental push from initial offset" >>* {
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, filesystem, _) <- QDestination()
 
         incCfg = incremental(
           path = ResourcePath.root() / ResourceName("initial"),
@@ -953,7 +1001,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   "update" >> {
     "restarts previous full push using saved query" >>* {
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         (ctl, data) <- controlledStream
 
@@ -1002,7 +1050,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "resumes previous incremental push from saved offset" >>* {
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         path = ResourcePath.root() / ResourceName("resume")
         config = incremental(path, "resume")
@@ -1049,7 +1097,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "resumes previous incremental push from beginning when no offset" >>* {
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         (ctl, data) <- controlledStream
 
@@ -1113,7 +1161,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "resumes previous incremental that failed prior to commit from initial" >>* {
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         (ctl, data) <- controlledStream
 
@@ -1172,7 +1220,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "resumes append push from saved offset" >>* {
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         path = ResourcePath.root() / ResourceName("qrs")
         config = sourceDriven(path, "append")
@@ -1216,7 +1264,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     }
     "retains committed incremental offset on failure" >>* {
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         (ctl, data) <- controlledStream
 
@@ -1293,7 +1341,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails if never started" >>* {
       for {
-        (dest, _) <- QDestination()
+        (dest, _, _) <- QDestination()
 
         path = ResourcePath.root() / ResourceName("nope")
 
@@ -1309,7 +1357,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "fails if already running" >> forallConfigs { config =>
       for {
-        (dest, filesystem) <- QDestination()
+        (dest, filesystem, _) <- QDestination()
 
         latch <- Deferred[IO, Unit]
 
@@ -1356,7 +1404,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val path = config.value.path
 
       for {
-        (destination, filesystem) <- QDestination()
+        (destination, filesystem, _) <- QDestination()
 
         (ctl, data0) <- controlledStream
         (data, awaitStart) <- startLatch(data0, 1)
@@ -1388,7 +1436,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "no-op when push already completed" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
@@ -1404,7 +1452,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "no-op when no push to path" >>* {
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         cancelRes <-
           mkResultPush(Map(DestinationId -> destination), emptyEvaluator)
@@ -1430,7 +1478,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes running push" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         (ctl, data0) <- controlledStream
         (data, awaitStart) <- startLatch(data0)
@@ -1456,7 +1504,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes running push when previous terminal exists" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         cfg0 = config.value
         cfgQ = cfg0.query
@@ -1502,7 +1550,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes canceled push" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         (ctl, data0) <- controlledStream
         (data, awaitStarted) <- startLatch(data0)
@@ -1532,7 +1580,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes completed push" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         pushed <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
@@ -1553,7 +1601,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "includes pushes that failed to initialize along with error that led to failure" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         eval = constEvaluator(IO.raiseError[Stream[IO, String]](new Exception("boom")))
 
@@ -1578,7 +1626,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val ex = new Exception("errored!")
 
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         eval = constEvaluator(IO(dataStream ++ Stream.raiseError[IO](ex)))
 
@@ -1601,7 +1649,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "results in previous terminal status if canceled before started" >> forallConfigs { config =>
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         cfg0 = config.value
         origQ = cfg0.query
@@ -1670,7 +1718,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     "empty when nothing has been pushed" >>* {
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         pushes <-
           mkResultPush(Map(DestinationId -> destination), emptyEvaluator)
@@ -1698,7 +1746,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       val incCfg = incremental(path2, "queryBar")
 
       for {
-        (destination, _) <- QDestination()
+        (destination, _, _) <- QDestination()
 
         (ctlA, dataA0) <- controlledStream
         (dataA, startedA) <- startLatch(dataA0)

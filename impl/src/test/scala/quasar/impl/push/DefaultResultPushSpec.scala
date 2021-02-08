@@ -500,7 +500,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       q: String,
       cols: PushConfig.Columns = colX)
       : ∃[PushConfig[*, String]] =
-    ∃[PushConfig[*, String]](PushConfig.SourceDriven(path, q, PushColumns.HasPrimary(cols.head, cols.tail)))
+    ∃[PushConfig[*, String]](PushConfig.SourceDriven(path, q, PushColumns.HasPrimary(List(), cols.head, cols.tail)))
 
   val configs: Map[String, ∃[PushConfig[*, String]]] = Map(
     "full" -> full(ResourcePath.root() / ResourceName("full"), "fullq"),

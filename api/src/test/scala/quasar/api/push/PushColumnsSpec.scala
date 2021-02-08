@@ -26,7 +26,7 @@ final class PushColumnsSpec extends quasar.Qspec {
       PushColumns.NoPrimary(NonEmptyList.of(1)).primary must beNone
     }
     "Some for HasPrimary" >> {
-      PushColumns.HasPrimary(1, List()).primary must beSome(1)
+      PushColumns.HasPrimary(List(), 1, List()).primary must beSome(1)
     }
   }
 }

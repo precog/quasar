@@ -21,7 +21,7 @@ import slamdata.Predef._
 import quasar.{IdStatus, Qspec, TreeMatchers}
 import quasar.api.DataPathSegment
 import quasar.api.datasource.DatasourceType
-import quasar.api.push.{OffsetKey, OffsetPath, InternalKey}
+import quasar.api.push.{OffsetPath, InternalKey}
 import quasar.api.resource._
 import quasar.connector._
 import quasar.connector.evaluate._

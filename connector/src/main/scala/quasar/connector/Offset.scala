@@ -17,18 +17,16 @@
 package quasar.connector
 
 import scala.{Product, Serializable}
-import quasar.api.push.{OffsetKey, OffsetPath, InternalKey}
+import quasar.api.push.{OffsetPath, InternalKey, ExternalOffsetKey}
 
 import skolems.∃
 
-sealed trait Offset extends Product with Serializable {
-  val value: ∃[OffsetKey.Actual]
-}
+sealed trait Offset extends Product with Serializable
 
 object Offset {
   final case class Internal(path: OffsetPath, value: ∃[InternalKey.Actual])
       extends Offset
 
-  final case class External(value: ∃[OffsetKey.Actual])
+  final case class External(value: ExternalOffsetKey)
       extends Offset
 }

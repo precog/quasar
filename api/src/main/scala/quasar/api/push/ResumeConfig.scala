@@ -20,9 +20,6 @@ import slamdata.Predef.{Eq => _, _}
 
 import quasar.api.Column
 
-import cats.{Eq, Show}
-import cats.implicits._
-
 import monocle.macros.Lenses
 
 /** Configuration required to resume an incremental push. */
@@ -31,12 +28,3 @@ final case class ResumeConfig[O](
     resultIdColumn: Column[(IdType, SelectedType)],
     resultOffsetColumn: Column[InternalKey.Formal[Unit, O]],
     sourceOffsetPath: OffsetPath)
-/*
-object ResumeConfig {
-  implicit def resumeConfigEq[O]: Eq[ResumeConfig[O]] =
-    Eq.by(c => (c.resultIdColumn, c.resultOffsetColumn, c.sourceOffsetPath))
-
-  implicit def resumeConfigShow[O]: Show[ResumeConfig[O]] =
-    Show.show(rc =>
-      s"ResumeConfig(${rc.resultIdColumn.show}, ${rc.resultOffsetColumn.show}, ${rc.sourceOffsetPath.show})")
-  */

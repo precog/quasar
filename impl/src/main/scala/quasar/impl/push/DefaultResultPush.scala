@@ -357,7 +357,7 @@ private[impl] final class DefaultResultPush[
         dest: Destination[F])(
         path: ResourcePath,
         query: Q,
-        actualOffset: Option[OffsetKey.Actual[ExternalOffsetKey]],
+        actualOffset: Option[ExternalOffsetKey],
         columns: PushColumns[Column[(ColumnType.Scalar, dest.Type)]])
         : EitherT[F, Errs, Stream[F, OffsetKey.Actual[ExternalOffsetKey]]] = {
       val C = Functor[Column]
@@ -369,7 +369,7 @@ private[impl] final class DefaultResultPush[
         val (renderColumns, destColumns) =
           Functor[PushColumns].compose[Column].unzip(columns)
 
-        val offset = actualOffset.map(o => Offset.External(∃(o)))
+        val offset = actualOffset.map(o => Offset.External(o))
 
         val args = ResultSink.AppendSink.Args(path, destColumns, offset match {
           case None => WriteMode.Replace
@@ -414,9 +414,22 @@ private[impl] final class DefaultResultPush[
             .map(_.evalMap(o => offsets.insert(key, ∃(o))))
 
         case PushConfig.SourceDriven(path, q, columns) =>
-          EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
-            .flatMap(handleAppend(dest)(path, q, resumeFrom, _))
-            .map(_.evalMap(o => offsets.insert(key, ∃(o))))
+          val resume: EitherT[F, Errs, Option[ExternalOffsetKey]] = resumeFrom.traverse {
+            case OffsetKey.ExternalKey(ek) => EitherT.rightT[F, Errs](ek)
+            case _ =>
+              val ex = new IllegalStateException(
+                s"${resumeFrom} is invalid offset, append pushes can work only with external encoded keys")
+
+              EitherT {
+                log.error(ex)(s"${debugKey(key)} Unable to resume source driven push")
+                  .productR(Concurrent[F].raiseError[Either[Errs, ExternalOffsetKey]](ex))
+              }
+          }
+          for {
+            r <- resume
+            cols <- EitherT.fromEither[F](typedColumns(destinationId, dest, columns))
+            str <- handleAppend(dest)(path, q, r, cols)
+          } yield str.evalMap(o => offsets.insert(key, ∃(o)))
       }
 
       terminal <- EitherT.right[Errs](Deferred[F, Status.Terminal])

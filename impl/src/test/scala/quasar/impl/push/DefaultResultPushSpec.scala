@@ -1229,12 +1229,11 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
           case ("append", None) =>
             IO(Stream(W1, W1, W1).covary[IO])
 
-          case ("append", Some(Offset.External(∃(k)))) =>
-            (k: OffsetKey.Actual[_]) match {
-              case OffsetKey.ExternalKey(ek) if ek.value.length === 15 =>
-                IO(Stream(W2, W2, W2).covary[IO])
-              case _ => IO.never
-            }
+          case ("append", Some(Offset.External(k))) =>
+            if (k.value.length === 15)
+              IO(Stream(W2, W2, W2).covary[IO])
+            else
+              IO.never
         }
 
         r <- mkResultPush(Map(DestinationId -> dest), eval) use { rp =>

@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.push.ExternalOffsetKey
 
-import fs2.{Stream, Pipe, Chunk}
+import fs2.{Stream, Chunk}
 
 import ResultData._
 

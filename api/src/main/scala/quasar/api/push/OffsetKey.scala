@@ -35,9 +35,15 @@ sealed trait OffsetKey[F[_], A] extends Product with Serializable {
 sealed trait InternalKey[F[_], A] extends OffsetKey[F, A]
 
 object InternalKey {
-  import OffsetKey._
   type Actual[A] = InternalKey[Id, A]
   type Formal[T, A] = InternalKey[Const[T, ?], A]
+
+  type RealKey[F[_]] = OffsetKey.RealKey[F]
+  val RealKey = OffsetKey.RealKey
+  type StringKey[F[_]] = OffsetKey.StringKey[F]
+  val StringKey = OffsetKey.StringKey
+  type DateTimeKey[F[_]] = OffsetKey.DateTimeKey[F]
+  val DateTimeKey = OffsetKey.DateTimeKey
 
   object Actual {
     def real(k: Real): Actual[Real] =

@@ -16,16 +16,19 @@
 
 package quasar.connector
 
-import scala._
+import scala._, Predef._
 
-trait ExternalCredentials[F[_]] extends Product with Serializable
+trait Credentials extends Product with Serializable
 
-object ExternalCredentials {
-  /** Credentials that are expected not to expire. */
-  final case class Perpetual[F[_]](credentials: Credentials)
-      extends ExternalCredentials[F]
+object Credentials {
+  /** An opaque token to be interpreted in a security context. */
+  final case class Token(toByteArray: Array[Byte])
+      extends Credentials
 
-  /** Credentials that may expire, along with a way to renew them. */
-  final case class Temporary[F[_]](credentials: F[Credentials], renew: F[Unit])
-      extends ExternalCredentials[F]
+  /** An X.509 certificate and PKCS#8 private key, both encoded in PEM format. */
+  final case class X509CertificatePair(
+      certificate: Array[Byte],
+      privateKey: Array[Byte],
+      privateKeyPassword: Option[String])
+      extends Credentials
 }

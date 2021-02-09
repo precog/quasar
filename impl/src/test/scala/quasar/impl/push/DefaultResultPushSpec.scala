@@ -96,7 +96,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
   // The string formed by concatentating Ws
   val dataString = W1 + W2 + W3
 
-  final class QDestination(fs: Ref[IO, Filesystem], pris: Ref[IO, PrimaryKeys], support: QDestination.Support)
+  final class QDestination(fs: Ref[IO, Filesystem], ids: Ref[IO, PrimaryKeys], support: QDestination.Support)
       extends Destination[IO] {
 
     import QDestination._
@@ -181,7 +181,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     val upsertSink: ResultSink[IO, Type] =
       ResultSink.upsert[IO, Type, Byte] { args =>
         val putPrimary =
-          Stream.eval_(pris.update(_.updated(args.path, args.idColumn.name)))
+          Stream.eval_(ids.update(_.updated(args.path, args.idColumn.name)))
 
         val init = args.writeMode match {
           case WriteMode.Replace =>
@@ -213,7 +213,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     val appendSink: ResultSink[IO, Type] =
       ResultSink.append[IO, Type, Byte] { (args) =>
         val putPrimary =
-          Stream.eval_(args.pushColumns.primary.traverse_(col => pris.update(_.updated(args.path, col.name))))
+          Stream.eval_(args.pushColumns.primary.traverse_(col => ids.update(_.updated(args.path, col.name))))
 
         val init = args.writeMode match {
           case WriteMode.Replace =>
@@ -247,8 +247,8 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
 
     def apply(supports: Support = All): IO[(QDestination, IO[Filesystem], IO[PrimaryKeys])] = for {
       fs <- Ref.of[IO, Filesystem](Map())
-      pris <- Ref.of[IO, PrimaryKeys](Map())
-    } yield (new QDestination(fs, pris, supports), fs.get, pris.get)
+      ids <- Ref.of[IO, PrimaryKeys](Map())
+    } yield (new QDestination(fs, ids, supports), fs.get, ids.get)
   }
 
   final class MockResultRender extends ResultRender[IO, Stream[IO, String]] {
@@ -506,7 +506,7 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
     "full" -> full(ResourcePath.root() / ResourceName("full"), "fullq"),
     "incremental" -> incremental(ResourcePath.root() / ResourceName("incremental"), "incrementalq"),
     "sourceDriven" -> sourceDriven(ResourcePath.root() / ResourceName("sourceDriven"), "sourceDrivenq"),
-    "sourceDrivenPrimary" -> sourceDrivenPrimary(ResourcePath.root() / ResourceName("primary"), "primaryq"))
+    "sourceDrivenPrimary" -> sourceDrivenPrimary(ResourcePath.root() / ResourceName("identity"), "identityq"))
 
   def forallConfigs[A: AsResult](f: ∃[PushConfig[?, String]] => IO[A]): Fragments =
     Fragment.foreach(configs.toList) { case (name, config) =>
@@ -553,21 +553,21 @@ object DefaultResultPushSpec extends EffectfulQSpec[IO] with ConditionMatchers {
       "sourceDriven" -> None,
       "sourceDrivenPrimary" -> Some("X"))
 
-    "provides primary key column" >> zippedConfigs(ExpectedKeys) { (config, expectedKey) =>
+    "provides identity key column" >> zippedConfigs(ExpectedKeys) { (config, expectedKey) =>
       for {
-        (destination, _, pris) <- QDestination()
+        (destination, _, ids) <- QDestination()
         r <- mkResultPush(Map(DestinationId -> destination), constEvaluator(IO(dataStream))) use { rp =>
           for {
             started <- rp.start(DestinationId, config, None)
             result <- await(started.sequence)
-            primaryKeysCollected <- pris
+            idKeysCollected <- ids
             } yield {
               val expectedKeys: Set[ResourcePath] = expectedKey match {
                 case None => Set()
                 case Some(_) => Set(config.value.path)
               }
-              primaryKeysCollected.keySet must equal(expectedKeys)
-              primaryKeysCollected.get(config.value.path) must equal(expectedKey)
+              idKeysCollected.keySet must equal(expectedKeys)
+              idKeysCollected.get(config.value.path) must equal(expectedKey)
             }
         }
       } yield r

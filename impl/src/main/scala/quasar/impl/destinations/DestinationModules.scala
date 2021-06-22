@@ -37,6 +37,7 @@ import scalaz.{ISet, EitherT}
 import scalaz.syntax.std.either._
 
 import shims.{monadToScalaz, monadToCats}
+import quasar.connector.ExternalCredentials
 
 trait DestinationModules[F[_], C] {
   def create(ref: DestinationRef[C]): EitherT[Resource[F, ?], CreateError[C], Destination[F]]
@@ -47,7 +48,8 @@ trait DestinationModules[F[_], C] {
 object DestinationModules {
   private[impl] def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[DestinationModule],
-      pushPull: PushmiPullyu[F])
+      pushPull: PushmiPullyu[F],
+      auth: UUID => F[Option[ExternalCredentials[F]]])
       : DestinationModules[F, Json] = {
 
     lazy val moduleSet: ISet[DestinationType] =
@@ -64,7 +66,7 @@ object DestinationModules {
               DestinationUnsupported(ref.kind, moduleSet))
 
           case Some(module) =>
-            handleInitErrors(ref.kind, module.destination[F](ref.config, pushPull))
+            handleInitErrors(ref.kind, module.destination[F](ref.config, pushPull, auth))
         }
 
       def sanitizeRef(inp: DestinationRef[Json]): DestinationRef[Json] = moduleMap.get(inp.kind) match {

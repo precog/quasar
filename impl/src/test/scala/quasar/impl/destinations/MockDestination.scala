@@ -28,7 +28,7 @@ import fs2.Stream
 
 import quasar.api.destination.DestinationType
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.connector.MonadResourceErr
+import quasar.connector.{MonadResourceErr, ExternalCredentials}
 import quasar.connector.destination._
 import quasar.connector.render.RenderConfig
 
@@ -42,7 +42,8 @@ final class MockDestinationModule private (initErrs: Map[Json, InitializationErr
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
-      pushPull: PushmiPullyu[F])
+      pushPull: PushmiPullyu[F],
+      auth: UUID => F[Option[ExternalCredentials[F]]])
       : Resource[F, Either[InitializationError[Json], Destination[F]]] =
     Resource.pure[F, Either[InitializationError[Json], Destination[F]]](
       initErrs.get(config) match {

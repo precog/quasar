@@ -18,13 +18,15 @@ package quasar.connector.destination
 
 import quasar.api.destination.DestinationType
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.connector.MonadResourceErr
+import quasar.connector.{MonadResourceErr, ExternalCredentials}
 
 import scala.util.Either
+import scala.Option
 
 import argonaut.Json
 
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Timer}
+import java.util.UUID
 
 trait DestinationModule {
   def destinationType: DestinationType
@@ -33,6 +35,7 @@ trait DestinationModule {
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
-      pushPull: PushmiPullyu[F])
+      pushPull: PushmiPullyu[F],
+      auth: UUID => F[Option[ExternalCredentials[F]]])
       : Resource[F, Either[InitializationError[Json], Destination[F]]]
 }

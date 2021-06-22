@@ -117,7 +117,7 @@ object Quasar extends Logging {
     implicit val uuidCodec0: Codec[UUID] = uuidCodec
 
     val destModules =
-      DestinationModules[F](destinationModules, pushPull)
+      DestinationModules[F](destinationModules, pushPull, getAuth)
 
     for {
       _ <- Resource.eval(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))

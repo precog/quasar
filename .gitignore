@@ -30,9 +30,3 @@ docker/Dockerfiles/Hadoop/hadoop*.tar.gz
 /pubring.pgp.enc
 /scripts/readVersion
 /secring.pgp.enc
-
-# metals
-.bloop/
-.metals/
-.bsp/
-metals.sbt

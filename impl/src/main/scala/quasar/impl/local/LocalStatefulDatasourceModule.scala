@@ -66,7 +66,7 @@ object LocalStatefulDatasourceModule extends DatasourceModule with LocalDestinat
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F],
-      auth: UUID => F[Option[ExternalCredentials[F]]])(
+      auth: GetAuth[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], DatasourceModule.DS[F]]] =
     Blocker.cached[F]("local-stateful-datasource") evalMap { blocker =>

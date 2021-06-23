@@ -29,7 +29,7 @@ import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
-import quasar.connector.{ExternalCredentials, Offset, QueryResult, ResourceSchema}
+import quasar.connector.{ExternalCredentials, GetAuth, Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.{Datasource, DatasourceModule}
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.connector.evaluate._
@@ -103,7 +103,7 @@ object Quasar extends Logging {
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, UUID],
       pushPull: PushmiPullyu[F],
-      getAuth: UUID => F[Option[ExternalCredentials[F]]])(
+      getAuth: GetAuth[F])(
       maxConcurrentPushes: Int,
       maxOutstandingPushes: Int,
       datasourceModules: List[DatasourceModule],
@@ -117,7 +117,7 @@ object Quasar extends Logging {
     implicit val uuidCodec0: Codec[UUID] = uuidCodec
 
     val destModules =
-      DestinationModules[F](destinationModules, pushPull)
+      DestinationModules[F](destinationModules, pushPull, getAuth)
 
     for {
       _ <- Resource.eval(warnDuplicates[F, DatasourceModule, DatasourceType](datasourceModules)(_.kind))

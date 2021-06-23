@@ -22,6 +22,7 @@ import quasar.contrib.scalaz.MonadError_
 
 package object connector {
   type ByteStore[F[_]] = Store[F, String, Array[Byte]]
+
   type GetAuth[F[_]] = UUID => F[Option[ExternalCredentials[F]]]
 
   type MonadResourceErr[F[_]] = MonadError_[F, ResourceError]

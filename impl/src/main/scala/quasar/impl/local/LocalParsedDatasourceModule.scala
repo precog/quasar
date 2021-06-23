@@ -40,7 +40,6 @@ import cats.effect._
 import cats.kernel.Hash
 import cats.implicits._
 
-import java.util.UUID
 
 object LocalParsedDatasourceModule extends LightweightDatasourceModule with LocalDestinationModule {
   val kind: DatasourceType = LocalParsedType
@@ -67,7 +66,7 @@ object LocalParsedDatasourceModule extends LightweightDatasourceModule with Loca
       config: Json,
       rateLimiting: RateLimiting[F, A],
       stateStore: ByteStore[F],
-      auth: UUID => F[Option[ExternalCredentials[F]]])(
+      auth: GetAuth[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]] =
     Blocker.cached[F]("local-parsed-datasource") evalMap { blocker =>

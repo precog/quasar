@@ -21,10 +21,9 @@ import quasar.RateLimiting
 import quasar.api.datasource.DatasourceType
 import quasar.api.datasource.DatasourceError.{ConfigurationError, InitializationError}
 import quasar.api.resource.{ResourcePath, ResourcePathType}
-import quasar.connector.{ByteStore, ExternalCredentials, MonadResourceErr, QueryResult}
+import quasar.connector.{ByteStore, GetAuth, MonadResourceErr, QueryResult}
 import quasar.qscript.InterpretedRead
 
-import scala.Option
 import scala.concurrent.ExecutionContext
 import scala.util.Either
 
@@ -32,7 +31,6 @@ import argonaut.Json
 import cats.effect.{ConcurrentEffect, ContextShift, Timer, Resource, Sync}
 import cats.kernel.Hash
 import fs2.Stream
-import java.util.UUID
 import scala.Long
 
 trait LightweightDatasourceModule {
@@ -55,7 +53,7 @@ trait LightweightDatasourceModule {
       config: Json,
       rateLimiting: RateLimiting[F, A],
       byteStore: ByteStore[F],
-      auth: UUID => F[Option[ExternalCredentials[F]]])(
+      auth: GetAuth[F])(
       implicit ec: ExecutionContext)
       : Resource[F, Either[InitializationError[Json], LightweightDatasourceModule.DS[F]]]
 }

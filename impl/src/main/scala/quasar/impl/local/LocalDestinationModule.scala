@@ -21,15 +21,13 @@ import quasar.api.destination.DestinationError.{
   malformedConfiguration
 }
 import quasar.concurrent._
-import quasar.connector.{MonadResourceErr, ExternalCredentials}
+import quasar.connector.{MonadResourceErr, GetAuth}
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 
 import scala.util.Either
-import scala.Option
 
 import argonaut.Json
 import cats.effect.{Blocker, ContextShift, ConcurrentEffect, Resource, Timer}
-import java.util.UUID
 
 trait LocalDestinationModule extends DestinationModule {
   val destinationType = LocalDestinationType
@@ -39,7 +37,7 @@ trait LocalDestinationModule extends DestinationModule {
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
       pushPull: PushmiPullyu[F],
-      auth: UUID => F[Option[ExternalCredentials[F]]])
+      auth: GetAuth[F])
       : Resource[F, Either[InitializationError[Json], Destination[F]]] =
     Blocker.cached[F]("local-destination") evalMap { blocker =>
       val dest = for {

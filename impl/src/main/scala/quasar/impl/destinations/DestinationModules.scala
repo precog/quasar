@@ -20,7 +20,7 @@ import slamdata.Predef._
 
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
-import quasar.connector.MonadResourceErr
+import quasar.connector.{MonadResourceErr, GetAuth}
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.impl.IncompatibleModuleException.linkDestination
 
@@ -37,7 +37,6 @@ import scalaz.{ISet, EitherT}
 import scalaz.syntax.std.either._
 
 import shims.{monadToScalaz, monadToCats}
-import quasar.connector.ExternalCredentials
 
 trait DestinationModules[F[_], C] {
   def create(ref: DestinationRef[C]): EitherT[Resource[F, ?], CreateError[C], Destination[F]]
@@ -49,7 +48,7 @@ object DestinationModules {
   private[impl] def apply[F[_]: ConcurrentEffect: ContextShift: Timer: MonadResourceErr](
       modules: List[DestinationModule],
       pushPull: PushmiPullyu[F],
-      auth: UUID => F[Option[ExternalCredentials[F]]])
+      auth: GetAuth[F])
       : DestinationModules[F, Json] = {
 
     lazy val moduleSet: ISet[DestinationType] =

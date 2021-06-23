@@ -73,7 +73,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
         config: Json,
         pushPull: PushmiPullyu[F],
-        auth: UUID => F[Option[ExternalCredentials[F]]]
+        auth: GetAuth[F]
         ) = {
       val dest: Destination[F] = new LegacyDestination[F] {
         def destinationType = kind

@@ -124,7 +124,7 @@ object DatasourceModulesSpec extends EffectfulQSpec[IO] {
           config: Json,
           rateLimiting: RateLimiting[F, A],
           byteStore: ByteStore[F],
-          auth: UUID => F[Option[ExternalCredentials[F]]])(
+          auth: GetAuth[F])(
           implicit ec: ExecutionContext)
           : Resource[F, R[F, InterpretedRead[ResourcePath]]] = {
 

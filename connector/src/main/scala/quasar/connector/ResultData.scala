@@ -18,7 +18,7 @@ package quasar.connector
 
 import slamdata.Predef._
 import quasar.api.push
-import quasar.common.data.CValue
+import quasar.common.data.RValue
 
 import cats._
 import cats.implicits._
@@ -36,7 +36,7 @@ object ResultData {
   sealed trait Part[+A] extends Product with Serializable {
     def fold[B](
         f1: push.ExternalOffsetKey => B,
-        f2: Map[String, CValue] => B,
+        f2: RValue => B,
         f3: Chunk[A] => B)
         : B =
       this match {
@@ -65,9 +65,7 @@ object ResultData {
       *
       * @param fields
       */
-    final case class ContextualData(fields: Map[String, CValue]) extends Part[Nothing]
-
-    val emptyContextualData: ContextualData = ContextualData(Map.empty)
+    final case class ContextualData(value: RValue) extends Part[Nothing]
 
     final case class Output[A](chunk: Chunk[A]) extends Part[A]
 

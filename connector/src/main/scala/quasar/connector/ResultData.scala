@@ -36,13 +36,24 @@ object ResultData {
   sealed trait Part[+A] extends Product with Serializable {
     def fold[B](
         f1: push.ExternalOffsetKey => B,
-        f2: RValue => B,
+        f2: Option[RValue] => B,
         f3: Chunk[A] => B)
         : B =
       this match {
         case Part.ExternalOffsetKey(k) => f1(k)
         case Part.ContextualData(d) => f2(d)
         case Part.Output(c) => f3(c)
+      }
+  }
+
+  sealed trait DataPart[+A] extends Part[A] {
+    def foldData[B](
+        f1: Option[RValue] => B,
+        f2: Chunk[A] => B)
+        : B =
+      this match {
+        case Part.ContextualData(d) => f1(d)
+        case Part.Output(c) => f2(c)
       }
   }
 
@@ -65,9 +76,9 @@ object ResultData {
       *
       * @param fields
       */
-    final case class ContextualData(value: RValue) extends Part[Nothing]
+    final case class ContextualData(value: Option[RValue]) extends DataPart[Nothing]
 
-    final case class Output[A](chunk: Chunk[A]) extends Part[A]
+    final case class Output[A](chunk: Chunk[A]) extends DataPart[A]
 
     implicit def functorPart: Functor[Part] = new Functor[Part] {
       def map[A, B](fa: Part[A])(f: A => B): Part[B] = fa match {

@@ -18,6 +18,8 @@ package quasar
 
 import slamdata.Predef._
 
+import quasar.fp.ski.ι
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import java.util.UUID
@@ -647,6 +649,82 @@ object RateLimiterSpec extends Specification with CatsIO {
 
       ctx.tick(1.seconds)
       a mustEqual(3)
+    }
+
+    "allows setting limits externally" in {
+      val ctx = TestContext()
+      val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+
+      var a: Int = 0
+
+      val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+        val rl = limiting.limiter
+        val key = limiting.freshKey
+
+        for {
+          effects <- key.flatMap(k => rl(k, 100, 5.seconds, ι))
+
+          limit = effects.limit
+          backoff = effects.backoff
+          setUsage = effects.setUsage
+
+          back <-
+            limit >> IO.delay(a += 1) >>
+            setUsage(100) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(5) >>
+            limit >> IO.delay(a += 1)
+        } yield back
+      }
+
+      run.unsafeRunAsyncAndForget()
+
+      a mustEqual(1)
+
+      ctx.tick(1.seconds)
+
+      a mustEqual(1)
+
+      ctx.tick(4.seconds)
+
+      a mustEqual(3)
+    }
+
+    "external limit is independent of event count" in {
+      val ctx = TestContext()
+      val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+
+      var a: Int = 0
+
+      val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+        val rl = limiting.limiter
+        val key = limiting.freshKey
+
+        for {
+          effects <- key.flatMap(k => rl(k, 3, 5.seconds, ι))
+
+          limit = effects.limit
+          backoff = effects.backoff
+          setUsage = effects.setUsage
+
+          back <-
+            limit >> IO.delay(a += 1) >>
+            setUsage(1) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(1) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(2) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(2) >>
+            limit >> IO.delay(a += 1)
+        } yield back
+      }
+
+      run.unsafeRunAsyncAndForget()
+
+      ctx.tick(5.seconds)
+
+      a mustEqual(5) // 5 events with a limit of 3
     }
   }
 }

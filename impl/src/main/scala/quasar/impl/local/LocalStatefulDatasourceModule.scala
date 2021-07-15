@@ -39,8 +39,6 @@ import cats.effect._
 import cats.kernel.Hash
 import cats.implicits._
 
-import java.util.UUID
-
 object LocalStatefulDatasourceModule extends DatasourceModule with LocalDestinationModule {
   val kind: DatasourceType = LocalStatefulType
 

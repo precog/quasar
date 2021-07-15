@@ -24,7 +24,7 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.impl.QuasarDatasource
 import quasar.impl.IncompatibleModuleException.linkDatasource
-import quasar.connector.{ExternalCredentials, GetAuth, MonadResourceErr, QueryResult}
+import quasar.connector.{GetAuth, MonadResourceErr, QueryResult}
 import quasar.connector.datasource.{Reconfiguration, Datasource, DatasourceModule}
 import quasar.qscript.{MonadPlannerErr, InterpretedRead}
 

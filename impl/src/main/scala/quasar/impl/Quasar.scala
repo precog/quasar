@@ -29,7 +29,7 @@ import quasar.api.resource.{ResourcePath, ResourcePathType}
 import quasar.api.scheduler.SchedulerType
 import quasar.api.scheduler.{Schedulers, SchedulerRef}
 import quasar.common.PhaseResultTell
-import quasar.connector.{ExternalCredentials, GetAuth, Offset, QueryResult, ResourceSchema}
+import quasar.connector.{GetAuth, Offset, QueryResult, ResourceSchema}
 import quasar.connector.datasource.{Datasource, DatasourceModule}
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 import quasar.connector.evaluate._

@@ -49,7 +49,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
     }).flatten
   }
 
-  def apply(key: A, max: Int, window: FiniteDuration, setUsage: Int => Int)
+  def apply(key: A, max: Int, window: FiniteDuration, updateUsage: Int => Int)
       : F[RateLimiterEffects[F]] =
     for {
       config <- Concurrent[F] delay {
@@ -64,7 +64,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
       }
     } yield {
       RateLimiterEffects[F](
-        limit(config, stateRef, setUsage),
+        limit(config, stateRef, updateUsage),
         backoff(config, stateRef),
         setWindowUsage(stateRef))
     }
@@ -94,7 +94,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
    *
    * We check which window we're in and determine if we're within the request limit.
    */
-  private def drain(config: RateLimiterConfig, stateRef: Ref[F, State[F]], setUsage: Int => Int)
+  private def drain(config: RateLimiterConfig, stateRef: Ref[F, State[F]], updateUsage: Int => Int)
       : F[Unit] = {
     val window = config.window
     val max = config.max
@@ -112,16 +112,16 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
         case Active(current, count, queue, cancel) =>
           if (current + window <= now) { // outside current window, reset the state and loop
             val state = Active(current + window, 0, queue, cancel)
-            val effect = drain(config, stateRef, setUsage)
+            val effect = drain(config, stateRef, updateUsage)
             (state, effect)
           } else if (count < max) { // in current window, and within the limit
             val (elem, remaining) = queue.dequeue
-            val state = Active(current, setUsage(count), remaining, cancel)
-            val effect = elem.complete(()) >> drain(config, stateRef, setUsage)
+            val state = Active(current, updateUsage(count), remaining, cancel)
+            val effect = elem.complete(()) >> drain(config, stateRef, updateUsage)
             (state, effect)
           } else { // in current window, limit exceeded
             val state = Active(current + window, 0, queue, cancel)
-            val effect = Timer[F].sleep((current + window) - now) >> drain(config, stateRef, setUsage)
+            val effect = Timer[F].sleep((current + window) - now) >> drain(config, stateRef, updateUsage)
             (state, effect)
           }
       }
@@ -135,7 +135,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
    *
    * If the queue is not empty, we enqueue the new request.
    */
-  private def limit(config: RateLimiterConfig, stateRef: Ref[F, State[F]], setUsage: Int => Int)
+  private def limit(config: RateLimiterConfig, stateRef: Ref[F, State[F]], updateUsage: Int => Int)
       : F[Unit] = {
     val window = config.window
     val max = config.max
@@ -149,9 +149,9 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
         case Active(current, count, queue, cancel) if queue.isEmpty =>
           if (current + window <= now) { // outside current window, reset the state and loop
             val state = Active[F](current + window, 0, queue, cancel)
-            (state, limit(config, stateRef, setUsage))
+            (state, limit(config, stateRef, updateUsage))
           } else if (count < max) { // in current window, within the limit
-            val state = Active[F](current, setUsage(count), queue, cancel)
+            val state = Active[F](current, updateUsage(count), queue, cancel)
             (state, ().pure[F])
           } else { // in current window, limit exceeded
             val deferred = Deferred.unsafe[F, Unit]
@@ -159,7 +159,7 @@ final class RateLimiter[F[_]: Concurrent: Timer, A: Hash] private () {
             val sleep = Timer[F].sleep((current + window) - now)
             // start draining so we can get the deferred
             val started =
-              Concurrent[F].start(sleep >> drain(config, stateRef, setUsage)).flatMap(fib =>
+              Concurrent[F].start(sleep >> drain(config, stateRef, updateUsage)).flatMap(fib =>
                 stateRef modify[F[Unit]] {
                   case Active(start, count, queue, cancel) =>
                     // we shouldn't need to actually run the old cancel, but we do anyways

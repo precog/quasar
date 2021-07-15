@@ -22,7 +22,7 @@ import quasar.{Condition, ConditionMatchers}
 import quasar.api.destination._
 import quasar.api.destination.DestinationError._
 import quasar.concurrent.unsafe._
-import quasar.connector.ResourceError
+import quasar.connector.{ResourceError, ExternalCredentials}
 import quasar.connector.destination.{Destination, PushmiPullyu}
 import quasar.contrib.scalaz.MonadError_
 import quasar.impl.ResourceManager
@@ -75,6 +75,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
   val blocker: Blocker = Blocker.unsafeCached("rdestinations-spec")
 
   val pushPull: PushmiPullyu[IO] = _ => _ => Stream.empty[IO]
+  val auth: UUID => IO[Option[ExternalCredentials[IO]]] = _ => IO.pure(None)
 
   def mkDestinations(initErrors: Map[Json, InitializationError[Json]] = Map.empty) = {
     val freshId = IO(java.util.UUID.randomUUID().toString())
@@ -83,7 +84,7 @@ object DefaultDestinationsSpec extends quasar.EffectfulQSpec[IO] with ConditionM
         ConcurrentMapIndexedStore.unhooked[IO, String, DestinationRef[Json]](mp, blocker)
       }
     val rCache = ResourceManager[IO, String, Destination[IO]]
-    val modules = DestinationModules[IO](List(MockDestinationModule(initErrors)), pushPull)
+    val modules = DestinationModules[IO](List(MockDestinationModule(initErrors)), pushPull, auth)
     for {
       refs <- Resource.eval(fRefs)
       cache <- rCache

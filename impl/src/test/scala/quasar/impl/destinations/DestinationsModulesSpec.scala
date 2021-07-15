@@ -72,7 +72,9 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
     def sanitizeDestinationConfig(inp: Json) = Json.jString("sanitized")
     def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
         config: Json,
-        pushPull: PushmiPullyu[F]) = {
+        pushPull: PushmiPullyu[F],
+        auth: GetAuth[F]
+        ) = {
       val dest: Destination[F] = new LegacyDestination[F] {
         def destinationType = kind
         def sinks = NonEmptyList.of(mock)
@@ -88,7 +90,7 @@ object DestinationModulesSpec extends EffectfulQSpec[IO] {
   }
 
   def mkModules(lst: List[DestinationModule]) =
-    DestinationModules[IO](lst, _ => _ => Stream.empty[IO])
+    DestinationModules[IO](lst, _ => _ => Stream.empty[IO], _ => IO.pure(None))
 
   "supported types" >> {
     "empty" >>* {

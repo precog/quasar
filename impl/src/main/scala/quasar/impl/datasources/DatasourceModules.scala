@@ -24,7 +24,7 @@ import quasar.api.datasource.DatasourceError._
 import quasar.api.resource._
 import quasar.impl.QuasarDatasource
 import quasar.impl.IncompatibleModuleException.linkDatasource
-import quasar.connector.{ExternalCredentials, MonadResourceErr, QueryResult}
+import quasar.connector.{GetAuth, MonadResourceErr, QueryResult}
 import quasar.connector.datasource.{Reconfiguration, Datasource, DatasourceModule}
 import quasar.qscript.{MonadPlannerErr, InterpretedRead}
 
@@ -43,7 +43,6 @@ import fs2.Stream
 
 import scalaz.ISet
 
-import java.util.UUID
 
 trait DatasourceModules[F[_], G[_], H[_], I, C, R, P <: ResourcePathType] { self =>
   type DS[FF[_], RR, PP <: ResourcePathType] = QuasarDatasource[G, FF, RR, PP]
@@ -135,7 +134,7 @@ object DatasourceModules {
       modules: List[DatasourceModule],
       rateLimiting: RateLimiting[F, A],
       byteStores: ByteStores[F, I],
-      getAuth: UUID => F[Option[ExternalCredentials[F]]])(
+      getAuth: GetAuth[F])(
       implicit
       ec: ExecutionContext)
       : Modules[F, I] = {

@@ -18,7 +18,7 @@ package quasar.connector.destination
 
 import quasar.api.destination.DestinationType
 import quasar.api.destination.DestinationError.InitializationError
-import quasar.connector.MonadResourceErr
+import quasar.connector.{MonadResourceErr, GetAuth}
 
 import scala.util.Either
 
@@ -33,6 +33,7 @@ trait DestinationModule {
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
-      pushPull: PushmiPullyu[F])
+      pushPull: PushmiPullyu[F],
+      auth: GetAuth[F])
       : Resource[F, Either[InitializationError[Json], Destination[F]]]
 }

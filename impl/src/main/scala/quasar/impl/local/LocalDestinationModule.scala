@@ -21,7 +21,7 @@ import quasar.api.destination.DestinationError.{
   malformedConfiguration
 }
 import quasar.concurrent._
-import quasar.connector.MonadResourceErr
+import quasar.connector.{MonadResourceErr, GetAuth}
 import quasar.connector.destination.{Destination, DestinationModule, PushmiPullyu}
 
 import scala.util.Either
@@ -36,7 +36,8 @@ trait LocalDestinationModule extends DestinationModule {
 
   def destination[F[_]: ConcurrentEffect: ContextShift: MonadResourceErr: Timer](
       config: Json,
-      pushPull: PushmiPullyu[F])
+      pushPull: PushmiPullyu[F],
+      auth: GetAuth[F])
       : Resource[F, Either[InitializationError[Json], Destination[F]]] =
     Blocker.cached[F]("local-destination") evalMap { blocker =>
       val dest = for {

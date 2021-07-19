@@ -18,6 +18,8 @@ package quasar
 
 import slamdata.Predef._
 
+import quasar.fp.ski.ι
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import java.util.UUID
@@ -50,7 +52,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 1, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 1, 1.seconds, (_ + 1)))
             stream = Stream.eval_(effects.limit) ++ Stream.emit(1)
             values <- stream.compile.toList
           } yield {
@@ -65,7 +67,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 2, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 2, 1.seconds, (_ + 1)))
             stream =
               Stream.eval_(effects.limit) ++ Stream.emit(1) ++
                 Stream.eval_(effects.limit) ++ Stream.emit(2)
@@ -82,7 +84,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 1, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 1, 1.seconds, (_ + 1)))
             stream =
               Stream.eval_(effects.limit) ++ Stream.emit(1) ++
                 Stream.eval_(effects.limit) ++ Stream.emit(2)
@@ -99,8 +101,8 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects1 <- key.flatMap(k => rl(k, 1, 1.seconds))
-            effects2 <- key.flatMap(k => rl(k, 1, 1.seconds))
+            effects1 <- key.flatMap(k => rl(k, 1, 1.seconds, (_ + 1)))
+            effects2 <- key.flatMap(k => rl(k, 1, 1.seconds, (_ + 1)))
 
             stream1 =
               Stream.eval_(effects1.limit) ++ Stream.emit(1) ++
@@ -131,7 +133,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 1, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 1, 1.seconds, (_ + 1)))
             limit = effects.limit
             back <-
                limit >> IO.delay(a += 1) >>
@@ -166,7 +168,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 1, 2.seconds))
+            effects <- key.flatMap(k => rl(k, 1, 2.seconds, (_ + 1)))
             limit = effects.limit
             back <-
               limit >> IO.delay(a += 1) >>
@@ -213,7 +215,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 2, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 2, 1.seconds, (_ + 1)))
             limit = effects.limit
             back <-
               limit >> IO.delay(a += 1) >>
@@ -247,7 +249,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 3, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 3, 1.seconds, (_ + 1)))
             limit = effects.limit
             back <-
               limit >> IO.delay(a += 1) >>
@@ -284,7 +286,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 3, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 3, 1.seconds, (_ + 1)))
             limit = effects.limit
             back <-
               limit >> IO.delay(a += 1) >>
@@ -321,7 +323,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 4, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 4, 1.seconds, (_ + 1)))
             limit = effects.limit
 
             run1 =
@@ -381,7 +383,7 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects <- key.flatMap(k => rl(k, 2, 1.seconds))
+            effects <- key.flatMap(k => rl(k, 2, 1.seconds, (_ + 1)))
             limit = effects.limit
 
             run1 =
@@ -458,8 +460,8 @@ object RateLimiterSpec extends Specification with CatsIO {
           for {
             k1 <- key
 
-            _ <- rl(k1, 2, 1.seconds)
-            effects <- rl(k1, 3, 1.seconds)
+            _ <- rl(k1, 2, 1.seconds, (_ + 1))
+            effects <- rl(k1, 3, 1.seconds, (_ + 1))
 
             limit = effects.limit
             back <-
@@ -495,8 +497,8 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects1 <- key.flatMap(k => rl(k, 2, 1.seconds))
-            effects2 <- key.flatMap(k => rl(k, 3, 1.seconds))
+            effects1 <- key.flatMap(k => rl(k, 2, 1.seconds, (_ + 1)))
+            effects2 <- key.flatMap(k => rl(k, 3, 1.seconds, (_ + 1)))
 
             limit1 = effects1.limit
             limit2 = effects2.limit
@@ -550,8 +552,8 @@ object RateLimiterSpec extends Specification with CatsIO {
           val key = limiting.freshKey
 
           for {
-            effects1 <- key.flatMap(k => rl(k, 2, 1.seconds))
-            effects2 <- key.flatMap(k => rl(k, 2, 2.seconds))
+            effects1 <- key.flatMap(k => rl(k, 2, 1.seconds, (_ + 1)))
+            effects2 <- key.flatMap(k => rl(k, 2, 2.seconds, (_ + 1)))
 
             limit1 = effects1.limit
             limit2 = effects2.limit
@@ -611,7 +613,7 @@ object RateLimiterSpec extends Specification with CatsIO {
         val key = limiting.freshKey
 
         for {
-          effects <- key.flatMap(k => rl(k, 1, 2.seconds))
+          effects <- key.flatMap(k => rl(k, 1, 2.seconds, (_ + 1)))
 
           limit = effects.limit
           backoff = effects.backoff
@@ -647,6 +649,82 @@ object RateLimiterSpec extends Specification with CatsIO {
 
       ctx.tick(1.seconds)
       a mustEqual(3)
+    }
+
+    "allows setting limits externally" in {
+      val ctx = TestContext()
+      val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+
+      var a: Int = 0
+
+      val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+        val rl = limiting.limiter
+        val key = limiting.freshKey
+
+        for {
+          effects <- key.flatMap(k => rl(k, 100, 5.seconds, ι))
+
+          limit = effects.limit
+          backoff = effects.backoff
+          setUsage = effects.setUsage
+
+          back <-
+            limit >> IO.delay(a += 1) >>
+            setUsage(100) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(5) >>
+            limit >> IO.delay(a += 1)
+        } yield back
+      }
+
+      run.unsafeRunAsyncAndForget()
+
+      a mustEqual(1)
+
+      ctx.tick(1.seconds)
+
+      a mustEqual(1)
+
+      ctx.tick(4.seconds)
+
+      a mustEqual(3)
+    }
+
+    "external limit is independent of event count" in {
+      val ctx = TestContext()
+      val concurrent = IO.ioConcurrentEffect(ctx.contextShift[IO])
+
+      var a: Int = 0
+
+      val run = RateLimiter[IO, UUID](freshKey)(concurrent, ctx.timer[IO], Hash[UUID]) use { limiting =>
+        val rl = limiting.limiter
+        val key = limiting.freshKey
+
+        for {
+          effects <- key.flatMap(k => rl(k, 3, 5.seconds, ι))
+
+          limit = effects.limit
+          backoff = effects.backoff
+          setUsage = effects.setUsage
+
+          back <-
+            limit >> IO.delay(a += 1) >>
+            setUsage(1) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(1) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(2) >>
+            limit >> IO.delay(a += 1) >>
+            setUsage(2) >>
+            limit >> IO.delay(a += 1)
+        } yield back
+      }
+
+      run.unsafeRunAsyncAndForget()
+
+      ctx.tick(5.seconds)
+
+      a mustEqual(5) // 5 events with a limit of 3
     }
   }
 }

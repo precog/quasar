@@ -16,6 +16,6 @@
 
 package quasar
 
-import slamdata.Predef.Unit
+import slamdata.Predef.{Int, Unit}
 
-final case class RateLimiterEffects[F[_]](limit: F[Unit], backoff: F[Unit])
+final case class RateLimiterEffects[F[_]](limit: F[Unit], backoff: F[Unit], setUsage: Int => F[Unit])

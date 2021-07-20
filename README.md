@@ -44,6 +44,7 @@ Configuration for the local datasource has the following JSON format
   ["compressionScheme": "gzip"]
 }
 ```
+
 * `rootDir` an absolute path to a local directory at which to root the datasource, all paths handled by the datasource will be interpreted relative to this physical directory.
 * `format` the format of _all_ resources in the datasource, currently JSON is supported in both array-wrapped and line-delimited variants.
 * `readChunkSizeBytes` (optional) an integer indicating the chunk size to use when reading local files, the default is `1048576` (1MB). Different values may yield higher throughput depending on the filesystem.
